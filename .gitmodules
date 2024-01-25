@@ -1,0 +1,3 @@
+[submodule "Engine/Source/Dependency/vcpkg"]
+	path = Engine/Source/Dependency/vcpkg
+	url = https://github.com/yhyu13/vcpkg.git
