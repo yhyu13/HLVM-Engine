@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.14)
 set(CMAKE_TOOLCHAIN_FILE "~/Documents/Gitrepo-My/HLVM-Engine/Engine/Source/Dependency/vcpkg/scripts/buildsystems/vcpkg.cmake"
   CACHE STRING "Vcpkg toolchain file")
-project(common C CXX)
+project(Common C CXX)
 
 # set compile flag
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -19,23 +19,30 @@ FetchContent_Declare(
     GIT_SHALLOW 1 # optional ( --depth=1 )
 )
 FetchContent_MakeAvailable(yalantinglibs)
+find_package(spdlog REQUIRED)
+find_package(mimalloc REQUIRED)
 
-find_package(spdlog)
-
-# Using vcpkg repo with cmake adding include paths
-# https://github.com/microsoft/vcpkg/issues/798#issuecomment-287219089
-find_path(SYSTEM_INCLUDE_DIR spdlog)
 # add include path
-include_directories(
-    ${CMAKE_CURRENT_SOURCE_DIR},
-    ${SYSTEM_INCLUDE_DIR}
-)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/Public)
 
 # add a static lib target
-add_library(common STATIC
-    common.cpp
+add_library(Common STATIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/Private/Common.cpp
 )
 
 # Add dependency packages
-target_link_libraries(common PRIVATE spdlog::spdlog_header_only)
-target_link_libraries(common PRIVATE yalantinglibs::yalantinglibs)
+target_link_libraries(Common PUBLIC yalantinglibs::yalantinglibs)
+target_link_libraries(Common PUBLIC spdlog::spdlog_header_only)
+target_link_libraries(Common PUBLIC mimalloc)
+
+# Clang-tidy
+# set(CLANG_TIDY_COMMAND clang-tidy-16;
+#   --header-filter=${CMAKE_CURRENT_SOURCE_DIR}/Private/Common.cpp;
+#   --config-file=${CMAKE_CURRENT_SOURCE_DIR}/.clang-tidy;
+# )
+# set_target_properties(Common PROPERTIES CXX_CLANG_TIDY "${CLANG_TIDY_COMMAND}")
+
+add_executable(Test
+    ${CMAKE_CURRENT_SOURCE_DIR}/Private/Test.cpp
+)
+target_link_libraries(Test PRIVATE Common)

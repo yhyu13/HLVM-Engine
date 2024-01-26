@@ -1,5 +1,4 @@
-#include "spdlog/spdlog.h"
-#include "ylt/struct_pack.hpp"
+#include "Common.h"
 
 void HelloWorld() 
 {
@@ -33,5 +32,3 @@ void HelloWorld()
         assert(person1 == person2);
     }
 }
-
-
