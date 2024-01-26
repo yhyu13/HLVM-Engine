@@ -7,6 +7,20 @@ project(common C CXX)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # set cpp strandard
 set(CMAKE_CXX_STANDARD 20)
+# set debug postfix for static lib
+set(CMAKE_DEBUG_POSTFIX d)
+
+# package dependency
+include(FetchContent)
+FetchContent_Declare(
+    yalantinglibs
+    GIT_REPOSITORY https://github.com/yhyu13/yalantinglibs.git
+    GIT_TAG 679cbac8f3c5566a842c91b9d332632d3076f6ac
+    GIT_SHALLOW 1 # optional ( --depth=1 )
+)
+FetchContent_MakeAvailable(yalantinglibs)
+
+find_package(spdlog)
 
 # Using vcpkg repo with cmake adding include paths
 # https://github.com/microsoft/vcpkg/issues/798#issuecomment-287219089
@@ -17,13 +31,11 @@ include_directories(
     ${SYSTEM_INCLUDE_DIR}
 )
 
-# set debug postfix for static lib
-set(CMAKE_DEBUG_POSTFIX d)
 # add a static lib target
 add_library(common STATIC
     common.cpp
 )
 
 # Add dependency packages
-find_package(spdlog)
 target_link_libraries(common PRIVATE spdlog::spdlog_header_only)
+target_link_libraries(common PRIVATE yalantinglibs::yalantinglibs)
