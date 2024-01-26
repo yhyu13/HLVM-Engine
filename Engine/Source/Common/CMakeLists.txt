@@ -22,15 +22,21 @@ FetchContent_MakeAvailable(yalantinglibs)
 find_package(spdlog REQUIRED)
 find_package(mimalloc REQUIRED)
 
-# add include path
+# project macro
+add_compile_definitions("$<$<CONFIG:Debug>:HLVM_BUILD_DEBUG=1>")
+add_compile_definitions("$<$<CONFIG:RelWithDebInfo>:HLVM_BUILD_DEVELOPMENT=1>")
+add_compile_definitions("$<$<CONFIG:Release>:HLVM_BUILD_RELEASE=1>")
+add_compile_definitions("$<$<CONFIG:MinSizeRel>:HLVM_BUILD_RELEASE=1>")
+
+# add project include path
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/Public)
 
-# add a static lib target
+# create static lib target
 add_library(Common STATIC
     ${CMAKE_CURRENT_SOURCE_DIR}/Private/Common.cpp
 )
 
-# Add dependency packages
+# add dependency packages
 target_link_libraries(Common PUBLIC yalantinglibs::yalantinglibs)
 target_link_libraries(Common PUBLIC spdlog::spdlog_header_only)
 target_link_libraries(Common PUBLIC mimalloc)
@@ -42,6 +48,7 @@ target_link_libraries(Common PUBLIC mimalloc)
 # )
 # set_target_properties(Common PROPERTIES CXX_CLANG_TIDY "${CLANG_TIDY_COMMAND}")
 
+# add unit test executable
 add_executable(Test
     ${CMAKE_CURRENT_SOURCE_DIR}/Private/Test.cpp
 )
