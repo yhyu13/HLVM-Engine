@@ -1,0 +1,6 @@
+#include "Core/Log.h"
+
+DEFINE_LOG_CATEGORY(LogTemp)
+DEFINE_LOG_CATEGORY(LogEngine)
+DEFINE_LOG_CATEGORY(LogGame)
+DEFINE_LOG_CATEGORY(LogEditor)

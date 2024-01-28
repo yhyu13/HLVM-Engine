@@ -1,7 +1,8 @@
 {
     "dependencies": [  
         "spdlog",
-        "mimalloc"
+        "mimalloc",
+        "magic-enum"
     ],
     "builtin-baseline": "53bef8994c541b6561884a8395ea35715ece75db"
 }

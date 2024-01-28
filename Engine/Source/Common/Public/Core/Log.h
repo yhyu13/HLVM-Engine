@@ -1,0 +1,218 @@
+#pragma once
+#include "Common.h"
+#include "String.h"
+
+#include <fmt/xchar.h>
+#define SPDLOG_ACTIVE_LEVEL 0
+#define HLVM_SPDLOG_USE_ASYNC !HLVM_BUILD_DEBUG
+#include <spdlog/spdlog.h>
+#if HLVM_SPDLOG_USE_ASYNC
+	#include <spdlog/async.h>
+#endif
+#include <spdlog/sinks/stdout_color_sinks.h>
+#include <spdlog/sinks/rotating_file_sink.h>
+
+#include <memory>
+#include <forward_list>
+#include <atomic>
+
+struct FLogCatgegory
+{
+	NOCOPY(FLogCatgegory)
+	FLogCatgegory() = delete;
+	explicit FLogCatgegory(const TCHAR* CategoryName)
+		: Name(CategoryName)
+	{
+	}
+	const TCHAR*			  Name;
+	spdlog::level::level_enum LogLevel = spdlog::level::trace;
+};
+
+// Macro for declare a log category
+#define DELCARE_LOG_CATEGORY(category) \
+	extern std::unique_ptr<FLogCatgegory> category;
+
+DELCARE_LOG_CATEGORY(LogTemp)
+DELCARE_LOG_CATEGORY(LogEngine)
+DELCARE_LOG_CATEGORY(LogGame)
+DELCARE_LOG_CATEGORY(LogEditor)
+
+// Define a logger category in Log.cpp file or other .cpp file
+#define DEFINE_LOG_CATEGORY(category) \
+	std::unique_ptr<FLogCatgegory> category = std::make_unique<FLogCatgegory>(TXT(#category));
+
+/**
+ * @brief FLogContext is a structure that contains information about a log message,
+	including the log category, log level, file name, and line number.
+ *
+ */
+struct FLogContext
+{
+	const FLogCatgegory*	  Category;
+	spdlog::level::level_enum LogLevel;
+	const TCHAR*			  FileName;
+	int						  Line;
+};
+
+/**
+ * @brief FLogDevice is designed to be extended by different log device classes,
+	and the Sink function should be implemented accordingly to log messages to the specific device type
+*/
+class FLogDevice
+{
+public:
+	NOCOPY(FLogDevice)
+	FLogDevice() = default;
+	// Virtual destructor
+	virtual ~FLogDevice() = default;
+
+	// Log to device
+	virtual void Sink(const FLogContext& Context, const FString& Message) const = 0;
+
+	// Check if the log should be sent to this device
+	bool AllowSink(const FLogContext& Context) const
+	{
+		// Check if the log level is higher than the category's log level
+		return bEnable && static_cast<int>(Context.LogLevel) >= static_cast<int>(Context.Category->LogLevel);
+	}
+
+	void Disable()
+	{
+		bEnable = false;
+	}
+
+protected:
+	bool bEnable = true;
+};
+
+/**
+ * @brief FLogRedirector is a singleton class that manages all log devices.
+ *
+ */
+class FLogRedirector
+{
+public:
+	NOCOPY(FLogRedirector)
+	FLogRedirector() = default;
+
+	static FLogRedirector* Get()
+	{
+		static FLogRedirector* instance = new FLogRedirector();
+		return instance;
+	}
+
+	// Formats the message before sending it to the sink
+	template <typename... Args>
+	auto FormatBeforeSink(const FLogContext& Context, const TCHAR* fmt, Args&&... args)
+	{
+		FString Message;
+		Message = fmt::format(TXT("{0}: {1} [{2}:{3}]"), Context.Category->Name, fmt, Context.FileName, Context.Line);
+		Message = fmt::format(Message, std::forward<Args>(args)...);
+		return Message;
+	}
+
+	// Sends the message to all devices
+	template <typename... Args>
+	void Pump(const FLogContext& Context, const TCHAR* fmt, Args&&... args)
+	{
+		FString Message;
+		for (auto& Device : LogDevices)
+		{
+			// Send to all devices
+			if (Device->AllowSink(Context))
+			{
+				// If the message is empty, format it first
+				if (Message.empty())
+				{
+					Message = FormatBeforeSink(Context, fmt, std::forward<Args>(args)...);
+				}
+				Device->Sink(Context, Message);
+			}
+		}
+	}
+
+	// Adds a new device to the list of devices
+	void AddDevice(const std::shared_ptr<FLogDevice>& Device)
+	{
+		LogDevices.push_front(Device);
+	}
+
+private:
+	std::forward_list<std::shared_ptr<FLogDevice>> LogDevices;
+};
+
+// Macro for logging with category
+#define HLVM_LOG(_Category, _level, fmt, ...)                                                 \
+	FLogRedirector::Get()->Pump(FLogContext{                                                  \
+									.Category = static_cast<FLogCatgegory*>(_Category.get()), \
+									.LogLevel = spdlog::level::_level,                        \
+									.FileName = __FILENAME__,                                 \
+									.Line = __LINE__ },                                       \
+		fmt, ##__VA_ARGS__)
+
+/**
+ * @brief FSpdlogConsoleDevice is a log device that logs to the console.
+ *
+ */
+class FSpdlogConsoleDevice final : public FLogDevice
+{
+public:
+	NOCOPY(FSpdlogConsoleDevice)
+
+	FSpdlogConsoleDevice()
+	{
+#if HLVM_SPDLOG_USE_ASYNC
+		// Initialize the thread pool for asynchronous logging
+		spdlog::init_thread_pool(8192, 2);
+#endif
+		// Set the log pattern
+		spdlog::set_pattern("%^[%Y-%m-%d %H:%M:%S.%e] %n:%l: %v%$");
+
+		// Create the console sink
+		auto						  stdout_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
+		std::vector<spdlog::sink_ptr> sinks{ stdout_sink };
+#if HLVM_SPDLOG_USE_ASYNC
+		// Create the asynchronous logger
+		AsyncLogger = std::make_shared<spdlog::async_logger>("CONSOLE", sinks.begin(), sinks.end(), spdlog::thread_pool(), spdlog::async_overflow_policy::block);
+#else
+		// Create the synchronous logger
+		AsyncLogger = std::make_shared<spdlog::logger>("CONSOLE", sinks.begin(), sinks.end());
+#endif
+		// Set the log level
+		AsyncLogger->set_level(spdlog::level::trace);
+		// Register the logger
+		spdlog::register_logger(AsyncLogger);
+
+		// Create the error sink
+		ImmediateLogger = std::make_shared<spdlog::logger>("CONSOLE_ERR", sinks.begin(), sinks.end());
+		// Set the log level
+		ImmediateLogger->set_level(spdlog::level::warn);
+		// Register the logger
+		spdlog::register_logger(ImmediateLogger);
+	}
+
+	~FSpdlogConsoleDevice()
+	{
+		// Drop the logger
+		spdlog::drop("CONSOLE");
+		spdlog::drop("CONSOLE_ERR");
+		// Set the logger to null
+		AsyncLogger = nullptr;
+		ImmediateLogger = nullptr;
+	}
+
+	// Log the message
+	virtual void Sink(const FLogContext& Context, const FString& Message) const override
+	{
+		// Get the loggers
+		spdlog::logger* Loggers[2] = { AsyncLogger.get(), ImmediateLogger.get() };
+		// Log the message
+		Loggers[static_cast<int>(Context.LogLevel) >= static_cast<int>(spdlog::level::warn)]->log(Context.LogLevel, reinterpret_cast<const char*>(Message.c_str()));
+	}
+
+public:
+	// The asynchronous logger
+	std::shared_ptr<spdlog::logger> AsyncLogger;
+	// The error logger
+	std::shared_ptr<spdlog::logger> ImmediateLogger;
+};

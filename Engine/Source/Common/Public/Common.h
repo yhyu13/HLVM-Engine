@@ -1,3 +1,5 @@
-#include "mimalloc-new-delete.h"
-#include "spdlog/spdlog.h"
-#include "ylt/struct_pack.hpp"
+#pragma once
+#include "GlobalDefinition.h"
+
+// https://github.com/microsoft/mimalloc
+#include <mimalloc-new-delete.h>
