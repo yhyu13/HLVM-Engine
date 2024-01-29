@@ -1,3 +1,7 @@
+/**
+ * Copyright (c) 2024. MIT License. All rights reserved.
+ */
+
 #pragma once
 #include <string>
 #include <fmt/xchar.h>
@@ -21,35 +25,35 @@ class FString final : public std::basic_string<TCHAR>
 public:
 	FString() = default;
 	FString(const char* str)
+		: std::basic_string<TCHAR>(reinterpret_cast<const TCHAR*>(str))
 	{
-		*this = reinterpret_cast<const TCHAR*>(str);
 	}
 	FString(const TCHAR* str)
+		: std::basic_string<TCHAR>(str)
 	{
-		*this = str;
 	}
 	FString(const std::basic_string<TCHAR>& str)
+		: std::basic_string<TCHAR>(str)
 	{
-		*this = str;
 	}
 
 	// Move, copy constructor
 	FString(FString&& other) noexcept
+		: std::basic_string<TCHAR>(std::move(other))
 	{
-		*this = std::move(other);
 	}
 	FString(const FString& other) noexcept
+		: std::basic_string<TCHAR>(other)
 	{
-		*this = other;
 	}
 	FString& operator=(FString&& other) noexcept
 	{
-		*this = std::move(other);
+		std::basic_string<TCHAR>::operator=(std::move(other));
 		return *this;
 	}
 	FString& operator=(const FString& other) noexcept
 	{
-		*this = other;
+		std::basic_string<TCHAR>::operator=(other);
 		return *this;
 	}
 

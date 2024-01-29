@@ -1,3 +1,7 @@
+/**
+ * Copyright (c) 2024. MIT License. All rights reserved.
+ */
+
 #include "Core/Parallel/Lock.h"
 #include "Core/Assert.h"
 #include "Core/Time/Timer.h"
@@ -5,14 +9,14 @@
 #include <emmintrin.h>
 
 #if !HLVM_BUILD_RELEASE
-	#define DEADLOCK_TIMER 1 // Debug break unfriendly, disabled unless you need to debug dead lock
+	#define DEADLOCK_TIMER 1 // Debug break on potential dead lock
 #else
 	#define DEADLOCK_TIMER 0
 #endif // !HLVM_BUILD_RELEASE
 
 #if DEADLOCK_TIMER
 	#define SET_DEADLOCK_TIMER() FTimer _timer
-	#define ASSERT_DEADLOCK_TIMER() ASSERT(_timer.Mark() < 10.f, TXT("Dead lock after 10s"))
+	#define ASSERT_DEADLOCK_TIMER() ASSERT(_timer.Mark() < 10., TXT("Dead lock after 10s"))
 #else
 	#define SET_DEADLOCK_TIMER()
 	#define ASSERT_DEADLOCK_TIMER()
@@ -38,6 +42,7 @@ FAtomicLockGuard::FAtomicLockGuard(std::atomic_flag& flag) noexcept
 		{
 			break;
 		}
+		ATOMIC_THREAD_FENCE();
 		ASSERT_DEADLOCK_TIMER();
 		THREAD_YIELD();
 	}
@@ -63,6 +68,7 @@ void FAtomicFlagStatic::LockS() noexcept
 		{
 			break;
 		}
+		ATOMIC_THREAD_FENCE();
 		ASSERT_DEADLOCK_TIMER();
 		THREAD_YIELD();
 	}
@@ -88,6 +94,7 @@ void FAtomicFlagNI::LockNI() noexcept
 		{
 			break;
 		}
+		ATOMIC_THREAD_FENCE();
 		ASSERT_DEADLOCK_TIMER();
 		THREAD_YIELD();
 	}
@@ -113,6 +120,7 @@ void FAtomicFlagNC::LockNC() const noexcept
 		{
 			break;
 		}
+		ATOMIC_THREAD_FENCE();
 		ASSERT_DEADLOCK_TIMER();
 		THREAD_YIELD();
 	}
@@ -138,6 +146,7 @@ void FAtomicFlag::Lock() const noexcept
 		{
 			break;
 		}
+		ATOMIC_THREAD_FENCE();
 		ASSERT_DEADLOCK_TIMER();
 		THREAD_YIELD();
 	}

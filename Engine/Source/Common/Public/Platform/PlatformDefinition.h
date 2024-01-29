@@ -1,3 +1,7 @@
+/**
+ * Copyright (c) 2024. MIT License. All rights reserved.
+ */
+
 #pragma once
 
 #if defined(_WIN32)

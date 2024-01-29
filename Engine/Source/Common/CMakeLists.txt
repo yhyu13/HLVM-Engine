@@ -19,6 +19,7 @@ add_compile_definitions("$<$<CONFIG:MinSizeRel>:HLVM_BUILD_RELEASE=1>")
 # add project include path
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/Public)
 
+####################################################################
 # target 1
 file(GLOB_RECURSE PRIVATE_CPPs ${CMAKE_CURRENT_SOURCE_DIR}/Private/*.cpp)
 add_library(Common STATIC ${PRIVATE_CPPs})
@@ -42,6 +43,12 @@ target_link_libraries(Common PUBLIC spdlog::spdlog_header_only)
 target_link_libraries(Common PUBLIC mimalloc)
 target_link_libraries(Common PUBLIC magic_enum::magic_enum)
 
+# pch
+target_precompile_headers(Common
+  PUBLIC
+  ${CMAKE_CURRENT_SOURCE_DIR}/Public/Common.shared.pch
+)
+
 # Clang-tidy (Slow!)
 # set(CLANG_TIDY_COMMAND clang-tidy-16;
 #   --header-filter=${CMAKE_CURRENT_SOURCE_DIR}/Private/Common.cpp;
@@ -49,8 +56,18 @@ target_link_libraries(Common PUBLIC magic_enum::magic_enum)
 # )
 # set_target_properties(Common PROPERTIES CXX_CLANG_TIDY "${CLANG_TIDY_COMMAND}")
 
+####################################################################
 # target 2
-add_executable(Test
-    ${CMAKE_CURRENT_SOURCE_DIR}/Tmp/Test.cpp
+add_executable(Test3rdParty
+    ${CMAKE_CURRENT_SOURCE_DIR}/Test/Test3rdParty.cpp
 )
-target_link_libraries(Test PRIVATE Common)
+target_link_libraries(Test3rdParty PRIVATE Common)
+target_precompile_headers(Test3rdParty REUSE_FROM Common)
+
+####################################################################
+# target 3
+add_executable(TestLogger
+        ${CMAKE_CURRENT_SOURCE_DIR}/Test/TestLogger.cpp
+)
+target_link_libraries(TestLogger PRIVATE Common)
+target_precompile_headers(TestLogger REUSE_FROM Common)

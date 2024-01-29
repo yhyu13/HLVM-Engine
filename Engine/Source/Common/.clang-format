@@ -1,4 +1,4 @@
-//https://github.com/TensorWorks/UE-Clang-Format
+#https://github.com/TensorWorks/UE-Clang-Format
 
 StatementMacros: ['UPROPERTY', 'UFUNCTION', 'UCLASS', 'USTRUCT', 'UENUM', 'UINTERFACE', 'GENERATED_BODY']
 Language: Cpp

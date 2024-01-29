@@ -1,10 +1,14 @@
+/**
+ * Copyright (c) 2024. MIT License. All rights reserved.
+ */
+
 #pragma once
 #include "Common.h"
 #include "String.h"
 
 #include <fmt/xchar.h>
 #define SPDLOG_ACTIVE_LEVEL 0
-#define HLVM_SPDLOG_USE_ASYNC !HLVM_BUILD_DEBUG
+#define HLVM_SPDLOG_USE_ASYNC 1 //! HLVM_BUILD_DEBUG
 #include <spdlog/spdlog.h>
 #if HLVM_SPDLOG_USE_ASYNC
 	#include <spdlog/async.h>
@@ -79,6 +83,11 @@ public:
 	void Disable()
 	{
 		bEnable = false;
+	}
+
+	void Enable()
+	{
+		bEnable = true;
 	}
 
 protected:
@@ -159,56 +168,11 @@ class FSpdlogConsoleDevice final : public FLogDevice
 public:
 	NOCOPY(FSpdlogConsoleDevice)
 
-	FSpdlogConsoleDevice()
-	{
-#if HLVM_SPDLOG_USE_ASYNC
-		// Initialize the thread pool for asynchronous logging
-		spdlog::init_thread_pool(8192, 2);
-#endif
-		// Set the log pattern
-		spdlog::set_pattern("%^[%Y-%m-%d %H:%M:%S.%e] %n:%l: %v%$");
-
-		// Create the console sink
-		auto						  stdout_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
-		std::vector<spdlog::sink_ptr> sinks{ stdout_sink };
-#if HLVM_SPDLOG_USE_ASYNC
-		// Create the asynchronous logger
-		AsyncLogger = std::make_shared<spdlog::async_logger>("CONSOLE", sinks.begin(), sinks.end(), spdlog::thread_pool(), spdlog::async_overflow_policy::block);
-#else
-		// Create the synchronous logger
-		AsyncLogger = std::make_shared<spdlog::logger>("CONSOLE", sinks.begin(), sinks.end());
-#endif
-		// Set the log level
-		AsyncLogger->set_level(spdlog::level::trace);
-		// Register the logger
-		spdlog::register_logger(AsyncLogger);
-
-		// Create the error sink
-		ImmediateLogger = std::make_shared<spdlog::logger>("CONSOLE_ERR", sinks.begin(), sinks.end());
-		// Set the log level
-		ImmediateLogger->set_level(spdlog::level::warn);
-		// Register the logger
-		spdlog::register_logger(ImmediateLogger);
-	}
-
-	~FSpdlogConsoleDevice()
-	{
-		// Drop the logger
-		spdlog::drop("CONSOLE");
-		spdlog::drop("CONSOLE_ERR");
-		// Set the logger to null
-		AsyncLogger = nullptr;
-		ImmediateLogger = nullptr;
-	}
+	FSpdlogConsoleDevice();
+	~FSpdlogConsoleDevice();
 
 	// Log the message
-	virtual void Sink(const FLogContext& Context, const FString& Message) const override
-	{
-		// Get the loggers
-		spdlog::logger* Loggers[2] = { AsyncLogger.get(), ImmediateLogger.get() };
-		// Log the message
-		Loggers[static_cast<int>(Context.LogLevel) >= static_cast<int>(spdlog::level::warn)]->log(Context.LogLevel, reinterpret_cast<const char*>(Message.c_str()));
-	}
+	virtual void Sink(const FLogContext& Context, const FString& Message) const override;
 
 public:
 	// The asynchronous logger

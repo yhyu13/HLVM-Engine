@@ -1,3 +1,7 @@
+/**
+ * Copyright (c) 2024. MIT License. All rights reserved.
+ */
+
 #pragma once
 
 #include "GlobalDefinition.h"
@@ -6,7 +10,7 @@
 #include <atomic>
 
 #define ATOMIC_LOCK_ENABLE_PADDING 1
-#define ATOMIC_THREAD_FENCE std::atomic_thread_fence(std::memory_order_acq_rel)
+#define ATOMIC_THREAD_FENCE() std::atomic_thread_fence(std::memory_order_acq_rel)
 
 class FAtomicFlag;
 class FAtomicLockGuard
@@ -25,12 +29,16 @@ private:
 	std::atomic_flag* m_lock;
 };
 
+/**
+ * @class FAtomicFlagStatic
+ * @brief 一个静态原子标志类
+ */
 class FAtomicFlagStatic
 {
 public:
 #define LOCK_GUARD_S()                        \
 	FAtomicLockGuard __lock_guard_s(sc_flag); \
-	ATOMIC_THREAD_FENCE
+	ATOMIC_THREAD_FENCE()
 
 	static void LockS() noexcept;
 	static void UnLockS() noexcept;
@@ -43,13 +51,17 @@ protected:
 	HLVM_CACHE_ALIGN inline static std::atomic_flag sc_flag; // c++ 20 default initialization to false
 };
 
+/**
+ * @class FAtomicFlagNI
+ * @brief 一个非实例原子标志类
+ */
 class FAtomicFlagNI
 {
 public:
 	NOINSTANT(FAtomicFlagNI);
 #define LOCK_GUARD_NI()                        \
 	FAtomicLockGuard __lock_guard_ni(ni_flag); \
-	ATOMIC_THREAD_FENCE
+	ATOMIC_THREAD_FENCE()
 
 	static void LockNI() noexcept;
 	static void UnLockNI() noexcept;
@@ -58,6 +70,10 @@ protected:
 	HLVM_CACHE_ALIGN inline static std::atomic_flag ni_flag; // c++ 20 default initialization to false
 };
 
+/**
+ * @class FAtomicFlagNC
+ * @brief 一个具有非复制的原子标志类
+ */
 class FAtomicFlagNC
 {
 public:
@@ -65,7 +81,7 @@ public:
 
 #define LOCK_GUARD_NC()                        \
 	FAtomicLockGuard __lock_guard_nc(nc_flag); \
-	ATOMIC_THREAD_FENCE
+	ATOMIC_THREAD_FENCE()
 
 	FAtomicFlagNC() = default;
 
@@ -85,12 +101,16 @@ private:
 #endif
 };
 
+/**
+ * @class FAtomicFlagNC
+ * @brief 一个通常的的原子标志类
+ */
 class FAtomicFlag
 {
 public:
 #define LOCK_GUARD()                        \
 	FAtomicLockGuard __lock_guard_(m_flag); \
-	ATOMIC_THREAD_FENCE
+	ATOMIC_THREAD_FENCE()
 
 	FAtomicFlag() noexcept = default;
 
