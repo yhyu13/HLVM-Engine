@@ -71,3 +71,11 @@ add_executable(TestLogger
 )
 target_link_libraries(TestLogger PRIVATE Common)
 target_precompile_headers(TestLogger REUSE_FROM Common)
+
+####################################################################
+# target 4
+add_executable(TestParallel
+        ${CMAKE_CURRENT_SOURCE_DIR}/Test/TestParallel.cpp
+)
+target_link_libraries(TestParallel PRIVATE Common)
+target_precompile_headers(TestParallel REUSE_FROM Common)

@@ -113,13 +113,3 @@ RECORD(magic_enum_test,
 			auto color_or_default = magic_enum::enum_cast<Color>(color_integer).value_or(Color::NONE);
 		}
 	})
-
-int main()
-{
-	// Run all registered test functions
-	for (auto& test_function : recorded_test_functions)
-	{
-		test_function();
-	}
-	return 0;
-}

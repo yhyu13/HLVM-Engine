@@ -31,9 +31,13 @@ public:
 	/**
 	 * @brief 构造函数，创建一个FTimer对象 period 参数为持续时间，单位为秒
 	 */
-	FTimer(std::chrono::duration<double, std::ratio<1>> period)
+	FTimer(std::chrono::duration<double, std::ratio<1>> period, bool reset = false)
 		: m_period(period.count())
 	{
+		if (reset)
+		{
+			Reset();
+		}
 	}
 
 	/**
@@ -42,6 +46,7 @@ public:
 	inline void Reset() noexcept
 	{
 		m_last = std::chrono::steady_clock::now();
+		m_init = true;
 	}
 
 	/**
@@ -51,16 +56,17 @@ public:
 	template <typename ratio = std::ratio<1>, typename ret_type = double>
 	inline ret_type Mark(bool reset = false) noexcept
 	{
-		if (!m_init)
+		auto now = std::chrono::steady_clock::now();
+		if (!m_init) [[unlikely]]
 		{
-			Reset();
+			m_last = now;
 			m_init = true;
 			return 0;
 		}
-		auto ret = std::chrono::duration<ret_type, ratio>(std::chrono::steady_clock::now() - m_last).count();
-		if (reset)
+		auto ret = std::chrono::duration<ret_type, ratio>(now - m_last).count();
+		if (reset) [[unlikely]]
 		{
-			Reset();
+			m_last = now;
 		}
 		return ret;
 	}
@@ -121,27 +127,19 @@ public:
 	 */
 	inline bool Check(bool reset) noexcept
 	{
-		if (m_period < 0.0)
-		{
-			return false;
-		}
-		else if (m_period == 0.0)
+		if (m_period == 0.0)
 		{
 			return true;
 		}
-		else if (Mark() < m_period)
+		if (MarkSec(reset) < m_period)
 		{
 			return false;
-		}
-		else if (reset)
-		{
-			Reset();
 		}
 		return true;
 	}
 
 private:
 	std::chrono::steady_clock::time_point m_last;		   ///< 时间点
-	double								  m_period{ 0.0 }; ///< 周期
 	bool								  m_init{ false }; ///< 是否初始化
+	double								  m_period{ 0.0 }; ///< 周期
 };

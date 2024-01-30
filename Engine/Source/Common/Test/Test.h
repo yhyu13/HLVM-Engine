@@ -15,11 +15,11 @@ std::function<void()> make_test_wrapper(const std::string& name, Func test_funct
 {
 	return [name, test_function]() {
 		std::cout << "Running " << name << "..." << std::endl;
-		auto start = std::chrono::high_resolution_clock::now();
+		auto start = std::chrono::steady_clock::now();
 
 		test_function(); // Run the actual test function
 
-		auto						  end = std::chrono::high_resolution_clock::now();
+		auto						  end = std::chrono::steady_clock::now();
 		std::chrono::duration<double> elapsed = end - start;
 		std::cout << "Completed " << name << ". Time elapsed: " << elapsed.count() << " seconds" << std::endl;
 	};
@@ -42,3 +42,13 @@ std::function<void()> make_test_wrapper(const std::string& name, Func test_funct
 		};                                                                                                  \
 		AutoRegister auto_register_##test_function = AutoRegister();                                        \
 	}
+
+int main()
+{
+	// Run all registered test functions
+	for (auto& test_function : recorded_test_functions)
+	{
+		test_function();
+	}
+	return 0;
+}

@@ -6,6 +6,9 @@
 
 #include "Core/Log.h"
 
+DELCARE_LOG_CATEGORY(LogTest)
+DEFINE_LOG_CATEGORY(LogTest)
+
 /*
 	<test method>
 */
@@ -13,22 +16,13 @@ RECORD(logger_test,
 	{
 		auto LogDevice = std::make_shared<FSpdlogConsoleDevice>();
 		FLogRedirector::Get()->AddDevice(LogDevice);
+		HLVM_LOG(LogTest, trace, TXT("Hello World!"));
 
 		// 1, Disable
 		LogDevice->Disable();
-		HLVM_LOG(LogTemp, critical, TXT("This message should not be shown!"));
+		HLVM_LOG(LogTest, critical, TXT("This message should not be shown!"));
 
 		// 2, Enable
 		LogDevice->Enable();
-		HLVM_LOG(LogTemp, info, TXT("This message should be shown!"));
+		HLVM_LOG(LogTest, info, TXT("This message should be shown!"));
 	})
-
-int main()
-{
-	// Run all registered test functions
-	for (auto& test_function : recorded_test_functions)
-	{
-		test_function();
-	}
-	return 0;
-}

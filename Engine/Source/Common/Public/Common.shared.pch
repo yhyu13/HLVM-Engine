@@ -7,8 +7,6 @@
  * @brief This file is automatically included by cmake for .cpp. This file should be as static as possible, with mostly only std library or equivalent
  */
 
-// #include <mimalloc-new-delete.h>
-
 #include <iostream>
 #include <fstream>
 #include <utility>

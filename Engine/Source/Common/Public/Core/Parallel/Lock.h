@@ -19,11 +19,9 @@ public:
 	NOCOPY(FAtomicLockGuard);
 	FAtomicLockGuard() = delete;
 	explicit FAtomicLockGuard(std::atomic_flag& flag) noexcept;
-	explicit FAtomicLockGuard(FAtomicFlag& Flag) = delete;
+	explicit FAtomicLockGuard(FAtomicFlag& Flag) noexcept;
 
 	~FAtomicLockGuard() noexcept;
-
-	friend FAtomicFlag;
 
 private:
 	std::atomic_flag* m_lock;
@@ -42,10 +40,6 @@ public:
 
 	static void LockS() noexcept;
 	static void UnLockS() noexcept;
-
-protected:
-	// protected non-virtual destructor that prevents delete by base pointer
-	~FAtomicFlagStatic() noexcept = default;
 
 protected:
 	HLVM_CACHE_ALIGN inline static std::atomic_flag sc_flag; // c++ 20 default initialization to false
@@ -87,10 +81,6 @@ public:
 
 	void LockNC() const noexcept;
 	void UnLockNC() const noexcept;
-
-protected:
-	// protected non-virtual destructor that prevents delete by base pointer
-	~FAtomicFlagNC() noexcept = default;
 
 protected:
 	mutable std::atomic_flag nc_flag;
@@ -137,10 +127,7 @@ public:
 	void UnLock() const noexcept;
 
 protected:
-	// protected non-virtual destructor that prevents delete by base pointer
-	~FAtomicFlag() noexcept = default;
-
-protected:
+	friend class FAtomicLockGuard;
 	mutable std::atomic_flag m_flag;
 
 private:
