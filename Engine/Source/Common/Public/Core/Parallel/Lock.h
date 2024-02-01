@@ -4,13 +4,11 @@
 
 #pragma once
 
-#include "GlobalDefinition.h"
-#include "Platform/PlatformDefinition.h"
+#include "ParallelDefinition.h"
 
-#include <atomic>
-
-#define ATOMIC_LOCK_ENABLE_PADDING 1
-#define ATOMIC_THREAD_FENCE() std::atomic_thread_fence(std::memory_order_acq_rel)
+#ifndef ATOMIC_LOCK_ENABLE_PADDING
+	#define ATOMIC_LOCK_ENABLE_PADDING 1
+#endif
 
 class FAtomicFlag;
 class FAtomicLockGuard
@@ -27,6 +25,10 @@ private:
 	std::atomic_flag* m_lock;
 };
 
+#define ATOMIC_LOCK_GUARD(x)          \
+	FAtomicLockGuard __lock_guard(x); \
+	ATOMIC_THREAD_FENCE()
+
 /**
  * @class FAtomicFlagStatic
  * @brief 一个静态原子标志类
@@ -42,7 +44,7 @@ public:
 	static void UnLockS() noexcept;
 
 protected:
-	HLVM_CACHE_ALIGN inline static std::atomic_flag sc_flag; // c++ 20 default initialization to false
+	HLVM_CACHE_ALIGN inline static std::atomic_flag sc_flag = ATOMIC_FLAG_INIT;
 };
 
 /**
@@ -61,7 +63,7 @@ public:
 	static void UnLockNI() noexcept;
 
 protected:
-	HLVM_CACHE_ALIGN inline static std::atomic_flag ni_flag; // c++ 20 default initialization to false
+	HLVM_CACHE_ALIGN inline static std::atomic_flag ni_flag = ATOMIC_FLAG_INIT;
 };
 
 /**
@@ -83,7 +85,7 @@ public:
 	void UnLockNC() const noexcept;
 
 protected:
-	mutable std::atomic_flag nc_flag;
+	mutable std::atomic_flag nc_flag = ATOMIC_FLAG_INIT;
 
 private:
 #if ATOMIC_LOCK_ENABLE_PADDING
@@ -128,10 +130,11 @@ public:
 
 protected:
 	friend class FAtomicLockGuard;
-	mutable std::atomic_flag m_flag;
+	mutable std::atomic_flag m_flag = ATOMIC_FLAG_INIT;
 
 private:
 #if ATOMIC_LOCK_ENABLE_PADDING
 	PADDING(HLVM_PLATFORM_CACHE_LINE - sizeof(std::atomic_flag));
 #endif
 };
+#undef ATOMIC_LOCK_ENABLE_PADDING

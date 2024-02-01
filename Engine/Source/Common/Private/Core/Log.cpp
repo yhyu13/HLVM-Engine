@@ -14,7 +14,7 @@ DEFINE_LOG_CATEGORY(LogEditor)
 // Initialize the thread pool for asynchronous logging
 // Had to use global variable to avoid thread pool being released before program finishing
 static auto SpglogThreadPool = std::make_shared<spdlog::details::thread_pool>(
-	8192, 2, [] {}, [] {});
+	8192, 1, [] {}, [] {});
 #endif
 
 FSpdlogConsoleDevice::FSpdlogConsoleDevice()

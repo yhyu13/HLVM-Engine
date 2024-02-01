@@ -16,7 +16,7 @@
 
 #if DEADLOCK_TIMER
 	#define SET_DEADLOCK_TIMER() FTimer _timer
-	#define ASSERT_DEADLOCK_TIMER() ASSERT(_timer.Mark() < 10., TXT("Dead lock after 10s"))
+	#define ASSERT_DEADLOCK_TIMER() HLVM_ASSERT(_timer.Mark() < 10., TXT("Dead lock after 10s"))
 #else
 	#define SET_DEADLOCK_TIMER()
 	#define ASSERT_DEADLOCK_TIMER()
@@ -26,24 +26,37 @@
 #define THREAD_YIELD() std::this_thread::yield() // pause for ~400 clocks on intel 11th-i7 11700
 #define SPIN_COUNT 8							 // ~=1.5 * 400 / 75
 
-#define LOCK_BODY(lock)                                                          \
-	SET_DEADLOCK_TIMER();                                                        \
-	while ((lock)->test_and_set(std::memory_order_acq_rel))                      \
-	{                                                                            \
-		int spin_count = SPIN_COUNT;                                             \
-		do                                                                       \
-		{                                                                        \
-			THREAD_PAUSE();                                                      \
-		}                                                                        \
-		while ((lock)->test_and_set(std::memory_order_acq_rel) && --spin_count); \
-		if (spin_count)                                                          \
-		{                                                                        \
-			break;                                                               \
-		}                                                                        \
-		ATOMIC_THREAD_FENCE();                                                   \
-		ASSERT_DEADLOCK_TIMER();                                                 \
-		THREAD_YIELD();                                                          \
-	}
+#if 1
+	#define LOCK_BODY(lock)                                                          \
+		SET_DEADLOCK_TIMER();                                                        \
+		while ((lock)->test_and_set(std::memory_order_acq_rel))                      \
+		{                                                                            \
+			int spin_count = SPIN_COUNT;                                             \
+			do                                                                       \
+			{                                                                        \
+				THREAD_PAUSE();                                                      \
+			}                                                                        \
+			while ((lock)->test_and_set(std::memory_order_acq_rel) && --spin_count); \
+			if (spin_count > 0)                                                      \
+			{                                                                        \
+				break;                                                               \
+			}                                                                        \
+			ATOMIC_THREAD_FENCE();                                                   \
+			ASSERT_DEADLOCK_TIMER();                                                 \
+			THREAD_YIELD();                                                          \
+		}                                                                            \
+		ATOMIC_THREAD_FENCE();
+#else
+	#define LOCK_BODY(lock)                                     \
+		while ((lock)->test_and_set(std::memory_order_acq_rel)) \
+		{                                                       \
+		}                                                       \
+		ATOMIC_THREAD_FENCE();
+#endif
+
+#define UNLOCK_BODY(lock)  \
+	ATOMIC_THREAD_FENCE(); \
+	(lock)->clear(std::memory_order_release);
 
 FAtomicLockGuard::FAtomicLockGuard(std::atomic_flag& flag) noexcept
 	: m_lock(&flag)
@@ -59,7 +72,7 @@ FAtomicLockGuard::FAtomicLockGuard(FAtomicFlag& Flag) noexcept
 
 FAtomicLockGuard::~FAtomicLockGuard() noexcept
 {
-	m_lock->clear(std::memory_order_release);
+	UNLOCK_BODY(m_lock);
 }
 
 void FAtomicFlagStatic::LockS() noexcept
@@ -69,7 +82,7 @@ void FAtomicFlagStatic::LockS() noexcept
 
 void FAtomicFlagStatic::UnLockS() noexcept
 {
-	sc_flag.clear(std::memory_order_release);
+	UNLOCK_BODY(&sc_flag);
 }
 
 void FAtomicFlagNI::LockNI() noexcept
@@ -79,7 +92,7 @@ void FAtomicFlagNI::LockNI() noexcept
 
 void FAtomicFlagNI::UnLockNI() noexcept
 {
-	ni_flag.clear(std::memory_order_release);
+	UNLOCK_BODY(&ni_flag);
 }
 
 void FAtomicFlagNC::LockNC() const noexcept
@@ -89,7 +102,7 @@ void FAtomicFlagNC::LockNC() const noexcept
 
 void FAtomicFlagNC::UnLockNC() const noexcept
 {
-	nc_flag.clear(std::memory_order_release);
+	UNLOCK_BODY(&nc_flag);
 }
 
 void FAtomicFlag::Lock() const noexcept
@@ -99,5 +112,5 @@ void FAtomicFlag::Lock() const noexcept
 
 void FAtomicFlag::UnLock() const noexcept
 {
-	m_flag.clear(std::memory_order_release);
+	UNLOCK_BODY(&m_flag);
 }

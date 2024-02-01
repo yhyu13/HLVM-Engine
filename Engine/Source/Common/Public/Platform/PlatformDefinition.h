@@ -4,35 +4,36 @@
 
 #pragma once
 
-#if defined(_WIN32)
+/**
+ * Platform check macros : https://github.com/abseil/abseil.github.io/blob/master/docs/cpp/platforms/macros.md
+ */
+#if defined(_WIN32) && defined(_MSC_VER)
+	#define PLATFORM_WINDOWS
+#endif
+
+#if defined(__linux__) && defined(__GNUC__)
+	#define PLATFORM_LINUXGNU
+#endif
+
+#if defined(PLATFORM_WINDOWS)
 	#define HLVM_DEBUG_BREAK() __debugbreak()
 
-	#define MS_ALIGN8 __declspec(align(8))
-	#define MS_ALIGN16 __declspec(align(16))
-	#define MS_ALIGN32 __declspec(align(32))
-	#define MS_ALIGN64 __declspec(align(64))
-	#define GCC_ALIGN8
-	#define GCC_ALIGN16
-	#define GCC_ALIGN32
-	#define GCC_ALIGN64
+	#define PACK(__class__) __pragma(pack(push, 1)) __class__ __pragma(pack(pop))
+	#define MS_ALIGN(N) __declspec(align(N))
+	#define GCC_ALIGN(N)
 
 	#define HLVM_PLATFORM_CACHE_LINE 64
 	#define HLVM_CACHE_ALIGN __declspec(align(PLATFORM_CACHE_LINE))
 
-#elif defined(__linux)
+#elif defined(PLATFORM_LINUXGNU)
 	#include <signal.h>
 	#define HLVM_DEBUG_BREAK() raise(SIGTRAP)
 
-	#define MS_ALIGN8
-	#define MS_ALIGN16
-	#define MS_ALIGN32
-	#define MS_ALIGN64
-	#define GCC_ALIGN8 __attribute__((packed)) __attribute__((aligned(16))
-	#define GCC_ALIGN16 __attribute__((packed)) __attribute__((aligned(16))
-	#define GCC_ALIGN32 __attribute__((packed)) __attribute__((aligned(16))
-	#define GCC_ALIGN64 __attribute__((packed)) __attribute__((aligned(16))
+	#define PACK(__class__) __class__ __attribute__((__packed__))
+	#define MS_ALIGN(N)
+	#define GCC_ALIGN(N) __attribute__((aligned(N))
 
-	#define HLVM_PLATFORM_CACHE_LINE 128
+	#define HLVM_PLATFORM_CACHE_LINE 64
 	#define HLVM_CACHE_ALIGN alignas(HLVM_PLATFORM_CACHE_LINE)
 
 #else
