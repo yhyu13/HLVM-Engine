@@ -115,8 +115,8 @@ public:
 	auto FormatBeforeSink(const FLogContext& Context, const TCHAR* fmt, Args&&... args)
 	{
 		FString Message;
-		Message = fmt::format(TXT("{0}:[{2}:{3}] {1}"), Context.Category->Name, fmt, Context.FileName, Context.Line);
-		Message = fmt::format(Message, std::forward<Args>(args)...);
+		Message = MoveTemp(fmt::format(TXT("{0}:[{2}:{3}] {1}"), Context.Category->Name, fmt, Context.FileName, Context.Line));
+		Message = MoveTemp(fmt::format(Message, std::forward<Args>(args)...));
 		return Message;
 	}
 

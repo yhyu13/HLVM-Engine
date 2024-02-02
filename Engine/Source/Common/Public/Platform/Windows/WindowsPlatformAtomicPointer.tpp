@@ -16,65 +16,61 @@ class TAtomicPointer
 
 public:
 	TAtomicPointer() = default;
-	explicit TAtomicPointer(ValueType Other)
+	explicit TAtomicPointer(ValueType Other) noexcept
 	{
 		Ptr = Other;
 	}
-	TAtomicPointer& operator=(ValueType Other)
+	TAtomicPointer& operator=(ValueType Other) noexcept
 	{
 		Ptr = Other;
 		return *this;
 	}
-	TAtomicPointer(const TAtomicPointer& Other)
+	TAtomicPointer(const TAtomicPointer& Other) noexcept
 	{
 		Ptr = (ValueType)Other;
 	}
-	TAtomicPointer& operator=(const TAtomicPointer& Other)
+	TAtomicPointer& operator=(const TAtomicPointer& Other) noexcept
 	{
 		Ptr = (ValueType)Other;
 		return *this;
 	}
-	~TAtomicPointer()
+	~TAtomicPointer() noexcept
 	{
-		if (Ptr)
-		{
-			delete Ptr;
-		}
 	}
 	/**
 	 * Release inner pointer without deleting it!
 	 */
-	ValueType Release()
+	ValueType Release() noexcept
 	{
 		return (ValueType)InterlockedExchangePointer((void&&)Ptr, nullptr);
 	}
 
-	operator ValueType() const
+	operator ValueType() const noexcept
 	{
 		return Ptr;
 	}
 
-	operator bool() const
+	operator bool() const noexcept
 	{
 		return Ptr != nullptr;
 	}
 
-	bool operator==(const ValueType& Other) const
+	bool operator==(const ValueType& Other) const noexcept
 	{
 		return (ValueType)(*this) == Other;
 	}
 
-	bool operator!=(const ValueType& Other) const
+	bool operator!=(const ValueType& Other) const noexcept
 	{
 		return !((*this) == Other);
 	}
 
-	ValueType volatile& operator->()
+	ValueType volatile& operator->() noexcept
 	{
 		return (ValueType volatile&)Ptr;
 	}
 
-	const ValueType volatile& operator->() const
+	const ValueType volatile& operator->() const noexcept
 	{
 		return (const ValueType volatile&)Ptr;
 	}

@@ -13,15 +13,15 @@
 	#define HLVM_ASSERT_EVEN_IN_RELEASE 0
 #endif
 
+// TODO: use async exception handling here, and some stack trace
 #if !HLVM_BUILD_RELEASE
 	#define HLVM_ASSERT(x, ...)                                                                                                                \
 		do                                                                                                                                     \
 		{                                                                                                                                      \
 			if (static_cast<bool>((x)) == false)                                                                                               \
 			{                                                                                                                                  \
-				HLVM_DEBUG_BREAK();                                                                                                            \
 				HLVM_LOG(LogTemp, critical, TXT("Assertion failed: {3}, {2} at {0}:{1}"), TXT(__FILE__), __LINE__, STRTIFY(x), ##__VA_ARGS__); \
-				throw std::exception();                                                                                                        \
+				HLVM_DEBUG_BREAK();                                                                                                            \
 			}                                                                                                                                  \
 		}                                                                                                                                      \
 		while (0)

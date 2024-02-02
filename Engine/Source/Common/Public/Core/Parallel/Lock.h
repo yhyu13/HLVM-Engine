@@ -25,8 +25,8 @@ private:
 	std::atomic_flag* m_lock;
 };
 
-#define ATOMIC_LOCK_GUARD(x)          \
-	FAtomicLockGuard __lock_guard(x); \
+#define ATOMIC_LOCK_GUARD(x)            \
+	FAtomicLockGuard __lock_guard((x)); \
 	ATOMIC_THREAD_FENCE()
 
 /**

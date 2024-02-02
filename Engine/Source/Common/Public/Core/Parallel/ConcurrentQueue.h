@@ -16,21 +16,21 @@
  */
 enum class EConcurrentQueueMode : uint8_t
 {
-	Spsc,
-	Mpsc,
-	Mpmc,
+	Spsc, // Single Producer Single Consumer
+	Mpsc, // Multiple Producer Single Consumer
+	Mpmc, // Multiple Producer Multiple Consumer
 };
 
 /**
  * Noncopyable lock-free concurrent queue, copy from Unreal Engine's TQueue
  */
-template <typename T, EConcurrentQueueMode Mode = EConcurrentQueueMode::Mpmc>
+template <typename T, EConcurrentQueueMode Mode = EConcurrentQueueMode::Mpmc, bool bCountSize = false>
 class FConcurrentQueue
 {
 #define IS_MP Mode == EConcurrentQueueMode::Mpsc || Mode == EConcurrentQueueMode::Mpmc
 #define IS_SC Mode == EConcurrentQueueMode::Mpsc || Mode == EConcurrentQueueMode::Spsc
 	/*
-	 *
+	 *  Concurrent Queue : Emulation
 	 *  Head = Tail
 	 *
 	 *  Push 1
@@ -59,26 +59,28 @@ class FConcurrentQueue
 		OldHead1->Next = NewNode2->Next = Tail->Next = NewNode1
 	 */
 private:
-	/** Structure for the internal linked list. */
+	/**
+	 * Structure for the internal linked list.
+	 */
 	struct QueueNode
 	{
 		QueueNode() = default;
 
-		explicit QueueNode(const T& InItem)
+		explicit QueueNode(const T& InItem) noexcept
 			: m_item(CopyTemp(InItem))
 		{
 		}
 
-		explicit QueueNode(T&& InItem)
+		explicit QueueNode(T&& InItem) noexcept
 			: m_item(MoveTemp(InItem))
 		{
 		}
 
-		~QueueNode()
+		~QueueNode() noexcept
 		{
 			/**
 			 * Call Release manually to avoid delete m_nextNode
-			 * which will trigger recursive delete on chained QueueNode* and their m_nextNode)
+			 * which might trigger recursive delete on chained QueueNode* and their m_nextNode)
 			 */
 			m_nextNode.Release();
 		}
@@ -93,7 +95,7 @@ public:
 		m_head = m_tail = new QueueNode();
 	}
 
-	~FConcurrentQueue()
+	~FConcurrentQueue() noexcept
 	{
 		while (QueueNode* temp = m_tail)
 		{
@@ -139,7 +141,10 @@ public:
 				// Step3 delete old tail
 				delete old_tail;
 
-				m_size.fetch_add(-1, std::memory_order_relaxed);
+				if constexpr (bCountSize)
+				{
+					m_size.fetch_add(-1, std::memory_order_relaxed);
+				}
 				return true;
 			}
 			else
@@ -155,7 +160,10 @@ public:
 					// Step3 delete old tail
 					delete old_tail;
 
-					m_size.fetch_add(-1, std::memory_order_relaxed);
+					if constexpr (bCountSize)
+					{
+						m_size.fetch_add(-1, std::memory_order_relaxed);
+					}
 					return true;
 				}
 			}
@@ -174,6 +182,7 @@ public:
 	 * @return
 	 */
 	size_t Num() const noexcept
+		requires(bCountSize == true)
 	{
 		return m_size.load(std::memory_order_relaxed);
 	}
@@ -201,7 +210,10 @@ private:
 			old_head->m_nextNode = NewNode;
 		}
 
-		m_size.fetch_add(1, std::memory_order_relaxed);
+		if constexpr (bCountSize)
+		{
+			m_size.fetch_add(1, std::memory_order_relaxed);
+		}
 	}
 
 private:

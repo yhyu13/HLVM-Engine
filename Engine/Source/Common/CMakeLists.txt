@@ -36,12 +36,18 @@ FetchContent_MakeAvailable(yalantinglibs)
 find_package(spdlog CONFIG REQUIRED)
 find_package(mimalloc CONFIG REQUIRED)
 find_package(magic_enum CONFIG REQUIRED)
+find_package(Boost REQUIRED)
+if (Boost_FOUND)
+    include_directories(${Boost_INCLUDE_DIRS})
+    link_directories(${Boost_LIBRARY_DIRS})
+endif ()
 
 # add dependency packages
 target_link_libraries(Common PUBLIC yalantinglibs::yalantinglibs)
 target_link_libraries(Common PUBLIC spdlog::spdlog_header_only)
 target_link_libraries(Common PUBLIC mimalloc)
 target_link_libraries(Common PUBLIC magic_enum::magic_enum)
+target_link_libraries(Common PUBLIC ${Boost_LIBRARIES})
 
 # pch
 target_precompile_headers(Common

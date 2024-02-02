@@ -15,10 +15,10 @@
 #endif // !HLVM_BUILD_RELEASE
 
 #if DEADLOCK_TIMER
-	#define SET_DEADLOCK_TIMER() FTimer _timer
+	#define INIT_DEADLOCK_TIMER() FTimer _timer
 	#define ASSERT_DEADLOCK_TIMER() HLVM_ASSERT(_timer.Mark() < 10., TXT("Dead lock after 10s"))
 #else
-	#define SET_DEADLOCK_TIMER()
+	#define INIT_DEADLOCK_TIMER()
 	#define ASSERT_DEADLOCK_TIMER()
 #endif
 
@@ -28,7 +28,7 @@
 
 #if 1
 	#define LOCK_BODY(lock)                                                          \
-		SET_DEADLOCK_TIMER();                                                        \
+		INIT_DEADLOCK_TIMER();                                                       \
 		while ((lock)->test_and_set(std::memory_order_acq_rel))                      \
 		{                                                                            \
 			int spin_count = SPIN_COUNT;                                             \
