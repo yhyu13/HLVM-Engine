@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.14)
-set(CMAKE_TOOLCHAIN_FILE "~/Documents/Gitrepo-My/HLVM-Engine/Engine/Source/Dependency/vcpkg/scripts/buildsystems/vcpkg.cmake"
+set(CMAKE_TOOLCHAIN_FILE "${CMAKE_CURRENT_SOURCE_DIR}/../Dependency/vcpkg/scripts/buildsystems/vcpkg.cmake"
   CACHE STRING "Vcpkg toolchain file")
 project(Common C CXX)
 
@@ -24,29 +24,49 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/Public)
 file(GLOB_RECURSE PRIVATE_CPPs ${CMAKE_CURRENT_SOURCE_DIR}/Private/*.cpp)
 add_library(Common STATIC ${PRIVATE_CPPs})
 
-# package dependency
+# add dependency packages
 include(FetchContent)
 FetchContent_Declare(
     yalantinglibs
     GIT_REPOSITORY https://github.com/yhyu13/yalantinglibs.git
     GIT_TAG 679cbac8f3c5566a842c91b9d332632d3076f6ac
     GIT_SHALLOW 1 # optional ( --depth=1 )
+    SYSTEM
 )
 FetchContent_MakeAvailable(yalantinglibs)
+target_link_libraries(Common PUBLIC yalantinglibs::yalantinglibs)
+
+#find_package(libdwarf CONFIG REQUIRED)
+#target_link_libraries(Common PUBLIC $<IF:$<TARGET_EXISTS:libdwarf::dwarf-static>,libdwarf::dwarf-static,libdwarf::dwarf-shared>)
+
+# Also requires one of: libbfd (gnu binutils), libdwarf, libdw (elfutils)
+# sudo apt-get install libdwarf-dev -y
+# sudo apt-get install libdw-dev -y
+FetchContent_Declare(
+    backward
+    GIT_REPOSITORY https://github.com/yhyu13/backward-cpp
+    GIT_TAG 51f0700452cf71c57d43c2d028277b24cde32502  # or a version tag, such as v1.6
+    GIT_SHALLOW 1 # optional ( --depth=1 )
+    SYSTEM          # optional, the Backward include directory will be treated as system directory
+)
+FetchContent_MakeAvailable(backward)
+# Add Backward to your target (either Backward::Interface, Backward::Object, or Backward::Backward)
+target_link_libraries(Common PUBLIC Backward::Interface)
+
 find_package(spdlog CONFIG REQUIRED)
+target_link_libraries(Common PUBLIC spdlog::spdlog_header_only)
+
 find_package(mimalloc CONFIG REQUIRED)
+target_link_libraries(Common PUBLIC mimalloc)
+
 find_package(magic_enum CONFIG REQUIRED)
+target_link_libraries(Common PUBLIC magic_enum::magic_enum)
+
 find_package(Boost REQUIRED)
 if (Boost_FOUND)
     include_directories(${Boost_INCLUDE_DIRS})
     link_directories(${Boost_LIBRARY_DIRS})
 endif ()
-
-# add dependency packages
-target_link_libraries(Common PUBLIC yalantinglibs::yalantinglibs)
-target_link_libraries(Common PUBLIC spdlog::spdlog_header_only)
-target_link_libraries(Common PUBLIC mimalloc)
-target_link_libraries(Common PUBLIC magic_enum::magic_enum)
 target_link_libraries(Common PUBLIC ${Boost_LIBRARIES})
 
 # pch
@@ -85,3 +105,11 @@ add_executable(TestParallel
 )
 target_link_libraries(TestParallel PRIVATE Common)
 target_precompile_headers(TestParallel REUSE_FROM Common)
+
+####################################################################
+# target 5
+add_executable(TestException
+        ${CMAKE_CURRENT_SOURCE_DIR}/Test/TestException.cpp
+)
+target_link_libraries(TestException PRIVATE Common)
+target_precompile_headers(TestException REUSE_FROM Common)

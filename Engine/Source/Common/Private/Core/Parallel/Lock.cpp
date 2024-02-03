@@ -8,13 +8,7 @@
 
 #include <emmintrin.h>
 
-#if !HLVM_BUILD_RELEASE
-	#define DEADLOCK_TIMER 1 // Debug break on potential dead lock
-#else
-	#define DEADLOCK_TIMER 0
-#endif // !HLVM_BUILD_RELEASE
-
-#if DEADLOCK_TIMER
+#if __DEADLOCK_TIMER
 	#define INIT_DEADLOCK_TIMER() FTimer _timer
 	#define ASSERT_DEADLOCK_TIMER() HLVM_ASSERT(_timer.Mark() < 10., TXT("Dead lock after 10s"))
 #else
@@ -58,13 +52,13 @@
 	ATOMIC_THREAD_FENCE(); \
 	(lock)->clear(std::memory_order_release);
 
-FAtomicLockGuard::FAtomicLockGuard(std::atomic_flag& flag) noexcept
+FAtomicLockGuard::FAtomicLockGuard(std::atomic_flag& flag) noexcept(!__DEADLOCK_TIMER)
 	: m_lock(&flag)
 {
 	LOCK_BODY(m_lock);
 }
 
-FAtomicLockGuard::FAtomicLockGuard(FAtomicFlag& Flag) noexcept
+FAtomicLockGuard::FAtomicLockGuard(FAtomicFlag& Flag) noexcept(!__DEADLOCK_TIMER)
 	: m_lock(&Flag.m_flag)
 {
 	LOCK_BODY(m_lock);
@@ -75,7 +69,7 @@ FAtomicLockGuard::~FAtomicLockGuard() noexcept
 	UNLOCK_BODY(m_lock);
 }
 
-void FAtomicFlagStatic::LockS() noexcept
+void FAtomicFlagStatic::LockS() noexcept(!__DEADLOCK_TIMER)
 {
 	LOCK_BODY(&sc_flag);
 }
@@ -85,7 +79,7 @@ void FAtomicFlagStatic::UnLockS() noexcept
 	UNLOCK_BODY(&sc_flag);
 }
 
-void FAtomicFlagNI::LockNI() noexcept
+void FAtomicFlagNI::LockNI() noexcept(!__DEADLOCK_TIMER)
 {
 	LOCK_BODY(&ni_flag);
 }
@@ -95,7 +89,7 @@ void FAtomicFlagNI::UnLockNI() noexcept
 	UNLOCK_BODY(&ni_flag);
 }
 
-void FAtomicFlagNC::LockNC() const noexcept
+void FAtomicFlagNC::LockNC() const noexcept(!__DEADLOCK_TIMER)
 {
 	LOCK_BODY(&nc_flag);
 }
@@ -105,7 +99,7 @@ void FAtomicFlagNC::UnLockNC() const noexcept
 	UNLOCK_BODY(&nc_flag);
 }
 
-void FAtomicFlag::Lock() const noexcept
+void FAtomicFlag::Lock() const noexcept(!__DEADLOCK_TIMER)
 {
 	LOCK_BODY(&m_flag);
 }

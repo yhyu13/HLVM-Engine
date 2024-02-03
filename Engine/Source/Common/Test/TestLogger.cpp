@@ -14,11 +14,10 @@ DEFINE_LOG_CATEGORY(LogTest)
 */
 RECORD(logger_test,
 	{
-		auto LogDevice = std::make_shared<FSpdlogConsoleDevice>();
-		FLogRedirector::Get()->AddDevice(LogDevice);
 		HLVM_LOG(LogTest, trace, TXT("Hello World!"));
 
 		// 1, Disable
+		auto LogDevice = FLogRedirector::Get()->AllDevices().front();
 		LogDevice->Disable();
 		HLVM_LOG(LogTest, critical, TXT("This message should not be shown!"));
 

@@ -6,9 +6,15 @@
 
 #include "ParallelDefinition.h"
 
-#ifndef ATOMIC_LOCK_ENABLE_PADDING
-	#define ATOMIC_LOCK_ENABLE_PADDING 1
+#ifndef __ATOMIC_LOCK_ENABLE_PADDING
+	#define __ATOMIC_LOCK_ENABLE_PADDING 1
 #endif
+
+#if !HLVM_BUILD_RELEASE
+	#define __DEADLOCK_TIMER 1 // Debug break on potential dead lock
+#else
+	#define __DEADLOCK_TIMER 0
+#endif // !HLVM_BUILD_RELEASE
 
 class FAtomicFlag;
 class FAtomicLockGuard
@@ -16,8 +22,8 @@ class FAtomicLockGuard
 public:
 	NOCOPY(FAtomicLockGuard);
 	FAtomicLockGuard() = delete;
-	explicit FAtomicLockGuard(std::atomic_flag& flag) noexcept;
-	explicit FAtomicLockGuard(FAtomicFlag& Flag) noexcept;
+	explicit FAtomicLockGuard(std::atomic_flag& flag) noexcept(!__DEADLOCK_TIMER);
+	explicit FAtomicLockGuard(FAtomicFlag& Flag) noexcept(!__DEADLOCK_TIMER);
 
 	~FAtomicLockGuard() noexcept;
 
@@ -40,7 +46,7 @@ public:
 	FAtomicLockGuard __lock_guard_s(sc_flag); \
 	ATOMIC_THREAD_FENCE()
 
-	static void LockS() noexcept;
+	static void LockS() noexcept(!__DEADLOCK_TIMER);
 	static void UnLockS() noexcept;
 
 protected:
@@ -59,7 +65,7 @@ public:
 	FAtomicLockGuard __lock_guard_ni(ni_flag); \
 	ATOMIC_THREAD_FENCE()
 
-	static void LockNI() noexcept;
+	static void LockNI() noexcept(!__DEADLOCK_TIMER);
 	static void UnLockNI() noexcept;
 
 protected:
@@ -81,14 +87,14 @@ public:
 
 	FAtomicFlagNC() = default;
 
-	void LockNC() const noexcept;
+	void LockNC() const noexcept(!__DEADLOCK_TIMER);
 	void UnLockNC() const noexcept;
 
 protected:
 	mutable std::atomic_flag nc_flag = ATOMIC_FLAG_INIT;
 
 private:
-#if ATOMIC_LOCK_ENABLE_PADDING
+#if __ATOMIC_LOCK_ENABLE_PADDING
 	PADDING(HLVM_PLATFORM_CACHE_LINE - sizeof(std::atomic_flag));
 #endif
 };
@@ -125,7 +131,7 @@ public:
 		return *this;
 	}
 
-	void Lock() const noexcept;
+	void Lock() const noexcept(!__DEADLOCK_TIMER);
 	void UnLock() const noexcept;
 
 protected:
@@ -133,8 +139,8 @@ protected:
 	mutable std::atomic_flag m_flag = ATOMIC_FLAG_INIT;
 
 private:
-#if ATOMIC_LOCK_ENABLE_PADDING
+#if __ATOMIC_LOCK_ENABLE_PADDING
 	PADDING(HLVM_PLATFORM_CACHE_LINE - sizeof(std::atomic_flag));
 #endif
 };
-#undef ATOMIC_LOCK_ENABLE_PADDING
+#undef __ATOMIC_LOCK_ENABLE_PADDING

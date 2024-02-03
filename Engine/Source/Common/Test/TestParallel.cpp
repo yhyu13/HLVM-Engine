@@ -16,24 +16,25 @@
 DELCARE_LOG_CATEGORY(LogTest)
 DEFINE_LOG_CATEGORY(LogTest)
 
-using TestFuncType = std::function<bool(double&)>;
-
-// TODO : implment smoothed averge time mesaruement
+// Implment smoothed averge time mesaruement
 // i.e. run test case mutiple times with timer and calculate averge by removing max and min
+using TestFuncType = std::function<bool(double&)>;
 double RunTestAndCalculateAvg(const TestFuncType& func, int num_iterations)
 {
 	std::vector<double> times;
 	for (int i = 0; i < num_iterations; ++i)
 	{
 		double duration;
-		func(duration);
+		HLVM_ASSERT(func(duration), TXT("Test case failed"));
 		times.emplace_back(duration);
 	}
 	{
+		// Remove max and min
 		auto mm = std::minmax_element(begin(times), end(times));
 		std::iter_swap(mm.first, end(times) - 2);
 		std::iter_swap(mm.second, end(times) - 1);
 	}
+	// Count average
 	double avg = 0.0;
 	for (int i = 0; i < num_iterations - 2; ++i)
 	{
@@ -47,16 +48,14 @@ double RunTestAndCalculateAvg(const TestFuncType& func, int num_iterations)
 */
 RECORD(lock_test,
 	{
-		auto LogDevice = std::make_shared<FSpdlogConsoleDevice>();
-		FLogRedirector::Get()->AddDevice(LogDevice);
-
 		constexpr int kNumThreads = 10;
 		constexpr int kNumIterations = 10;
+		constexpr int kNumLoops = 10000;
 		double		  time_no_lock, time_lock;
 		{
-			HLVM_LOG(LogTest, info, TXT("No lock : Create 10 threads and adds to i"));
+			HLVM_LOG(LogTest, info, TXT("Atomic ops : Create 10 threads and adds to i"));
 			auto TestFunc = [&](double& Duration) -> bool {
-				int						 i = 0;
+				std::atomic_int32_t		 i = 0;
 				FTimer					 Timer;
 				std::once_flag			 Flag;
 				std::atomic<int>		 Counter{ kNumThreads };
@@ -68,9 +67,9 @@ RECORD(lock_test,
 						std::call_once(Flag, [&Timer] {
 							Timer.Reset();
 						});
-						for (int k = 0; k < 1000; ++k)
+						for (int k = 0; k < kNumLoops; ++k)
 						{
-							i++;
+							i.fetch_add(1, std::memory_order_relaxed);
 						}
 						if (--Counter == 0)
 						{
@@ -84,11 +83,11 @@ RECORD(lock_test,
 					t.join();
 				}
 
-				HLVM_LOG(LogTest, info, TXT("i = {0:d}, took {1:f}"), i, Duration);
+				HLVM_LOG(LogTest, info, TXT("i = {0:d}, took {1:f}"), i.load(), Duration);
 				return true;
 			};
 			time_no_lock = RunTestAndCalculateAvg(TestFunc, kNumIterations);
-			HLVM_LOG(LogTest, info, TXT("No lock avg took {0:f}"), time_no_lock);
+			HLVM_LOG(LogTest, info, TXT("Atomic ops avg took {0:f}"), time_no_lock);
 		}
 
 		{
@@ -107,7 +106,7 @@ RECORD(lock_test,
 						std::call_once(Flag, [&Timer] {
 							Timer.Reset();
 						});
-						for (int k = 0; k < 1000; ++k)
+						for (int k = 0; k < kNumLoops; ++k)
 						{
 							ATOMIC_LOCK_GUARD(lock);
 							i++;
@@ -133,7 +132,7 @@ RECORD(lock_test,
 		}
 		double ratio = time_lock / time_no_lock;
 		double efficient = kNumThreads / ratio * 100;
-		HLVM_LOG(LogTest, info, TXT("No lock = {0:.2f}x With lock, lock is {1:.2f}% efficient"), ratio, efficient);
+		HLVM_LOG(LogTest, info, TXT("Atomic ops = {0:.2f}x With lock, lock is {1:.2f}% efficient"), ratio, efficient);
 	})
 
 RECORD(queue_test,
@@ -142,6 +141,7 @@ RECORD(queue_test,
 
 		constexpr int kNumThreads = 10;
 		constexpr int kNumIterations = 10;
+		constexpr int kNumLoops = 10000;
 		double		  time_concurrent, time_lock;
 		{
 			HLVM_LOG(LogTest, info, TXT("Queue test #1 FConcurrentQueue"));
@@ -157,14 +157,14 @@ RECORD(queue_test,
 						std::call_once(Flag, [&Timer] {
 							Timer.Reset();
 						});
-						for (int j = 0; j < 1000; ++j)
+						for (int j = 0; j < kNumLoops; ++j)
 						{
 							Queue.Push(j);
 						}
 					});
 
 					threads.emplace_back([&Queue, &Timer, &Counter, &Duration] {
-						for (int j = 0; j < 1000;)
+						for (int j = 0; j < kNumLoops;)
 						{
 							int val;
 							if (Queue.PopFront(val))
@@ -183,7 +183,7 @@ RECORD(queue_test,
 				{
 					t.join();
 				}
-				// HLVM_LOG(LogTest, info, TXT("Queue test #1 took {0:f}, queue size {1:d}"), Duration, Queue.Num());
+				HLVM_LOG(LogTest, info, TXT("Queue test #1 took {0:f}, queue size {1:d}"), Duration, Queue.Num());
 				return true;
 			};
 
@@ -194,7 +194,7 @@ RECORD(queue_test,
 		{
 			HLVM_LOG(LogTest, info, TXT("Queue test #2 boost::lockfree::queue"));
 			auto Test2Func = [&](double& Duration) -> bool {
-				auto					 Queue = boost::lockfree::queue<int>(1000 * kNumThreads);
+				auto					 Queue = boost::lockfree::queue<int>(kNumLoops * kNumThreads);
 				FTimer					 Timer;
 				std::once_flag			 Flag;
 				std::atomic<int>		 Counter{ kNumThreads };
@@ -205,14 +205,14 @@ RECORD(queue_test,
 						std::call_once(Flag, [&Timer] {
 							Timer.Reset();
 						});
-						for (int j = 0; j < 1000; ++j)
+						for (int j = 0; j < kNumLoops; ++j)
 						{
 							Queue.push(j);
 						}
 					});
 
 					threads.emplace_back([&Queue, &Timer, &Counter, &Duration] {
-						for (int j = 0; j < 1000;)
+						for (int j = 0; j < kNumLoops;)
 						{
 							int val;
 							if (Queue.pop(val))
@@ -231,7 +231,7 @@ RECORD(queue_test,
 				{
 					t.join();
 				}
-				// HLVM_LOG(LogTest, info, TXT("Queue test #2 took {0:f}, queue size {1:d}"), Duration, Queue.empty() ? 0 : -1);
+				HLVM_LOG(LogTest, info, TXT("Queue test #2 took {0:f}, queue size {1:d}"), Duration, Queue.empty() ? 0 : -1);
 				return true;
 			};
 
@@ -240,6 +240,5 @@ RECORD(queue_test,
 		}
 
 		double ratio = time_lock / time_concurrent;
-		double per_thread_gain = ratio / kNumThreads * 100;
-		HLVM_LOG(LogTest, info, TXT("Queue test #1 = {0:.2f}x Queue test #2, per thread gain {1:.2f}%"), ratio, per_thread_gain);
+		HLVM_LOG(LogTest, info, TXT("Queue test #1 FConcurrentQueue = {0:.2f}x Queue test #2 boost::lockfree::queue"), ratio);
 	})

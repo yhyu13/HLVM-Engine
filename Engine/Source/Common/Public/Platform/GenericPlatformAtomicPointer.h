@@ -6,13 +6,9 @@
 
 #include "GenericPlatform.h"
 
-#if !defined(PLATFORM_WINDOWS)
-	#include <atomic>
-#endif
 #include <concepts>
 
 // Concept https://en.cppreference.com/w/cpp/language/constraints
-
 template <class T>
 concept TPointer = std::is_pointer<T>::value;
 
@@ -45,5 +41,5 @@ public:
 		typename TAtomicPointer<T>::ValueType desired) noexcept;
 };
 
-#include "LinuGNU/LinuxGNUPlatformAtomicPointer.tpp"
-#include "Windows/WindowsPlatformAtomicPointer.tpp"
+#include "LinuGNU/LinuxGNUPlatformAtomicPointer.hpp"
+#include "Windows/WindowsPlatformAtomicPointer.hpp"

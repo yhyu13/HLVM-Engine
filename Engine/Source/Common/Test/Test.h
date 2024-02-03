@@ -2,6 +2,8 @@
  * Copyright (c) 2024. MIT License. All rights reserved.
  */
 
+#include "Core/Log.h"
+
 #include <iostream>
 #include <vector>
 #include <functional>
@@ -45,6 +47,9 @@ std::function<void()> make_test_wrapper(const std::string& name, Func test_funct
 
 int main()
 {
+	auto LogDevice = std::make_shared<FSpdlogConsoleDevice>();
+	FLogRedirector::Get()->AddDevice(LogDevice);
+
 	// Run all registered test functions
 	for (auto& test_function : recorded_test_functions)
 	{

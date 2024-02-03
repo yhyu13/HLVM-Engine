@@ -5,6 +5,8 @@
 #pragma once
 
 #ifdef PLATFORM_LINUXGNU
+
+	#include <atomic>
 /**
  * For linux we use std::atomic
  */

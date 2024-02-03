@@ -122,12 +122,12 @@ public:
 
 	/**
 	 * @brief 检查是否满足周期要求
-	 * @param period 是否重置Timer
+	 * @param reset 是否重置Timer
 	 * @return 是否满足周期要求
 	 */
-	inline bool Check(bool reset) noexcept
+	inline bool Check(bool reset = false) noexcept
 	{
-		if (m_period == 0.0)
+		if (m_period <= 0.0)
 		{
 			return true;
 		}

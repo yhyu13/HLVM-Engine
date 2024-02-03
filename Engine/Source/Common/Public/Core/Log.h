@@ -24,12 +24,12 @@ struct FLogCatgegory
 {
 	NOCOPY(FLogCatgegory)
 	FLogCatgegory() = delete;
-	explicit FLogCatgegory(const TCHAR* CategoryName)
-		: Name(CategoryName)
+	explicit FLogCatgegory(const TCHAR* CategoryName, const spdlog::level::level_enum Level = spdlog::level::trace)
+		: Name(CategoryName), LogLevel(Level)
 	{
 	}
 	const TCHAR*			  Name;
-	spdlog::level::level_enum LogLevel = spdlog::level::trace;
+	spdlog::level::level_enum LogLevel;
 };
 
 // Macro for declare a log category
@@ -44,6 +44,8 @@ DELCARE_LOG_CATEGORY(LogEditor)
 // Define a logger category in Log.cpp file or other .cpp file
 #define DEFINE_LOG_CATEGORY(category) \
 	std::unique_ptr<FLogCatgegory> category = std::make_unique<FLogCatgegory>(TXT(#category));
+#define DEFINE_LOG_CATEGORY2(category, _level) \
+	std::unique_ptr<FLogCatgegory> category = std::make_unique<FLogCatgegory>(TXT(#category), spdlog::level::_level);
 
 /**
  * @brief FLogContext is a structure that contains information about a log message,
@@ -76,8 +78,10 @@ public:
 	// Check if the log should be sent to this device
 	bool AllowSink(const FLogContext& Context) const
 	{
-		// Check if the log level is higher than the category's log level
-		return bEnable && static_cast<int>(Context.LogLevel) >= static_cast<int>(Context.Category->LogLevel);
+		// Check if the log level is higher than the category's log level, and the log level is not off
+		return bEnable
+			&& static_cast<int>(Context.LogLevel) >= static_cast<int>(Context.Category->LogLevel)
+			&& static_cast<int>(Context.LogLevel) != SPDLOG_LEVEL_OFF;
 	}
 
 	void Disable()
@@ -101,6 +105,8 @@ protected:
 class FLogRedirector
 {
 public:
+	using ContainerType = std::forward_list<std::shared_ptr<FLogDevice>>;
+
 	NOCOPY(FLogRedirector)
 	FLogRedirector() = default;
 
@@ -130,7 +136,7 @@ public:
 			// Send to all devices
 			if (Device->AllowSink(Context))
 			{
-				// If the message is empty, format it first
+				// If the message is empty, format it first, and reuse it
 				if (Message.empty())
 				{
 					Message = FormatBeforeSink(Context, fmt, std::forward<Args>(args)...);
@@ -146,8 +152,13 @@ public:
 		LogDevices.push_front(Device);
 	}
 
+	ContainerType AllDevices() const
+	{
+		return LogDevices;
+	}
+
 private:
-	std::forward_list<std::shared_ptr<FLogDevice>> LogDevices;
+	ContainerType LogDevices;
 };
 
 // Macro for logging with category

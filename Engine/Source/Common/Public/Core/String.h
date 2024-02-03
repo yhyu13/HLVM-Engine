@@ -15,6 +15,7 @@ static_assert(sizeof(TCHAR) == sizeof(char), "TCHAR is not char");
 #define U8_STRING(str) u8##str
 #define TXT(str) U8_STRING(str)
 #define STRTIFY(x) TXT(#x)
+#define TO_TCHAR_STR(x) (const TCHAR*)(x)
 
 // https://stackoverflow.com/a/8488201
 // Get the file name without path
@@ -57,15 +58,31 @@ public:
 		return *this;
 	}
 
-	// Conver to const TCHAR*
-	operator const TCHAR*() const
-	{
-		return reinterpret_cast<const TCHAR*>(this->c_str());
-	}
-
 	template <typename... Args>
 	static FString Format(const TCHAR* format, Args&&... args)
 	{
 		return FString(fmt::format(format, std::forward<Args>(args)...));
+	}
+
+	// Conver to const TCHAR*
+	operator const TCHAR*() const
+	{
+		return this->data();
+	}
+
+	friend const TCHAR* operator*(const FString& fs)
+	{
+		return (const TCHAR*)fs;
+	}
+
+	// Conver to const TCHAR*
+	operator const char*() const
+	{
+		return reinterpret_cast<const char*>(this->data());
+	}
+
+	const char* ToCharStr() const
+	{
+		return (const char*)(*this);
 	}
 };
