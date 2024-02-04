@@ -4,16 +4,15 @@
 
 #include "Platform/PlatformDefinition.h"
 
-#ifdef PLATFORM_LINUXGNU
+#ifdef PLATFORM_WINDOWS
 	#include "Platform/GenericPlatformDebuggerUtil.h"
 	#include "Ultility/Timer.h"
 	#include "Core/Parallel/Lock.h"
 
-// https://opensource.com/article/18/1/how-debuggers-work
-// https://forum.juce.com/t/detecting-if-a-process-is-being-run-under-a-debugger/2098
-	#include <sys/ptrace.h>
+	// https://medium.com/@X3non_C0der/anti-debugging-techniques-eda1868e0503
+	#include <debugapi.h>
 
-class LinuxGNUPlatformDebuggerUtil final : public GenericPlatformDebuggerUtil
+class WindowsPlatformDebuggerUtil final : public GenericPlatformDebuggerUtil
 {
 protected:
 	virtual bool IsDebuggerPresentInternal() final override
@@ -25,12 +24,9 @@ protected:
 		ATOMIC_LOCK_GUARD(Lock);
 		if (!isCheckedAlready || PeriodicTimer.Check(false))
 		{
-			if (ptrace(PTRACE_TRACEME, 0, 1, 0) < 0
-	#if HLVM_BUILD_RELEASE && !HLVM_ALLOW_DEBUGGER_EVEN_IN_RELEASE
-				// In release build, we also check if possible to detach from a debugger
-				|| ptrace(PTRACE_DETACH, 0, 1, 0) >= 0
-	#endif
-			)
+			BOOL bDebuggerPresent;
+			if (IsDebuggerPresent()
+				|| (TRUE == CheckRemoteDebuggerPresent(GetCurrentProcess(), &bDebuggerPresent) && TRUE == bDebuggerPresent))
 			{
 				underDebugger = 1;
 			}
@@ -47,6 +43,6 @@ protected:
 };
 
 std::unique_ptr<GenericPlatformDebuggerUtil>
-	GenericPlatformDebuggerUtil::s_instance{ new LinuxGNUPlatformDebuggerUtil() };
+	GenericPlatformDebuggerUtil::s_instance{ new WindowsPlatformDebuggerUtil() };
 
 #endif

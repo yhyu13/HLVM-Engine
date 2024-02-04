@@ -26,32 +26,33 @@ add_library(Common STATIC ${PRIVATE_CPPs})
 
 # add dependency packages
 include(FetchContent)
+Set(FETCHCONTENT_QUIET FALSE)
 FetchContent_Declare(
     yalantinglibs
     GIT_REPOSITORY https://github.com/yhyu13/yalantinglibs.git
     GIT_TAG 679cbac8f3c5566a842c91b9d332632d3076f6ac
     GIT_SHALLOW 1 # optional ( --depth=1 )
+    GIT_PROGRESS TRUE
     SYSTEM
 )
 FetchContent_MakeAvailable(yalantinglibs)
+target_compile_definitions(yalantinglibs INTERFACE YLT_ENABLE_PMR IGUANA_ENABLE_PMR ENABLE_STRUCT_PACK_OPTIMIZE)
 target_link_libraries(Common PUBLIC yalantinglibs::yalantinglibs)
 
-#find_package(libdwarf CONFIG REQUIRED)
-#target_link_libraries(Common PUBLIC $<IF:$<TARGET_EXISTS:libdwarf::dwarf-static>,libdwarf::dwarf-static,libdwarf::dwarf-shared>)
-
 # Also requires one of: libbfd (gnu binutils), libdwarf, libdw (elfutils)
-# sudo apt-get install libdwarf-dev -y
-# sudo apt-get install libdw-dev -y
+# Either vckpg install elfutils libdwarf or sudo apt-get install libdwarf-dev libdw-dev -y
 FetchContent_Declare(
     backward
     GIT_REPOSITORY https://github.com/yhyu13/backward-cpp
     GIT_TAG 51f0700452cf71c57d43c2d028277b24cde32502  # or a version tag, such as v1.6
     GIT_SHALLOW 1 # optional ( --depth=1 )
+    GIT_PROGRESS TRUE
     SYSTEM          # optional, the Backward include directory will be treated as system directory
 )
 FetchContent_MakeAvailable(backward)
 # Add Backward to your target (either Backward::Interface, Backward::Object, or Backward::Backward)
 target_link_libraries(Common PUBLIC Backward::Interface)
+target_link_libraries(Common PUBLIC ${CMAKE_DL_LIBS})
 
 find_package(spdlog CONFIG REQUIRED)
 target_link_libraries(Common PUBLIC spdlog::spdlog_header_only)

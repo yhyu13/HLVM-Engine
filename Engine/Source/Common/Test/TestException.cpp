@@ -7,8 +7,7 @@
 #include "Core/Log.h"
 #include "Core/Assert.h"
 
-#include <thread>
-#include <vector>
+#include <backward.hpp>
 
 DELCARE_LOG_CATEGORY(LogTest)
 DEFINE_LOG_CATEGORY(LogTest)
@@ -24,6 +23,11 @@ RECORD(excpetion_test,
 			{
 				HLVM_LOG(LogTest, warn, TXT("If there is a attached debugger, you will get debug pause after assertion failed. Press continue to finish this test."));
 			}
+			using namespace backward;
+			StackTrace st;
+			st.load_here(32);
+			Printer p;
+			p.print(st);
 			HLVM_ASSERT(1 != 1, TXT("1 != 1"));
 		}
 		catch (const std::runtime_error& e)
