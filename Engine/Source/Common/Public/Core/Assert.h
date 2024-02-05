@@ -16,33 +16,33 @@
 
 // TODO: use async exception handling here, and some stack trace
 #if !HLVM_BUILD_RELEASE
-	#define HLVM_ASSERT(x, ...)                                                                                            \
-		do                                                                                                                 \
-		{                                                                                                                  \
-			if (static_cast<bool>((x)) == false)                                                                           \
-			{                                                                                                              \
-				const FCharStringView& StackTrace = FGenericPlatformDebuggerUtil::GetStackTrace();                         \
-				HLVM_LOG(LogTemp, err, TXT("StackTrace: {}"), *StackTrace);                                                \
-				const FString& msg = FString::Format(TXT("Assertion failed: {0}, with '{1}'"), STRTIFY(x), ##__VA_ARGS__); \
-				HLVM_LOG(LogTemp, critical, *msg);                                                                         \
-				HLVM_TRY_DEBUG_BREAK();                                                                                    \
-				throw std::runtime_error(msg.ToCharStr());                                                                 \
-			}                                                                                                              \
-		}                                                                                                                  \
+	#define HLVM_ASSERT(x, ...)                                                                                                                         \
+		do                                                                                                                                              \
+		{                                                                                                                                               \
+			if (static_cast<bool>((x)) == false)                                                                                                        \
+			{                                                                                                                                           \
+				const FCharStringView& StackTrace = FGenericPlatformDebuggerUtil::GetStackTrace();                                                      \
+				const FString&		   msg = FString::Format(TXT("Assertion failed: {1}, with '{2}' at\n{0}"), *StackTrace, STRTIFY(x), ##__VA_ARGS__); \
+				HLVM_LOG(LogTemp, critical, *msg);                                                                                                      \
+				HLVM_TRY_DEBUG_BREAK();                                                                                                                 \
+				throw std::runtime_error(msg.ToCharStr());                                                                                              \
+			}                                                                                                                                           \
+		}                                                                                                                                               \
 		while (0)
 #else
 	#if HLVM_ALLOW_ASSERT_EVEN_IN_RELEASE
-		#define HLVM_ASSERT(x, ...)                                                                                                                     \
-			do                                                                                                                                          \
-			{                                                                                                                                           \
-				if (static_cast<bool>((x)) == false)                                                                                                    \
-				{                                                                                                                                       \
-					FString msg = fmt::format(TXT("Assertion failed: {3}, with '{2}' at {0}:{1}"), TXT(__FILE__), __LINE__, STRTIFY(x), ##__VA_ARGS__); \
-					HLVM_LOG(LogTemp, critical, msg);                                                                                                   \
-					HLVM_TRY_DEBUG_BREAK();                                                                                                             \
-					throw std::runtime_error(msg.ToCharStr());                                                                                          \
-				}                                                                                                                                       \
-			}                                                                                                                                           \
+		#define HLVM_ASSERT(x, ...)                                                                                                                         \
+			do                                                                                                                                              \
+			{                                                                                                                                               \
+				if (static_cast<bool>((x)) == false)                                                                                                        \
+				{                                                                                                                                           \
+					const FCharStringView& StackTrace = FGenericPlatformDebuggerUtil::GetStackTrace();                                                      \
+					const FString&		   msg = FString::Format(TXT("Assertion failed: {1}, with '{2}' at\n{0}"), *StackTrace, STRTIFY(x), ##__VA_ARGS__); \
+					HLVM_LOG(LogTemp, critical, *msg);                                                                                                      \
+					HLVM_TRY_DEBUG_BREAK();                                                                                                                 \
+					throw std::runtime_error(msg.ToCharStr());                                                                                              \
+				}                                                                                                                                           \
+			}                                                                                                                                               \
 			while (0)
 	#else
 		#define HLVM_ASSERT(...)

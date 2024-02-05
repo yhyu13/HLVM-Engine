@@ -30,8 +30,6 @@ public:
 		backward::Printer  p;
 		std::ostringstream ss;
 		p.print(st, ss);
-		// TODO: maybe escape '{' and '}' to avoid fmt consider stack trace contains formatting,
-		//  thus lead to 'no argument found' exception
 		// TODO: maybe re-implement st load_here with parameter to skip first n frames,
 		//  so that we can skip the stack trace of inner backward callings
 		return FCharStringView(MoveTemp(ss.str()));

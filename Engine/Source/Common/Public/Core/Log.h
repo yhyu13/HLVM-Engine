@@ -121,7 +121,15 @@ public:
 	static FString FormatBeforeSink(const FLogContext& Context, const TCHAR* fmt, Args&&... args)
 	{
 		FString Message = FString::Format(TXT("{0}:[{2}:{3}] {1}"), Context.Category->Name, fmt, Context.FileName, Context.Line);
-		return FString::Format(*Message, std::forward<Args>(args)...);
+		// check if args num is zero
+		if constexpr (sizeof...(args) == 0)
+		{
+			return Message;
+		}
+		else
+		{
+			return FString::Format(*Message, std::forward<Args>(args)...);
+		}
 	}
 
 	// Sends the message to all devices
