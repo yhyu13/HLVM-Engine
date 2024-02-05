@@ -118,12 +118,10 @@ public:
 
 	// Formats the message before sending it to the sink
 	template <typename... Args>
-	auto FormatBeforeSink(const FLogContext& Context, const TCHAR* fmt, Args&&... args)
+	static FString FormatBeforeSink(const FLogContext& Context, const TCHAR* fmt, Args&&... args)
 	{
-		FString Message;
-		Message = MoveTemp(fmt::format(TXT("{0}:[{2}:{3}] {1}"), Context.Category->Name, fmt, Context.FileName, Context.Line));
-		Message = MoveTemp(fmt::format(Message, std::forward<Args>(args)...));
-		return Message;
+		FString Message = FString::Format(TXT("{0}:[{2}:{3}] {1}"), Context.Category->Name, fmt, Context.FileName, Context.Line);
+		return FString::Format(*Message, std::forward<Args>(args)...);
 	}
 
 	// Sends the message to all devices
@@ -139,7 +137,7 @@ public:
 				// If the message is empty, format it first, and reuse it
 				if (Message.empty())
 				{
-					Message = FormatBeforeSink(Context, fmt, std::forward<Args>(args)...);
+					Message = MoveTemp(FormatBeforeSink(Context, fmt, std::forward<Args>(args)...));
 				}
 				Device->Sink(Context, Message);
 			}

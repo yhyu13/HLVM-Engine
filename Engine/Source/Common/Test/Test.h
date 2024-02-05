@@ -28,11 +28,7 @@ std::function<void()> make_test_wrapper(const std::string& name, Func test_funct
 }
 
 // Macro to record a test function
-#define RECORD(test_function, ...)                                                                          \
-	void test_##test_function()                                                                             \
-	{                                                                                                       \
-		__VA_ARGS__;                                                                                        \
-	};                                                                                                      \
+#define RECORD_TEST_FUNC(test_function)                                                                     \
 	namespace AutoRegister_##test_function                                                                  \
 	{                                                                                                       \
 		struct AutoRegister                                                                                 \
@@ -44,6 +40,13 @@ std::function<void()> make_test_wrapper(const std::string& name, Func test_funct
 		};                                                                                                  \
 		AutoRegister auto_register_##test_function = AutoRegister();                                        \
 	}
+
+#define RECORD(test_function, ...) \
+	void test_##test_function()    \
+	{                              \
+		__VA_ARGS__;               \
+	};                             \
+	RECORD_TEST_FUNC(test_function);
 
 int main()
 {

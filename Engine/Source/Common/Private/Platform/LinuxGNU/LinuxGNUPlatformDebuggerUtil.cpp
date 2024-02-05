@@ -13,7 +13,7 @@
 // https://forum.juce.com/t/detecting-if-a-process-is-being-run-under-a-debugger/2098
 	#include <sys/ptrace.h>
 
-class LinuxGNUPlatformDebuggerUtil final : public GenericPlatformDebuggerUtil
+class FLinuxGNUPlatformDebuggerUtil final : public FGenericPlatformDebuggerUtil
 {
 protected:
 	virtual bool IsDebuggerPresentInternal() final override
@@ -46,7 +46,7 @@ protected:
 	}
 };
 
-std::unique_ptr<GenericPlatformDebuggerUtil>
-	GenericPlatformDebuggerUtil::s_instance{ new LinuxGNUPlatformDebuggerUtil() };
+std::unique_ptr<FGenericPlatformDebuggerUtil>
+	FGenericPlatformDebuggerUtil::s_instance{ new FLinuxGNUPlatformDebuggerUtil() };
 
 #endif

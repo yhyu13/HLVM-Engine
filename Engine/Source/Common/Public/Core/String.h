@@ -59,9 +59,9 @@ public:
 	}
 
 	template <typename... Args>
-	static FString Format(const TCHAR* format, Args&&... args)
+	static FString Format(const TCHAR* _format, Args&&... args)
 	{
-		return FString(fmt::format(format, std::forward<Args>(args)...));
+		return FString(MoveTemp(fmt::format(_format, std::forward<Args>(args)...)));
 	}
 
 	// Conver to const TCHAR*
@@ -69,7 +69,6 @@ public:
 	{
 		return this->data();
 	}
-
 	friend const TCHAR* operator*(const FString& fs)
 	{
 		return (const TCHAR*)fs;
@@ -80,9 +79,39 @@ public:
 	{
 		return reinterpret_cast<const char*>(this->data());
 	}
-
 	const char* ToCharStr() const
 	{
 		return (const char*)(*this);
+	}
+};
+
+/**
+ * FStdStringView is just a wrapper around a already allocated std::string whose sole purpose is to
+ * be used as a const TCHAR* later, and thus avoid copying into FString.
+ */
+class FCharStringView final : public std::basic_string<char>
+{
+public:
+	FCharStringView() = delete;
+	// Move constructor
+	explicit FCharStringView(std::basic_string<char>&& other) noexcept
+		: std::basic_string<char>(std::move(other))
+	{
+	}
+	FCharStringView& operator=(FCharStringView&& other) noexcept
+	{
+		std::basic_string<char>::operator=(std::move(other));
+		return *this;
+	}
+
+	// Conver to const TCHAR*
+	operator const TCHAR*() const
+	{
+		return reinterpret_cast<const TCHAR*>(this->data());
+	}
+
+	friend const TCHAR* operator*(const FCharStringView& fs)
+	{
+		return (const TCHAR*)fs;
 	}
 };

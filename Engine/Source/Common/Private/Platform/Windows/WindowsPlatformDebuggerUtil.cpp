@@ -12,7 +12,7 @@
 	// https://medium.com/@X3non_C0der/anti-debugging-techniques-eda1868e0503
 	#include <debugapi.h>
 
-class WindowsPlatformDebuggerUtil final : public GenericPlatformDebuggerUtil
+class FWindowsPlatformDebuggerUtil final : public FGenericPlatformDebuggerUtil
 {
 protected:
 	virtual bool IsDebuggerPresentInternal() final override
@@ -42,7 +42,7 @@ protected:
 	}
 };
 
-std::unique_ptr<GenericPlatformDebuggerUtil>
-	GenericPlatformDebuggerUtil::s_instance{ new WindowsPlatformDebuggerUtil() };
+std::unique_ptr<FGenericPlatformDebuggerUtil>
+	FGenericPlatformDebuggerUtil::s_instance{ new FWindowsPlatformDebuggerUtil() };
 
 #endif
