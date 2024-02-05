@@ -3,6 +3,9 @@
  */
 
 #include "Core/Log.h"
+#include "Core/String.h"
+#include "Core/Assert.h"
+#include "Ultility/Timer.h"
 
 #include <iostream>
 #include <vector>
@@ -13,17 +16,21 @@ static std::vector<std::function<void()>> recorded_test_functions;
 
 // Helper function to create a lambda that runs the test and prints the info
 template <typename Func>
-std::function<void()> make_test_wrapper(const std::string& name, Func test_function)
+std::function<void()> make_test_wrapper(const FString& name, Func test_function)
 {
 	return [name, test_function]() {
-		std::cout << "Running " << name << "..." << std::endl;
-		auto start = std::chrono::steady_clock::now();
-
-		test_function(); // Run the actual test function
-
-		auto						  end = std::chrono::steady_clock::now();
-		std::chrono::duration<double> elapsed = end - start;
-		std::cout << "Completed " << name << ". Time elapsed: " << elapsed.count() << " seconds" << std::endl;
+		HLVM_LOG(LogTemp, info, TXT("Running {}"), *name);
+		FTimer Timer{ true };
+		// check if test_function has return type bool
+		if constexpr (std::is_same_v<decltype(test_function()), bool>)
+		{
+			HLVM_ASSERT(test_function(), TXT("Test failed {}"), *name); // Run the actual test function
+		}
+		else
+		{
+			test_function();
+		}
+		HLVM_LOG(LogTemp, info, TXT("Completed {} in {} seconds"), *name, Timer.MarkSec());
 	};
 }
 

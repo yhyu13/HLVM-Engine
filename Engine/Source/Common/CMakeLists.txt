@@ -63,7 +63,7 @@ target_link_libraries(Common PUBLIC mimalloc)
 find_package(magic_enum CONFIG REQUIRED)
 target_link_libraries(Common PUBLIC magic_enum::magic_enum)
 
-find_package(Boost REQUIRED)
+find_package(Boost REQUIRED COMPONENTS filesystem system thread date_time regex timer chrono)
 if (Boost_FOUND)
     include_directories(${Boost_INCLUDE_DIRS})
     link_directories(${Boost_LIBRARY_DIRS})
@@ -114,3 +114,11 @@ add_executable(TestException
 )
 target_link_libraries(TestException PRIVATE Common)
 target_precompile_headers(TestException REUSE_FROM Common)
+
+####################################################################
+# target 6
+add_executable(TestUtility
+        ${CMAKE_CURRENT_SOURCE_DIR}/Test/TestUtility.cpp
+)
+target_link_libraries(TestUtility PRIVATE Common)
+target_precompile_headers(TestUtility REUSE_FROM Common)

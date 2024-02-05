@@ -13,7 +13,7 @@ DEFINE_LOG_CATEGORY(LogTest)
 /*
 	<test method>
 */
-void test_logger_test()
+bool test_logger_test()
 {
 	HLVM_LOG(LogTest, trace, TXT("Hello World!"));
 
@@ -28,5 +28,7 @@ void test_logger_test()
 	HLVM_LOG(LogTest, info, TXT("This message is formatted: {0}"), TXT("Hi"));
 	FString msg = FString::Format(TXT("This message is also formatted: {0}"), TXT("Hi2"));
 	HLVM_LOG(LogTest, info, *msg);
+
+	return true;
 };
 RECORD_TEST_FUNC(logger_test);
