@@ -5,10 +5,15 @@
 #include "Test.h"
 
 #include <ylt/struct_pack.hpp>
+#include <async_simple/coro/Lazy.h>
 #include <spdlog/spdlog.h>
 #include <spdlog/async.h>
 #include <magic_enum_all.hpp>
 #include <backward.hpp>
+#include <parallel_hashmap/phmap.h>
+
+DELCARE_LOG_CATEGORY(LogTest)
+DEFINE_LOG_CATEGORY(LogTest)
 
 /*
 	<test method>
@@ -45,30 +50,57 @@ RECORD(spdlog_test,
 
 RECORD(yalantinlibs_test,
 	{
-		// Yalantin example
-		struct person
+		HLVM_LOG(LogTest, info, TXT("Yalantin test"));
 		{
-			int64_t		id;
-			std::string name;
-			int			age;
-			double		salary;
-
-			bool operator==(const person& other) const
+			// Yalantin example
+			struct person
 			{
-				return id == other.id && name == other.name && age == other.age && salary == other.salary;
-			}
-		};
+				int64_t		id;
+				std::string name;
+				int			age;
+				double		salary;
 
-		person person1{ .id = 1, .name = "hello struct pack", .age = 20, .salary = 1024.42 };
+				bool operator==(const person& other) const
+				{
+					return id == other.id && name == other.name && age == other.age && salary == other.salary;
+				}
+			};
 
-		// one line code serialize
-		auto buffer = struct_pack::serialize(person1);
+			person person1{ .id = 1, .name = "hello struct pack", .age = 20, .salary = 1024.42 };
 
-		// one line code deserialization
-		person person2;
-		auto   ec = struct_pack::deserialize_to(person2, buffer.data(), buffer.size());
-		assert(!ec);
-		assert(person1 == person2);
+			// one line code serialize
+			auto buffer = struct_pack::serialize(person1);
+
+			// one line code deserialization
+			person person2;
+			auto   ec = struct_pack::deserialize_to(person2, buffer.data(), buffer.size());
+			assert(!ec);
+			assert(person1 == person2);
+		}
+		{
+			auto task1 = [](int x) -> async_simple::coro::Lazy<int> {
+				co_return x;
+			};
+			auto task2 = [&task1]() -> async_simple::coro::Lazy<> {
+				auto t = task1(10);
+				auto x = co_await t;
+				HLVM_ASSERT(x == 10, TXT("task2 failed."));
+				HLVM_LOG(LogTest, info, TXT("task2 completed successfully."));
+			};
+			auto func = [&task2]() -> async_simple::coro::Lazy<> {
+				co_await task2();
+			};
+			func().start([](async_simple::Try<void> Result) {
+				if (Result.hasError())
+				{
+					Result.value();
+				}
+				else
+				{
+					HLVM_LOG(LogTest, info, TXT("func completed successfully."));
+				}
+			});
+		}
 	})
 
 RECORD(magic_enum_test,
@@ -123,5 +155,69 @@ RECORD(backward_test,
 			st.load_here(32);
 			Printer p;
 			p.print(st);
+		}
+	})
+
+RECORD(phmap_test,
+	{
+		HLVM_LOG(LogTest, info, TXT("phmap test"));
+		{
+			phmap::flat_hash_map<std::string, int> map;
+			map["hello"] = 1;
+			map["world"] = 2;
+			for (auto& [key, value] : map)
+			{
+				HLVM_LOG(LogTest, info, TXT("key: {} value: {}"), TO_TCHAR_STR(key.c_str()), value);
+			}
+			map.erase("hello");
+			for (auto& [key, value] : map)
+			{
+				HLVM_LOG(LogTest, info, TXT("key: {} value: {}"), TO_TCHAR_STR(key.c_str()), value);
+			}
+			map.clear();
+			for (auto& [key, value] : map)
+			{
+				HLVM_LOG(LogTest, info, TXT("key: {} value: {}"), TO_TCHAR_STR(key.c_str()), value);
+			}
+		}
+		{
+			phmap::node_hash_map<std::string, int> map;
+			map["hello"] = 1;
+			map["world"] = 2;
+			for (auto& [key, value] : map)
+			{
+				HLVM_LOG(LogTest, info, TXT("key: {} value: {}"), TO_TCHAR_STR(key.c_str()), value);
+			}
+			map.erase("hello");
+			for (auto& [key, value] : map)
+			{
+				HLVM_LOG(LogTest, info, TXT("key: {} value: {}"), TO_TCHAR_STR(key.c_str()), value);
+			}
+			map.clear();
+			for (auto& [key, value] : map)
+			{
+				HLVM_LOG(LogTest, info, TXT("key: {} value: {}"), TO_TCHAR_STR(key.c_str()), value);
+			}
+		}
+		{
+			{
+				phmap::parallel_flat_hash_map<std::string, int> map;
+				map["hello"] = 1;
+				map["world"] = 2;
+				for (auto& [key, value] : map)
+				{
+					HLVM_LOG(LogTest, info, TXT("key: {} value: {}"), TO_TCHAR_STR(key.c_str()), value);
+				}
+				map.erase("hello");
+				for (auto& [key, value] : map)
+				{
+					HLVM_LOG(LogTest, info, TXT("key: {} value: {}"), TO_TCHAR_STR(key.c_str()), value);
+				}
+				map.clear();
+				for (auto& [key, value] : map)
+				{
+					HLVM_LOG(LogTest, info, TXT("key: {} value: {}"), TO_TCHAR_STR(key.c_str()), value);
+				}
+			}
 		}
 	})

@@ -27,6 +27,7 @@ add_library(Common STATIC ${PRIVATE_CPPs})
 # add dependency packages
 include(FetchContent)
 Set(FETCHCONTENT_QUIET FALSE)
+message("package : fetch yalantinglibs")
 FetchContent_Declare(
     yalantinglibs
     GIT_REPOSITORY https://github.com/yhyu13/yalantinglibs.git
@@ -39,6 +40,7 @@ FetchContent_MakeAvailable(yalantinglibs)
 target_compile_definitions(yalantinglibs INTERFACE YLT_ENABLE_PMR IGUANA_ENABLE_PMR ENABLE_STRUCT_PACK_OPTIMIZE)
 target_link_libraries(Common PUBLIC yalantinglibs::yalantinglibs)
 
+message("package : fetch backward")
 # Also requires one of: libbfd (gnu binutils), libdwarf, libdw (elfutils)
 # Either vckpg install elfutils libdwarf or sudo apt-get install libdwarf-dev libdw-dev -y
 FetchContent_Declare(
@@ -52,22 +54,40 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(backward)
 # Add Backward to your target (either Backward::Interface, Backward::Object, or Backward::Backward)
 target_link_libraries(Common PUBLIC Backward::Interface)
+# cmake vcpkg elfutil libdw missing '<dlfcn.h>' https://github.com/bombela/backward-cpp/issues/331
 target_link_libraries(Common PUBLIC ${CMAKE_DL_LIBS})
 
+message("package : fetch parallel-hashmap")
+FetchContent_Declare(
+        parallel-hashmap
+        GIT_REPOSITORY https://github.com/yhyu13/parallel-hashmap.git
+        GIT_TAG        67c24619e4f5ab2097b74cc397732c17a25d6944 # adjust tag/branch/commit as needed
+        GIT_SHALLOW 1 # optional ( --depth=1 )
+        GIT_PROGRESS TRUE
+        SYSTEM
+)
+FetchContent_MakeAvailable(parallel-hashmap)
+message("parallel-hashmap include ${parallel-hashmap_SOURCE_DIR}")
+include_directories(${parallel-hashmap_SOURCE_DIR})
+
+message("package : find spdlog")
 find_package(spdlog CONFIG REQUIRED)
 target_link_libraries(Common PUBLIC spdlog::spdlog_header_only)
 
+message("package : find mimalloc")
 find_package(mimalloc CONFIG REQUIRED)
 target_link_libraries(Common PUBLIC mimalloc)
 
+message("package : find magic_enum")
 find_package(magic_enum CONFIG REQUIRED)
 target_link_libraries(Common PUBLIC magic_enum::magic_enum)
 
+message("package : find Boost")
 find_package(Boost REQUIRED COMPONENTS filesystem system thread date_time regex timer chrono)
-if (Boost_FOUND)
-    include_directories(${Boost_INCLUDE_DIRS})
-    link_directories(${Boost_LIBRARY_DIRS})
-endif ()
+message("Boost include ${Boost_INCLUDE_DIRS}")
+include_directories(${Boost_INCLUDE_DIRS})
+message("Boost link include ${Boost_LIBRARY_DIRS}")
+link_directories(${Boost_LIBRARY_DIRS})
 target_link_libraries(Common PUBLIC ${Boost_LIBRARIES})
 
 # pch
