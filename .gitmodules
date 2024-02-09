@@ -1,3 +1,9 @@
 [submodule "Engine/Source/Dependency/vcpkg"]
 	path = Engine/Source/Dependency/vcpkg
 	url = https://github.com/yhyu13/vcpkg.git
+[submodule "Engine/Scripts/pyarg"]
+	path = Engine/Scripts/pyarg
+	url = https://gitee.com/yhyu13/pyarg.git
+[submodule "Engine/Scripts/pycmake"]
+	path = Engine/Scripts/pycmake
+	url = https://gitee.com/yhyu13/pycmake.git

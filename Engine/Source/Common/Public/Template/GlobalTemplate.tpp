@@ -6,6 +6,8 @@
 
 #include "ReferenceTemplate.tpp"
 
+#include <type_traits>
+
 template <typename T>
 inline typename TReferenceRemoved<T>::Type&& MoveTemp(T&& Var)
 {
