@@ -21,7 +21,7 @@ RECORD(excpetion_test,
 			{
 				HLVM_LOG(LogTest, warn, TXT("If there is a attached debugger, you will get debug pause after assertion failed. Press continue to finish this test."));
 			}
-			HLVM_ASSERT(1 != 1, TXT("1 != 1"));
+			HLVM_ENSURE(1 != 1, TXT("1 != 1"));
 		}
 		catch (const std::runtime_error& e)
 		{

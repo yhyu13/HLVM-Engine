@@ -84,7 +84,7 @@ RECORD(yalantinlibs_test,
 			auto task2 = [&task1]() -> async_simple::coro::Lazy<> {
 				auto t = task1(10);
 				auto x = co_await t;
-				HLVM_ASSERT(x == 10, TXT("task2 failed."));
+				HLVM_ENSURE(x == 10, TXT("task2 failed."));
 				HLVM_LOG(LogTest, info, TXT("task2 completed successfully."));
 			};
 			auto func = [&task2]() -> async_simple::coro::Lazy<> {

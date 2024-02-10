@@ -25,7 +25,7 @@ double RunTestAndCalculateAvg(const TestFuncType& func, int num_iterations)
 	for (int i = 0; i < num_iterations; ++i)
 	{
 		double duration;
-		HLVM_ASSERT(func(duration), TXT("Test case failed"));
+		HLVM_ENSURE(func(duration), TXT("Test case failed"));
 		times.emplace_back(duration);
 	}
 	{

@@ -24,7 +24,7 @@ std::function<void()> make_test_wrapper(const FString& name, Func test_function)
 		// check if test_function has return type bool
 		if constexpr (std::is_same_v<decltype(test_function()), bool>)
 		{
-			HLVM_ASSERT(test_function(), TXT("Test failed {}"), *name); // Run the actual test function
+			HLVM_ENSURE(test_function(), TXT("Test failed {}"), *name); // Run the actual test function
 		}
 		else
 		{
