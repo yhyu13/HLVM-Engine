@@ -20,7 +20,7 @@ class FAtomicFlag;
 class FAtomicLockGuard
 {
 public:
-	NOCOPY(FAtomicLockGuard);
+	NOCOPYMOVE(FAtomicLockGuard);
 	FAtomicLockGuard() = delete;
 	explicit FAtomicLockGuard(std::atomic_flag& flag) noexcept(!__DEADLOCK_TIMER);
 	explicit FAtomicLockGuard(FAtomicFlag& Flag) noexcept(!__DEADLOCK_TIMER);
@@ -79,7 +79,7 @@ protected:
 class FAtomicFlagNC
 {
 public:
-	NOCOPY(FAtomicFlagNC);
+	NOCOPYMOVE(FAtomicFlagNC);
 
 #define LOCK_GUARD_NC()                        \
 	FAtomicLockGuard __lock_guard_nc(nc_flag); \

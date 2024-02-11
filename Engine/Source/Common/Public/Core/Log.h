@@ -22,7 +22,7 @@
 
 struct FLogCatgegory
 {
-	NOCOPY(FLogCatgegory)
+	NOCOPYMOVE(FLogCatgegory)
 	FLogCatgegory() = delete;
 	explicit FLogCatgegory(const TCHAR* CategoryName, const spdlog::level::level_enum Level = spdlog::level::trace)
 		: Name(CategoryName), LogLevel(Level)
@@ -67,7 +67,7 @@ struct FLogContext
 class FLogDevice
 {
 public:
-	NOCOPY(FLogDevice)
+	NOCOPYMOVE(FLogDevice)
 	FLogDevice() = default;
 	// Virtual destructor
 	virtual ~FLogDevice() = default;
@@ -107,7 +107,7 @@ class FLogRedirector
 public:
 	using ContainerType = std::forward_list<std::shared_ptr<FLogDevice>>;
 
-	NOCOPY(FLogRedirector)
+	NOCOPYMOVE(FLogRedirector)
 	FLogRedirector() = default;
 
 	static FLogRedirector* Get()
@@ -183,7 +183,7 @@ private:
 class FSpdlogConsoleDevice final : public FLogDevice
 {
 public:
-	NOCOPY(FSpdlogConsoleDevice)
+	NOCOPYMOVE(FSpdlogConsoleDevice)
 
 	FSpdlogConsoleDevice();
 	~FSpdlogConsoleDevice();

@@ -21,11 +21,17 @@
 #endif
 
 // 定义一个类，禁止复制和移动
-#define NOCOPY(Class)                        \
-	Class(const Class&) = delete;            \
-	Class(const Class&&) = delete;           \
-	Class& operator=(const Class&) = delete; \
+#define NOCOPY(Class)             \
+	Class(const Class&) = delete; \
+	Class& operator=(const Class&) = delete;
+
+#define NOMOVE(Class)              \
+	Class(const Class&&) = delete; \
 	Class& operator=(const Class&&) = delete;
+
+#define NOCOPYMOVE(Class) \
+	NOCOPY(Class)         \
+	NOMOVE(Class)
 
 // 定义一个类，禁止实例化
 #define NOINSTANT(Class)                     \
