@@ -9,7 +9,7 @@ conda env create -f ./env.yaml
 git submodule update --init --recursive
 
 # vcpkg
-cd ./Engine/Source/Dependency/vcpkg
+cd ./Engine/Source/Dependency/vcpkg || exit
 ./bootstrap-vcpkg.sh
 cd "$ROOT_DIR" || exit
 

@@ -146,14 +146,15 @@ RECORD(queue_test,
 		{
 			HLVM_LOG(LogTest, info, TXT("Queue test #1 FConcurrentQueue"));
 			auto Test1Func = [&](double& Duration) -> bool {
-				auto					 Queue = FConcurrentQueue<int, EConcurrentQueueMode::Mpmc, true>();
+				auto					 Queue = FConcurrentQueue<int, EConcurrentQueueMode::Mpmc, true, true>();
 				FTimer					 Timer;
 				std::once_flag			 Flag;
 				std::atomic<int>		 Counter{ kNumThreads };
-				std::vector<std::thread> threads;
+				std::vector<std::thread> PushThreads;
+				std::vector<std::thread> PopThreads;
 				for (int i = 0; i < kNumThreads; ++i)
 				{
-					threads.emplace_back([&Queue, &Timer, &Flag] {
+					PushThreads.emplace_back([&Queue, &Timer, &Flag] {
 						std::call_once(Flag, [&Timer] {
 							Timer.Reset();
 						});
@@ -163,8 +164,8 @@ RECORD(queue_test,
 						}
 					});
 
-					threads.emplace_back([&Queue, &Timer, &Counter, &Duration] {
-						for (int j = 0; j < kNumLoops;)
+					PopThreads.emplace_back([&Queue, &Timer, &Counter, &Duration] {
+						for (int j = 0; !Queue.ShouldStopPop();)
 						{
 							int val;
 							if (Queue.PopFront(val))
@@ -179,7 +180,12 @@ RECORD(queue_test,
 					});
 				}
 
-				for (std::thread& t : threads)
+				for (std::thread& t : PushThreads)
+				{
+					t.join();
+				}
+				Queue.SignalStop();
+				for (std::thread& t : PopThreads)
 				{
 					t.join();
 				}
@@ -198,10 +204,12 @@ RECORD(queue_test,
 				FTimer					 Timer;
 				std::once_flag			 Flag;
 				std::atomic<int>		 Counter{ kNumThreads };
-				std::vector<std::thread> threads;
+				bool					 bSignalStop = false;
+				std::vector<std::thread> PushThreads;
+				std::vector<std::thread> PopThreads;
 				for (int i = 0; i < kNumThreads; ++i)
 				{
-					threads.emplace_back([&Queue, &Timer, &Flag] {
+					PushThreads.emplace_back([&Queue, &Timer, &Flag] {
 						std::call_once(Flag, [&Timer] {
 							Timer.Reset();
 						});
@@ -211,8 +219,8 @@ RECORD(queue_test,
 						}
 					});
 
-					threads.emplace_back([&Queue, &Timer, &Counter, &Duration] {
-						for (int j = 0; j < kNumLoops;)
+					PopThreads.emplace_back([&Queue, &Timer, &Counter, &Duration, &bSignalStop] {
+						for (int j = 0; !(Queue.empty() && bSignalStop);)
 						{
 							int val;
 							if (Queue.pop(val))
@@ -227,7 +235,12 @@ RECORD(queue_test,
 					});
 				}
 
-				for (std::thread& t : threads)
+				for (std::thread& t : PushThreads)
+				{
+					t.join();
+				}
+				bSignalStop = true;
+				for (std::thread& t : PopThreads)
 				{
 					t.join();
 				}

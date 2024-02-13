@@ -65,7 +65,7 @@ class CommonModule(BaseModule):
     def __init__(self):
         super().__init__(module=ModuleTargetModel(target='Common',
                                                   type=ModuleEnum.STATIC,
-                                                  source_files=glob_paths([GlobModel(path='./Private/**/*.cpp',
+                                                  source_files=glob_cmake_paths([GlobModel(path='./Private/**/*.cpp',
                                                                                      recursive=True)
                                                                            ])),
                          fetch_packages=[yalantinlibs,
@@ -86,12 +86,10 @@ class CommonModule(BaseModule):
 
 
 class TestCommonModule(BaseModule):
-    def __init__(self, name: str):
-        super().__init__(module=ModuleTargetModel(target=name,
+    def __init__(self, cpp_path: str):
+        super().__init__(module=ModuleTargetModel(target=os.path.basename(cpp_path).split('.')[0],
                                                   type=ModuleEnum.EXECUTABLE,
-                                                  source_files=glob_paths([GlobModel(path=f'./Test/{name}.cpp',
-                                                                                     recursive=False)
-                                                                           ]))
+                                                  source_files=[ToCMakePath(cpp_path)])
                          )
         self.target_interface.add_pch_files(domain=DomainEnum.REUSE_FROM,
                                             values=['Common'])
@@ -110,14 +108,8 @@ class CommonProject(BaseProject):
                                                               "$<$<CONFIG:RelWithDebInfo>:HLVM_BUILD_DEVELOPMENT=1>",
                                                               "$<$<CONFIG:Release>:HLVM_BUILD_RELEASE=1>",
                                                               "$<$<CONFIG:MinSizeRel>:HLVM_BUILD_RELEASE=1>"])
-        self.modules.extend([CommonModule(),
-                             TestCommonModule('Test3rdParty'),
-                             TestCommonModule('TestLogger'),
-                             TestCommonModule('TestParallel'),
-                             TestCommonModule('TestException'),
-                             TestCommonModule('TestUtility'),
-                             ]
-                            )
+        self.modules.append(CommonModule())
+        self.modules.extend([TestCommonModule(path) for path in glob.glob("./Test/*.cpp")])
 
 
 if __name__ == '__main__':

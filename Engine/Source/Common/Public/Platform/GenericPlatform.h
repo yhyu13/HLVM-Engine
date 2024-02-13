@@ -8,6 +8,8 @@
 
 #include "Core/Log.h"
 
+DELCARE_LOG_CATEGORY(LogGenericPlatform)
+
 #if defined(PLATFORM_WINDOWS)
 DELCARE_LOG_CATEGORY(LogWindowsPlatform)
 #elif defined(PLATFORM_LINUXGNU)

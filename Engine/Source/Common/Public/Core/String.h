@@ -3,6 +3,8 @@
  */
 
 #pragma once
+#include "Template/GlobalTemplate.tpp"
+
 #include <string>
 #include <fmt/xchar.h>
 #include <fmt/format.h>
@@ -40,7 +42,7 @@ public:
 
 	// Move, copy constructor
 	FString(FString&& other) noexcept
-		: std::basic_string<TCHAR>(std::move(other))
+		: std::basic_string<TCHAR>(MoveTemp(other))
 	{
 	}
 	FString(const FString& other) noexcept
@@ -49,7 +51,7 @@ public:
 	}
 	FString& operator=(FString&& other) noexcept
 	{
-		std::basic_string<TCHAR>::operator=(std::move(other));
+		std::basic_string<TCHAR>::operator=(MoveTemp(other));
 		return *this;
 	}
 	FString& operator=(const FString& other) noexcept
@@ -64,20 +66,20 @@ public:
 		return FString(MoveTemp(fmt::format(_format, std::forward<Args>(args)...)));
 	}
 
-	// Conver to const TCHAR*
+	// Convert to const TCHAR*
 	operator const TCHAR*() const
 	{
-		return this->data();
+		return this->c_str();
 	}
 	friend const TCHAR* operator*(const FString& fs)
 	{
 		return (const TCHAR*)fs;
 	}
 
-	// Conver to const TCHAR*
+	// Convert to const TCHAR*
 	operator const char*() const
 	{
-		return reinterpret_cast<const char*>(this->data());
+		return reinterpret_cast<const char*>(this->c_str());
 	}
 	const char* ToCharStr() const
 	{
@@ -95,12 +97,12 @@ public:
 	FCharStringView() = delete;
 	// Move constructor
 	explicit FCharStringView(std::basic_string<char>&& other) noexcept
-		: std::basic_string<char>(std::move(other))
+		: std::basic_string<char>(MoveTemp(other))
 	{
 	}
 	FCharStringView& operator=(FCharStringView&& other) noexcept
 	{
-		std::basic_string<char>::operator=(std::move(other));
+		std::basic_string<char>::operator=(MoveTemp(other));
 		return *this;
 	}
 

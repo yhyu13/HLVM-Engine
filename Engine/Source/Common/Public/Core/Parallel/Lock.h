@@ -91,6 +91,9 @@ public:
 	void UnLockNC() const noexcept;
 
 protected:
+	// Prevent delete by this pointer type, this way compiler would not allow it
+	~FAtomicFlagNC() noexcept = default;
+
 	mutable std::atomic_flag nc_flag = ATOMIC_FLAG_INIT;
 
 private:
@@ -111,6 +114,7 @@ public:
 	ATOMIC_THREAD_FENCE()
 
 	FAtomicFlag() noexcept = default;
+	~FAtomicFlag() noexcept = default;
 
 	FAtomicFlag(const FAtomicFlag& other) noexcept
 	{

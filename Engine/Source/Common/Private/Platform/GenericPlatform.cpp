@@ -4,6 +4,8 @@
 
 #include "Platform/GenericPlatform.h"
 
+DEFINE_LOG_CATEGORY(LogGenericPlatform)
+
 #if defined(PLATFORM_WINDOWS)
 DEFINE_LOG_CATEGORY(LogWindowsPlatform)
 #elif defined(PLATFORM_LINUXGNU)

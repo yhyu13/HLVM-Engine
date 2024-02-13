@@ -9,8 +9,6 @@
 #include "Core/Assert.h"
 #include "Template/GlobalTemplate.tpp"
 
-#include <utility>
-
 /**
  * Enumerates concurrent queue modes.
  */
@@ -24,7 +22,10 @@ enum class EConcurrentQueueMode : uint8_t
 /**
  * Noncopyable lock-free concurrent queue, copy from Unreal Engine's TQueue
  */
-template <typename T, EConcurrentQueueMode Mode = EConcurrentQueueMode::Mpmc, bool bCountSize = false>
+template <typename T,
+	EConcurrentQueueMode Mode = EConcurrentQueueMode::Mpmc,
+	bool				 bBlockPopOnEmpty = true, // Applying block on pop when empty actually makes the queue performance 1.25 faster on the TestParallel benchmark
+	bool				 bCountSize = false>
 class FConcurrentQueue
 {
 #define IS_MP Mode == EConcurrentQueueMode::Mpsc || Mode == EConcurrentQueueMode::Mpmc
@@ -92,14 +93,26 @@ private:
 public:
 	FConcurrentQueue()
 	{
-		m_head = m_tail = new QueueNode();
+		Head = Tail = new QueueNode();
+
+		if constexpr (bBlockPopOnEmpty)
+		{
+			Mutex = new std::mutex();
+			CV = new std::condition_variable();
+		}
 	}
 
 	~FConcurrentQueue() noexcept
 	{
-		while (QueueNode* temp = m_tail)
+		if constexpr (bBlockPopOnEmpty)
 		{
-			m_tail = m_tail->m_nextNode;
+			delete Mutex;
+			delete CV;
+		}
+
+		while (QueueNode* temp = Tail)
+		{
+			Tail = Tail->m_nextNode;
 			ATOMIC_THREAD_FENCE();
 			delete temp;
 		}
@@ -117,23 +130,35 @@ public:
 
 	/**
 	 * This is not atomic! Use with caution!
+	 * Also make sure that the queue is not empty before calling this function.
 	 * @return T&
 	 */
 	T& PeekFront() const noexcept
 	{
-		HLVM_ASSERT(m_tail->m_nextNode, TXT("Tail is null"));
-		return m_tail->m_nextNode->m_item;
+		HLVM_ASSERT(Tail->m_nextNode, TXT("Tail is null"));
+		return Tail->m_nextNode->m_item;
 	}
 
 	bool PopFront(T& ret) noexcept
 	{
-		if (QueueNode* poped_node = m_tail->m_nextNode)
+		if constexpr (bBlockPopOnEmpty)
 		{
-			if constexpr (Mode == EConcurrentQueueMode::Mpsc || Mode == EConcurrentQueueMode::Spsc)
+			while (Empty() && !bStopFlagByUser)
+			{
+				std::unique_lock<std::mutex> lock(*Mutex);
+				CV->wait(lock, [] {
+					return true;
+				});
+			}
+		}
+
+		if (QueueNode* poped_node = Tail->m_nextNode)
+		{
+			if constexpr (IS_SC)
 			{
 				// Step1 swap tail pointer
-				QueueNode* old_tail = m_tail;
-				m_tail = poped_node;
+				QueueNode* old_tail = Tail;
+				Tail = poped_node;
 
 				// Step2 assign value
 				ret = MoveTemp(poped_node->m_item);
@@ -143,16 +168,16 @@ public:
 
 				if constexpr (bCountSize)
 				{
-					m_size.fetch_add(-1, std::memory_order_relaxed);
+					Count.fetch_add(-1, std::memory_order_relaxed);
 				}
 				return true;
 			}
 			else
 			{
-				QueueNode* old_tail = m_tail;
+				QueueNode* old_tail = Tail;
 				// Step1 swap tail pointer
 				if (old_tail->m_nextNode == poped_node
-					&& FGenericPlatformAtomicPointer::AtomicCompareExchange(&m_tail, &old_tail, poped_node))
+					&& FGenericPlatformAtomicPointer::AtomicCompareExchange(&Tail, &old_tail, poped_node))
 				{
 					// Step2 assign value
 					ret = MoveTemp(poped_node->m_item);
@@ -162,7 +187,7 @@ public:
 
 					if constexpr (bCountSize)
 					{
-						m_size.fetch_add(-1, std::memory_order_relaxed);
+						Count.fetch_add(-1, std::memory_order_relaxed);
 					}
 					return true;
 				}
@@ -174,35 +199,53 @@ public:
 
 	bool Empty() const noexcept
 	{
-		return m_tail->m_nextNode == nullptr;
+		return Tail->m_nextNode == nullptr;
 	}
 
 	/**
-	 * This method is debugging propose. Should use while(!Queue.Empty()) to check queue is empty or not.
+	 * This method is for debugging propose.
+	 * User should use while(!Queue.ShouldStopPop()) to check queue should pop or not.
 	 * @return
 	 */
 	size_t Num() const noexcept
-		requires(bCountSize == true)
+		requires(bCountSize)
 	{
-		return m_size.load(std::memory_order_relaxed);
+		return Count.load(std::memory_order_relaxed);
+	}
+
+	void SignalStop() noexcept
+	{
+		bStopFlagByUser = true;
+	}
+
+	bool ShouldStopPop() const noexcept
+	{
+		if constexpr (bBlockPopOnEmpty)
+		{
+			return bStopFlagByUser && Empty();
+		}
+		else
+		{
+			return Empty();
+		}
 	}
 
 private:
 	void push_internal(QueueNode* NewNode) noexcept
 	{
 		QueueNode* old_head;
-		if constexpr (Mode == EConcurrentQueueMode::Mpsc || Mode == EConcurrentQueueMode::Mpmc)
+		if constexpr (IS_MP)
 		{
 			// Step1, swap pointer
-			old_head = FGenericPlatformAtomicPointer::AtomicExchange(&m_head, NewNode);
+			old_head = FGenericPlatformAtomicPointer::AtomicExchange(&Head, NewNode);
 			// Step2, chain pointer
 			FGenericPlatformAtomicPointer::AtomicExchange(&old_head->m_nextNode, NewNode);
 		}
 		else
 		{
 			// Step1, swap pointer
-			old_head = m_head;
-			m_head = NewNode;
+			old_head = Head;
+			Head = NewNode;
 
 			// Step2, chain pointer
 			// Prevent compiler reordering step2 into step1
@@ -212,17 +255,29 @@ private:
 
 		if constexpr (bCountSize)
 		{
-			m_size.fetch_add(1, std::memory_order_relaxed);
+			Count.fetch_add(1, std::memory_order_relaxed);
+		}
+
+		if constexpr (bBlockPopOnEmpty)
+		{
+			CV->notify_one(); // Notify the poping thread
 		}
 	}
 
 private:
 	/** Holds a pointer to the head (back) of the list. */
-	HLVM_CACHE_ALIGN TAtomicPointer<QueueNode*> m_head{ nullptr };
+	HLVM_CACHE_ALIGN TAtomicPointer<QueueNode*> Head{ nullptr };
 	/** Holds a pointer to the tail (front) of the list. */
-	TAtomicPointer<QueueNode*> m_tail{ nullptr };
+	TAtomicPointer<QueueNode*> Tail{ nullptr };
 
-	std::atomic_int32_t m_size{ 0 };
+	/** Mutex for blocking pop. */
+	std::mutex*				 Mutex;
+	std::condition_variable* CV;
+	/** Whether the queue is quit by user. */
+	BIT_FLAG(bStopFlagByUser){ false };
+
+	/** Size of the queue. */
+	std::atomic_int_fast32_t Count{ 0 };
 
 #undef IS_MP
 #undef IS_SC
