@@ -16,9 +16,7 @@
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/sinks/rotating_file_sink.h>
 
-#include <memory>
 #include <forward_list>
-#include <atomic>
 
 struct FLogCatgegory
 {
@@ -34,8 +32,9 @@ struct FLogCatgegory
 
 // Macro for declare a log category
 #define DELCARE_LOG_CATEGORY(category) \
-	extern std::unique_ptr<FLogCatgegory> category;
+	extern const FLogCatgegory category;
 
+DELCARE_LOG_CATEGORY(LogAssert)
 DELCARE_LOG_CATEGORY(LogTemp)
 DELCARE_LOG_CATEGORY(LogEngine)
 DELCARE_LOG_CATEGORY(LogGame)
@@ -43,9 +42,9 @@ DELCARE_LOG_CATEGORY(LogEditor)
 
 // Define a logger category in Log.cpp file or other .cpp file
 #define DEFINE_LOG_CATEGORY(category) \
-	std::unique_ptr<FLogCatgegory> category = std::make_unique<FLogCatgegory>(TXT(#category));
+	const FLogCatgegory category = FLogCatgegory(TXT(#category));
 #define DEFINE_LOG_CATEGORY2(category, _level) \
-	std::unique_ptr<FLogCatgegory> category = std::make_unique<FLogCatgegory>(TXT(#category), spdlog::level::_level);
+	const FLogCatgegory category = FLogCatgegory(TXT(#category), spdlog::level::_level);
 
 /**
  * @brief FLogContext is a structure that contains information about a log message,
@@ -95,7 +94,7 @@ public:
 	}
 
 protected:
-	bool bEnable = true;
+	BIT_FLAG(bEnable){ true };
 };
 
 /**
@@ -112,8 +111,8 @@ public:
 
 	static FLogRedirector* Get()
 	{
-		static FLogRedirector* instance = new FLogRedirector();
-		return instance;
+		static FLogRedirector instance = FLogRedirector();
+		return &instance;
 	}
 
 	// Formats the message before sending it to the sink
@@ -168,12 +167,12 @@ private:
 };
 
 // Macro for logging with category
-#define HLVM_LOG(_Category, _level, fmt, ...)                                                 \
-	FLogRedirector::Get()->Pump(FLogContext{                                                  \
-									.Category = static_cast<FLogCatgegory*>(_Category.get()), \
-									.LogLevel = spdlog::level::_level,                        \
-									.FileName = __FILENAME__,                                 \
-									.Line = __LINE__ },                                       \
+#define HLVM_LOG(_Category, _level, fmt, ...)                                                               \
+	FLogRedirector::Get()->Pump(FLogContext{                                                                \
+									.Category = &_Category,                                                 \
+									.LogLevel = spdlog::level::_level,                                      \
+									.FileName = TO_TCHAR_STR(&std::string_view(strrchr(__FILE__, '/'))[1]), \
+									.Line = __LINE__ },                                                     \
 		fmt, ##__VA_ARGS__)
 
 /**
@@ -186,7 +185,7 @@ public:
 	NOCOPYMOVE(FSpdlogConsoleDevice)
 
 	FSpdlogConsoleDevice();
-	~FSpdlogConsoleDevice();
+	~FSpdlogConsoleDevice() override;
 
 	// Log the message
 	virtual void Sink(const FLogContext& Context, const FString& Message) const override;

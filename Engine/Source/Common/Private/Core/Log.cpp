@@ -5,6 +5,7 @@
 #include "Common.h"
 #include "Core/Log.h"
 
+DEFINE_LOG_CATEGORY(LogAssert)
 DEFINE_LOG_CATEGORY(LogTemp)
 DEFINE_LOG_CATEGORY(LogEngine)
 DEFINE_LOG_CATEGORY(LogGame)
@@ -13,7 +14,7 @@ DEFINE_LOG_CATEGORY(LogEditor)
 #if HLVM_SPDLOG_USE_ASYNC
 // Initialize the thread pool for asynchronous logging
 // Had to use global variable to avoid thread pool being released before program finishing
-static auto SpglogThreadPool = std::make_shared<spdlog::details::thread_pool>(
+static std::shared_ptr<spdlog::details::thread_pool> SpglogThreadPool = std::make_shared<spdlog::details::thread_pool>(
 	8192, 1, [] {}, [] {});
 #endif
 

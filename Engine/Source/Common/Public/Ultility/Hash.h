@@ -5,7 +5,6 @@
 #pragma once
 
 #include "Core/String.h"
-#include "Template/GlobalTemplate.tpp"
 
 #include <boost/algorithm/hex.hpp>
 #include <boost/uuid/detail/md5.hpp>

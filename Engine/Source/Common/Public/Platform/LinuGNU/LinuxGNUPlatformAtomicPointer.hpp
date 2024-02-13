@@ -29,11 +29,11 @@ public:
 	}
 	TAtomicPointer(const TAtomicPointer& Other) noexcept
 	{
-		Ptr.store((ValueType)Other, std::memory_order_acquire);
+		Ptr.store(static_cast<ValueType>(Other), std::memory_order_acquire);
 	}
 	TAtomicPointer& operator=(const TAtomicPointer& Other) noexcept
 	{
-		Ptr.store((ValueType)Other, std::memory_order_acquire);
+		Ptr.store(static_cast<ValueType>(Other), std::memory_order_acquire);
 		return *this;
 	}
 	~TAtomicPointer() noexcept
@@ -54,12 +54,12 @@ public:
 
 	operator bool() const noexcept
 	{
-		return (ValueType)Ptr != nullptr;
+		return static_cast<ValueType>(Ptr) != nullptr;
 	}
 
 	bool operator==(const ValueType& Other) const noexcept
 	{
-		return (ValueType)(*this) == Other;
+		return static_cast<ValueType>(*this) == Other;
 	}
 
 	bool operator!=(const ValueType& Other) const noexcept
@@ -67,14 +67,14 @@ public:
 		return !((*this) == Other);
 	}
 
-	ValueType volatile& operator->() noexcept
+	ValueType operator->() noexcept
 	{
-		return (ValueType volatile&)Ptr;
+		return static_cast<ValueType>(Ptr);
 	}
 
-	const ValueType volatile& operator->() const noexcept
+	const ValueType operator->() const noexcept
 	{
-		return (const ValueType volatile&)Ptr;
+		return static_cast<ValueType>(Ptr);
 	}
 
 	friend FGenericPlatformAtomicPointer;

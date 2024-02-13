@@ -3,7 +3,7 @@
  */
 
 #pragma once
-#include "Template/GlobalTemplate.tpp"
+#include "Template/ReferenceTemplate.tpp"
 
 #include <string>
 #include <fmt/xchar.h>
@@ -17,11 +17,7 @@ static_assert(sizeof(TCHAR) == sizeof(char), "TCHAR is not char");
 #define U8_STRING(str) u8##str
 #define TXT(str) U8_STRING(str)
 #define STRTIFY(x) TXT(#x)
-#define TO_TCHAR_STR(x) (const TCHAR*)(x)
-
-// https://stackoverflow.com/a/8488201
-// Get the file name without path
-#define __FILENAME__ FString(strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
+#define TO_TCHAR_STR(x) reinterpret_cast<const TCHAR*>((x))
 
 class FString final : public std::basic_string<TCHAR>
 {
@@ -73,7 +69,7 @@ public:
 	}
 	friend const TCHAR* operator*(const FString& fs)
 	{
-		return (const TCHAR*)fs;
+		return static_cast<const TCHAR*>(fs);
 	}
 
 	// Convert to const TCHAR*
@@ -83,7 +79,7 @@ public:
 	}
 	const char* ToCharStr() const
 	{
-		return (const char*)(*this);
+		return static_cast<const char*>(*this);
 	}
 };
 
@@ -114,6 +110,6 @@ public:
 
 	friend const TCHAR* operator*(const FCharStringView& fs)
 	{
-		return (const TCHAR*)fs;
+		return static_cast<const TCHAR*>(fs);
 	}
 };

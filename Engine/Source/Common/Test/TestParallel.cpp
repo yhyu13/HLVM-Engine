@@ -16,33 +16,6 @@
 DELCARE_LOG_CATEGORY(LogTest)
 DEFINE_LOG_CATEGORY(LogTest)
 
-// Implment smoothed averge time mesaruement
-// i.e. run test case mutiple times with timer and calculate averge by removing max and min
-using TestFuncType = std::function<bool(double&)>;
-double RunTestAndCalculateAvg(const TestFuncType& func, int num_iterations)
-{
-	std::vector<double> times;
-	for (int i = 0; i < num_iterations; ++i)
-	{
-		double duration;
-		HLVM_ENSURE(func(duration), TXT("Test case failed"));
-		times.emplace_back(duration);
-	}
-	{
-		// Remove max and min
-		auto mm = std::minmax_element(begin(times), end(times));
-		std::iter_swap(mm.first, end(times) - 2);
-		std::iter_swap(mm.second, end(times) - 1);
-	}
-	// Count average
-	double avg = 0.0;
-	for (int i = 0; i < num_iterations - 2; ++i)
-	{
-		avg += times[i];
-	}
-	return avg / (num_iterations - 2);
-}
-
 /*
 	<test method>
 */
@@ -60,7 +33,6 @@ RECORD(lock_test,
 				std::once_flag			 Flag;
 				std::atomic<int>		 Counter{ kNumThreads };
 				std::vector<std::thread> threads;
-				FTimer					 timer{ true };
 				for (int j = 0; j < kNumThreads; ++j)
 				{
 					threads.emplace_back([&i, &Timer, &Flag, &Counter, &Duration] {
@@ -99,7 +71,6 @@ RECORD(lock_test,
 				std::once_flag			 Flag;
 				std::atomic<int>		 Counter{ kNumThreads };
 				std::vector<std::thread> threads;
-				FTimer					 timer{ true };
 				for (int j = 0; j < kNumThreads; ++j)
 				{
 					threads.emplace_back([&i, &Timer, &Flag, &Counter, &Duration, &lock] {
@@ -132,7 +103,7 @@ RECORD(lock_test,
 		}
 		double ratio = time_lock / time_no_lock;
 		double efficient = kNumThreads / ratio * 100;
-		HLVM_LOG(LogTest, info, TXT("Atomic ops = {0:.2f}x With lock, lock is {1:.2f}% efficient"), ratio, efficient);
+		HLVM_LOG(LogTest, info, TXT("Atomic ops = {0:.2f}x With lock, lock is {1:.2f}% efficient, ideally, lock should be 95% to 99% efficient"), ratio, efficient);
 	})
 
 RECORD(queue_test,
@@ -152,6 +123,12 @@ RECORD(queue_test,
 				std::atomic<int>		 Counter{ kNumThreads };
 				std::vector<std::thread> PushThreads;
 				std::vector<std::thread> PopThreads;
+				{
+					Queue.Push(1);
+					int val = Queue.PeekFront();
+					HLVM_ENSURE(val == 1, TXT("Queue peek front failed"));
+					HLVM_ENSURE(Queue.PopFront(val), TXT("Queue pop front failed"));
+				}
 				for (int i = 0; i < kNumThreads; ++i)
 				{
 					PushThreads.emplace_back([&Queue, &Timer, &Flag] {
@@ -207,6 +184,12 @@ RECORD(queue_test,
 				bool					 bSignalStop = false;
 				std::vector<std::thread> PushThreads;
 				std::vector<std::thread> PopThreads;
+				{
+					Queue.push(1);
+					int val;
+					HLVM_ENSURE(Queue.pop(val), TXT("Queue pop front failed"));
+					HLVM_ENSURE(val == 1, TXT("Queue peek front failed"));
+				}
 				for (int i = 0; i < kNumThreads; ++i)
 				{
 					PushThreads.emplace_back([&Queue, &Timer, &Flag] {

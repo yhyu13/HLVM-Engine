@@ -12,7 +12,10 @@
 #include <functional>
 #include <chrono>
 
-static std::vector<std::function<void()>> recorded_test_functions;
+#define CR_DEFINE_STATIC_LOCAL(type, name, arguments) \
+	static type& name = *new type arguments
+
+CR_DEFINE_STATIC_LOCAL(std::vector<std::function<void()>>, recorded_test_functions, {});
 
 // Helper function to create a lambda that runs the test and prints the info
 template <typename Func>
@@ -45,15 +48,42 @@ std::function<void()> make_test_wrapper(const FString& name, Func test_function)
 				recorded_test_functions.push_back(make_test_wrapper(#test_function, test_##test_function)); \
 			}                                                                                               \
 		};                                                                                                  \
-		AutoRegister auto_register_##test_function = AutoRegister();                                        \
+		static AutoRegister auto_register_##test_function = AutoRegister();                                 \
 	}
 
-#define RECORD(test_function, ...) \
-	void test_##test_function()    \
-	{                              \
-		__VA_ARGS__;               \
-	};                             \
+#define RECORD(test_function, ...)     \
+	static void test_##test_function() \
+	{                                  \
+		__VA_ARGS__;                   \
+	};                                 \
 	RECORD_TEST_FUNC(test_function);
+
+// Implment smoothed averge time mesaruement
+// i.e. run test case mutiple times with timer and calculate averge by removing max and min
+using TestFuncType = std::function<bool(double&)>;
+static double RunTestAndCalculateAvg(const TestFuncType& func, int num_iterations)
+{
+	std::vector<double> times;
+	for (int i = 0; i < num_iterations; ++i)
+	{
+		double duration;
+		HLVM_ENSURE(func(duration), TXT("Test case failed"));
+		times.emplace_back(duration);
+	}
+	{
+		// Remove max and min
+		auto mm = std::minmax_element(begin(times), end(times));
+		std::iter_swap(mm.first, end(times) - 2);
+		std::iter_swap(mm.second, end(times) - 1);
+	}
+	// Count average
+	double avg = 0.0;
+	for (int i = 0; i < num_iterations - 2; ++i)
+	{
+		avg += times[static_cast<unsigned long>(i)];
+	}
+	return avg / (num_iterations - 2);
+}
 
 int main()
 {

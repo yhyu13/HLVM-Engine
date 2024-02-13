@@ -42,7 +42,6 @@ protected:
 	}
 };
 
-std::unique_ptr<FGenericPlatformDebuggerUtil>
-	FGenericPlatformDebuggerUtil::s_instance{ new FWindowsPlatformDebuggerUtil() };
+FGenericPlatformDebuggerUtil* FGenericPlatformDebuggerUtil::s_instance{ new FWindowsPlatformDebuggerUtil() };
 
 #endif

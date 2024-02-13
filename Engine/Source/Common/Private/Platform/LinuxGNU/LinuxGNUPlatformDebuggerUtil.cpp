@@ -18,6 +18,8 @@ class FLinuxGNUPlatformDebuggerUtil final : public FGenericPlatformDebuggerUtil
 protected:
 	virtual bool IsDebuggerPresentInternal() final override
 	{
+		using namespace std::chrono_literals;
+
 		static FTimer	   PeriodicTimer{ 1s, true };
 		static int		   underDebugger = 0;
 		static bool		   isCheckedAlready = false;
@@ -46,7 +48,6 @@ protected:
 	}
 };
 
-std::unique_ptr<FGenericPlatformDebuggerUtil>
-	FGenericPlatformDebuggerUtil::s_instance{ new FLinuxGNUPlatformDebuggerUtil() };
+FGenericPlatformDebuggerUtil* FGenericPlatformDebuggerUtil::s_instance{ new FLinuxGNUPlatformDebuggerUtil() };
 
 #endif

@@ -29,7 +29,7 @@ inline typename TReferenceRemoved<T>::Type&& MoveTemp(T&& Var)
 {
 	using OutType = typename TReferenceRemoved<T>::Type;
 	static_assert(!std::is_same_v<const OutType&, OutType&>, "Move should not be used on const object");
-	return (OutType&&)Var;
+	return static_cast<OutType&&>(Var);
 }
 
 template <typename T>

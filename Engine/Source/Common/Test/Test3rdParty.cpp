@@ -11,6 +11,7 @@
 #include <magic_enum_all.hpp>
 #include <backward.hpp>
 #include <parallel_hashmap/phmap.h>
+#include <ctre.hpp>
 
 DELCARE_LOG_CATEGORY(LogTest)
 DEFINE_LOG_CATEGORY(LogTest)
@@ -220,4 +221,28 @@ RECORD(phmap_test,
 				}
 			}
 		}
+	})
+
+constexpr auto match(std::string_view sv) noexcept
+{
+	return ctre::match<"h.*">(sv);
+};
+
+constexpr auto match_functionCall(std::string_view sv) noexcept
+{
+	return ctre::match<R"(\w+\((.*?)\)\w*)">(sv);
+};
+
+constexpr auto match_assignment(std::string_view sv) noexcept
+{
+	return ctre::match<R"(.*?[^=]=[^=].*?)">(sv);
+};
+
+RECORD(test_ctre,
+	{
+		HLVM_ENSURE(match("h.h.cpp"), TXT("Failed"));
+		HLVM_ENSURE(match_functionCall("a()"), TXT("Failed"));
+		HLVM_ENSURE(!match_functionCall("(a)"), TXT("Failed"));
+		HLVM_ENSURE(match_assignment("a() = 1"), TXT("Failed"));
+		HLVM_ENSURE(!match_assignment("bool(a == 1)"), TXT("Failed"));
 	})

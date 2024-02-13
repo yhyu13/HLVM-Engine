@@ -35,6 +35,12 @@ parallel_hashmap = FetchContent(name='parallel-hashmap',
                                     DomainValueModel(domain=DomainEnum.PUBLIC,
                                                      values=['${parallel-hashmap_SOURCE_DIR}'])],
                                 )
+ctre = FetchContent(name='ctre',
+                    git_repo_url='https://github.com/yhyu13/compile-time-regular-expressions.git',
+                    git_tag='9725886582a928491a086bba1c07909b2e583157',
+                    target_link_libs=[DomainValueModel(domain=DomainEnum.PUBLIC,
+                                                       values=['ctre::ctre'])]
+                    )
 
 spdlog = FindPackage(name='spdlog',
                      config=True,
@@ -66,11 +72,13 @@ class CommonModule(BaseModule):
         super().__init__(module=ModuleTargetModel(target='Common',
                                                   type=ModuleEnum.STATIC,
                                                   source_files=glob_cmake_paths([GlobModel(path='./Private/**/*.cpp',
-                                                                                     recursive=True)
-                                                                           ])),
+                                                                                           recursive=True)
+                                                                                 ]),
+                                                  unity_build=True),
                          fetch_packages=[yalantinlibs,
                                          backward,
                                          parallel_hashmap,
+                                         ctre
                                          ],
                          find_packages=[spdlog,
                                         mimalloc,
@@ -89,7 +97,8 @@ class TestCommonModule(BaseModule):
     def __init__(self, cpp_path: str):
         super().__init__(module=ModuleTargetModel(target=os.path.basename(cpp_path).split('.')[0],
                                                   type=ModuleEnum.EXECUTABLE,
-                                                  source_files=[ToCMakePath(cpp_path)])
+                                                  source_files=[ToCMakePath(cpp_path)],
+                                                  unity_build=False)
                          )
         self.target_interface.add_pch_files(domain=DomainEnum.REUSE_FROM,
                                             values=['Common'])
@@ -108,6 +117,9 @@ class CommonProject(BaseProject):
                                                               "$<$<CONFIG:RelWithDebInfo>:HLVM_BUILD_DEVELOPMENT=1>",
                                                               "$<$<CONFIG:Release>:HLVM_BUILD_RELEASE=1>",
                                                               "$<$<CONFIG:MinSizeRel>:HLVM_BUILD_RELEASE=1>"])
+        self.global_interface.add_compile_options(domain=DomainEnum.GLOBAL,
+                                                  values=[])
+
         self.modules.append(CommonModule())
         self.modules.extend([TestCommonModule(path) for path in glob.glob("./Test/*.cpp")])
 
@@ -125,3 +137,25 @@ if __name__ == '__main__':
     write_cmake_file_to_current_dir([
         CommonProject()
     ])
+
+
+    # # Enable all warnings
+    # set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra")
+    #
+    # # Enable even more pedantic warnings
+    # set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -pedantic")
+    #
+    # # Treat warnings as errors
+    # set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Werror")
+    #
+    # # Same for C++
+    # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic -Werror")
+    #
+    # # Optionally, enable specific warnings like unused variables or implicit conversion
+    # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wunused-variable -Wconversion")
+    #
+    # # For a stricter check, include warnings that are not enabled by -Wall and -Wextra
+    # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Weverything")
+    #
+    # # But if you want to disable certain warnings (for example, some third-party libraries might trigger them), you can exclude:
+    # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-c++98-compat-pedantic")  # Disable C++98 compatibility warnings

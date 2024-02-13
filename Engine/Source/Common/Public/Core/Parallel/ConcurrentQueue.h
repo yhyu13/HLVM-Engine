@@ -7,7 +7,7 @@
 #include "ParallelDefinition.h"
 #include "Platform/GenericPlatformAtomicPointer.h"
 #include "Core/Assert.h"
-#include "Template/GlobalTemplate.tpp"
+#include "Template/ReferenceTemplate.tpp"
 
 /**
  * Enumerates concurrent queue modes.
@@ -205,12 +205,12 @@ public:
 	/**
 	 * This method is for debugging propose.
 	 * User should use while(!Queue.ShouldStopPop()) to check queue should pop or not.
-	 * @return
+	 * @return size_t Number of elements in the queue
 	 */
 	size_t Num() const noexcept
 		requires(bCountSize)
 	{
-		return Count.load(std::memory_order_relaxed);
+		return static_cast<size_t>(Count.load(std::memory_order_relaxed));
 	}
 
 	void SignalStop() noexcept

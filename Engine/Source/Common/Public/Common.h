@@ -4,6 +4,7 @@
 
 #pragma once
 #include "GlobalDefinition.h"
+#include "Platform/PlatformDefinition.h"
 #include "Template/GlobalTemplate.tpp"
 
 // https://github.com/microsoft/mimalloc

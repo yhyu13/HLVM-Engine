@@ -6,8 +6,6 @@
 
 #include <chrono>
 
-using namespace std::chrono_literals;
-
 /**
  * @brief Timer that set and return time point in sec/millisec, etc. FTimer will now initialized until user called Reset() or Mark()
  *        This class has the advantage of trivial construction (save couple hundred clocks) for counting down only when you need it.
@@ -140,6 +138,6 @@ public:
 
 private:
 	std::chrono::steady_clock::time_point m_last;		   ///< 时间点
-	bool								  m_init{ false }; ///< 是否初始化
 	double								  m_period{ 0.0 }; ///< 周期
+	BIT_FLAG(m_init){ false };							   ///< 是否初始化
 };

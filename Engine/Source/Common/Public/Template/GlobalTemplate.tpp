@@ -5,3 +5,5 @@
 #pragma once
 
 #include "ReferenceTemplate.tpp"
+#include "PointerTemplate.tpp"
+#include "ExpressionTemplate.tpp"

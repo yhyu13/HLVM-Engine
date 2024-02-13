@@ -3,6 +3,7 @@
  */
 
 #include "Ultility/Hash.h"
+#include "Template/ReferenceTemplate.tpp"
 
 FMD5Hash::MD5Digest::MD5Digest(boost::uuids::detail::md5::digest_type&& data)
 {
@@ -12,8 +13,8 @@ FMD5Hash::MD5Digest::MD5Digest(boost::uuids::detail::md5::digest_type&& data)
 
 FString FMD5Hash::MD5Digest::ToString() const
 {
-	FString result;
-	auto	char_digest = reinterpret_cast<const char*>(&digest);
+	FString		result;
+	const char* char_digest = reinterpret_cast<const char*>(&digest);
 	boost::algorithm::hex(char_digest, char_digest + sizeof(digest), std::back_inserter(result));
 	return result;
 }

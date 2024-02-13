@@ -20,9 +20,9 @@ class FGenericPlatformAtomicPointer
 public:
 	/**
 	 * Mimic std::atomic_exchange
-	 * @tparam T
-	 * @param obj
-	 * @param desired
+	 * @tparam T Must be Pointer type
+	 * @param obj the object to exchange to a new value
+	 * @param desired the value to be exchanged
 	 * @return old obj value
 	 */
 	template <TPointer T>
@@ -30,10 +30,10 @@ public:
 
 	/**
 	 * Mimic std::atomic_compare_exchange
-	 * @tparam T
-	 * @param obj
-	 * @param expected
-	 * @param desired
+	 * @tparam T Must be Pointer type
+	 * @param obj the object to exchange to a new value
+	 * @param expected the value to be compared, if it is equal to obj, then exchange obj to desired
+	 * @param desired the value to be exchanged
 	 * @return true if exchange was successful
 	 */
 	template <TPointer T>

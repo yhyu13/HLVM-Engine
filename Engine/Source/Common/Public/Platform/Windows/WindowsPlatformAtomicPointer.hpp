@@ -65,14 +65,14 @@ public:
 		return !((*this) == Other);
 	}
 
-	ValueType volatile& operator->() noexcept
+	ValueType operator->() noexcept
 	{
-		return (ValueType volatile&)Ptr;
+		return (ValueType)Ptr;
 	}
 
-	const ValueType volatile& operator->() const noexcept
+	const ValueType operator->() const noexcept
 	{
-		return (const ValueType volatile&)Ptr;
+		return (const ValueType)Ptr;
 	}
 
 	friend FGenericPlatformAtomicPointer;
