@@ -38,8 +38,12 @@
 			}                          \
 			while (0)
 	#else
+constexpr auto ctre_checkExpressionPassAssert(std::u8string_view sv) noexcept -> bool
+{
+	return ctre_MatchFunctionCall(sv) || ctre_MatchAssignment(sv);
+};
 		#define HLVM_ASSERT(x, ...) \
-			static_assert(!(ctre_MatchFunctionCall(STRTIFY(x)) || ctre_MatchAssignment(STRTIFY(x))), "Should not ignore evaluation of this expression, consider set HLVM_ASSERT_ALWAYS_EVLUATE_EXPERSION=1 or using HLVM_ENSURE")
+			static_assert(!(ctre_checkExpressionPassAssert(STRTIFY(x))), "Should not ignore evaluation of this expression, consider set HLVM_ASSERT_ALWAYS_EVLUATE_EXPERSION=1 or using HLVM_ENSURE")
 	#endif
 #endif
 

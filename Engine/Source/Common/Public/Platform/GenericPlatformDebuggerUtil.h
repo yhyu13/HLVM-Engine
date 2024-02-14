@@ -16,6 +16,8 @@
 class FGenericPlatformDebuggerUtil
 {
 public:
+	NOCOPYMOVE(FGenericPlatformDebuggerUtil)
+	FGenericPlatformDebuggerUtil() = default;
 	virtual ~FGenericPlatformDebuggerUtil() = default;
 
 	inline static bool IsDebuggerPresent()

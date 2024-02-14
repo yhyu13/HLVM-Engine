@@ -10,8 +10,18 @@
 #include <spdlog/async.h>
 #include <magic_enum_all.hpp>
 #include <backward.hpp>
-#include <parallel_hashmap/phmap.h>
 #include <ctre.hpp>
+
+/**
+ * phmap has alot of unconventional warnings, pretty bad code though
+ */
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wcomma"
+#pragma clang diagnostic ignored "-Wold-style-cast"
+#pragma clang diagnostic ignored "-Wsign-conversion"
+#pragma clang diagnostic ignored "-Wmissing-noreturn"
+#include <parallel_hashmap/phmap.h>
+#pragma clang diagnostic pop
 
 DELCARE_LOG_CATEGORY(LogTest)
 DEFINE_LOG_CATEGORY(LogTest)
@@ -33,7 +43,7 @@ RECORD(spdlog_test,
 		spdlog::info("Positional args are {1} {0}..", "too", "supported");
 		spdlog::info("中文 is {0}{1}..", "也", "支持的");
 		std::u8string str = u8"u8中文";
-		spdlog::info((char*)str.data());
+		spdlog::info(reinterpret_cast<const char*>(str.c_str()));
 		spdlog::info("{:<30}", "left aligned");
 
 		spdlog::set_level(spdlog::level::debug); // Set global log level to debug

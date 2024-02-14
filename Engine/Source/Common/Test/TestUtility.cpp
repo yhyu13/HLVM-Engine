@@ -17,8 +17,9 @@ DEFINE_LOG_CATEGORY(LogTest)
 /*
 	<test method>
 */
-bool test_timer_test()
+static bool test_timer_test()
 {
+	using namespace std::chrono_literals;
 	HLVM_LOG(LogTest, debug, TXT("Timer Test"));
 	{
 		// Trivially construct w/o reset, and no period given
@@ -56,7 +57,7 @@ bool test_timer_test()
 };
 RECORD_TEST_FUNC(timer_test);
 
-bool test_hash_test()
+static bool test_hash_test()
 {
 	// Generate some text data
 	std::string			TextData = "Hello World";

@@ -13,7 +13,7 @@ DEFINE_LOG_CATEGORY(LogTest)
 /*
 	<test method>
 */
-bool test_logger_test()
+static bool test_logger_test()
 {
 	HLVM_LOG(LogTest, trace, TXT("Hello World!"));
 

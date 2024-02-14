@@ -12,10 +12,7 @@
 #include <functional>
 #include <chrono>
 
-#define CR_DEFINE_STATIC_LOCAL(type, name, arguments) \
-	static type& name = *new type arguments
-
-CR_DEFINE_STATIC_LOCAL(std::vector<std::function<void()>>, recorded_test_functions, {});
+static std::vector<std::function<void()>> recorded_test_functions{};
 
 // Helper function to create a lambda that runs the test and prints the info
 template <typename Func>

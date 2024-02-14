@@ -86,6 +86,12 @@ class CommonModule(BaseModule):
                                         Boost,
                                         ]
                          )
+        self.target_interface.add_compile_options(domain=DomainEnum.PUBLIC, values=[
+            '$<$<COMPILE_LANGUAGE:C>: -Wall -Wextra -pedantic -Werror>',
+            '$<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra -pedantic -Werror -Wunused-variable -Wconversion -Weverything>',
+            '$<$<COMPILE_LANGUAGE:CXX>:-Wno-padded -Wno-gnu-zero-variadic-macro-arguments -Wno-reserved-identifier -Wno-exit-time-destructors -Wno-global-constructors -Wno-c++98-compat-pedantic -Wno-float-equal>',
+            '$<$<COMPILE_LANGUAGE:CXX>:-Wno-error=global-constructors -Wno-error=exit-time-destructors -Wno-error=unsafe-buffer-usage -Wno-error=unused-function -Wno-error=unused-but-set-variable -Wno-error=unused-variable -Wno-error=unused-member-function>'
+        ])
 
         self.target_interface.add_include_dirs(domain=DomainEnum.PUBLIC,
                                                values=['./Public'])
@@ -112,13 +118,20 @@ class CommonProject(BaseProject):
                          vcpkg_context=vcpkg_cxt, **kwargs)
         vcpkg_cxt.dump('./vcpkg.json')
 
+        self.global_interface.add_global_set('CMAKE_EXPORT_COMPILE_COMMANDS', ['ON'])
+        self.global_interface.add_global_set('CMAKE_C_STANDARD', ['23'])
+        self.global_interface.add_global_set('CMAKE_CXX_STANDARD', ['23'])
+        self.global_interface.add_global_set('CMAKE_DEBUG_POSTFIX', ['d'])
+        bin_output_dir = '${PROJECT_SOURCE_DIR}/Binary/${CMAKE_BUILD_TYPE}'
+        self.global_interface.add_global_set('CMAKE_RUNTIME_OUTPUT_DIRECTORY', [bin_output_dir])
+        self.global_interface.add_global_set('CMAKE_LIBRARY_OUTPUT_DIRECTORY', [bin_output_dir])
+        self.global_interface.add_global_set('CMAKE_ARCHIVE_OUTPUT_DIRECTORY', [bin_output_dir])
+
         self.global_interface.add_compile_definitions(domain=DomainEnum.GLOBAL,
                                                       values=["$<$<CONFIG:Debug>:HLVM_BUILD_DEBUG=1>",
                                                               "$<$<CONFIG:RelWithDebInfo>:HLVM_BUILD_DEVELOPMENT=1>",
                                                               "$<$<CONFIG:Release>:HLVM_BUILD_RELEASE=1>",
                                                               "$<$<CONFIG:MinSizeRel>:HLVM_BUILD_RELEASE=1>"])
-        self.global_interface.add_compile_options(domain=DomainEnum.GLOBAL,
-                                                  values=[])
 
         self.modules.append(CommonModule())
         self.modules.extend([TestCommonModule(path) for path in glob.glob("./Test/*.cpp")])
@@ -137,25 +150,3 @@ if __name__ == '__main__':
     write_cmake_file_to_current_dir([
         CommonProject()
     ])
-
-
-    # # Enable all warnings
-    # set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra")
-    #
-    # # Enable even more pedantic warnings
-    # set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -pedantic")
-    #
-    # # Treat warnings as errors
-    # set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Werror")
-    #
-    # # Same for C++
-    # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic -Werror")
-    #
-    # # Optionally, enable specific warnings like unused variables or implicit conversion
-    # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wunused-variable -Wconversion")
-    #
-    # # For a stricter check, include warnings that are not enabled by -Wall and -Wextra
-    # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Weverything")
-    #
-    # # But if you want to disable certain warnings (for example, some third-party libraries might trigger them), you can exclude:
-    # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-c++98-compat-pedantic")  # Disable C++98 compatibility warnings

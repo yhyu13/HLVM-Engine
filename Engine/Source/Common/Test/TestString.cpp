@@ -13,7 +13,7 @@ DEFINE_LOG_CATEGORY(LogTest)
 /*
 	<test method>
 */
-void test_string_test()
+static void test_string_test()
 {
 	HLVM_LOG(LogTest, trace, TXT("Test performance impact on different order of formatting!"));
 	{
