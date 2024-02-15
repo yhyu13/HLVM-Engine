@@ -4,11 +4,8 @@
 
 #pragma once
 
-#include "Platform/GenericPlatformDebuggerUtil.h"
-#include "Core/Log.h"
 #include "Core/String.h"
-
-#include <exception>
+#include "Template/ExpressionTemplate.tpp"
 
 [[noreturn]] void hlvm_internal_assert(const TCHAR* Expression, FString&& Message, const TCHAR* File, int Line);
 
@@ -38,12 +35,12 @@
 			}                          \
 			while (0)
 	#else
-constexpr auto ctre_checkExpressionPassAssert(std::u8string_view sv) noexcept -> bool
+constexpr auto __ctre_checkExpressionPassAssert(std::u8string_view sv) noexcept -> bool
 {
 	return ctre_MatchFunctionCall(sv) || ctre_MatchAssignment(sv);
 };
 		#define HLVM_ASSERT(x, ...) \
-			static_assert(!(ctre_checkExpressionPassAssert(STRTIFY(x))), "Should not ignore evaluation of this expression, consider set HLVM_ASSERT_ALWAYS_EVLUATE_EXPERSION=1 or using HLVM_ENSURE")
+			static_assert(!(__ctre_checkExpressionPassAssert(STRTIFY(x))), "Should not ignore evaluation of this expression, consider set HLVM_ASSERT_ALWAYS_EVLUATE_EXPERSION=1 or using HLVM_ENSURE")
 	#endif
 #endif
 
@@ -55,18 +52,3 @@ constexpr auto ctre_checkExpressionPassAssert(std::u8string_view sv) noexcept ->
 			hlvm_internal_assert(STRTIFY(x), FString::Format(__VA_ARGS__), TXT(__FILE__), __LINE__); \
 	}                                                                                                \
 	while (0)
-
-// Avoid using this inline macro as it creates too many inline code
-// #define HLVM_ENSURE(x, ...)                                                                                                                      \
-//	do                                                                                                                                           \
-//	{                                                                                                                                            \
-//		if (static_cast<bool>((x)) == false)                                                                                                     \
-//		{                                                                                                                                        \
-//			const FCharStringView& StackTrace = FGenericPlatformDebuggerUtil::GetStackTrace();                                                   \
-//			const FString&		   msg = FString::Format(TXT("Ensure failed: {1}, with '{2}' at\n{0}"), *StackTrace, STRTIFY(x), __VA_ARGS__); \
-//			HLVM_LOG(LogAssert, critical, *msg);                                                                                                 \
-//			HLVM_TRY_DEBUG_BREAK();                                                                                                              \
-//			throw std::runtime_error(msg.ToCharStr());                                                                                           \
-//		}                                                                                                                                        \
-//	}                                                                                                                                            \
-//	while (0)

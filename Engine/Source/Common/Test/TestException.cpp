@@ -4,6 +4,7 @@
 
 #include "Test.h"
 
+#include "Platform/GenericPlatformDebuggerUtil.h"
 #include "Core/Log.h"
 #include "Core/Assert.h"
 

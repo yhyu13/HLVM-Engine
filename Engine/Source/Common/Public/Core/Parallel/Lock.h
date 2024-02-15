@@ -7,7 +7,7 @@
 #include "ParallelDefinition.h"
 
 #ifndef HLVM_ATOMIC_LOCK_ENABLE_PADDING
-	#define HLVM_ATOMIC_LOCK_ENABLE_PADDING 1
+	#define HLVM_ATOMIC_LOCK_ENABLE_PADDING 0
 #endif
 
 #if !HLVM_BUILD_RELEASE
@@ -24,6 +24,7 @@ public:
 	FAtomicLockGuard() = delete;
 	explicit FAtomicLockGuard(std::atomic_flag& flag) noexcept(!HLVM_DEADLOCK_TIMER);
 	explicit FAtomicLockGuard(FAtomicFlag& Flag) noexcept(!HLVM_DEADLOCK_TIMER);
+	explicit FAtomicLockGuard(std::optional<FAtomicFlag>& Flag) noexcept(!HLVM_DEADLOCK_TIMER);
 
 	~FAtomicLockGuard() noexcept;
 
@@ -50,7 +51,7 @@ public:
 	static void UnLockS() noexcept;
 
 protected:
-	HLVM_CACHE_ALIGN inline static std::atomic_flag sc_flag = ATOMIC_FLAG_INIT;
+	HLVM_CACHE_ALIGN inline static std::atomic_flag sc_flag{ 0 };
 };
 
 /**
@@ -69,7 +70,7 @@ public:
 	static void UnLockNI() noexcept;
 
 protected:
-	HLVM_CACHE_ALIGN inline static std::atomic_flag ni_flag = ATOMIC_FLAG_INIT;
+	HLVM_CACHE_ALIGN inline static std::atomic_flag ni_flag{ 0 };
 };
 
 /**
@@ -94,7 +95,7 @@ protected:
 	// Prevent delete by this pointer type, this way compiler would not allow it
 	~FAtomicFlagNC() noexcept = default;
 
-	mutable std::atomic_flag nc_flag = ATOMIC_FLAG_INIT;
+	mutable std::atomic_flag nc_flag{ 0 };
 
 private:
 #if HLVM_ATOMIC_LOCK_ENABLE_PADDING
@@ -117,21 +118,25 @@ public:
 	~FAtomicFlag() noexcept = default;
 
 	FAtomicFlag(const FAtomicFlag&) noexcept
+		: m_flag{ 0 }
 	{
-		// Not copy the atomic flag
+		// Trivial
 	}
 
 	FAtomicFlag(FAtomicFlag&&) noexcept
+		: m_flag{ 0 }
 	{
-		// Not copy the atomic flag
+		// Trivial
 	}
 
 	FAtomicFlag& operator=(const FAtomicFlag&) noexcept
 	{
+		// Trivial
 		return *this;
 	}
 	FAtomicFlag& operator=(FAtomicFlag&&) noexcept
 	{
+		// Trivial
 		return *this;
 	}
 
@@ -140,7 +145,7 @@ public:
 
 protected:
 	friend class FAtomicLockGuard;
-	mutable std::atomic_flag m_flag = ATOMIC_FLAG_INIT;
+	mutable std::atomic_flag m_flag{ 0 };
 
 private:
 #if HLVM_ATOMIC_LOCK_ENABLE_PADDING

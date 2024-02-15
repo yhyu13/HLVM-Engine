@@ -3,6 +3,8 @@
  */
 
 #include "Core/Assert.h"
+#include "Core/Log.h"
+#include "Platform/GenericPlatformDebuggerUtil.h"
 
 [[noreturn]] void hlvm_internal_assert(const TCHAR* Expression, FString&& Message, const TCHAR* File, int Line)
 {

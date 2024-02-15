@@ -65,9 +65,10 @@ RECORD(lock_test,
 		{
 			HLVM_LOG(LogTest, info, TXT("With lock : Create 10 threads and adds to i"));
 			auto TestFunc = [&](double& Duration) -> bool {
-				int						 i = 0;
-				FTimer					 Timer;
-				FAtomicFlag				 lock;
+				int						   i = 0;
+				FTimer					   Timer;
+				std::optional<FAtomicFlag> lock = FAtomicFlag{};
+				// std::optional<FAtomicFlag> lock;
 				std::once_flag			 Flag;
 				std::atomic<int>		 Counter{ kNumThreads };
 				std::vector<std::thread> threads;

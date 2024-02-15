@@ -10,7 +10,7 @@
 
 #if HLVM_DEADLOCK_TIMER
 	#define INIT_DEADLOCK_TIMER() FTimer _timer
-	#define ASSERT_DEADLOCK_TIMER() HLVM_ASSERT(_timer.Mark() < 10., TXT("Dead lock after 10s"))
+	#define ASSERT_DEADLOCK_TIMER() HLVM_ENSURE(_timer.Mark() < 10., TXT("Dead lock after 10s"))
 #else
 	#define INIT_DEADLOCK_TIMER()
 	#define ASSERT_DEADLOCK_TIMER()
@@ -64,8 +64,18 @@ FAtomicLockGuard::FAtomicLockGuard(FAtomicFlag& Flag) noexcept(!HLVM_DEADLOCK_TI
 	LOCK_BODY(m_lock);
 }
 
+FAtomicLockGuard::FAtomicLockGuard(std::optional<FAtomicFlag>& Flag) noexcept(!HLVM_DEADLOCK_TIMER)
+	: m_lock((Flag) ? &Flag->m_flag : nullptr)
+{
+	if (!m_lock) [[unlikely]]
+		return;
+	LOCK_BODY(m_lock);
+}
+
 FAtomicLockGuard::~FAtomicLockGuard() noexcept
 {
+	if (!m_lock) [[unlikely]]
+		return;
 	UNLOCK_BODY(m_lock);
 }
 

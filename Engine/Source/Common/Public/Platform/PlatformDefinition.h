@@ -39,3 +39,10 @@
 #else
 	#error "Not implemented for uknown platform"
 #endif
+
+/**
+ * Generic platform definitions
+ */
+static_assert(1 == sizeof(char), "char is not 1 byte in size");
+static_assert(1 == sizeof(uint8_t), "char is not 1 byte in size");
+static_assert(1 == sizeof(std::byte), "char is not 1 byte in size");
