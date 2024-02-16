@@ -7,6 +7,10 @@
 #include "String.h"
 
 #include <fmt/xchar.h>
+#ifdef SPDLOG_ACTIVE_LEVEL
+	// Undefine spdlog default SPDLOG_ACTIVE_LEVEL
+	#undef SPDLOG_ACTIVE_LEVEL
+#endif
 #define SPDLOG_ACTIVE_LEVEL 0
 #define HLVM_SPDLOG_USE_ASYNC 1 //! HLVM_BUILD_DEBUG
 #include <spdlog/spdlog.h>

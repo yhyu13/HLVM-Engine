@@ -7,6 +7,9 @@
  * @brief This file is automatically included by cmake for .cpp. This file should be as static as possible, with mostly only std library or equivalent
  */
 
+/**
+ * std library includes
+ */
 #include <iostream>
 #include <fstream>
 #include <utility>
@@ -39,3 +42,29 @@
 
 #include <math.h>
 #include <filesystem>
+
+/**
+ * 3rd party includes
+ */
+#include <ylt/struct_pack.hpp>
+#include <spdlog/spdlog.h>
+#include <spdlog/async.h>
+#include <magic_enum_all.hpp>
+#include <backward.hpp>
+#include <ctre.hpp>
+
+/**
+ * phmap has alot of unconventional warnings, pretty bad code though
+ */
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wcomma"
+#pragma clang diagnostic ignored "-Wold-style-cast"
+#pragma clang diagnostic ignored "-Wsign-conversion"
+#pragma clang diagnostic ignored "-Wmissing-noreturn"
+#include <parallel_hashmap/phmap.h>
+#pragma clang diagnostic pop
+
+/**
+ * Boost include
+ */
+#include <boost/filesystem.hpp>

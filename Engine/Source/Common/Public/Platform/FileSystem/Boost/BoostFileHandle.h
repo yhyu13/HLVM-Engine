@@ -5,8 +5,8 @@
 #pragma once
 
 #include "Core/Assert.h"
-#include "Core/FileSystem/FileHandle.h"
-#include "Core/FileSystem/Path.h"
+#include "Platform/FileSystem/FileHandle.h"
+#include "Platform/FileSystem/Path.h"
 #include "Core/Parallel/Lock.h"
 
 #include <magic_enum_all.hpp>
@@ -53,12 +53,17 @@ public:
 	virtual OpRetType Tell(int64_t& Offset, OpStatusType Status_InOut) final override;
 	virtual OpRetType Size(size_t& Size, OpStatusType Status_InOut) final override;
 
-	virtual OpRetType Truncate(size_t Size, const FPath& FilePath, OpStatusType Status_InOut) final override;
+	/**
+	 * These methods can be static methods, but since we require inheritance, they have to be member virtual methods
+	 */
+	virtual OpRetType Truncate(size_t Size, OpStatusType Status_InOut) final override;
 	virtual OpRetType Stat(std::shared_ptr<IFFileStat>& Stat, const FPath& FilePath, OpStatusType Status_InOut) final override;
 
 private:
-	void HandleException(const OpStatusType& Status_InOut, const TCHAR* Function, const std::exception& Exception);
-	void HandleException2(const OpStatusType& Status_InOut, const TCHAR* Function);
+	const void* MappedFileCurPos_R(int64_t Offset) const;
+	void*		MappedFileCurPos_W(int64_t Offset);
+	void		HandleException(const OpStatusType& Status_InOut, const TCHAR* Function, const std::exception& Exception);
+	void		HandleException2(const OpStatusType& Status_InOut, const TCHAR* Function);
 
 private:
 	FPath												  mFilePath;

@@ -5,6 +5,7 @@
 #pragma once
 
 #include "Core/String.h"
+#include "Core/Container/ContainerDefinition.h"
 
 #include <boost/filesystem/path.hpp>
 
@@ -78,4 +79,11 @@ public:
 	{
 		return static_cast<const char*>(*this);
 	}
+
+	/**
+	 * Static methods, internally calling generic platform api
+	 */
+	static bool				 IsDirectory(const FPath& path);
+	static bool				 Exists(const FPath& path);
+	static TSVector32<FPath> FindAllMatch(const FPath& path, const FString& pattern, bool recursive = false);
 };

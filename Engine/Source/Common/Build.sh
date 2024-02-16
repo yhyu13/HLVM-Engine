@@ -13,7 +13,7 @@ for dir in "${directories[@]}"; do
     #cmake -DCMAKE_BUILD_TYPE=$(basename "$dir") ../
 
     # 构建项目
-    cmake --build .
+    cmake --build . && ctest . || exit 1
 
     # 回到上级目录
     cd "$ROOT_DIR" || exit

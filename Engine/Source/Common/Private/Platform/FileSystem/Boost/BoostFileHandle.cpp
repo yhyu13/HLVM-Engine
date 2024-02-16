@@ -2,7 +2,7 @@
  * Copyright (c) 2024. MIT License. All rights reserved.
  */
 
-#include "Core/FileSystem/BoostFileHandle.h"
+#include "Platform/FileSystem/Boost/BoostFileHandle.h"
 #include "Core/Log.h"
 
 DELCARE_LOG_CATEGORY(LogBoostFileHandle)
@@ -16,8 +16,7 @@ DEFINE_LOG_CATEGORY(LogBoostFileHandle)
 
 #define HANDLE_EXCPETIONS() HandleException(Status_InOut, TO_TCHAR_STR(__FUNCTION__), Exception)
 #define HANDLE_EXCPETIONS2() HandleException2(Status_InOut, TO_TCHAR_STR(__FUNCTION__))
-#define MAPPEDFILE_CURPOS_W() (&(mMappedFile->data()[mMappedSeekPos]))
-#define MAPPEDFILE_CURPOS_R() (&(mMappedFile->const_data()[mMappedSeekPos]))
+
 #define HANDLE_ASSERT(x, ...) HLVM_ASSERT(x, TXT("File {} : {}"), *mFilePath, ##__VA_ARGS__)
 #define HANDLE_ENSURE(x, ...) HLVM_ENSURE(x, TXT("File {} : {}"), *mFilePath, ##__VA_ARGS__)
 #define VERBOSE_LOG(...)                                                                         \
@@ -211,8 +210,8 @@ IFileHandle::OpRetType FBoostFileHandle::Read(void* Buffer, size_t Size, int64_t
 		SCOPE_LOCK();
 		if (mFileOptions.eFileMapped == EFileMapped::Mapped)
 		{
-			HANDLE_ASSERT(!IsPointerOverlap(Buffer, Size, &MAPPEDFILE_CURPOS_R()[Offset]), TXT("mMappedFile overlap with read region"));
-			std::memcpy(Buffer, &MAPPEDFILE_CURPOS_R()[Offset], Size);
+			HANDLE_ASSERT(!IsPointerOverlap(Buffer, Size, MappedFileCurPos_R(Offset)), TXT("mMappedFile overlap with read region"));
+			std::memcpy(Buffer, MappedFileCurPos_R(Offset), Size);
 		}
 		else
 		{
@@ -258,8 +257,8 @@ IFileHandle::OpRetType FBoostFileHandle::Write(const void* Buffer, size_t Size, 
 		SCOPE_LOCK();
 		if (mFileOptions.eFileMapped == EFileMapped::Mapped)
 		{
-			HANDLE_ASSERT(!IsPointerOverlap(&MAPPEDFILE_CURPOS_W()[Offset], Size, Buffer), TXT("mMappedFile overlap with write region"));
-			std::memcpy(&MAPPEDFILE_CURPOS_W()[Offset], Buffer, Size);
+			HANDLE_ASSERT(!IsPointerOverlap(MappedFileCurPos_W(Offset), Size, Buffer), TXT("mMappedFile overlap with write region"));
+			std::memcpy(MappedFileCurPos_W(Offset), Buffer, Size);
 		}
 		else
 		{
@@ -475,17 +474,17 @@ IFileHandle::OpRetType FBoostFileHandle::Size(size_t& Size, OpStatusType Status_
 	return *this;
 }
 
-IFileHandle::OpRetType FBoostFileHandle::Truncate(size_t Size, const FPath& FilePath, OpStatusType Status_InOut)
+IFileHandle::OpRetType FBoostFileHandle::Truncate(size_t Size, OpStatusType Status_InOut)
 {
-	HANDLE_ENSURE2(*Status_InOut, TXT("File operation continue with failed status"));
+	HANDLE_ENSURE(*Status_InOut, TXT("File operation continue with failed status"));
 
 	try
 	{
 		SCOPE_LOCK();
 		{
 			boost::system::error_code ec;
-			boost::filesystem::resize_file(FilePath.ToCharStr(), Size, ec);
-			HANDLE_ENSURE2(!ec, TXT("File truncate failed"));
+			boost::filesystem::resize_file(mFilePath.ToCharStr(), Size, ec);
+			HANDLE_ENSURE(!ec, TXT("File truncate failed"));
 		}
 
 		if (Status_InOut->bCancelByUser) [[unlikely]]
@@ -496,7 +495,7 @@ IFileHandle::OpRetType FBoostFileHandle::Truncate(size_t Size, const FPath& File
 		{
 			Status_InOut->eFileOpStatus = EFileOpStatus::Success;
 		}
-		VERBOSE_LOG2(FString::Format(TXT("Truncate success with size {}"), Size));
+		VERBOSE_LOG(FString::Format(TXT("Truncate success with size {}"), Size));
 	}
 	catch (std::exception& Exception)
 	{
@@ -545,6 +544,22 @@ IFileHandle::OpRetType FBoostFileHandle::Stat(std::shared_ptr<IFFileStat>& Stat,
 	}
 
 	return *this;
+}
+
+const void* FBoostFileHandle::MappedFileCurPos_R(int64_t Offset) const
+{
+	auto _Offeset = mMappedSeekPos + Offset;
+	auto _Size = static_cast<int64_t>(mMappedFile->size());
+	HANDLE_ASSERT(_Offeset >= 0 && _Offeset < _Size, FString::Format(TXT("MappedFileCurPos_R {} out of range [0,{})"), _Offeset, _Size));
+	return (&(mMappedFile->const_data()[_Offeset]));
+}
+
+void* FBoostFileHandle::MappedFileCurPos_W(int64_t Offset)
+{
+	auto _Offeset = mMappedSeekPos + Offset;
+	auto _Size = static_cast<int64_t>(mMappedFile->size());
+	HANDLE_ASSERT(_Offeset >= 0 && _Offeset < _Size, FString::Format(TXT("MappedFileCurPos_W {} out of range [0,{})"), _Offeset, _Size));
+	return (&(mMappedFile->data()[_Offeset]));
 }
 
 void FBoostFileHandle::HandleException(const OpStatusType& Status_InOut, const TCHAR* Function, const std::exception& Exception)

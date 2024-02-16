@@ -2,6 +2,7 @@ cmake-build*/
 Binary/
 Build/
 Intermediate/
+Testing/
 CMakeLists.txt
 vcpkg.json
 

@@ -63,13 +63,9 @@ static bool IsPointerOverlap(const void* ptr1, size_t size1, const void* ptr2)
 	// Calculate the end pointer of ptr1 by adding its size
 	const char* end_ptr1 = cptr1 + size1;
 
-	// If end_ptr1 is less than ptr2, they do not overlap
-	if (end_ptr1 <= cptr2)
-		return false;
-
-	// If ptr1 is greater than or equal to ptr2, and end_ptr1 is greater than ptr2,
+	// If ptr1 is smaller than or equal to ptr2, and end_ptr1 is greater than ptr2,
 	// then there is an overlap
-	return (cptr1 <= cptr2 && end_ptr1 >= cptr2);
+	return (cptr1 <= cptr2 && end_ptr1 > cptr2);
 }
 
 // To compare with another region, you can modify the function to take a second size:
@@ -82,11 +78,9 @@ static bool IsPointerOverlap2(const void* ptr1, size_t size1, const void* ptr2, 
 	const char* end_ptr1 = cptr1 + size1;
 	const char* end_ptr2 = cptr2 + size2;
 
-	// Check if any part of region 1 overlaps with region 2
-	if ((cptr1 <= cptr2 && end_ptr1 >= cptr2) || (cptr1 <= end_ptr2 && end_ptr1 >= end_ptr2) || (cptr2 <= cptr1 && end_ptr2 >= cptr1) || (cptr2 <= end_ptr1 && end_ptr2 >= end_ptr1))
-	{
-		return true;
-	}
-
-	return false;
+	// Check if any part of region 1 overlaps with region 2 or vice versa
+	return (cptr1 <= cptr2 && end_ptr1 > cptr2)
+		|| (cptr1 <= end_ptr2 && end_ptr1 > end_ptr2)
+		|| (cptr2 <= cptr1 && end_ptr2 > cptr1)
+		|| (cptr2 <= end_ptr1 && end_ptr2 > end_ptr1);
 }

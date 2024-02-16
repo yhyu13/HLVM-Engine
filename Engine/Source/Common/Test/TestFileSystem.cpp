@@ -4,7 +4,7 @@
 
 #include "Test.h"
 
-#include "Core/FileSystem/BoostFileHandle.h"
+#include "Platform/FileSystem/Boost/BoostFileHandle.h"
 
 DELCARE_LOG_CATEGORY(LogTest)
 DEFINE_LOG_CATEGORY(LogTest)

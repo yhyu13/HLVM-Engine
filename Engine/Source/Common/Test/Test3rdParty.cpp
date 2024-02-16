@@ -5,7 +5,7 @@
 #include "Test.h"
 
 #include <ylt/struct_pack.hpp>
-#include <async_simple/coro/Lazy.h>
+#include <ylt/thirdparty/async_simple/coro/Lazy.h>
 #include <spdlog/spdlog.h>
 #include <spdlog/async.h>
 #include <magic_enum_all.hpp>

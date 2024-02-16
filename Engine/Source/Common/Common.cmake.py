@@ -102,7 +102,7 @@ class CommonModule(BaseModule):
 class TestCommonModule(BaseModule):
     def __init__(self, cpp_path: str):
         super().__init__(module=ModuleTargetModel(target=os.path.basename(cpp_path).split('.')[0],
-                                                  type=ModuleEnum.EXECUTABLE,
+                                                  type=ModuleEnum.EXECUTABLE_AND_TEST,
                                                   source_files=[ToCMakePath(cpp_path)],
                                                   unity_build=False)
                          )

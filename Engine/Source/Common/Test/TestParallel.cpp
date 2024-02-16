@@ -116,9 +116,9 @@ RECORD(queue_test,
 		constexpr int kNumLoops = 10000;
 		double		  time_concurrent, time_lock;
 		{
-			HLVM_LOG(LogTest, info, TXT("Queue test #1 FConcurrentQueue"));
+			HLVM_LOG(LogTest, info, TXT("Queue test #1 TConcurrentQueue"));
 			auto Test1Func = [&](double& Duration) -> bool {
-				auto					 Queue = FConcurrentQueue<int, EConcurrentQueueMode::Mpmc, true, true>();
+				auto					 Queue = TConcurrentQueue<int, EConcurrentQueueMode::Mpmc, true, true>();
 				FTimer					 Timer;
 				std::once_flag			 Flag;
 				std::atomic<int>		 Counter{ kNumThreads };
@@ -237,5 +237,5 @@ RECORD(queue_test,
 		}
 
 		double ratio = time_lock / time_concurrent;
-		HLVM_LOG(LogTest, info, TXT("Queue test #1 FConcurrentQueue = {0:.2f}x Queue test #2 boost::lockfree::queue"), ratio);
+		HLVM_LOG(LogTest, info, TXT("Queue test #1 TConcurrentQueue = {0:.2f}x Queue test #2 boost::lockfree::queue"), ratio);
 	})

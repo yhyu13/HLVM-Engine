@@ -176,8 +176,8 @@ public:
 	/**
 	 * These methods can be static methods, but since we require inheritance, they have to be member virtual methods
 	 */
-	virtual OpRetType Truncate(size_t Size, const FPath& FilePath, OpStatusType Status_InOut) = 0;
-	virtual OpRetType Stat(std::shared_ptr<IFFileStat>& Stat_InOut, const FPath& FilePath, OpStatusType Status_InOut) = 0;
+	virtual OpRetType Truncate(size_t Size, OpStatusType Status_InOut) = 0;
+	virtual OpRetType Stat(std::shared_ptr<IFFileStat>& Stat, const FPath& FilePath, OpStatusType Status_InOut) = 0;
 
 protected:
 	FFileOptions mFileOptions;

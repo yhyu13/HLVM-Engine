@@ -26,7 +26,7 @@ template <typename T,
 	EConcurrentQueueMode Mode = EConcurrentQueueMode::Mpmc,
 	bool				 bBlockPopOnEmpty = true, // Applying block on pop when empty actually makes the queue performance 1.25 faster on the TestParallel benchmark
 	bool				 bCountSize = false>
-class FConcurrentQueue
+class TConcurrentQueue
 {
 #define IS_MP Mode == EConcurrentQueueMode::Mpsc || Mode == EConcurrentQueueMode::Mpmc
 #define IS_SC Mode == EConcurrentQueueMode::Mpsc || Mode == EConcurrentQueueMode::Spsc
@@ -91,7 +91,7 @@ private:
 	};
 
 public:
-	FConcurrentQueue()
+	TConcurrentQueue()
 	{
 		Head = Tail = new QueueNode();
 
@@ -102,7 +102,7 @@ public:
 		}
 	}
 
-	~FConcurrentQueue() noexcept
+	~TConcurrentQueue() noexcept
 	{
 		if constexpr (bBlockPopOnEmpty)
 		{

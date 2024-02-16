@@ -13,5 +13,5 @@ constexpr auto ctre_MatchFunctionCall(std::u8string_view sv) noexcept
 
 constexpr auto ctre_MatchAssignment(std::u8string_view sv) noexcept
 {
-	return ctre::match<R"(.*?[^=]=[^=].*?)">(sv);
+	return ctre::match<R"(.*?[^=<>]=[^=<>].*?)">(sv);
 };

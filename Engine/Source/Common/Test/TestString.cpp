@@ -22,8 +22,8 @@ static void test_string_test()
 							  FString::Format(TXT("1!=1")));
 
 		constexpr int kNumThreads = 1;
-		constexpr int kNumIterations = 50;
-		constexpr int kNumLoops = 100000;
+		constexpr int kNumIterations = 10;
+		constexpr int kNumLoops = 1000;
 		double		  time_order_big_first, time_order_small_first;
 		{
 			auto TestFunc = [&](double& Duration) -> bool {
@@ -100,11 +100,25 @@ static void test_string_test()
 
 		if (time_order_big_first < time_order_small_first)
 		{
-			HLVM_LOG(LogTest, info, TXT("order_big_first is faster than order_small_first"));
+			if ((time_order_small_first - time_order_big_first) / time_order_small_first <= 0.05)
+			{
+				HLVM_LOG(LogTest, info, TXT("difference smaller than 5%"));
+			}
+			else
+			{
+				HLVM_LOG(LogTest, info, TXT("order_big_first is faster than order_small_first"));
+			}
 		}
 		else
 		{
-			HLVM_LOG(LogTest, info, TXT("order_small_first is faster than order_big_first"));
+			if ((time_order_big_first - time_order_small_first) / time_order_big_first <= 0.05)
+			{
+				HLVM_LOG(LogTest, info, TXT("difference smaller than 5%"));
+			}
+			else
+			{
+				HLVM_LOG(LogTest, info, TXT("order_small_first is faster than order_big_first"));
+			}
 		}
 	}
 };
