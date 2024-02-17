@@ -19,16 +19,16 @@ enum class EFilePlatformFileType : uint8_t
 class FGenericPlatformFile
 {
 public:
+	NOCOPYMOVE(FGenericPlatformFile)
+	FGenericPlatformFile() = default;
 	virtual ~FGenericPlatformFile() = default;
 
-	static bool				 IsDirectory(const FPath& path);
-	static bool				 Exists(const FPath& path);
-	static TSVector32<FPath> FindAllMatch(const FPath& path, const FString& pattern, bool recursive = false);
+	virtual bool			  IsDirectory(const FPath& path);
+	virtual bool			  Exists(const FPath& path);
+	virtual TSVector32<FPath> FindAllMatch(const FPath& root_dir, const FString& regex, bool recursive = false);
+
+	static FGenericPlatformFile* Get();
 
 protected:
-	virtual bool			  _IsDirectory(const FPath& path) = 0;
-	virtual bool			  _Exists(const FPath& path) = 0;
-	virtual TSVector32<FPath> _FindAllMatch(const FPath& path, const FString& pattern, bool recursive = false) = 0;
-
 	static TSMap<EFilePlatformFileType, FGenericPlatformFile*> sPlatformFileRedirector;
 };

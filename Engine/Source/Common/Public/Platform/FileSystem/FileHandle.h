@@ -32,6 +32,16 @@ static bool operator&(EFileMode a, EFileMode b)
 	return static_cast<uint8_t>(a) & static_cast<uint8_t>(b);
 }
 
+static bool operator==(EFileMode a, EFileMode b)
+{
+	return static_cast<uint8_t>(a) == static_cast<uint8_t>(b);
+}
+
+static bool operator!=(EFileMode a, EFileMode b)
+{
+	return static_cast<uint8_t>(a) != static_cast<uint8_t>(b);
+}
+
 enum class EFileMapped : uint8_t
 {
 	NoMapped = 0,

@@ -10,12 +10,12 @@
 class FBoostPlatformFile final : public FGenericPlatformFile
 {
 public:
-	FBoostPlatformFile();
+	static void Initialize();
 
 protected:
-	virtual bool			  _IsDirectory(const FPath& path) final override;
-	virtual bool			  _Exists(const FPath& path) final override;
-	virtual TSVector32<FPath> _FindAllMatch(const FPath& path, const FString& pattern, bool recursive = false) final override;
+	virtual bool			  IsDirectory(const FPath& path) final override;
+	virtual bool			  Exists(const FPath& path) final override;
+	virtual TSVector32<FPath> FindAllMatch(const FPath& root_dir, const FString& regex, bool recursive = false) final override;
 
 private:
 	FBoostFileHandle mInnerFileHandle;

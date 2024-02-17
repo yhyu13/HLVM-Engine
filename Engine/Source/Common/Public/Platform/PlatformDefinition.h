@@ -41,6 +41,15 @@
 #endif
 
 /**
+ *  This macro is defined for desktop platforms but not for mobile platforms like Android or iOS
+ */
+#ifdef __STDCPP_DEFAULT_NEW_ALIGNMENT__
+	#define PLATFORM_DESKTOP 1
+#else
+	#define PLATFORM_DESKTOP 0
+#endif
+
+/**
  * Generic platform definitions
  */
 static_assert(1 == sizeof(char), "char is not 1 byte in size");

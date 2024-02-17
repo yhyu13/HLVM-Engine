@@ -18,6 +18,7 @@ static_assert(sizeof(TCHAR) == sizeof(char), "TCHAR is not char");
 #define TXT(str) U8_STRING(str)
 #define STRTIFY(x) TXT(#x)
 #define TO_TCHAR_STR(x) reinterpret_cast<const TCHAR*>((x))
+#define TO_FSTRING(x) FString((x))
 
 class FString final : public std::basic_string<TCHAR>
 {
@@ -56,12 +57,6 @@ public:
 		return *this;
 	}
 
-	template <typename... Args>
-	static FString Format(const TCHAR* _format, Args&&... args)
-	{
-		return FString(MoveTemp(fmt::format(_format, std::forward<Args>(args)...)));
-	}
-
 	// Convert to const TCHAR*
 	operator const TCHAR*() const
 	{
@@ -80,6 +75,30 @@ public:
 	const char* ToCharStr() const
 	{
 		return static_cast<const char*>(*this);
+	}
+
+	template <typename... Args>
+	static FString Format(const TCHAR* _format, Args&&... args)
+	{
+		return FString(MoveTemp(fmt::format(_format, std::forward<Args>(args)...)));
+	}
+
+	template <typename VecType, typename PredType>
+	static FString Join(const VecType& Vec,
+		const PredType&				   func,
+		const TCHAR*				   splitter = TXT(" ,\n"))
+	{
+		FString result{ "[ " };
+		for (const auto& elem : Vec)
+		{
+			if (!result.empty())
+			{
+				result += splitter;
+			}
+			result += static_cast<const TCHAR*>(func(elem));
+		}
+		result += TXT(" ]");
+		return result;
 	}
 };
 

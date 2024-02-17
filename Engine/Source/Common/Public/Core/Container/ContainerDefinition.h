@@ -8,6 +8,7 @@
 
 #include <boost/container/vector.hpp>
 #include <boost/container/small_vector.hpp>
+#include <boost/algorithm/string/join.hpp>
 
 /**
  * phmap has alot of unconventional warnings, pretty bad code though

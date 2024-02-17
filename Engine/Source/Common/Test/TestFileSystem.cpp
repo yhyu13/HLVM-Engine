@@ -24,6 +24,9 @@ static void test_boostfile_test()
 			.Close(&Status);
 	}
 	{
+		/**
+		 * Mapped file cannot be create by file open, so only read write
+		 */
 		std::shared_ptr<FBoostFileHandle> fileHandle = std::make_shared<FBoostFileHandle>();
 		FFileOptions					  Options{ .eFileMode = EFileMode::R, .eFileMapped = EFileMapped::Mapped };
 		FFileOpStatus					  Status;
@@ -32,6 +35,14 @@ static void test_boostfile_test()
 			.Read(Buffer, (sizeof(Buffer) / sizeof(Buffer[0]) - 1), 0, &Status)
 			.Close(&Status);
 		HLVM_LOG(LogTest, info, TXT("Test BoostFileHandle result: {}"), TO_TCHAR_STR(Buffer));
+	}
+	{
+		HLVM_ENSURE(!FPath::IsDirectory("./test.txt"), TXT("Test failed"));
+		HLVM_ENSURE(FPath::Exists("./test.txt"), TXT("Test failed"));
+
+		auto all_matches = FPath::FindAllMatch("./", ".*Test.*", true);
+		auto all_matches_str = FString::Join(all_matches, [](auto& item) { return *item; });
+		HLVM_LOG(LogTest, info, TXT("Test FPath::FindAllMatch result:\n{}"), all_matches_str);
 	}
 }
 RECORD_TEST_FUNC(boostfile_test)

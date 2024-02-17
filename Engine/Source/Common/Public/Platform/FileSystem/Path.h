@@ -10,7 +10,7 @@
 #include <boost/filesystem/path.hpp>
 
 /**
- * https://blog.csdn.net/toby54king/article/details/81334962
+ * boost path usage : https://blog.csdn.net/toby54king/article/details/81334962
  */
 
 class FPath final : public boost::filesystem::path
@@ -85,5 +85,5 @@ public:
 	 */
 	static bool				 IsDirectory(const FPath& path);
 	static bool				 Exists(const FPath& path);
-	static TSVector32<FPath> FindAllMatch(const FPath& path, const FString& pattern, bool recursive = false);
+	static TSVector32<FPath> FindAllMatch(const FPath& path, const FString& regex, bool recursive = false);
 };

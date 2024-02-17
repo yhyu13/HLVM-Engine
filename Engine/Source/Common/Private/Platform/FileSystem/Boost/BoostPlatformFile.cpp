@@ -1,0 +1,70 @@
+/**
+ * Copyright (c) 2024. MIT License. All rights reserved.
+ */
+
+#include "Core/Assert.h"
+#include "Platform/FileSystem/Boost/BoostPlatformFile.h"
+
+#include <boost/regex.hpp>
+
+DELCARE_LOG_CATEGORY(LogBoostPlatformFile)
+DEFINE_LOG_CATEGORY(LogBoostPlatformFile)
+
+void FBoostPlatformFile::Initialize()
+{
+	HLVM_ASSERT(!sPlatformFileRedirector[EFilePlatformFileType::Local], TXT("Platform file is already registered"));
+	sPlatformFileRedirector[EFilePlatformFileType::Local] = new FBoostPlatformFile();
+	HLVM_LOG(LogBoostPlatformFile, debug, TXT("FBoostPlatformFile::Initialize()"));
+}
+
+bool FBoostPlatformFile::IsDirectory(const FPath& path)
+{
+	FFileOpStatus				_Status;
+	std::shared_ptr<IFFileStat> _Stat;
+	mInnerFileHandle.Stat(_Stat, path, &_Status);
+	return _Stat->IsDirectory();
+}
+
+bool FBoostPlatformFile::Exists(const FPath& path)
+{
+	FFileOpStatus				_Status;
+	std::shared_ptr<IFFileStat> _Stat;
+	mInnerFileHandle.Stat(_Stat, path, &_Status);
+	return _Stat->Exists();
+}
+
+TSVector32<FPath> FBoostPlatformFile::FindAllMatch(const FPath& root_dir, const FString& regex, bool recursive)
+{
+	TSVector32<FPath> Result;
+	boost::regex	  Regex{ regex.ToCharStr() };
+
+	if (recursive)
+	{
+		size_t RECURSIVE_ALERT = 100;
+		for (boost::filesystem::recursive_directory_iterator it(root_dir), end; it != end; ++it)
+		{
+			if (boost::filesystem::is_regular_file(it->path()) && boost::regex_match(it->path().c_str(), Regex))
+			{
+				Result.push_back(FPath(it->path()));
+			}
+			if (Result.size() > RECURSIVE_ALERT)
+			{
+				RECURSIVE_ALERT += RECURSIVE_ALERT;
+				HLVM_LOG(LogBoostPlatformFile, debug,
+					TXT("FBoostPlatformFile::FindAllMatch() - Recursive search {} is too for {}?"), RECURSIVE_ALERT, *root_dir);
+			}
+		}
+	}
+	else
+	{
+		for (boost::filesystem::directory_iterator it(root_dir), end; it != end; ++it)
+		{
+			if (boost::filesystem::is_regular_file(it->path()) && boost::regex_match(it->path().c_str(), Regex))
+			{
+				Result.push_back(FPath(it->path()));
+			}
+		}
+	}
+
+	return Result;
+}

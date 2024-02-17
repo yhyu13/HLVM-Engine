@@ -5,6 +5,8 @@
 #include "Platform/FileSystem/Boost/BoostFileHandle.h"
 #include "Core/Log.h"
 
+#include <magic_enum_all.hpp>
+
 DELCARE_LOG_CATEGORY(LogBoostFileHandle)
 DEFINE_LOG_CATEGORY(LogBoostFileHandle)
 

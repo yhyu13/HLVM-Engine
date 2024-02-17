@@ -4,12 +4,10 @@
 
 #pragma once
 
-#include "Core/Assert.h"
 #include "Platform/FileSystem/FileHandle.h"
 #include "Platform/FileSystem/Path.h"
 #include "Core/Parallel/Lock.h"
 
-#include <magic_enum_all.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/iostreams/device/mapped_file.hpp>
 #include <boost/interprocess/sync/file_lock.hpp>
@@ -34,8 +32,9 @@ private:
 };
 
 /**
- * https://theboostcpplibraries.com/boost.filesystem-files-and-directories
- * https://www.boost.org/doc/libs/1_84_0/doc/html/interprocess/synchronization_mechanisms.html#interprocess.synchronization_mechanisms.file_lock
+ * boost file system  https://theboostcpplibraries.com/boost.filesystem-files-and-directories
+ * boost interprocess file lock https://www.boost.org/doc/libs/1_84_0/doc/html/interprocess/synchronization_mechanisms.html#interprocess.synchronization_mechanisms.file_lock
+ * boost mapped file https://beta.boost.org/doc/libs/1_83_0/libs/iostreams/doc/classes/mapped_file.html
  */
 
 class FBoostFileHandle final : public IFileHandle

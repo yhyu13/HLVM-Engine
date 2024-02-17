@@ -7,15 +7,15 @@
 
 bool FPath::IsDirectory(const FPath& path)
 {
-	return FGenericPlatformFile::IsDirectory(path);
+	return FGenericPlatformFile::Get()->IsDirectory(path);
 }
 
 bool FPath::Exists(const FPath& path)
 {
-	return FGenericPlatformFile::Exists(path);
+	return FGenericPlatformFile::Get()->Exists(path);
 }
 
-TSVector32<FPath> FPath::FindAllMatch(const FPath& path, const FString& pattern, bool recursive)
+TSVector32<FPath> FPath::FindAllMatch(const FPath& path, const FString& regex, bool recursive)
 {
-	return FGenericPlatformFile::FindAllMatch(path, pattern, recursive);
+	return FGenericPlatformFile::Get()->FindAllMatch(path, regex, recursive);
 }
