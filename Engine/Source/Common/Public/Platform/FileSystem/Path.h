@@ -9,6 +9,13 @@
 
 #include <boost/filesystem/path.hpp>
 
+enum class EPlatformFileType : uint8_t
+{
+	Unkown,
+	Local,
+	Packed,
+};
+
 /**
  * boost path usage : https://blog.csdn.net/toby54king/article/details/81334962
  */
@@ -85,5 +92,10 @@ public:
 	 */
 	static bool				 IsDirectory(const FPath& path);
 	static bool				 Exists(const FPath& path);
-	static TSVector32<FPath> FindAllMatch(const FPath& path, const FString& regex, bool recursive = false);
+	static TSVector32<FPath> FindAllMatch(const FPath& root_dir, const FString& regex, bool recursive = false);
+
+private:
+	void ResolvePath() const;
+
+	EPlatformFileType mFileType{ EPlatformFileType::Unkown };
 };

@@ -12,8 +12,8 @@ DEFINE_LOG_CATEGORY(LogBoostPlatformFile)
 
 void FBoostPlatformFile::Initialize()
 {
-	HLVM_ASSERT(!sPlatformFileRedirector[EFilePlatformFileType::Local], TXT("Platform file is already registered"));
-	sPlatformFileRedirector[EFilePlatformFileType::Local] = new FBoostPlatformFile();
+	HLVM_ASSERT(!sPlatformFileRedirector[EPlatformFileType::Local], TXT("Platform file is already registered"));
+	sPlatformFileRedirector[EPlatformFileType::Local] = new FBoostPlatformFile();
 	HLVM_LOG(LogBoostPlatformFile, debug, TXT("FBoostPlatformFile::Initialize()"));
 }
 
@@ -21,7 +21,7 @@ bool FBoostPlatformFile::IsDirectory(const FPath& path)
 {
 	FFileOpStatus				_Status;
 	std::shared_ptr<IFFileStat> _Stat;
-	mInnerFileHandle.Stat(_Stat, path, &_Status);
+	mDummyFileHandle.Stat(_Stat, path, &_Status);
 	return _Stat->IsDirectory();
 }
 
@@ -29,7 +29,7 @@ bool FBoostPlatformFile::Exists(const FPath& path)
 {
 	FFileOpStatus				_Status;
 	std::shared_ptr<IFFileStat> _Stat;
-	mInnerFileHandle.Stat(_Stat, path, &_Status);
+	mDummyFileHandle.Stat(_Stat, path, &_Status);
 	return _Stat->Exists();
 }
 

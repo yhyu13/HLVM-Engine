@@ -6,7 +6,7 @@
 #include "Platform/FileSystem/Path.h"
 #include "Platform/FileSystem/Boost/BoostPlatformFile.h"
 
-TSMap<EFilePlatformFileType, FGenericPlatformFile*> FGenericPlatformFile::sPlatformFileRedirector;
+TSMap<EPlatformFileType, FGenericPlatformFile*> FGenericPlatformFile::sPlatformFileRedirector;
 
 FGenericPlatformFile* FGenericPlatformFile::Get()
 {
@@ -20,15 +20,15 @@ FGenericPlatformFile* FGenericPlatformFile::Get()
 
 bool FGenericPlatformFile::IsDirectory(const FPath& path)
 {
-	return sPlatformFileRedirector[EFilePlatformFileType::Local]->IsDirectory(path);
+	return sPlatformFileRedirector[EPlatformFileType::Local]->IsDirectory(path);
 }
 
 bool FGenericPlatformFile::Exists(const FPath& path)
 {
-	return sPlatformFileRedirector[EFilePlatformFileType::Local]->Exists(path);
+	return sPlatformFileRedirector[EPlatformFileType::Local]->Exists(path);
 }
 
 TSVector32<FPath> FGenericPlatformFile::FindAllMatch(const FPath& path, const FString& regex, bool recursive)
 {
-	return sPlatformFileRedirector[EFilePlatformFileType::Local]->FindAllMatch(path, regex, recursive);
+	return sPlatformFileRedirector[EPlatformFileType::Local]->FindAllMatch(path, regex, recursive);
 }

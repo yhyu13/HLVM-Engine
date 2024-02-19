@@ -8,14 +8,6 @@
 #include "Platform/FileSystem/FileSystem.h"
 #include "Core/Container/ContainerDefinition.h"
 
-enum class EFilePlatformFileType : uint8_t
-{
-	Local,
-	Packed,
-	Network,
-	GPU,
-};
-
 class FGenericPlatformFile
 {
 public:
@@ -30,5 +22,5 @@ public:
 	static FGenericPlatformFile* Get();
 
 protected:
-	static TSMap<EFilePlatformFileType, FGenericPlatformFile*> sPlatformFileRedirector;
+	static TSMap<EPlatformFileType, FGenericPlatformFile*> sPlatformFileRedirector;
 };

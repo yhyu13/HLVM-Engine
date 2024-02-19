@@ -10,31 +10,31 @@
 DELCARE_LOG_CATEGORY(LogBoostFileHandle)
 DEFINE_LOG_CATEGORY(LogBoostFileHandle)
 
-#define SCOPE_LOCK()                                                                \
+#define BFH_SCOPE_LOCK()                                                            \
 	ATOMIC_LOCK_GUARD(mLock);                                                       \
 	boost::interprocess::sharable_lock<boost::interprocess::file_lock> __lock_file; \
 	if (mFileLock)                                                                  \
 	__lock_file = MoveTemp(boost::interprocess::sharable_lock<boost::interprocess::file_lock>(*mFileLock))
 
-#define HANDLE_EXCPETIONS() HandleException(Status_InOut, TO_TCHAR_STR(__FUNCTION__), Exception)
-#define HANDLE_EXCPETIONS2() HandleException2(Status_InOut, TO_TCHAR_STR(__FUNCTION__))
+#define BFH_HANDLE_EXCPETIONS() HandleException(Status_InOut, TO_TCHAR_STR(__FUNCTION__), Exception)
+#define BFH_HANDLE_EXCPETIONS2() HandleException2(Status_InOut, TO_TCHAR_STR(__FUNCTION__))
 
-#define HANDLE_ASSERT(x, ...) HLVM_ASSERT(x, TXT("File {} : {}"), *mFilePath, ##__VA_ARGS__)
-#define HANDLE_ENSURE(x, ...) HLVM_ENSURE(x, TXT("File {} : {}"), *mFilePath, ##__VA_ARGS__)
-#define VERBOSE_LOG(...)                                                                         \
-	do                                                                                           \
-	{                                                                                            \
-		if (Status_InOut->bVerbose)                                                              \
-			HLVM_LOG(LogBoostFileHandle, trace, TXT("File {} : {}"), *mFilePath, ##__VA_ARGS__); \
-	}                                                                                            \
+#define BFH_HANDLE_ASSERT(x, ...) HLVM_ASSERT(x, TXT("File {} : {}"), *mFilePath, FString::Format(__VA_ARGS__))
+#define BFH_HANDLE_ENSURE(x, ...) HLVM_ENSURE(x, TXT("File {} : {}"), *mFilePath, FString::Format(__VA_ARGS__))
+#define BFH_HANDLE_ENSURE2(x, ...) HLVM_ENSURE(x, TXT("File {} : {}"), *FilePath, FString::Format(__VA_ARGS__))
+#define BFH_VERBOSE_LOG(...)                                                                                    \
+	do                                                                                                          \
+	{                                                                                                           \
+		if (Status_InOut->bVerbose)                                                                             \
+			HLVM_LOG(LogBoostFileHandle, trace, TXT("File {} : {}"), *mFilePath, FString::Format(__VA_ARGS__)); \
+	}                                                                                                           \
 	while (0)
-#define HANDLE_ENSURE2(x, ...) HLVM_ENSURE(x, TXT("File {} : {}"), *FilePath, ##__VA_ARGS__)
-#define VERBOSE_LOG2(...)                                                                       \
-	do                                                                                          \
-	{                                                                                           \
-		if (Status_InOut->bVerbose)                                                             \
-			HLVM_LOG(LogBoostFileHandle, trace, TXT("File {} : {}"), *FilePath, ##__VA_ARGS__); \
-	}                                                                                           \
+#define BFH_VERBOSE_LOG2(...)                                                                                  \
+	do                                                                                                         \
+	{                                                                                                          \
+		if (Status_InOut->bVerbose)                                                                            \
+			HLVM_LOG(LogBoostFileHandle, trace, TXT("File {} : {}"), *FilePath, FString::Format(__VA_ARGS__)); \
+	}                                                                                                          \
 	while (0)
 
 FBoostFileStat::FBoostFileStat(const FPath& Path)
@@ -76,36 +76,47 @@ FBoostFileHandle::~FBoostFileHandle()
 
 IFileHandle::OpRetType FBoostFileHandle::Open(const FPath& FilePath, const FFileOptions& Options, OpStatusType Status_InOut)
 {
+	if (!Status_InOut)
+	{
+		Status_InOut = &mFileOpStatus;
+	}
+	else
+	{
+		mFileOpStatus = *Status_InOut;
+	}
+	BFH_HANDLE_ENSURE(*Status_InOut, TXT("File operation continue with failed status"));
+	BFH_HANDLE_ASSERT(!mOpened, TXT("File operation begin with another already open file {}"), *mFilePath);
+
 	mFilePath = FilePath;
 	mFileOptions = Options;
 	if (mFileOptions.eFileMapped == EFileMapped::Mapped)
 	{
-		VERBOSE_LOG(TXT("Create Mapped file"));
+		BFH_VERBOSE_LOG(TXT("Create Mapped file"));
 		mMappedFile = boost::iostreams::mapped_file();
 	}
 	else if (mFileOptions.eFileMapped == EFileMapped::NoMapped)
 	{
-		VERBOSE_LOG(TXT("Create file stream"));
+		BFH_VERBOSE_LOG(TXT("Create file stream"));
 		mFStream = std::fstream();
 	}
 	else
 	{
-		HANDLE_ASSERT(false, TXT("Not implemented"));
+		BFH_HANDLE_ASSERT(false, TXT("Not implemented"));
 	}
 
 	if (mFileOptions.eFileAsync == EFileAsync::Async)
 	{
-		HANDLE_ASSERT(false, TXT("Not implemented"));
+		BFH_HANDLE_ASSERT(false, TXT("Not implemented"));
 	}
 
 	if (mFileOptions.eFileLock & EFileLock::InterProcessLock)
 	{
-		VERBOSE_LOG(TXT("Create interprocess file lock"));
+		BFH_VERBOSE_LOG(TXT("Create interprocess file lock"));
 		mFileLock = boost::interprocess::file_lock(FilePath);
 	}
 	else if (mFileOptions.eFileLock & EFileLock::ThreadLock)
 	{
-		VERBOSE_LOG(TXT("Create thrad lock"));
+		BFH_VERBOSE_LOG(TXT("Create thrad lock"));
 		mLock = FAtomicFlag();
 	}
 	else if (mFileOptions.eFileLock == EFileLock::NoLock)
@@ -113,45 +124,54 @@ IFileHandle::OpRetType FBoostFileHandle::Open(const FPath& FilePath, const FFile
 	}
 	else
 	{
-		HANDLE_ASSERT(false, TXT("Not implemented"));
+		BFH_HANDLE_ASSERT(false, TXT("Not implemented"));
 	}
 
 	try
 	{
-		SCOPE_LOCK();
+		BFH_SCOPE_LOCK();
 
 		if (mFileOptions.eFileMapped == EFileMapped::Mapped)
 		{
-			HANDLE_ASSERT(mMappedFile, TXT("MappedFile file null"));
-			boost::iostreams::mapped_file_params params;
-			params.path = FilePath.ToCharStr();
-			params.flags = (mFileOptions.eFileMode & EFileMode::W) ? boost::iostreams::mapped_file::readwrite : boost::iostreams::mapped_file::readonly;
-			mMappedFile->open(params);
-			HANDLE_ENSURE(mMappedFile->is_open(), TXT("MappedFile file open failed"));
-			if (mFileOptions.eFileMode & EFileMode::E)
+			mMappedLazyInit = false;
 			{
-				mMappedSeekPos = static_cast<int64_t>(mMappedFile->size());
+				auto file = std::fstream();
+				file.open(FilePath, static_cast<std::ios::openmode>(mFileOptions.eFileMode));
+				BFH_HANDLE_ENSURE(file.is_open(), TXT("file open failed"));
+				if (file.tellg() <= 0)
+				{
+					mMappedLazyInit = true;
+				}
+				file.close();
+			}
+			if (!mMappedLazyInit)
+			{
+				MappedFileLazyInit();
+			}
+			else
+			{
+				BFH_VERBOSE_LOG(TXT("Mapped File requires lazy init"));
 			}
 		}
 		else
 		{
-			HANDLE_ASSERT(mFStream, TXT("FStream file null"));
+			BFH_HANDLE_ASSERT(mFStream, TXT("FStream file null"));
 			mFStream->open(FilePath, static_cast<std::ios::openmode>(mFileOptions.eFileMode));
-			HANDLE_ENSURE(mFStream->is_open(), TXT("FStream open failed"));
+			BFH_HANDLE_ENSURE(mFStream->is_open(), TXT("FStream open failed"));
 		}
 		mOpened = true;
 		Status_InOut->eFileOpStatus = EFileOpStatus::Success;
-		VERBOSE_LOG(FString::Format(TXT("Open success with {}"), TO_TCHAR_STR(magic_enum::enum_name(mFileOptions.eFileMode).data())));
+		BFH_VERBOSE_LOG(TXT("Open success with mode {}"), TO_TCHAR_STR(magic_enum::enum_name(mFileOptions.eFileMode).data()));
 	}
 	catch (std::exception& Exception)
 	{
 		Status_InOut->eFileOpStatus = EFileOpStatus::Failed;
-		HANDLE_EXCPETIONS();
+		BFH_HANDLE_EXCPETIONS();
 	}
 	catch (...)
 	{
 		Status_InOut->eFileOpStatus = EFileOpStatus::Failed;
-		HANDLE_EXCPETIONS2();
+		BFH_HANDLE_EXCPETIONS2();
 	}
 
 	return *this;
@@ -159,12 +179,16 @@ IFileHandle::OpRetType FBoostFileHandle::Open(const FPath& FilePath, const FFile
 
 IFileHandle::OpRetType FBoostFileHandle::Close(OpStatusType Status_InOut)
 {
-	HANDLE_ENSURE(*Status_InOut, TXT("File operation continue with failed status"));
-	HANDLE_ENSURE(mOpened, TXT("File operation continue w/o open"));
+	if (!Status_InOut)
+	{
+		Status_InOut = &mFileOpStatus;
+	}
+	BFH_HANDLE_ENSURE(*Status_InOut, TXT("File operation continue with failed status"));
+	BFH_HANDLE_ASSERT(mOpened, TXT("File operation continue w/o open"));
 
 	try
 	{
-		SCOPE_LOCK();
+		BFH_SCOPE_LOCK();
 		Status_InOut->Reset();
 
 		if (mFileOptions.eFileMapped == EFileMapped::Mapped)
@@ -174,6 +198,7 @@ IFileHandle::OpRetType FBoostFileHandle::Close(OpStatusType Status_InOut)
 		else
 		{
 			mFStream->close();
+			BFH_HANDLE_ENSURE(!mFStream->fail(), TXT("File operation failed"));
 		}
 
 		if (Status_InOut->bCancelByUser) [[unlikely]]
@@ -185,43 +210,72 @@ IFileHandle::OpRetType FBoostFileHandle::Close(OpStatusType Status_InOut)
 			Status_InOut->eFileOpStatus = EFileOpStatus::Success;
 		}
 		mOpened = false;
-		VERBOSE_LOG(TXT("Close file success"));
+		BFH_VERBOSE_LOG(TXT("Close file success"));
 	}
 	catch (std::exception& Exception)
 	{
 		Status_InOut->eFileOpStatus = EFileOpStatus::Failed;
-		HANDLE_EXCPETIONS();
+		BFH_HANDLE_EXCPETIONS();
 	}
 	catch (...)
 	{
 		Status_InOut->eFileOpStatus = EFileOpStatus::Failed;
-		HANDLE_EXCPETIONS2();
+		BFH_HANDLE_EXCPETIONS2();
 	}
 
 	return *this;
 }
 
-IFileHandle::OpRetType FBoostFileHandle::Read(void* Buffer, size_t Size, int64_t Offset, OpStatusType Status_InOut)
+IFileHandle::OpRetType FBoostFileHandle::Read(void* Buffer, size_t Size, const FFileSeekCtx& SeekCtx, OpStatusType Status_InOut)
 {
-	HANDLE_ENSURE(*Status_InOut, TXT("File operation continue with failed status"));
-	HANDLE_ENSURE(mOpened, TXT("File operation continue w/o open"));
-	HANDLE_ENSURE(mFileOptions.eFileMode & EFileMode::R, TXT("File operation cannot read"));
+	if (!Status_InOut)
+	{
+		Status_InOut = &mFileOpStatus;
+	}
+	BFH_HANDLE_ENSURE(*Status_InOut, TXT("File operation continue with failed status"));
+	BFH_HANDLE_ASSERT(mOpened, TXT("File operation continue w/o open"));
+	BFH_HANDLE_ASSERT(mFileOptions.eFileMode & EFileMode::R, TXT("File operation cannot read"));
+	BFH_HANDLE_ASSERT(Size > 0, TXT("Buffer size invalid {}"), Size);
+
+	// tell if necessary
+	int64_t Prev_Tell = { -1 };
+	if (SeekCtx.ResetPos)
+	{
+		Tell(Prev_Tell, Status_InOut);
+		BFH_HANDLE_ASSERT(Prev_Tell > 0, TXT("Tell failed before reset pos"), Prev_Tell);
+	}
+	// Seek if necessary
+	if (SeekCtx.NonTrivialSeek())
+	{
+		Seek(SeekCtx.Offset, SeekCtx.Whence, Status_InOut);
+	}
 
 	try
 	{
-		SCOPE_LOCK();
+		BFH_SCOPE_LOCK();
 		if (mFileOptions.eFileMapped == EFileMapped::Mapped)
 		{
-			HANDLE_ASSERT(!IsPointerOverlap(Buffer, Size, MappedFileCurPos_R(Offset)), TXT("mMappedFile overlap with read region"));
-			std::memcpy(Buffer, MappedFileCurPos_R(Offset), Size);
+			BFH_HANDLE_ASSERT(!mMappedLazyInit, TXT("Mapped file not init!"));
+			size_t	FileSize = mMappedFile->size();
+			int64_t rest_size = static_cast<int64_t>(FileSize) - (mMappedSeekPos);
+			// Check space avilable for reading
+			const bool available = rest_size >= static_cast<int64_t>(Size);
+			BFH_HANDLE_ASSERT(available, TXT("mMappedFile size is not enough for read. SeekPos {}, File Size {}, available size {} Buffer Size {}"),
+				mMappedSeekPos, FileSize, rest_size, Size);
+			auto readPos = MappedFileCurPos_R(0);
+			// Check buffer and mmap no overlapping
+			const bool overlap = IsPointerOverlap(Buffer, Size, readPos, static_cast<size_t>(rest_size));
+			BFH_HANDLE_ASSERT(!overlap, TXT("mMappedFile overlap with read region. SeekPos {}, File Size {}, available size {} Buffer Size {}"),
+				mMappedSeekPos, FileSize, rest_size, Size);
+
+			// do the mmap
+			std::memcpy(Buffer, readPos, Size);
+			mMappedSeekPos += Size;
 		}
 		else
 		{
-			if (Offset != 0)
-			{
-				mFStream->seekg(static_cast<std::streamoff>(Offset));
-			}
 			mFStream->read(reinterpret_cast<char*>(Buffer), static_cast<std::streamsize>(Size));
+			BFH_HANDLE_ENSURE(!mFStream->fail(), TXT("File operation failed"));
 		}
 
 		if (Status_InOut->bCancelByUser) [[unlikely]]
@@ -232,43 +286,111 @@ IFileHandle::OpRetType FBoostFileHandle::Read(void* Buffer, size_t Size, int64_t
 		{
 			Status_InOut->eFileOpStatus = EFileOpStatus::Success;
 		}
-		VERBOSE_LOG(FString::Format(TXT("Read file success at offset {} with {} bytes"), Offset, Size));
+		BFH_VERBOSE_LOG(TXT("Read file success with {} bytes"), Size);
 	}
 	catch (std::exception& Exception)
 	{
 		Status_InOut->eFileOpStatus = EFileOpStatus::Failed;
-		HANDLE_EXCPETIONS();
+		BFH_HANDLE_EXCPETIONS();
 	}
 	catch (...)
 	{
 		Status_InOut->eFileOpStatus = EFileOpStatus::Failed;
-		HANDLE_EXCPETIONS2();
+		BFH_HANDLE_EXCPETIONS2();
+	}
+
+	// Reset if necessary
+	if (SeekCtx.ResetPos)
+	{
+		Seek(Prev_Tell, EWhence::Begin, Status_InOut);
+	}
+	// Erase if necessary
+	else if (SeekCtx.EraseSeekPos)
+	{
+		Seek(0 - static_cast<int64_t>(Size), EWhence::Current, Status_InOut);
 	}
 
 	return *this;
 }
 
-IFileHandle::OpRetType FBoostFileHandle::Write(const void* Buffer, size_t Size, int64_t Offset, OpStatusType Status_InOut)
+IFileHandle::OpRetType FBoostFileHandle::Write(const void* Buffer, size_t Size, const FFileSeekCtx& SeekCtx, OpStatusType Status_InOut)
 {
-	HANDLE_ENSURE(*Status_InOut, TXT("File operation continue with failed status"));
-	HANDLE_ENSURE(mOpened, TXT("File operation continue w/o open"));
-	HANDLE_ENSURE(mFileOptions.eFileMode & EFileMode::W, TXT("File operation cannot write"));
+	if (!Status_InOut)
+	{
+		Status_InOut = &mFileOpStatus;
+	}
+	BFH_HANDLE_ENSURE(*Status_InOut, TXT("File operation continue with failed status"));
+	BFH_HANDLE_ASSERT(mOpened, TXT("File operation continue w/o open"));
+	BFH_HANDLE_ASSERT(mFileOptions.eFileMode & EFileMode::W, TXT("File operation cannot write"));
+	BFH_HANDLE_ASSERT(Size > 0, TXT("Buffer size invalid {}"), Size);
+
+	// tell if necessary
+	int64_t Prev_Tell{ -1 };
+	if (SeekCtx.ResetPos)
+	{
+		Tell(Prev_Tell, Status_InOut);
+		BFH_HANDLE_ASSERT(Prev_Tell > 0, TXT("Tell failed before reset pos"), Prev_Tell);
+	}
+	// Seek if necessary
+	if (SeekCtx.NonTrivialSeek())
+	{
+		Seek(SeekCtx.Offset, SeekCtx.Whence, Status_InOut);
+	}
 
 	try
 	{
-		SCOPE_LOCK();
+		BFH_SCOPE_LOCK();
 		if (mFileOptions.eFileMapped == EFileMapped::Mapped)
 		{
-			HANDLE_ASSERT(!IsPointerOverlap(MappedFileCurPos_W(Offset), Size, Buffer), TXT("mMappedFile overlap with write region"));
-			std::memcpy(MappedFileCurPos_W(Offset), Buffer, Size);
+			if (mMappedLazyInit)
+			{
+				// Create file on lazy init with size of write buffer
+				{
+					std::filebuf fbuf;
+					fbuf.open(mFilePath, std::ios::out | std::ios::trunc | std::ios::binary);
+					// Set the size
+					auto offset = mMappedSeekPos + static_cast<int64_t>(Size);
+					fbuf.pubseekoff(offset - 1, std::ios::beg);
+					fbuf.sputc(0);
+					fbuf.close();
+				}
+
+				MappedFileLazyInit();
+				BFH_VERBOSE_LOG(TXT("Mapped File finish lazy init before write"));
+			}
+
+			size_t	FileSize = mMappedFile->size();
+			int64_t rest_size = static_cast<int64_t>(FileSize) - (mMappedSeekPos);
+			// Resize file to fit write buffer if necessary
+			if (rest_size < static_cast<int64_t>(Size))
+			{
+				auto new_size = static_cast<int64_t>(FileSize) - rest_size + static_cast<int64_t>(Size);
+				mMappedFile->resize(new_size);
+				BFH_VERBOSE_LOG(TXT("Mapped File resize before write from {} to {}"), FileSize, new_size);
+				{
+					FileSize = mMappedFile->size();
+					rest_size = static_cast<int64_t>(FileSize) - (mMappedSeekPos);
+					bool available = rest_size >= static_cast<int64_t>(Size);
+					BFH_HANDLE_ASSERT(available, TXT("mMappedFile size is not enough for write. SeekPos {}, File Size {}, available size {} Buffer Size {}"),
+						mMappedSeekPos, FileSize, rest_size, Size);
+				}
+			}
+
+			auto writePos = MappedFileCurPos_W(0);
+			// Check buffer and mmap no overlapping
+			const bool overlap = IsPointerOverlap(Buffer, Size, writePos, static_cast<size_t>(rest_size));
+			BFH_HANDLE_ASSERT(!overlap, TXT("mMappedFile overlap with write region. SeekPos {}, File Size {}, available size {} Buffer Size {}"),
+				mMappedSeekPos, FileSize, rest_size, Size);
+
+			// Do mmap
+			std::memcpy(writePos, Buffer, Size);
+			// Advance seek pos
+			mMappedSeekPos += Size;
 		}
 		else
 		{
-			if (Offset != 0)
-			{
-				mFStream->seekp(static_cast<std::streamoff>(Offset));
-			}
 			mFStream->write(reinterpret_cast<const char*>(Buffer), static_cast<std::streamsize>(Size));
+			BFH_HANDLE_ENSURE(!mFStream->fail(), TXT("File operation failed"));
 		}
 
 		if (Status_InOut->bCancelByUser) [[unlikely]]
@@ -279,17 +401,28 @@ IFileHandle::OpRetType FBoostFileHandle::Write(const void* Buffer, size_t Size, 
 		{
 			Status_InOut->eFileOpStatus = EFileOpStatus::Success;
 		}
-		VERBOSE_LOG(FString::Format(TXT("Write file success at offset {} with {} bytes"), Offset, Size));
+		BFH_VERBOSE_LOG(TXT("Write file success with {} bytes"), Size);
 	}
 	catch (std::exception& Exception)
 	{
 		Status_InOut->eFileOpStatus = EFileOpStatus::Failed;
-		HANDLE_EXCPETIONS();
+		BFH_HANDLE_EXCPETIONS();
 	}
 	catch (...)
 	{
 		Status_InOut->eFileOpStatus = EFileOpStatus::Failed;
-		HANDLE_EXCPETIONS2();
+		BFH_HANDLE_EXCPETIONS2();
+	}
+
+	// Reset if necessary
+	if (SeekCtx.ResetPos)
+	{
+		Seek(Prev_Tell, EWhence::Begin, Status_InOut);
+	}
+	// Erase if necessary
+	else if (SeekCtx.EraseSeekPos)
+	{
+		Seek(0 - static_cast<int64_t>(Size), EWhence::Current, Status_InOut);
 	}
 
 	return *this;
@@ -297,13 +430,17 @@ IFileHandle::OpRetType FBoostFileHandle::Write(const void* Buffer, size_t Size, 
 
 IFileHandle::OpRetType FBoostFileHandle::Flush(OpStatusType Status_InOut)
 {
-	HANDLE_ENSURE(*Status_InOut, TXT("File operation continue with failed status"));
-	HANDLE_ENSURE(mOpened, TXT("File operation continue w/o open"));
-	HANDLE_ENSURE(mFileOptions.eFileMode & EFileMode::W, TXT("File operation cannot flush"));
+	if (!Status_InOut)
+	{
+		Status_InOut = &mFileOpStatus;
+	}
+	BFH_HANDLE_ENSURE(*Status_InOut, TXT("File operation continue with failed status"));
+	BFH_HANDLE_ASSERT(mOpened, TXT("File operation continue w/o open"));
+	BFH_HANDLE_ASSERT(mFileOptions.eFileMode & EFileMode::W, TXT("File operation cannot flush"));
 
 	try
 	{
-		SCOPE_LOCK();
+		BFH_SCOPE_LOCK();
 		if (mFileOptions.eFileMapped == EFileMapped::Mapped)
 		{
 			// Mapped files are always flushed by the OS
@@ -311,6 +448,7 @@ IFileHandle::OpRetType FBoostFileHandle::Flush(OpStatusType Status_InOut)
 		else
 		{
 			mFStream->flush();
+			BFH_HANDLE_ENSURE(!mFStream->fail(), TXT("File operation failed"));
 		}
 
 		if (Status_InOut->bCancelByUser) [[unlikely]]
@@ -321,17 +459,17 @@ IFileHandle::OpRetType FBoostFileHandle::Flush(OpStatusType Status_InOut)
 		{
 			Status_InOut->eFileOpStatus = EFileOpStatus::Success;
 		}
-		VERBOSE_LOG(TXT("Flush file"));
+		BFH_VERBOSE_LOG(TXT("Flush file"));
 	}
 	catch (std::exception& Exception)
 	{
 		Status_InOut->eFileOpStatus = EFileOpStatus::Failed;
-		HANDLE_EXCPETIONS();
+		BFH_HANDLE_EXCPETIONS();
 	}
 	catch (...)
 	{
 		Status_InOut->eFileOpStatus = EFileOpStatus::Failed;
-		HANDLE_EXCPETIONS2();
+		BFH_HANDLE_EXCPETIONS2();
 	}
 
 	return *this;
@@ -339,32 +477,37 @@ IFileHandle::OpRetType FBoostFileHandle::Flush(OpStatusType Status_InOut)
 
 IFileHandle::OpRetType FBoostFileHandle::Seek(int64_t Offset, EWhence Whence, OpStatusType Status_InOut)
 {
-	HANDLE_ENSURE(*Status_InOut, TXT("File operation continue with failed status"));
-	HANDLE_ENSURE(mOpened, TXT("File operation continue w/o open"));
+	if (!Status_InOut)
+	{
+		Status_InOut = &mFileOpStatus;
+	}
+	BFH_HANDLE_ENSURE(*Status_InOut, TXT("File operation continue with failed status"));
+	BFH_HANDLE_ASSERT(mOpened, TXT("File operation continue w/o open"));
 
 	try
 	{
-		SCOPE_LOCK();
+		BFH_SCOPE_LOCK();
 		if (mFileOptions.eFileMapped == EFileMapped::Mapped)
 		{
-			int64_t Size = static_cast<int64_t>(mMappedFile->size());
 			switch (Whence)
 			{
-				case EWhence::Beg:
+				case EWhence::Begin:
 					mMappedSeekPos = Offset;
 					break;
-				case EWhence::Cur:
+				case EWhence::Current:
 					mMappedSeekPos += Offset;
 					break;
 				case EWhence::End:
+					int64_t Size = static_cast<int64_t>(mMappedFile->size());
 					mMappedSeekPos = Size - Offset;
 					break;
 			}
-			HANDLE_ENSURE(mMappedSeekPos >= 0 && mMappedSeekPos <= Size, TXT("Map file seek out of range"));
+			BFH_HANDLE_ENSURE(mMappedSeekPos >= 0, TXT("Map file seek out of range: {}"), mMappedSeekPos);
 		}
 		else
 		{
-			mFStream->seekg(static_cast<std::streamoff>(Offset), static_cast<std::ios_base::seekdir>(Whence));
+			mFStream->seekg(static_cast<std::streamoff>(Offset), static_cast<std::ios::seekdir>(Whence));
+			BFH_HANDLE_ENSURE(!mFStream->fail(), TXT("File operation failed"));
 		}
 
 		if (Status_InOut->bCancelByUser) [[unlikely]]
@@ -375,17 +518,17 @@ IFileHandle::OpRetType FBoostFileHandle::Seek(int64_t Offset, EWhence Whence, Op
 		{
 			Status_InOut->eFileOpStatus = EFileOpStatus::Success;
 		}
-		VERBOSE_LOG(FString::Format(TXT("Seek success at offset {} with {}"), Offset, TO_TCHAR_STR(magic_enum::enum_name(Whence).data())));
+		BFH_VERBOSE_LOG(TXT("Seek success given offset {} with {}"), Offset, TO_TCHAR_STR(magic_enum::enum_name(Whence).data()));
 	}
 	catch (std::exception& Exception)
 	{
 		Status_InOut->eFileOpStatus = EFileOpStatus::Failed;
-		HANDLE_EXCPETIONS();
+		BFH_HANDLE_EXCPETIONS();
 	}
 	catch (...)
 	{
 		Status_InOut->eFileOpStatus = EFileOpStatus::Failed;
-		HANDLE_EXCPETIONS2();
+		BFH_HANDLE_EXCPETIONS2();
 	}
 
 	return *this;
@@ -393,12 +536,16 @@ IFileHandle::OpRetType FBoostFileHandle::Seek(int64_t Offset, EWhence Whence, Op
 
 IFileHandle::IFileHandle::OpRetType FBoostFileHandle::Tell(int64_t& Offset, OpStatusType Status_InOut)
 {
-	HANDLE_ENSURE(*Status_InOut, TXT("File operation continue with failed status"));
-	HANDLE_ENSURE(mOpened, TXT("File operation continue w/o open"));
+	if (!Status_InOut)
+	{
+		Status_InOut = &mFileOpStatus;
+	}
+	BFH_HANDLE_ENSURE(*Status_InOut, TXT("File operation continue with failed status"));
+	BFH_HANDLE_ASSERT(mOpened, TXT("File operation continue w/o open"));
 
 	try
 	{
-		SCOPE_LOCK();
+		BFH_SCOPE_LOCK();
 		if (mFileOptions.eFileMapped == EFileMapped::Mapped)
 		{
 			Offset = mMappedSeekPos;
@@ -406,7 +553,8 @@ IFileHandle::IFileHandle::OpRetType FBoostFileHandle::Tell(int64_t& Offset, OpSt
 		else
 		{
 			Offset = static_cast<int64_t>(mFStream->tellg());
-			HANDLE_ENSURE(Offset >= 0, TXT("File Tell failed"));
+			BFH_HANDLE_ENSURE(Offset >= 0, TXT("File Tell failed with value {}"), Offset);
+			BFH_HANDLE_ENSURE(!mFStream->fail(), TXT("File operation failed"));
 		}
 
 		if (Status_InOut->bCancelByUser) [[unlikely]]
@@ -417,17 +565,17 @@ IFileHandle::IFileHandle::OpRetType FBoostFileHandle::Tell(int64_t& Offset, OpSt
 		{
 			Status_InOut->eFileOpStatus = EFileOpStatus::Success;
 		}
-		VERBOSE_LOG(FString::Format(TXT("Tell success with offset {}"), Offset));
+		BFH_VERBOSE_LOG(TXT("Tell success with offset {}"), Offset);
 	}
 	catch (std::exception& Exception)
 	{
 		Status_InOut->eFileOpStatus = EFileOpStatus::Failed;
-		HANDLE_EXCPETIONS();
+		BFH_HANDLE_EXCPETIONS();
 	}
 	catch (...)
 	{
 		Status_InOut->eFileOpStatus = EFileOpStatus::Failed;
-		HANDLE_EXCPETIONS2();
+		BFH_HANDLE_EXCPETIONS2();
 	}
 
 	return *this;
@@ -435,11 +583,15 @@ IFileHandle::IFileHandle::OpRetType FBoostFileHandle::Tell(int64_t& Offset, OpSt
 
 IFileHandle::OpRetType FBoostFileHandle::Size(size_t& Size, OpStatusType Status_InOut)
 {
-	HANDLE_ENSURE(*Status_InOut, TXT("File operation continue with failed status"));
+	if (!Status_InOut)
+	{
+		Status_InOut = &mFileOpStatus;
+	}
+	BFH_HANDLE_ENSURE(*Status_InOut, TXT("File operation continue with failed status"));
 
 	try
 	{
-		SCOPE_LOCK();
+		BFH_SCOPE_LOCK();
 		if (mFileOptions.eFileMapped == EFileMapped::Mapped)
 		{
 			Size = mMappedFile->size();
@@ -447,9 +599,10 @@ IFileHandle::OpRetType FBoostFileHandle::Size(size_t& Size, OpStatusType Status_
 		else
 		{
 			auto curPos = mFStream->tellg();
-			mFStream->seekg(0, static_cast<std::ios_base::seekdir>(EWhence::End));
+			mFStream->seekg(0, static_cast<std::ios::seekdir>(EWhence::End));
 			Size = static_cast<size_t>(mFStream->tellg());
-			mFStream->seekg(curPos, static_cast<std::ios_base::seekdir>(EWhence::Beg));
+			mFStream->seekg(curPos, static_cast<std::ios::seekdir>(EWhence::Begin));
+			BFH_HANDLE_ENSURE(!mFStream->fail(), TXT("File operation failed"));
 		}
 
 		if (Status_InOut->bCancelByUser) [[unlikely]]
@@ -460,17 +613,17 @@ IFileHandle::OpRetType FBoostFileHandle::Size(size_t& Size, OpStatusType Status_
 		{
 			Status_InOut->eFileOpStatus = EFileOpStatus::Success;
 		}
-		VERBOSE_LOG(FString::Format(TXT("Size success with size {}"), Size));
+		BFH_VERBOSE_LOG(TXT("Size success with size {}"), Size);
 	}
 	catch (std::exception& Exception)
 	{
 		Status_InOut->eFileOpStatus = EFileOpStatus::Failed;
-		HANDLE_EXCPETIONS();
+		BFH_HANDLE_EXCPETIONS();
 	}
 	catch (...)
 	{
 		Status_InOut->eFileOpStatus = EFileOpStatus::Failed;
-		HANDLE_EXCPETIONS2();
+		BFH_HANDLE_EXCPETIONS2();
 	}
 
 	return *this;
@@ -478,15 +631,28 @@ IFileHandle::OpRetType FBoostFileHandle::Size(size_t& Size, OpStatusType Status_
 
 IFileHandle::OpRetType FBoostFileHandle::Truncate(size_t Size, OpStatusType Status_InOut)
 {
-	HANDLE_ENSURE(*Status_InOut, TXT("File operation continue with failed status"));
+	if (!Status_InOut)
+	{
+		Status_InOut = &mFileOpStatus;
+	}
+	BFH_HANDLE_ENSURE(*Status_InOut, TXT("File operation continue with failed status"));
 
 	try
 	{
-		SCOPE_LOCK();
+		BFH_SCOPE_LOCK();
 		{
 			boost::system::error_code ec;
 			boost::filesystem::resize_file(mFilePath.ToCharStr(), Size, ec);
-			HANDLE_ENSURE(!ec, TXT("File truncate failed"));
+			BFH_HANDLE_ENSURE(!ec, TXT("File truncate failed"));
+		}
+
+		if (mFileOptions.eFileMapped == EFileMapped::Mapped)
+		{
+			if (mMappedLazyInit)
+			{
+				MappedFileLazyInit();
+				BFH_VERBOSE_LOG(TXT("Mapped File finish lazy init after truncation"));
+			}
 		}
 
 		if (Status_InOut->bCancelByUser) [[unlikely]]
@@ -497,17 +663,17 @@ IFileHandle::OpRetType FBoostFileHandle::Truncate(size_t Size, OpStatusType Stat
 		{
 			Status_InOut->eFileOpStatus = EFileOpStatus::Success;
 		}
-		VERBOSE_LOG(FString::Format(TXT("Truncate success with size {}"), Size));
+		BFH_VERBOSE_LOG(TXT("Truncate success with size {}"), Size);
 	}
 	catch (std::exception& Exception)
 	{
 		Status_InOut->eFileOpStatus = EFileOpStatus::Failed;
-		HANDLE_EXCPETIONS();
+		BFH_HANDLE_EXCPETIONS();
 	}
 	catch (...)
 	{
 		Status_InOut->eFileOpStatus = EFileOpStatus::Failed;
-		HANDLE_EXCPETIONS2();
+		BFH_HANDLE_EXCPETIONS2();
 	}
 
 	return *this;
@@ -515,11 +681,11 @@ IFileHandle::OpRetType FBoostFileHandle::Truncate(size_t Size, OpStatusType Stat
 
 IFileHandle::OpRetType FBoostFileHandle::Stat(std::shared_ptr<IFFileStat>& Stat, const FPath& FilePath, OpStatusType Status_InOut)
 {
-	HANDLE_ENSURE2(*Status_InOut, TXT("File operation continue with failed status"));
+	BFH_HANDLE_ENSURE2(*Status_InOut, TXT("File operation continue with failed status"));
 
 	try
 	{
-		SCOPE_LOCK();
+		BFH_SCOPE_LOCK();
 		{
 			Stat = std::make_shared<FBoostFileStat>(FilePath);
 		}
@@ -532,27 +698,46 @@ IFileHandle::OpRetType FBoostFileHandle::Stat(std::shared_ptr<IFFileStat>& Stat,
 		{
 			Status_InOut->eFileOpStatus = EFileOpStatus::Success;
 		}
-		VERBOSE_LOG2(TXT("Stat success"));
+		BFH_VERBOSE_LOG2(TXT("Stat success"));
 	}
 	catch (std::exception& Exception)
 	{
 		Status_InOut->eFileOpStatus = EFileOpStatus::Failed;
-		HANDLE_EXCPETIONS();
+		BFH_HANDLE_EXCPETIONS();
 	}
 	catch (...)
 	{
 		Status_InOut->eFileOpStatus = EFileOpStatus::Failed;
-		HANDLE_EXCPETIONS2();
+		BFH_HANDLE_EXCPETIONS2();
 	}
 
 	return *this;
+}
+
+void FBoostFileHandle::MappedFileLazyInit()
+{
+	BFH_HANDLE_ASSERT(mMappedFile, TXT("MappedFile file null"));
+	boost::iostreams::mapped_file_params params;
+	params.path = mFilePath.ToCharStr();
+	params.flags = (mFileOptions.eFileMode & EFileMode::W) ? boost::iostreams::mapped_file::readwrite : boost::iostreams::mapped_file::readonly;
+	mMappedFile->open(params);
+	BFH_HANDLE_ENSURE(mMappedFile->is_open(), TXT("MappedFile file open failed"));
+	// Set seek pos to the end of file if ate mode
+	if (mFileOptions.eFileMode & EFileMode::E)
+	{
+		size_t FileSize = mMappedFile->size();
+		mMappedSeekPos = static_cast<int64_t>(FileSize);
+		BFH_HANDLE_ASSERT(mMappedSeekPos > 0, TXT("MappedFile file seek <= 0 with file size {}"), FileSize);
+	}
+
+	mMappedLazyInit = false;
 }
 
 const void* FBoostFileHandle::MappedFileCurPos_R(int64_t Offset) const
 {
 	auto _Offeset = mMappedSeekPos + Offset;
 	auto _Size = static_cast<int64_t>(mMappedFile->size());
-	HANDLE_ASSERT(_Offeset >= 0 && _Offeset < _Size, FString::Format(TXT("MappedFileCurPos_R {} out of range [0,{})"), _Offeset, _Size));
+	BFH_HANDLE_ASSERT(_Offeset >= 0 && _Offeset < _Size, FString::Format(TXT("MappedFileCurPos_R {} out of range [0,{})"), _Offeset, _Size));
 	return (&(mMappedFile->const_data()[_Offeset]));
 }
 
@@ -560,7 +745,7 @@ void* FBoostFileHandle::MappedFileCurPos_W(int64_t Offset)
 {
 	auto _Offeset = mMappedSeekPos + Offset;
 	auto _Size = static_cast<int64_t>(mMappedFile->size());
-	HANDLE_ASSERT(_Offeset >= 0 && _Offeset < _Size, FString::Format(TXT("MappedFileCurPos_W {} out of range [0,{})"), _Offeset, _Size));
+	BFH_HANDLE_ASSERT(_Offeset >= 0 && _Offeset < _Size, FString::Format(TXT("MappedFileCurPos_W {} out of range [0,{})"), _Offeset, _Size));
 	return (&(mMappedFile->data()[_Offeset]));
 }
 

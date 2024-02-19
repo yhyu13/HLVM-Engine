@@ -15,7 +15,7 @@ bool FPath::Exists(const FPath& path)
 	return FGenericPlatformFile::Get()->Exists(path);
 }
 
-TSVector32<FPath> FPath::FindAllMatch(const FPath& path, const FString& regex, bool recursive)
+TSVector32<FPath> FPath::FindAllMatch(const FPath& root_dir, const FString& regex, bool recursive)
 {
-	return FGenericPlatformFile::Get()->FindAllMatch(path, regex, recursive);
+	return FGenericPlatformFile::Get()->FindAllMatch(root_dir, regex, recursive);
 }

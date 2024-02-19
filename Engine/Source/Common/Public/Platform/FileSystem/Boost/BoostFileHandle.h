@@ -45,8 +45,8 @@ public:
 
 	virtual OpRetType Open(const FPath& FilePath, const FFileOptions& Options, OpStatusType Status_InOut) final override;
 	virtual OpRetType Close(OpStatusType Status_InOut) final override;
-	virtual OpRetType Read(void* Buffer, size_t Size, int64_t Offset, OpStatusType Status_InOut) final override;
-	virtual OpRetType Write(const void* Buffer, size_t Size, int64_t Offset, OpStatusType Status_InOut) final override;
+	virtual OpRetType Read(void* Buffer, size_t Size, const FFileSeekCtx& SeekCtx, OpStatusType Status_InOut) final override;
+	virtual OpRetType Write(const void* Buffer, size_t Size, const FFileSeekCtx& SeekCtx, OpStatusType Status_InOut) final override;
 	virtual OpRetType Flush(OpStatusType Status_InOut) final override;
 	virtual OpRetType Seek(int64_t Offset, EWhence Whence, OpStatusType Status_InOut) final override;
 	virtual OpRetType Tell(int64_t& Offset, OpStatusType Status_InOut) final override;
@@ -59,6 +59,7 @@ public:
 	virtual OpRetType Stat(std::shared_ptr<IFFileStat>& Stat, const FPath& FilePath, OpStatusType Status_InOut) final override;
 
 private:
+	void		MappedFileLazyInit();
 	const void* MappedFileCurPos_R(int64_t Offset) const;
 	void*		MappedFileCurPos_W(int64_t Offset);
 	void		HandleException(const OpStatusType& Status_InOut, const TCHAR* Function, const std::exception& Exception);
@@ -72,4 +73,5 @@ private:
 	mutable std::optional<FAtomicFlag>					  mLock;
 	mutable std::optional<boost::interprocess::file_lock> mFileLock;
 	BIT_FLAG(mOpened){ false };
+	BIT_FLAG(mMappedLazyInit){ false };
 };

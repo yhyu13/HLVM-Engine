@@ -18,5 +18,5 @@ protected:
 	virtual TSVector32<FPath> FindAllMatch(const FPath& root_dir, const FString& regex, bool recursive = false) final override;
 
 private:
-	FBoostFileHandle mInnerFileHandle;
+	FBoostFileHandle mDummyFileHandle; // Dummy file handle just to get file stat
 };

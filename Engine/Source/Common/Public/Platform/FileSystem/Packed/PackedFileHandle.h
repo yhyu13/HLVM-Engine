@@ -24,9 +24,6 @@ public:
 	virtual bool Exists() const final override;
 	virtual bool IsFile() const final override;
 	virtual bool IsLink() const final override;
-
-private:
-	boost::filesystem::file_status fs;
 };
 
 class FPackedFileHandle final : public IFileHandle

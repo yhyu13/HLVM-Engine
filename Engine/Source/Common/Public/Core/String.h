@@ -86,12 +86,13 @@ public:
 	template <typename VecType, typename PredType>
 	static FString Join(const VecType& Vec,
 		const PredType&				   func,
-		const TCHAR*				   splitter = TXT(" ,\n"))
+		const TCHAR*				   splitter = TXT(",\n"))
 	{
 		FString result{ "[ " };
+		int32_t count = 0;
 		for (const auto& elem : Vec)
 		{
-			if (!result.empty())
+			if (count++ > 0)
 			{
 				result += splitter;
 			}
@@ -121,7 +122,7 @@ public:
 		return *this;
 	}
 
-	// Conver to const TCHAR*
+	// Convert to const TCHAR*
 	operator const TCHAR*() const
 	{
 		return reinterpret_cast<const TCHAR*>(this->data());

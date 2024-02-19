@@ -69,7 +69,7 @@ static bool IsPointerOverlap(const void* ptr1, size_t size1, const void* ptr2)
 }
 
 // To compare with another region, you can modify the function to take a second size:
-static bool IsPointerOverlap2(const void* ptr1, size_t size1, const void* ptr2, size_t size2)
+static bool IsPointerOverlap(const void* ptr1, size_t size1, const void* ptr2, size_t size2)
 {
 	const char* cptr1 = reinterpret_cast<const char*>(ptr1);
 	const char* cptr2 = reinterpret_cast<const char*>(ptr2);
