@@ -47,3 +47,20 @@
 #define PADDING(size) std::byte TOKENPASTE2(padding_, __LINE__)[size]
 
 #define BIT_FLAG(x) bool x : 1
+
+#define HLVM_ENUM(enum_class, type, ...) \
+	enum class enum_class : type         \
+	{                                    \
+		__VA_ARGS__,                     \
+		HLVM_NUM                         \
+	};                                   \
+	static constexpr size_t enum_class##_NUM = static_cast<size_t>(enum_class::HLVM_NUM)
+
+#define HLVM_ENUM_V(enum_class, enum_value) static_cast<std::underlying_type_t<enum_class>>(enum_class::enum_value)
+#define HLVM_ENUM_V_SIZE_T(enum_class, enum_value) static_cast<size_t>(enum_class::enum_value)
+
+#define S_C(type, value) static_cast<type>(value)
+#define SP_C(type, value) static_pointer_cast<type>(value)
+#define D_C(type, value) dynamic_cast<type>(value)
+#define C_C(type, value) const_cast<type>(value)
+#define R_C(type, value) reinterpret_cast<type>(value)

@@ -1,5 +1,6 @@
 from PyCMake.cmakecpp import *
 
+# Create a VcpkgContext object with the specified path for vcpkg root and version
 vcpkg_cxt = VcpkgContenxt(vcpkg_root_path='../Dependency/vcpkg',
                           vcpkg_config=VcpkgConfigModel(name='Common',
                                                         version='0.1.0',
@@ -12,6 +13,35 @@ vcpkg_cxt = VcpkgContenxt(vcpkg_root_path='../Dependency/vcpkg',
                                                         ],
                                                         builtin_baseline='53bef8994c541b6561884a8395ea35715ece75db'))
 
+# Find the spdlog package with the specified options
+spdlog = FindPackage(name='spdlog',
+                     config=True,
+                     required=True,
+                     target_link_libs=[DomainValueModel(domain=DomainEnum.PUBLIC, values=['spdlog::spdlog'])])
+
+# Find the mimalloc package with the specified options
+mimalloc = FindPackage(name='mimalloc',
+                       config=True,
+                       required=True,
+                       target_link_libs=[DomainValueModel(domain=DomainEnum.PUBLIC, values=['mimalloc'])])
+
+# Find the magic_enum package with the specified options
+magic_enum = FindPackage(name='magic_enum',
+                         config=True,
+                         required=True,
+                         target_link_libs=[
+                             DomainValueModel(domain=DomainEnum.PUBLIC, values=['yalantinglibs::yalantinglibs'])])
+
+# Find the Boost package with the specified options
+Boost = FindPackage(name='Boost',
+                    config=False,
+                    required=True,
+                    components=['iostreams filesystem system thread date_time regex timer chrono'],
+                    target_include_dirs=[DomainValueModel(domain=DomainEnum.PUBLIC, values=['${Boost_INCLUDE_DIRS}'])],
+                    target_link_dirs=[DomainValueModel(domain=DomainEnum.PUBLIC, values=['${Boost_LIBRARY_DIRS}'])],
+                    target_link_libs=[DomainValueModel(domain=DomainEnum.PUBLIC, values=['${Boost_LIBRARIES}'])])
+
+# Fetch the Yalantinglibs package from GitHub with the specified options
 yalantinlibs = FetchContent(name='yalantinglibs',
                             git_repo_url='https://github.com/yhyu13/yalantinglibs.git',
                             git_tag='679cbac8f3c5566a842c91b9d332632d3076f6ac',
@@ -22,12 +52,16 @@ yalantinlibs = FetchContent(name='yalantinglibs',
                             target_link_libs=[
                                 DomainValueModel(domain=DomainEnum.PUBLIC, values=['yalantinglibs::yalantinglibs'])]
                             )
+
+# Fetch the Backward package from GitHub with the specified options
 backward = FetchContent(name='backward',
                         git_repo_url='https://github.com/yhyu13/backward-cpp.git',
                         git_tag='51f0700452cf71c57d43c2d028277b24cde32502',
                         target_link_libs=[DomainValueModel(domain=DomainEnum.PUBLIC,
                                                            values=['Backward::Interface', '${CMAKE_DL_LIBS}'])]
                         )
+
+# Fetch the parallel-hashmap package from GitHub with the specified options
 parallel_hashmap = FetchContent(name='parallel-hashmap',
                                 git_repo_url='https://github.com/yhyu13/parallel-hashmap.git',
                                 git_tag='67c24619e4f5ab2097b74cc397732c17a25d6944',
@@ -35,6 +69,8 @@ parallel_hashmap = FetchContent(name='parallel-hashmap',
                                     DomainValueModel(domain=DomainEnum.PUBLIC,
                                                      values=['${parallel-hashmap_SOURCE_DIR}'])],
                                 )
+
+# Fetch the ctre package from GitHub with the specified options
 ctre = FetchContent(name='ctre',
                     git_repo_url='https://github.com/yhyu13/compile-time-regular-expressions.git',
                     git_tag='9725886582a928491a086bba1c07909b2e583157',
@@ -42,31 +78,17 @@ ctre = FetchContent(name='ctre',
                                                        values=['ctre::ctre'])]
                     )
 
-spdlog = FindPackage(name='spdlog',
-                     config=True,
-                     required=True,
-                     target_link_libs=[DomainValueModel(domain=DomainEnum.PUBLIC, values=['spdlog::spdlog'])])
-
-mimalloc = FindPackage(name='mimalloc',
-                       config=True,
-                       required=True,
-                       target_link_libs=[DomainValueModel(domain=DomainEnum.PUBLIC, values=['mimalloc'])])
-
-magic_enum = FindPackage(name='magic_enum',
-                         config=True,
-                         required=True,
-                         target_link_libs=[
-                             DomainValueModel(domain=DomainEnum.PUBLIC, values=['yalantinglibs::yalantinglibs'])])
-
-Boost = FindPackage(name='Boost',
-                    config=False,
-                    required=True,
-                    components=['iostreams filesystem system thread date_time regex timer chrono'],
-                    target_include_dirs=[DomainValueModel(domain=DomainEnum.PUBLIC, values=['${Boost_INCLUDE_DIRS}'])],
-                    target_link_dirs=[DomainValueModel(domain=DomainEnum.PUBLIC, values=['${Boost_LIBRARY_DIRS}'])],
-                    target_link_libs=[DomainValueModel(domain=DomainEnum.PUBLIC, values=['${Boost_LIBRARIES}'])])
+string_pool = FetchContent(name='StringPool',
+                           git_repo_url='https://github.com/yhyu13/StringPool.git',
+                           git_tag='4dd2bc2d02322578e1efc387674059b75b5cce87',
+                           target_include_dirs=[
+                               DomainValueModel(domain=DomainEnum.PUBLIC,
+                                                values=['${StringPool_SOURCE_DIR}'])],
+                           )
 
 
+
+# Create a CommonModule object with the specified options
 class CommonModule(BaseModule):
     def __init__(self):
         super().__init__(module=ModuleTargetModel(target='Common',
@@ -78,7 +100,8 @@ class CommonModule(BaseModule):
                          fetch_packages=[yalantinlibs,
                                          backward,
                                          parallel_hashmap,
-                                         ctre
+                                         ctre,
+                                         string_pool
                                          ],
                          find_packages=[spdlog,
                                         mimalloc,
@@ -99,6 +122,7 @@ class CommonModule(BaseModule):
                                             values=['./Public/Common.shared.pch'])
 
 
+# Create a TestCommonModule object with the specified options
 class TestCommonModule(BaseModule):
     def __init__(self, cpp_path: str):
         super().__init__(module=ModuleTargetModel(target=os.path.basename(cpp_path).split('.')[0],
@@ -111,6 +135,7 @@ class TestCommonModule(BaseModule):
         self.target_interface.add_link_libs(domain=DomainEnum.PRIVATE, values=['Common'])
 
 
+# Create a CommonProject object with the specified options
 class CommonProject(BaseProject):
     def __init__(self, **kwargs):
         super().__init__(name='Common',
@@ -137,6 +162,7 @@ class CommonProject(BaseProject):
         self.modules.extend([TestCommonModule(path) for path in glob.glob("./Test/*.cpp")])
 
 
+# Main function
 if __name__ == '__main__':
     # cd to script dir
     logging.info(f'Exec {__file__}')

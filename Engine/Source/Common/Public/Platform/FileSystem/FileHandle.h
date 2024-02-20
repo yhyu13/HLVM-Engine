@@ -72,10 +72,10 @@ static bool operator&(EFileLock a, EFileLock b)
  */
 struct FFileOptions
 {
-	EFileMode	eFileMode{ EFileMode::RWA };
-	EFileMapped eFileMapped{ EFileMapped::Mapped };
+	EFileMode	eFileMode{ EFileMode::R };
+	EFileMapped eFileMapped{ EFileMapped::NoMapped };
 	EFileAsync	eFileAsync{ EFileAsync::NoAsync };
-	EFileLock	eFileLock{ EFileLock::ThreadLock };
+	EFileLock	eFileLock{ EFileLock::NoLock };
 };
 
 /**
@@ -154,8 +154,8 @@ struct FFileSeekCtx
 {
 	int64_t Offset{ 0 };
 	EWhence Whence{ EWhence::Current };
-	BIT_FLAG(ResetPos){ false };	// Reset seek pos to location before (offset, whence) is applied. This will override EraseSeekPos
-	BIT_FLAG(EraseSeekPos){ true }; // Reset seek pos to (offset, whence) right before r/w. Otherwise advance file pointer
+	BIT_FLAG(ResetPos){ false };	 // Reset seek pos to location before (offset, whence) is applied. This will override EraseSeekPos
+	BIT_FLAG(EraseSeekPos){ false }; // Reset seek pos to (offset, whence) right before r/w. Otherwise, advance file pointer
 
 	/**
 	 * see if non trivial seek, which requires extra calling seek
@@ -192,13 +192,7 @@ public:
 
 	virtual OpRetType Open(const FPath& FilePath, const FFileOptions& Options = FFileOptions(), OpStatusType Status_InOut = nullptr) = 0;
 	virtual OpRetType Close(OpStatusType Status_InOut = nullptr) = 0;
-	/**
-	 * @param SeekCtx Reset seek pos to (offset, whence) right before read after read
-	 */
 	virtual OpRetType Read(void* Buffer, size_t Size, const FFileSeekCtx& SeekCtx = FFileSeekCtx(), OpStatusType Status_InOut = nullptr) = 0;
-	/**
-	 * @param SeekCtx Reset seek pos to (offset, whence) right before write after write
-	 */
 	virtual OpRetType Write(const void* Buffer, size_t Size, const FFileSeekCtx& SeekCtx = FFileSeekCtx(), OpStatusType Status_InOut = nullptr) = 0;
 	virtual OpRetType Flush(OpStatusType Status_InOut = nullptr) = 0;
 	virtual OpRetType Seek(int64_t Offset, EWhence Whence = EWhence::Begin, OpStatusType Status_InOut = nullptr) = 0;
@@ -208,8 +202,8 @@ public:
 	/**
 	 * These methods can be static methods, but since we require inheritance, they have to be member virtual methods
 	 */
-	virtual OpRetType Truncate(size_t Size, OpStatusType Status_InOut = nullptr) = 0;
-	virtual OpRetType Stat(std::shared_ptr<IFFileStat>& Stat, const FPath& FilePath, OpStatusType Status_InOut = nullptr) = 0;
+	virtual OpRetType								  Truncate(size_t Size, OpStatusType Status_InOut = nullptr) = 0;
+	[[nodiscard]] virtual std::shared_ptr<IFFileStat> Stat(const FPath& FilePath, OpStatusType Status_InOut = nullptr) = 0;
 
 protected:
 	FFileOptions  mFileOptions;

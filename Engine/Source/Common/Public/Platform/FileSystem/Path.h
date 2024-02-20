@@ -9,12 +9,10 @@
 
 #include <boost/filesystem/path.hpp>
 
-enum class EPlatformFileType : uint8_t
-{
-	Unkown,
+HLVM_ENUM(EPlatformFileType, uint8_t,
 	Local,
 	Packed,
-};
+	Unkown);
 
 /**
  * boost path usage : https://blog.csdn.net/toby54king/article/details/81334962
@@ -87,15 +85,42 @@ public:
 		return static_cast<const char*>(*this);
 	}
 
+	size_t GetHash() const noexcept
+	{
+		if (mHash == 0)
+		{
+			mHash = CalculateHash();
+		}
+		return mHash;
+	}
+
 	/**
 	 * Static methods, internally calling generic platform api
 	 */
-	static bool				 IsDirectory(const FPath& path);
-	static bool				 Exists(const FPath& path);
-	static TSVector32<FPath> FindAllMatch(const FPath& root_dir, const FString& regex, bool recursive = false);
+	static bool					 IsDirectory(const FPath& path);
+	static bool					 Exists(const FPath& path);
+	static TSmallVector32<FPath> FindAllMatch(const FPath& root_dir, const FString& regex, bool recursive = false);
+	static FString				 DumpJson(const TSmallVector32<FPath>& paths);
 
 private:
-	void ResolvePath() const;
+	void   ResolvePath() const;
+	size_t CalculateHash() const noexcept;
 
+	mutable size_t	  mHash{ 0 };
 	EPlatformFileType mFileType{ EPlatformFileType::Unkown };
 };
+
+/*
+	Custom hash function for FPath
+*/
+namespace std
+{
+	template <>
+	struct hash<FPath>
+	{
+		std::size_t operator()(const FPath& path) const noexcept
+		{
+			return path.GetHash();
+		}
+	};
+} // namespace std

@@ -15,12 +15,12 @@ public:
 	FGenericPlatformFile() = default;
 	virtual ~FGenericPlatformFile() = default;
 
-	virtual bool			  IsDirectory(const FPath& path);
-	virtual bool			  Exists(const FPath& path);
-	virtual TSVector32<FPath> FindAllMatch(const FPath& root_dir, const FString& regex, bool recursive = false);
+	virtual bool				  IsDirectory(const FPath& path);
+	virtual bool				  Exists(const FPath& path);
+	virtual TSmallVector32<FPath> FindAllMatch(const FPath& root_dir, const FString& regex, bool recursive = false);
 
 	static FGenericPlatformFile* Get();
 
 protected:
-	static TSMap<EPlatformFileType, FGenericPlatformFile*> sPlatformFileRedirector;
+	static FGenericPlatformFile* sPlatformFileRedirector[EPlatformFileType_NUM];
 };

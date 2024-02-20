@@ -10,33 +10,26 @@
 DELCARE_LOG_CATEGORY(LogBoostPlatformFile)
 DEFINE_LOG_CATEGORY(LogBoostPlatformFile)
 
-void FBoostPlatformFile::Initialize()
-{
-	HLVM_ASSERT(!sPlatformFileRedirector[EPlatformFileType::Local], TXT("Platform file is already registered"));
-	sPlatformFileRedirector[EPlatformFileType::Local] = new FBoostPlatformFile();
-	HLVM_LOG(LogBoostPlatformFile, debug, TXT("FBoostPlatformFile::Initialize()"));
-}
-
 bool FBoostPlatformFile::IsDirectory(const FPath& path)
 {
-	FFileOpStatus				_Status;
-	std::shared_ptr<IFFileStat> _Stat;
-	mDummyFileHandle.Stat(_Stat, path, &_Status);
+	FFileOpStatus					_Status;
+	std::shared_ptr<FBoostFileStat> _Stat = SP_C(FBoostFileStat, mDummyFileHandle.Stat(path, &_Status));
+	HLVM_ASSERT(_Status, TXT("FBoostPlatformFile::IsDirectory() - Failed to stat file"));
 	return _Stat->IsDirectory();
 }
 
 bool FBoostPlatformFile::Exists(const FPath& path)
 {
-	FFileOpStatus				_Status;
-	std::shared_ptr<IFFileStat> _Stat;
-	mDummyFileHandle.Stat(_Stat, path, &_Status);
+	FFileOpStatus					_Status;
+	std::shared_ptr<FBoostFileStat> _Stat = SP_C(FBoostFileStat, mDummyFileHandle.Stat(path, &_Status));
+	HLVM_ASSERT(_Status, TXT("FBoostPlatformFile::Exists() - Failed to stat file"));
 	return _Stat->Exists();
 }
 
-TSVector32<FPath> FBoostPlatformFile::FindAllMatch(const FPath& root_dir, const FString& regex, bool recursive)
+TSmallVector32<FPath> FBoostPlatformFile::FindAllMatch(const FPath& root_dir, const FString& regex, bool recursive)
 {
-	TSVector32<FPath> Result;
-	boost::regex	  Regex{ regex.ToCharStr() };
+	TSmallVector32<FPath> Result;
+	boost::regex		  Regex{ regex.ToCharStr() };
 
 	if (recursive)
 	{

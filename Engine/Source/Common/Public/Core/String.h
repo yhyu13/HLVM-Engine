@@ -133,3 +133,36 @@ public:
 		return static_cast<const TCHAR*>(fs);
 	}
 };
+
+template <size_t N>
+struct TCharArrayStr
+{
+	static constexpr size_t Capacity{ N };
+	TCHAR					Buffer[Capacity + 1];
+	size_t					Size{ 0 };
+
+	TCharArrayStr()
+	{
+		std::memset(Buffer, 0, Capacity + 1);
+	}
+
+	// 构造函数接受一个C风格字符串进行初始化
+	TCharArrayStr(const TCHAR* input)
+	{
+		Size = std::strlen(reinterpret_cast<const char*>(input));
+		assert(Size <= Capacity);
+		std::strncpy(Buffer, input, Size);
+		Buffer[Size + 1] = '\0'; // 确保总是以空字符结束
+	}
+
+	// 获取字符串内容
+	const TCHAR* c_str() const
+	{
+		return Buffer;
+	}
+
+	TCHAR* data()
+	{
+		return Buffer;
+	}
+};
