@@ -14,18 +14,18 @@ DEFINE_LOG_CATEGORY(LogTest)
 /*
 	<test method>
 */
-RECORD(excpetion_test,
+RECORD(excpetion_test)
+{
+	try
 	{
-		try
+		if (HLVM_IS_DEBUGGER_PRESENT())
 		{
-			if (HLVM_IS_DEBUGGER_PRESENT())
-			{
-				HLVM_LOG(LogTest, warn, TXT("If there is a attached debugger, you will get debug pause after assertion failed. Press continue to finish this test."));
-			}
-			HLVM_ENSURE(1 != 1, TXT("1 != 1"));
+			HLVM_LOG(LogTest, warn, TXT("If there is a attached debugger, you will get debug pause after assertion failed. Press continue to finish this test."));
 		}
-		catch (const std::runtime_error& e)
-		{
-			HLVM_LOG(LogTest, debug, TO_TCHAR_STR(e.what()));
-		}
-	})
+		HLVM_ENSURE(1 != 1, TXT("1 != 1"));
+	}
+	catch (const std::runtime_error& e)
+	{
+		HLVM_LOG(LogTest, debug, TO_TCHAR_STR(e.what()));
+	}
+};

@@ -34,7 +34,14 @@ std::function<void()> make_test_wrapper(const FString& name, Func test_function)
 	};
 }
 
-// Macro to record a test function
+/** Macro to record a test function
+ * Example : (1) use static method (2) function name prefix test_
+ * static bool test_hash_test()
+ * {
+ *     ...
+ * };
+ * RECORD_TEST_FUNC(hash_test);
+ */
 #define RECORD_TEST_FUNC(test_function)                                                                     \
 	namespace AutoRegister_##test_function                                                                  \
 	{                                                                                                       \
@@ -48,15 +55,21 @@ std::function<void()> make_test_wrapper(const FString& name, Func test_function)
 		static AutoRegister auto_register_##test_function = AutoRegister();                                 \
 	}
 
-#define RECORD(test_function, ...)     \
-	static void test_##test_function() \
-	{                                  \
-		__VA_ARGS__;                   \
-	};                                 \
-	RECORD_TEST_FUNC(test_function);
+/**
+ * Macro to record a test function (easier version)
+ * Example :
+ * RECORD(hash_test)
+ * {
+ *    ...
+ * }
+ */
+#define RECORD(test_function)        \
+	void test_##test_function();     \
+	RECORD_TEST_FUNC(test_function); \
+	void test_##test_function()
 
-// Implment smoothed averge time mesaruement
-// i.e. run test case mutiple times with timer and calculate averge by removing max and min
+// Implement smoothed average time measurement
+// i.e. run test case multiple times with timer and calculate average by removing max and min
 using TestFuncType = std::function<bool(double&)>;
 static double RunTestAndCalculateAvg(const TestFuncType& func, int num_iterations)
 {
@@ -67,13 +80,13 @@ static double RunTestAndCalculateAvg(const TestFuncType& func, int num_iteration
 		HLVM_ENSURE(func(duration), TXT("Test case failed"));
 		times.emplace_back(duration);
 	}
+	// Remove max and min duration from data collected (by moving them to the end of the array)
 	{
-		// Remove max and min
 		auto mm = std::minmax_element(begin(times), end(times));
 		std::iter_swap(mm.first, end(times) - 2);
 		std::iter_swap(mm.second, end(times) - 1);
 	}
-	// Count average
+	// Count average on the rest of data
 	double avg = 0.0;
 	for (int i = 0; i < num_iterations - 2; ++i)
 	{

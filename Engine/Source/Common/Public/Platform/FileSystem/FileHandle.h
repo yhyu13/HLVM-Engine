@@ -206,7 +206,11 @@ public:
 	[[nodiscard]] virtual std::shared_ptr<IFFileStat> Stat(const FPath& FilePath, OpStatusType Status_InOut = nullptr) = 0;
 
 protected:
+	void HandleException(const OpStatusType& Status_InOut, const TCHAR* Function, const std::exception& Exception);
+	void HandleException2(const OpStatusType& Status_InOut, const TCHAR* Function);
+
+	FPath		  mFilePath;
 	FFileOptions  mFileOptions;
 	FFileOpStatus mFileOpStatus;
-	BIT_FLAG(mOpen){ false };
+	BIT_FLAG(mOpened){ false };
 };

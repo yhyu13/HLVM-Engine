@@ -13,10 +13,10 @@ for dir in "${directories[@]}"; do
     #cmake -DCMAKE_BUILD_TYPE=$(basename "$dir") ../
 
     # 构建项目
-    cmake --build . && ctest . || exit 1
+    (cmake --build . && ctest . || exit 1) | tee "$ROOT_DIR"/build_"$(basename "$dir")".log
 
     # 回到上级目录
-    cd "$ROOT_DIR" || exit
+    cd "$ROOT_DIR" || exit 1
 done
 
 echo "Finished building all targets"

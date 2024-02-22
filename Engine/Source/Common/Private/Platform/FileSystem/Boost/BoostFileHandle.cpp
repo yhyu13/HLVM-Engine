@@ -258,7 +258,8 @@ IFileHandle::OpRetType FBoostFileHandle::Read(void* Buffer, size_t Size, const F
 			const bool available = rest_size >= static_cast<int64_t>(Size);
 			BFH_HANDLE_ASSERT(available, TXT("mMappedFile size is not enough for read. SeekPos {}, File Size {}, available size {} Buffer Size {}"),
 				mMappedSeekPos, FileSize, rest_size, Size);
-			auto readPos = MappedFileCurPos_R(0);
+
+			auto readPos = MappedFileCurPos_R();
 			// Check buffer and mmap no overlapping
 			const bool overlap = IsPointerOverlap(Buffer, Size, readPos, static_cast<size_t>(rest_size));
 			BFH_HANDLE_ASSERT(!overlap, TXT("mMappedFile overlap with read region. SeekPos {}, File Size {}, available size {} Buffer Size {}"),
@@ -371,7 +372,7 @@ IFileHandle::OpRetType FBoostFileHandle::Write(const void* Buffer, size_t Size, 
 				}
 			}
 
-			auto writePos = MappedFileCurPos_W(0);
+			auto writePos = MappedFileCurPos_W();
 			// Check buffer and mmap no overlapping
 			const bool overlap = IsPointerOverlap(Buffer, Size, writePos, static_cast<size_t>(rest_size));
 			BFH_HANDLE_ASSERT(!overlap, TXT("mMappedFile overlap with write region. SeekPos {}, File Size {}, available size {} Buffer Size {}"),
@@ -730,48 +731,4 @@ void* FBoostFileHandle::MappedFileCurPos_W(int64_t Offset)
 	auto _Size = static_cast<int64_t>(mMappedFile->size());
 	BFH_HANDLE_ASSERT(_Offeset >= 0 && _Offeset < _Size, FString::Format(TXT("MappedFileCurPos_W {} out of range [0,{})"), _Offeset, _Size));
 	return (&(mMappedFile->data()[_Offeset]));
-}
-
-void FBoostFileHandle::HandleException(const OpStatusType& Status_InOut, const TCHAR* Function, const std::exception& Exception)
-{
-	FString Msg = FString::Format(TXT("File {}: calling '{}' return {} with errorNo {} and exception {}"),
-		*mFilePath,
-		Function,
-		TO_TCHAR_STR(magic_enum::enum_name(Status_InOut->eFileOpStatus).data()),
-		TO_TCHAR_STR(magic_enum::enum_name(Status_InOut->eFileOpErrorNo).data()),
-		TO_TCHAR_STR(Exception.what()));
-	if (!Status_InOut->bCancelByUser)
-	{
-		HLVM_LOG(LogBoostFileHandle, err, MoveTemp(Msg));
-		if (!Status_InOut->bSupressFailExceptions)
-		{
-			throw Exception;
-		}
-	}
-	else
-	{
-		HLVM_LOG(LogBoostFileHandle, warn, TXT("{} but canceled by user, so we continue."), MoveTemp(Msg));
-	}
-}
-
-void FBoostFileHandle::HandleException2(const OpStatusType& Status_InOut, const TCHAR* Function)
-{
-	FString Msg = FString::Format(TXT("File {}: calling '{}' return {} with errorNo {}"),
-		*mFilePath,
-		Function,
-		TO_TCHAR_STR(magic_enum::enum_name(Status_InOut->eFileOpStatus).data()),
-		TO_TCHAR_STR(magic_enum::enum_name(Status_InOut->eFileOpErrorNo).data()));
-	if (!Status_InOut->bCancelByUser)
-	{
-		HLVM_LOG(LogBoostFileHandle, err, MoveTemp(Msg));
-		if (!Status_InOut->bSupressFailExceptions)
-		{
-			// 重新抛出了当前正在处理的异常
-			throw;
-		}
-	}
-	else
-	{
-		HLVM_LOG(LogBoostFileHandle, warn, TXT("{} but canceled by user, so we continue."), MoveTemp(Msg));
-	}
 }

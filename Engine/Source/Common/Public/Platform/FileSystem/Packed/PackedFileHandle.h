@@ -7,15 +7,24 @@
 #include "Platform/FileSystem/FileHandle.h"
 #include "Platform/FileSystem/Path.h"
 #include "Core/Container/ContainerDefinition.h"
+#include "Core/Compress/CompressDefinition.h"
 
 #include <boost/iostreams/device/mapped_file.hpp>
 
+/**
+ * Region of a file in a Cot file.
+ */
+struct FTokEntryData
+{
+	size_t		  StartPos;
+	size_t		  Size;
+	ECompressType CompressType;
+};
+
 struct FTokEntry
 {
-public:
-	FPath  Path;
-	size_t StartPos;
-	size_t Size;
+	FPath		  Path;
+	FTokEntryData Region;
 };
 
 class FPackedFileStat final : public IFFileStat
@@ -29,15 +38,10 @@ public:
 	virtual bool Exists() const final override;
 	virtual bool IsFile() const final override;
 	virtual bool IsLink() const final override;
-
-private:
-	boost::filesystem::file_status fs;
 };
 
 /**
- * boost file system  https://theboostcpplibraries.com/boost.filesystem-files-and-directories
- * boost interprocess file lock https://www.boost.org/doc/libs/1_84_0/doc/html/interprocess/synchronization_mechanisms.html#interprocess.synchronization_mechanisms.file_lock
- * boost mapped file https://beta.boost.org/doc/libs/1_83_0/libs/iostreams/doc/classes/mapped_file.html
+ * mapped region https://live.boost.org/doc/libs/1_83_0/doc/html/boost/interprocess/mapped_region.html
  */
 
 class FPackedTokCotFileHandle final : public IFileHandle
@@ -68,7 +72,6 @@ private:
 private:
 	FPath										 mTokFilePath;
 	FPath										 mCotFilePath;
-	TMap<FPath, >								 mTokMappedFile;
+	TMap<FPath, FTokRegion>						 mTokMap;
 	std::optional<boost::iostreams::mapped_file> mCotMappedFile;
-	BIT_FLAG(mOpened){ false };
 };

@@ -6,6 +6,7 @@
 #include "Platform/FileSystem/Boost/BoostPlatformFile.h"
 
 #include <boost/regex.hpp>
+#include <boost/filesystem/directory.hpp>
 
 DELCARE_LOG_CATEGORY(LogBoostPlatformFile)
 DEFINE_LOG_CATEGORY(LogBoostPlatformFile)

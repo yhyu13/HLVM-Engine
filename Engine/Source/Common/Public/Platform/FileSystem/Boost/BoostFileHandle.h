@@ -32,6 +32,7 @@ private:
  * boost file system  https://theboostcpplibraries.com/boost.filesystem-files-and-directories
  * boost interprocess file lock https://www.boost.org/doc/libs/1_84_0/doc/html/interprocess/synchronization_mechanisms.html#interprocess.synchronization_mechanisms.file_lock
  * boost mapped file https://beta.boost.org/doc/libs/1_83_0/libs/iostreams/doc/classes/mapped_file.html
+ * boost std:fbuf init file before mapping https://stackoverflow.com/questions/70480239/boost-mmaping-a-file-into-memory-for-readswrites
  */
 
 class FBoostFileHandle final : public IFileHandle
@@ -57,18 +58,14 @@ public:
 
 private:
 	void		MappedFileLazyInit();
-	const void* MappedFileCurPos_R(int64_t Offset) const;
-	void*		MappedFileCurPos_W(int64_t Offset);
-	void		HandleException(const OpStatusType& Status_InOut, const TCHAR* Function, const std::exception& Exception);
-	void		HandleException2(const OpStatusType& Status_InOut, const TCHAR* Function);
+	const void* MappedFileCurPos_R(int64_t Offset = 0) const;
+	void*		MappedFileCurPos_W(int64_t Offset = 0);
 
 private:
-	FPath												  mFilePath;
 	std::optional<boost::iostreams::mapped_file>		  mMappedFile;
 	int64_t												  mMappedSeekPos{ 0 };
 	std::optional<std::fstream>							  mFStream;
 	mutable std::optional<FAtomicFlag>					  mLock;
 	mutable std::optional<boost::interprocess::file_lock> mFileLock;
-	BIT_FLAG(mOpened){ false };
 	BIT_FLAG(mMappedLazyInit){ false };
 };

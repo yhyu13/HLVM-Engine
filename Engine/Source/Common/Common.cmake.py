@@ -9,7 +9,10 @@ vcpkg_cxt = VcpkgContenxt(vcpkg_root_path='../Dependency/vcpkg',
                                                             "mimalloc",
                                                             "magic-enum",
                                                             "boost",
-                                                            "elfutils"
+                                                            "elfutils",
+                                                            "zstd",
+                                                            "botan",
+                                                            "advobfuscator"
                                                         ],
                                                         builtin_baseline='53bef8994c541b6561884a8395ea35715ece75db'))
 
@@ -23,7 +26,7 @@ spdlog = FindPackage(name='spdlog',
 mimalloc = FindPackage(name='mimalloc',
                        config=True,
                        required=True,
-                       target_link_libs=[DomainValueModel(domain=DomainEnum.PUBLIC, values=['mimalloc'])])
+                       target_link_libs=[DomainValueModel(domain=DomainEnum.PUBLIC, values=['mimalloc-static'])])
 
 # Find the magic_enum package with the specified options
 magic_enum = FindPackage(name='magic_enum',
@@ -41,14 +44,35 @@ Boost = FindPackage(name='Boost',
                     target_link_dirs=[DomainValueModel(domain=DomainEnum.PUBLIC, values=['${Boost_LIBRARY_DIRS}'])],
                     target_link_libs=[DomainValueModel(domain=DomainEnum.PUBLIC, values=['${Boost_LIBRARIES}'])])
 
+# Find the Botan3 package with the specified options
+botan3 = FindPackage(name='Botan',
+                     config=False,
+                     required=True,
+                     target_link_libs=[
+                         DomainValueModel(domain=DomainEnum.PUBLIC, values=['Botan::Botan'])])
+
+# Find the zstd package with the specified options
+zstd = FindPackage(name='zstd',
+                   config=True,
+                   required=True,
+                   target_link_libs=[
+                       DomainValueModel(domain=DomainEnum.PUBLIC, values=['zstd::libzstd_static'])])
+
+# Find the zstd package with the specified options
+advobfuscator = FindPackage(name='Advobfuscator',
+                   config=False,
+                   required=True,
+                   target_include_dirs=[
+                       DomainValueModel(domain=DomainEnum.PUBLIC, values=['${ADVOBFUSCATOR_INCLUDE_DIRS}'])])
+
 # Fetch the Yalantinglibs package from GitHub with the specified options
 yalantinlibs = FetchContent(name='yalantinglibs',
                             git_repo_url='https://github.com/yhyu13/yalantinglibs.git',
-                            git_tag='679cbac8f3c5566a842c91b9d332632d3076f6ac',
-                            compile_definitions=[DomainValueModel(domain=DomainEnum.INTERFACE,
-                                                                  values=['YLT_ENABLE_PMR',
-                                                                          'IGUANA_ENABLE_PMR',
-                                                                          'ENABLE_STRUCT_PACK_OPTIMIZE'])],
+                            git_tag='abf6016a8f7841d29303ef68f118ea85b69a1051',
+                            compile_options=[DomainValueModel(domain=DomainEnum.INTERFACE,
+                                                              values=['-DYLT_ENABLE_PMR=ON',
+                                                                      '-DIGUANA_ENABLE_PMR=ON',
+                                                                      '-DENABLE_STRUCT_PACK_OPTIMIZE=ON'])],
                             target_link_libs=[
                                 DomainValueModel(domain=DomainEnum.PUBLIC, values=['yalantinglibs::yalantinglibs'])]
                             )
@@ -87,7 +111,6 @@ string_pool = FetchContent(name='StringPool',
                            )
 
 
-
 # Create a CommonModule object with the specified options
 class CommonModule(BaseModule):
     def __init__(self):
@@ -107,6 +130,9 @@ class CommonModule(BaseModule):
                                         mimalloc,
                                         magic_enum,
                                         Boost,
+                                        botan3,
+                                        zstd,
+                                        advobfuscator
                                         ]
                          )
         self.target_interface.add_compile_options(domain=DomainEnum.PUBLIC, values=[
