@@ -12,7 +12,7 @@
 #include <functional>
 #include <chrono>
 
-static std::vector<std::function<void()>> recorded_test_functions{};
+inline std::vector<std::function<void()>> recorded_test_functions{};
 
 // Helper function to create a lambda that runs the test and prints the info
 template <typename Func>
@@ -52,7 +52,7 @@ std::function<void()> make_test_wrapper(const FString& name, Func test_function)
 				recorded_test_functions.push_back(make_test_wrapper(#test_function, test_##test_function)); \
 			}                                                                                               \
 		};                                                                                                  \
-		static AutoRegister auto_register_##test_function = AutoRegister();                                 \
+		inline AutoRegister auto_register_##test_function = AutoRegister();                                 \
 	}
 
 /**
@@ -71,7 +71,7 @@ std::function<void()> make_test_wrapper(const FString& name, Func test_function)
 // Implement smoothed average time measurement
 // i.e. run test case multiple times with timer and calculate average by removing max and min
 using TestFuncType = std::function<bool(double&)>;
-static double RunTestAndCalculateAvg(const TestFuncType& func, int num_iterations)
+inline double RunTestAndCalculateAvg(const TestFuncType& func, int num_iterations)
 {
 	std::vector<double> times;
 	for (int i = 0; i < num_iterations; ++i)
@@ -86,7 +86,7 @@ static double RunTestAndCalculateAvg(const TestFuncType& func, int num_iteration
 		std::iter_swap(mm.first, end(times) - 2);
 		std::iter_swap(mm.second, end(times) - 1);
 	}
-	// Count average on the rest of data
+	// mCount average on the rest of data
 	double avg = 0.0;
 	for (int i = 0; i < num_iterations - 2; ++i)
 	{

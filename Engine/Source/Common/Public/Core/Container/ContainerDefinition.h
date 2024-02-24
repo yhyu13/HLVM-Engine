@@ -35,3 +35,7 @@ using TMap = phmap::flat_hash_map<Key, Value>;
 
 template <typename Key, typename Value>
 using TStableMap = phmap::node_hash_map<Key, Value>;
+
+#define HLVM_MAP_FIND(iter, map, key) \
+	auto iter = (map).find((key));    \
+	(iter) != (map).end()

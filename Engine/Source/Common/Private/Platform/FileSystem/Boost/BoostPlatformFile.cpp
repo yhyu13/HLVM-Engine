@@ -13,17 +13,15 @@ DEFINE_LOG_CATEGORY(LogBoostPlatformFile)
 
 bool FBoostPlatformFile::IsDirectory(const FPath& path)
 {
-	FFileOpStatus					_Status;
-	std::shared_ptr<FBoostFileStat> _Stat = SP_C(FBoostFileStat, mDummyFileHandle.Stat(path, &_Status));
-	HLVM_ASSERT(_Status, TXT("FBoostPlatformFile::IsDirectory() - Failed to stat file"));
+	std::shared_ptr<FBoostFileStat> _Stat = SP_C(FBoostFileStat, mFileHandle.Stat(path));
+	HLVM_ASSERT(mFileHandle, TXT("FBoostPlatformFile::IsDirectory() - Failed to stat file"));
 	return _Stat->IsDirectory();
 }
 
 bool FBoostPlatformFile::Exists(const FPath& path)
 {
-	FFileOpStatus					_Status;
-	std::shared_ptr<FBoostFileStat> _Stat = SP_C(FBoostFileStat, mDummyFileHandle.Stat(path, &_Status));
-	HLVM_ASSERT(_Status, TXT("FBoostPlatformFile::Exists() - Failed to stat file"));
+	std::shared_ptr<FBoostFileStat> _Stat = SP_C(FBoostFileStat, mFileHandle.Stat(path));
+	HLVM_ASSERT(mFileHandle, TXT("FBoostPlatformFile::Exists() - Failed to stat file"));
 	return _Stat->Exists();
 }
 

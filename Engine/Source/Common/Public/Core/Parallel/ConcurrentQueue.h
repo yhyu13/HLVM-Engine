@@ -32,7 +32,7 @@ class TConcurrentQueue
 #define IS_SC Mode == EConcurrentQueueMode::Mpsc || Mode == EConcurrentQueueMode::Spsc
 	/*
 	 *  Concurrent Queue : Emulation
-	 *  Head = Tail
+	 *  mHead = mTail
 	 *
 	 *  Push 1
 		OldHead1=null NewNode1=SomePtr
@@ -40,24 +40,24 @@ class TConcurrentQueue
 		OldHead2=null NewNode2=SomePtr
 
 		Push 2 Interlock step1
-		OldHead2 = Head = Tail
-		Head = NewNode2
+		OldHead2 = mHead = mTail
+		mHead = NewNode2
 
 		Push 1 Interlock step1
-		OldHead1 = Head = NewNode2
-		Head = NewNode1
+		OldHead1 = mHead = NewNode2
+		mHead = NewNode1
 
 		Push 2 Interlock step2
-		OldHead2->Next = Tail->Next = NewNode2
+		OldHead2->Next = mTail->Next = NewNode2
 
 		Pop
-		Tail->Next is poped
-		delete Tail
-		Tail = Tail->Next
-		Tail->Item = Empty
+		mTail->Next is poped
+		delete mTail
+		mTail = mTail->Next
+		mTail->Item = Empty
 
 		Push 1 Interlock step2
-		OldHead1->Next = NewNode2->Next = Tail->Next = NewNode1
+		OldHead1->Next = NewNode2->Next = mTail->Next = NewNode1
 	 */
 private:
 	/**
@@ -93,12 +93,12 @@ private:
 public:
 	TConcurrentQueue()
 	{
-		Head = Tail = new QueueNode();
+		mHead = mTail = new QueueNode();
 
 		if constexpr (bBlockPopOnEmpty)
 		{
-			Mutex = new std::mutex();
-			CV = new std::condition_variable();
+			mMutex = new std::mutex();
+			mCV = new std::condition_variable();
 		}
 	}
 
@@ -106,13 +106,13 @@ public:
 	{
 		if constexpr (bBlockPopOnEmpty)
 		{
-			delete Mutex;
-			delete CV;
+			delete mMutex;
+			delete mCV;
 		}
 
-		while (QueueNode* temp = Tail)
+		while (QueueNode* temp = mTail)
 		{
-			Tail = Tail->m_nextNode;
+			mTail = mTail->m_nextNode;
 			ATOMIC_THREAD_FENCE();
 			delete temp;
 		}
@@ -135,30 +135,30 @@ public:
 	 */
 	T& PeekFront() const noexcept
 	{
-		HLVM_ASSERT(Tail->m_nextNode, TXT("Tail is null"));
-		return Tail->m_nextNode->m_item;
+		HLVM_ASSERT(mTail->m_nextNode, TXT("mTail is null"));
+		return mTail->m_nextNode->m_item;
 	}
 
 	bool PopFront(T& ret) noexcept
 	{
 		if constexpr (bBlockPopOnEmpty)
 		{
-			while (Empty() && !bStopFlagByUser)
+			while (Empty() && !mbStopFlagByUser)
 			{
-				std::unique_lock<std::mutex> lock(*Mutex);
-				CV->wait(lock, [] {
+				std::unique_lock<std::mutex> lock(*mMutex);
+				mCV->wait(lock, [] {
 					return true;
 				});
 			}
 		}
 
-		if (QueueNode* poped_node = Tail->m_nextNode)
+		if (QueueNode* poped_node = mTail->m_nextNode)
 		{
 			if constexpr (IS_SC)
 			{
 				// Step1 swap tail pointer
-				QueueNode* old_tail = Tail;
-				Tail = poped_node;
+				QueueNode* old_tail = mTail;
+				mTail = poped_node;
 
 				// Step2 assign value
 				ret = MoveTemp(poped_node->m_item);
@@ -168,16 +168,16 @@ public:
 
 				if constexpr (bCountSize)
 				{
-					Count.fetch_add(-1, std::memory_order_relaxed);
+					mCount.fetch_sub(1, std::memory_order_relaxed);
 				}
 				return true;
 			}
 			else
 			{
-				QueueNode* old_tail = Tail;
+				QueueNode* old_tail = mTail;
 				// Step1 swap tail pointer
 				if (old_tail->m_nextNode == poped_node
-					&& FGenericPlatformAtomicPointer::AtomicCompareExchange(&Tail, &old_tail, poped_node))
+					&& FGenericPlatformAtomicPointer::AtomicCompareExchange(&mTail, &old_tail, poped_node))
 				{
 					// Step2 assign value
 					ret = MoveTemp(poped_node->m_item);
@@ -187,7 +187,7 @@ public:
 
 					if constexpr (bCountSize)
 					{
-						Count.fetch_add(-1, std::memory_order_relaxed);
+						mCount.fetch_sub(1, std::memory_order_relaxed);
 					}
 					return true;
 				}
@@ -199,7 +199,7 @@ public:
 
 	bool Empty() const noexcept
 	{
-		return Tail->m_nextNode == nullptr;
+		return mTail->m_nextNode == nullptr;
 	}
 
 	/**
@@ -210,19 +210,24 @@ public:
 	size_t Num() const noexcept
 		requires(bCountSize)
 	{
-		return static_cast<size_t>(Count.load(std::memory_order_relaxed));
+		return static_cast<size_t>(mCount.load(std::memory_order_relaxed));
 	}
 
+	/**
+	 * Use should call singla stop after all push finished,
+	 * so that poping will not be blocked until queue is popped to empty
+	 */
 	void SignalStop() noexcept
+		requires(bBlockPopOnEmpty)
 	{
-		bStopFlagByUser = true;
+		mbStopFlagByUser = true;
 	}
 
 	bool ShouldStopPop() const noexcept
 	{
 		if constexpr (bBlockPopOnEmpty)
 		{
-			return bStopFlagByUser && Empty();
+			return mbStopFlagByUser && Empty();
 		}
 		else
 		{
@@ -237,15 +242,15 @@ private:
 		if constexpr (IS_MP)
 		{
 			// Step1, swap pointer
-			old_head = FGenericPlatformAtomicPointer::AtomicExchange(&Head, NewNode);
+			old_head = FGenericPlatformAtomicPointer::AtomicExchange(&mHead, NewNode);
 			// Step2, chain pointer
 			FGenericPlatformAtomicPointer::AtomicExchange(&old_head->m_nextNode, NewNode);
 		}
 		else
 		{
 			// Step1, swap pointer
-			old_head = Head;
-			Head = NewNode;
+			old_head = mHead;
+			mHead = NewNode;
 
 			// Step2, chain pointer
 			// Prevent compiler reordering step2 into step1
@@ -255,29 +260,29 @@ private:
 
 		if constexpr (bCountSize)
 		{
-			Count.fetch_add(1, std::memory_order_relaxed);
+			mCount.fetch_add(1, std::memory_order_relaxed);
 		}
 
 		if constexpr (bBlockPopOnEmpty)
 		{
-			CV->notify_one(); // Notify the poping thread
+			mCV->notify_one(); // Notify the poping thread
 		}
 	}
 
 private:
 	/** Holds a pointer to the head (back) of the list. */
-	HLVM_CACHE_ALIGN TAtomicPointer<QueueNode*> Head{ nullptr };
+	HLVM_CACHE_ALIGN TAtomicPointer<QueueNode*> mHead{ nullptr };
 	/** Holds a pointer to the tail (front) of the list. */
-	TAtomicPointer<QueueNode*> Tail{ nullptr };
+	TAtomicPointer<QueueNode*> mTail{ nullptr };
 
-	/** Mutex for blocking pop. */
-	std::mutex*				 Mutex;
-	std::condition_variable* CV;
+	/** mMutex for blocking pop. */
+	std::mutex*				 mMutex;
+	std::condition_variable* mCV;
 	/** Whether the queue is quit by user. */
-	BIT_FLAG(bStopFlagByUser){ false };
+	BIT_FLAG(mbStopFlagByUser){ false };
 
 	/** Size of the queue. */
-	std::atomic_int_fast32_t Count{ 0 };
+	std::atomic_uint_fast32_t mCount{ 0 };
 
 #undef IS_MP
 #undef IS_SC

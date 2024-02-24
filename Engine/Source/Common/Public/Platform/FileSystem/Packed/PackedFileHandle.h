@@ -4,74 +4,82 @@
 
 #pragma once
 
+#include "PackedDefinition.h"
 #include "Platform/FileSystem/FileHandle.h"
-#include "Platform/FileSystem/Path.h"
 #include "Core/Container/ContainerDefinition.h"
 #include "Core/Compress/CompressDefinition.h"
+#include "Core/Encrypt/EncryptDefinition.h"
 
 #include <boost/iostreams/device/mapped_file.hpp>
+
+HLVM_ENUM(EPackedFileType, uint8_t,
+	Base,
+	Patch,
+	Unkown);
 
 /**
  * Region of a file in a Cot file.
  */
-struct FTokEntryData
+struct FPackedTokenEntryData
 {
 	size_t		  StartPos;
 	size_t		  Size;
+	size_t		  DecompressSize;
+	EEncryptType  EncryptType;
 	ECompressType CompressType;
 };
 
-struct FTokEntry
+/**
+ * Token data structure represented by each json object
+ */
+struct FPackedTokenEntry
 {
-	FPath		  Path;
-	FTokEntryData Region;
-};
-
-class FPackedFileStat final : public IFFileStat
-{
-public:
-	NOCOPYMOVE(FPackedFileStat)
-	FPackedFileStat() = delete;
-	explicit FPackedFileStat(const FPath& Path);
-
-	virtual bool IsDirectory() const final override;
-	virtual bool Exists() const final override;
-	virtual bool IsFile() const final override;
-	virtual bool IsLink() const final override;
+	FPath				  Path;
+	FPackedTokenEntryData Region;
 };
 
 /**
  * mapped region https://live.boost.org/doc/libs/1_83_0/doc/html/boost/interprocess/mapped_region.html
  */
 
-class FPackedTokCotFileHandle final : public IFileHandle
+class FPackedFileHandle final : public IFileHandle
 {
 public:
-	FPackedTokCotFileHandle() = default;
-	~FPackedTokCotFileHandle() final override;
+	static constexpr FFileOptions sPackedFileOptions{
+		.eFileMode = EFileMode::RB,
+		.eFileMapped = EFileMapped::Mapped,
+		.eFileAsync = EFileAsync::NoAsync,
+		.eFileLock = EFileLock::NoLock
+	};
 
-	virtual OpRetType Open(const FPath& FilePath, const FFileOptions& Options = FFileOptions(), OpStatusType Status_InOut = nullptr) final override;
-	virtual OpRetType Close(OpStatusType Status_InOut = nullptr) final override;
-	virtual OpRetType Read(void* Buffer, size_t Size, const FFileSeekCtx& SeekCtx = FFileSeekCtx(), OpStatusType Status_InOut = nullptr) final override;
-	virtual OpRetType Write(const void* Buffer, size_t Size, const FFileSeekCtx& SeekCtx = FFileSeekCtx(), OpStatusType Status_InOut = nullptr) final override;
-	virtual OpRetType Flush(OpStatusType Status_InOut = nullptr) final override;
-	virtual OpRetType Seek(int64_t Offset, EWhence Whence = EWhence::Begin, OpStatusType Status_InOut = nullptr) final override;
-	virtual OpRetType Tell(int64_t& Offset, OpStatusType Status_InOut = nullptr) final override;
-	virtual OpRetType Size(size_t& Size, OpStatusType Status_InOut = nullptr) final override;
+	static constexpr FFileSeekCtx sPackedFileSeekCtx{
+		.Whence = EWhence::Begin,
+		.bResetPos = false,
+		.bEraseSeekPos = false,
+	};
+
+	FPackedFileHandle() = default;
+	~FPackedFileHandle() final override;
+
+	virtual OpRetType Open(const FPath& FilePath, const FFileOptions& Options = sPackedFileOptions) final override;
+	virtual OpRetType Close() final override;
+	virtual OpRetType Read(void* Buffer, size_t Size, const FFileSeekCtx& SeekCtx = sPackedFileSeekCtx) final override;
+	virtual OpRetType Write(const void* Buffer, size_t Size, const FFileSeekCtx& SeekCtx = sPackedFileSeekCtx) final override;
+	virtual OpRetType Flush() final override;
+	virtual OpRetType Seek(int64_t Offset, EWhence Whence = EWhence::Begin) final override;
+	virtual OpRetType Tell(int64_t& Offset) final override;
+	virtual OpRetType Size(size_t& Size) final override;
 
 	/**
 	 * These methods can be static methods, but since we require inheritance, they have to be member virtual methods
 	 */
-	virtual OpRetType								  Truncate(size_t Size, OpStatusType Status_InOut = nullptr) final override;
-	[[nodiscard]] virtual std::shared_ptr<IFFileStat> Stat(const FPath& FilePath, OpStatusType Status_InOut = nullptr) final override;
+	virtual OpRetType								  Truncate(size_t Size) final override;
+	[[nodiscard]] virtual std::shared_ptr<IFFileStat> Stat(const FPath& FilePath) final override;
 
 private:
-	void HandleException(const OpStatusType& Status_InOut, const TCHAR* Function, const std::exception& Exception);
-	void HandleException2(const OpStatusType& Status_InOut, const TCHAR* Function);
+	const void* MappedFileCurPos_R(int64_t Offset) const;
 
-private:
-	FPath										 mTokFilePath;
-	FPath										 mCotFilePath;
-	TMap<FPath, FTokRegion>						 mTokMap;
-	std::optional<boost::iostreams::mapped_file> mCotMappedFile;
+	TMap<FPath, FPackedTokenEntry> mTokenEntryMap;
+	boost::iostreams::mapped_file  mContainerMappedFile;
+	EPackedFileType				   mPackedFileType{ EPackedFileType::Unkown };
 };

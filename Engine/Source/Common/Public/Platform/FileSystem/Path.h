@@ -17,7 +17,6 @@ HLVM_ENUM(EPlatformFileType, uint8_t,
 /**
  * boost path usage : https://blog.csdn.net/toby54king/article/details/81334962
  */
-
 class FPath final : public boost::filesystem::path
 {
 public:
@@ -25,18 +24,22 @@ public:
 	FPath(const char* str)
 		: boost::filesystem::path(str)
 	{
+		ResolvePath();
 	}
 	FPath(const TCHAR* str)
 		: boost::filesystem::path(reinterpret_cast<const char*>(str))
 	{
+		ResolvePath();
 	}
 	FPath(const boost::filesystem::path& str)
 		: boost::filesystem::path(str)
 	{
+		ResolvePath();
 	}
 	FPath(const FString& str)
 		: boost::filesystem::path(str.ToCharStr())
 	{
+		ResolvePath();
 	}
 
 	// Move, copy constructor
@@ -102,8 +105,20 @@ public:
 	static TSmallVector32<FPath> FindAllMatch(const FPath& root_dir, const FString& regex, bool recursive = false);
 	static FString				 DumpJson(const TSmallVector32<FPath>& paths);
 
+public:
+	inline static boost::regex					 PathReplacePattern{ ("\\$\\{([^}]+)\\}") };
+	inline static TMap<std::string, std::string> PathReplaceMap;
+
 private:
-	void   ResolvePath() const;
+	/**
+	 * Resolve path ${XXX} with certain values
+	 */
+	void ResolvePath();
+
+	/**
+	 * Calculate hash
+	 * @return Fast Hash value
+	 */
 	size_t CalculateHash() const noexcept;
 
 	mutable size_t	  mHash{ 0 };

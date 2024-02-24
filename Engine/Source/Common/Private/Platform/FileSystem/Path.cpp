@@ -29,8 +29,19 @@ FString FPath::DumpJson(const TSmallVector32<FPath>& paths)
 		paths, [](auto& item) { return FString::Format(TXT("\"{}\""), *item); }, TXT(",\n"));
 }
 
-void FPath::ResolvePath() const
+void FPath::ResolvePath()
 {
+	if (boost::regex_match(this->ToCharStr(), PathReplacePattern))
+	{
+		HLVM_ASSERT(PathReplaceMap.size() > 0, TXT("PathReplaceMap is empty"));
+		boost::smatch match;
+		std::string	  result = this->ToCharStr();
+		for (auto const& replacement : PathReplaceMap)
+		{
+			result = boost::regex_replace(result, PathReplacePattern, replacement.second, boost::match_default | boost::format_sed);
+		}
+		this->assign(MoveTemp(result));
+	}
 }
 
 size_t FPath::CalculateHash() const noexcept

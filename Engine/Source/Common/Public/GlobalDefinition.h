@@ -54,7 +54,7 @@
 		__VA_ARGS__,                     \
 		HLVM_NUM                         \
 	};                                   \
-	static constexpr size_t enum_class##_NUM = static_cast<size_t>(enum_class::HLVM_NUM)
+	inline constexpr size_t enum_class##_NUM = static_cast<size_t>(enum_class::HLVM_NUM)
 
 #define HLVM_ENUM_V(enum_class, enum_value) static_cast<std::underlying_type_t<enum_class>>(enum_class::enum_value)
 #define HLVM_ENUM_V_SIZE_T(enum_class, enum_value) static_cast<size_t>(enum_class::enum_value)
@@ -64,3 +64,16 @@
 #define D_C(type, value) dynamic_cast<type>(value)
 #define C_C(type, value) const_cast<type>(value)
 #define R_C(type, value) reinterpret_cast<type>(value)
+
+#define HLVM_NOT_IMPLEMENTED() assert(false)
+
+#define HLVM_DELETE(ptr)    \
+	do                      \
+	{                       \
+		if (ptr != nullptr) \
+		{                   \
+			delete ptr;     \
+			ptr = nullptr;  \
+		}                   \
+	}                       \
+	while (0)

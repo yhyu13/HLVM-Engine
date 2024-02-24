@@ -11,8 +11,9 @@
 DELCARE_LOG_CATEGORY(LogBoostFileHandle)
 DEFINE_LOG_CATEGORY(LogBoostFileHandle)
 
+#define BFH_RECRSIVE_LOCK() ATOMIC_LOCK_GUARD(mRecursiveLock)
+
 #define BFH_SCOPE_LOCK()                                                            \
-	ATOMIC_LOCK_GUARD(mLock);                                                       \
 	boost::interprocess::sharable_lock<boost::interprocess::file_lock> __lock_file; \
 	if (mFileLock)                                                                  \
 	__lock_file = MoveTemp(boost::interprocess::sharable_lock<boost::interprocess::file_lock>(*mFileLock))
@@ -38,13 +39,7 @@ DEFINE_LOG_CATEGORY(LogBoostFileHandle)
 	}                                                                                                          \
 	while (0)
 
-#define HANDLE_STATUS(Status)        \
-	do                               \
-	{                                \
-		if (!Status)                 \
-			Status = &mFileOpStatus; \
-	}                                \
-	while (0)
+#define BFH_HANDLE_STATUS(Status) OpStatusType Status = &FileOpStatus
 
 FBoostFileStat::FBoostFileStat(const FPath& Path)
 {
@@ -78,55 +73,50 @@ FBoostFileHandle::~FBoostFileHandle()
 {
 	if (mOpened)
 	{
-		FFileOpStatus __Status_InOut;
-		Close(&__Status_InOut);
+		Close();
 	}
+	HLVM_DELETE(mMappedFile);
+	HLVM_DELETE(mFStream);
+	HLVM_DELETE(mFileLock);
 }
 
-IFileHandle::OpRetType FBoostFileHandle::Open(const FPath& FilePath, const FFileOptions& Options, OpStatusType Status_InOut)
+IFileHandle::OpRetType FBoostFileHandle::Open(const FPath& FilePath, const FFileOptions& Options)
 {
-	HANDLE_STATUS(Status_InOut);
+	BFH_HANDLE_STATUS(Status_InOut);
 	BFH_HANDLE_ENSURE(*Status_InOut, TXT("File operation continue with failed status"));
-	BFH_HANDLE_ASSERT(!mOpened, TXT("File operation begin with another already open file {}"), *mFilePath);
+	BFH_HANDLE_ASSERT(!mOpened, TXT("File operation begin with another already open file"));
 
 	mFilePath = FilePath;
 	mFileOptions = Options;
 	if (mFileOptions.eFileMapped == EFileMapped::Mapped)
 	{
 		BFH_VERBOSE_LOG(TXT("Create Mapped file"));
-		mMappedFile = boost::iostreams::mapped_file();
+		mMappedFile = new boost::iostreams::mapped_file();
 	}
 	else if (mFileOptions.eFileMapped == EFileMapped::NoMapped)
 	{
 		BFH_VERBOSE_LOG(TXT("Create file stream"));
-		mFStream = std::fstream();
+		mFStream = new std::fstream();
 	}
 	else
 	{
-		BFH_HANDLE_ASSERT(false, TXT("Not implemented"));
+		HLVM_NOT_IMPLEMENTED();
 	}
 
 	if (mFileOptions.eFileAsync == EFileAsync::Async)
 	{
-		BFH_HANDLE_ASSERT(false, TXT("Not implemented"));
+		HLVM_NOT_IMPLEMENTED();
 	}
 
 	if (mFileOptions.eFileLock & EFileLock::InterProcessLock)
 	{
 		BFH_VERBOSE_LOG(TXT("Create interprocess file lock"));
-		mFileLock = boost::interprocess::file_lock(FilePath);
+		mFileLock = new boost::interprocess::file_lock(FilePath);
 	}
-	else if (mFileOptions.eFileLock & EFileLock::ThreadLock)
+	if (mFileOptions.eFileLock & EFileLock::ThreadLock)
 	{
-		BFH_VERBOSE_LOG(TXT("Create thrad lock"));
-		mLock = FAtomicFlag();
-	}
-	else if (mFileOptions.eFileLock == EFileLock::NoLock)
-	{
-	}
-	else
-	{
-		BFH_HANDLE_ASSERT(false, TXT("Not implemented"));
+		BFH_VERBOSE_LOG(TXT("Create thread lock"));
+		mRecursiveLock = FRecursiveAtomicFlag();
 	}
 
 	try
@@ -179,16 +169,15 @@ IFileHandle::OpRetType FBoostFileHandle::Open(const FPath& FilePath, const FFile
 	return *this;
 }
 
-IFileHandle::OpRetType FBoostFileHandle::Close(OpStatusType Status_InOut)
+IFileHandle::OpRetType FBoostFileHandle::Close()
 {
-	HANDLE_STATUS(Status_InOut);
+	BFH_HANDLE_STATUS(Status_InOut);
 	BFH_HANDLE_ENSURE(*Status_InOut, TXT("File operation continue with failed status"));
 	BFH_HANDLE_ASSERT(mOpened, TXT("File operation continue w/o open"));
 
 	try
 	{
 		BFH_SCOPE_LOCK();
-		Status_InOut->Reset();
 
 		if (mFileOptions.eFileMapped == EFileMapped::Mapped)
 		{
@@ -225,25 +214,26 @@ IFileHandle::OpRetType FBoostFileHandle::Close(OpStatusType Status_InOut)
 	return *this;
 }
 
-IFileHandle::OpRetType FBoostFileHandle::Read(void* Buffer, size_t Size, const FFileSeekCtx& SeekCtx, OpStatusType Status_InOut)
+IFileHandle::OpRetType FBoostFileHandle::Read(void* Buffer, size_t Size, const FFileSeekCtx& SeekCtx)
 {
-	HANDLE_STATUS(Status_InOut);
+	BFH_HANDLE_STATUS(Status_InOut);
 	BFH_HANDLE_ENSURE(*Status_InOut, TXT("File operation continue with failed status"));
 	BFH_HANDLE_ASSERT(mOpened, TXT("File operation continue w/o open"));
 	BFH_HANDLE_ASSERT(mFileOptions.eFileMode & EFileMode::R, TXT("File operation cannot read"));
 	BFH_HANDLE_ASSERT(Size > 0, TXT("Buffer size invalid {}"), Size);
+	BFH_RECRSIVE_LOCK();
 
 	// tell if necessary
 	int64_t Prev_Tell = { -1 };
-	if (SeekCtx.ResetPos)
+	if (SeekCtx.bResetPos)
 	{
-		Tell(Prev_Tell, Status_InOut);
+		Tell(Prev_Tell);
 		BFH_HANDLE_ASSERT(Prev_Tell > 0, TXT("Tell failed before reset pos"), Prev_Tell);
 	}
 	// Seek if necessary
 	if (SeekCtx.NonTrivialSeek())
 	{
-		Seek(SeekCtx.Offset, SeekCtx.Whence, Status_InOut);
+		Seek(SeekCtx.Offset, SeekCtx.Whence);
 	}
 
 	try
@@ -297,40 +287,41 @@ IFileHandle::OpRetType FBoostFileHandle::Read(void* Buffer, size_t Size, const F
 	}
 
 	// Reset if necessary
-	if (SeekCtx.ResetPos)
+	if (SeekCtx.bResetPos)
 	{
-		BFH_VERBOSE_LOG(TXT("ResetPos after read"));
-		Seek(Prev_Tell, EWhence::Begin, Status_InOut);
+		BFH_VERBOSE_LOG(TXT("bResetPos after read"));
+		Seek(Prev_Tell, EWhence::Begin);
 	}
 	// Erase if necessary
-	else if (SeekCtx.EraseSeekPos)
+	else if (SeekCtx.bEraseSeekPos)
 	{
-		BFH_VERBOSE_LOG(TXT("EraseSeekPos after read"));
-		Seek(0 - static_cast<int64_t>(Size), EWhence::Current, Status_InOut);
+		BFH_VERBOSE_LOG(TXT("bEraseSeekPos after read"));
+		Seek(0 - static_cast<int64_t>(Size), EWhence::Current);
 	}
 
 	return *this;
 }
 
-IFileHandle::OpRetType FBoostFileHandle::Write(const void* Buffer, size_t Size, const FFileSeekCtx& SeekCtx, OpStatusType Status_InOut)
+IFileHandle::OpRetType FBoostFileHandle::Write(const void* Buffer, size_t Size, const FFileSeekCtx& SeekCtx)
 {
-	HANDLE_STATUS(Status_InOut);
+	BFH_HANDLE_STATUS(Status_InOut);
 	BFH_HANDLE_ENSURE(*Status_InOut, TXT("File operation continue with failed status"));
 	BFH_HANDLE_ASSERT(mOpened, TXT("File operation continue w/o open"));
 	BFH_HANDLE_ASSERT(mFileOptions.eFileMode & EFileMode::W, TXT("File operation cannot write"));
 	BFH_HANDLE_ASSERT(Size > 0, TXT("Buffer size invalid {}"), Size);
+	BFH_RECRSIVE_LOCK();
 
 	// tell if necessary
 	int64_t Prev_Tell{ -1 };
-	if (SeekCtx.ResetPos)
+	if (SeekCtx.bResetPos)
 	{
-		Tell(Prev_Tell, Status_InOut);
+		Tell(Prev_Tell);
 		BFH_HANDLE_ASSERT(Prev_Tell > 0, TXT("Tell failed before reset pos"), Prev_Tell);
 	}
 	// Seek if necessary
 	if (SeekCtx.NonTrivialSeek())
 	{
-		Seek(SeekCtx.Offset, SeekCtx.Whence, Status_InOut);
+		Seek(SeekCtx.Offset, SeekCtx.Whence);
 	}
 
 	try
@@ -411,27 +402,28 @@ IFileHandle::OpRetType FBoostFileHandle::Write(const void* Buffer, size_t Size, 
 	}
 
 	// Reset if necessary
-	if (SeekCtx.ResetPos)
+	if (SeekCtx.bResetPos)
 	{
-		BFH_VERBOSE_LOG(TXT("ResetPos after write"));
-		Seek(Prev_Tell, EWhence::Begin, Status_InOut);
+		BFH_VERBOSE_LOG(TXT("bResetPos after write"));
+		Seek(Prev_Tell, EWhence::Begin);
 	}
 	// Erase if necessary
-	else if (SeekCtx.EraseSeekPos)
+	else if (SeekCtx.bEraseSeekPos)
 	{
-		BFH_VERBOSE_LOG(TXT("EraseSeekPos after write"));
-		Seek(0 - static_cast<int64_t>(Size), EWhence::Current, Status_InOut);
+		BFH_VERBOSE_LOG(TXT("bEraseSeekPos after write"));
+		Seek(0 - static_cast<int64_t>(Size), EWhence::Current);
 	}
 
 	return *this;
 }
 
-IFileHandle::OpRetType FBoostFileHandle::Flush(OpStatusType Status_InOut)
+IFileHandle::OpRetType FBoostFileHandle::Flush()
 {
-	HANDLE_STATUS(Status_InOut);
+	BFH_HANDLE_STATUS(Status_InOut);
 	BFH_HANDLE_ENSURE(*Status_InOut, TXT("File operation continue with failed status"));
 	BFH_HANDLE_ASSERT(mOpened, TXT("File operation continue w/o open"));
 	BFH_HANDLE_ASSERT(mFileOptions.eFileMode & EFileMode::W, TXT("File operation cannot flush"));
+	BFH_RECRSIVE_LOCK();
 
 	try
 	{
@@ -470,11 +462,12 @@ IFileHandle::OpRetType FBoostFileHandle::Flush(OpStatusType Status_InOut)
 	return *this;
 }
 
-IFileHandle::OpRetType FBoostFileHandle::Seek(int64_t Offset, EWhence Whence, OpStatusType Status_InOut)
+IFileHandle::OpRetType FBoostFileHandle::Seek(int64_t Offset, EWhence Whence)
 {
-	HANDLE_STATUS(Status_InOut);
+	BFH_HANDLE_STATUS(Status_InOut);
 	BFH_HANDLE_ENSURE(*Status_InOut, TXT("File operation continue with failed status"));
 	BFH_HANDLE_ASSERT(mOpened, TXT("File operation continue w/o open"));
+	BFH_RECRSIVE_LOCK();
 
 	try
 	{
@@ -526,11 +519,12 @@ IFileHandle::OpRetType FBoostFileHandle::Seek(int64_t Offset, EWhence Whence, Op
 	return *this;
 }
 
-IFileHandle::IFileHandle::OpRetType FBoostFileHandle::Tell(int64_t& Offset, OpStatusType Status_InOut)
+IFileHandle::IFileHandle::OpRetType FBoostFileHandle::Tell(int64_t& Offset)
 {
-	HANDLE_STATUS(Status_InOut);
+	BFH_HANDLE_STATUS(Status_InOut);
 	BFH_HANDLE_ENSURE(*Status_InOut, TXT("File operation continue with failed status"));
 	BFH_HANDLE_ASSERT(mOpened, TXT("File operation continue w/o open"));
+	BFH_RECRSIVE_LOCK();
 
 	try
 	{
@@ -570,10 +564,11 @@ IFileHandle::IFileHandle::OpRetType FBoostFileHandle::Tell(int64_t& Offset, OpSt
 	return *this;
 }
 
-IFileHandle::OpRetType FBoostFileHandle::Size(size_t& Size, OpStatusType Status_InOut)
+IFileHandle::OpRetType FBoostFileHandle::Size(size_t& Size)
 {
-	HANDLE_STATUS(Status_InOut);
+	BFH_HANDLE_STATUS(Status_InOut);
 	BFH_HANDLE_ENSURE(*Status_InOut, TXT("File operation continue with failed status"));
+	BFH_RECRSIVE_LOCK();
 
 	try
 	{
@@ -615,10 +610,11 @@ IFileHandle::OpRetType FBoostFileHandle::Size(size_t& Size, OpStatusType Status_
 	return *this;
 }
 
-IFileHandle::OpRetType FBoostFileHandle::Truncate(size_t Size, OpStatusType Status_InOut)
+IFileHandle::OpRetType FBoostFileHandle::Truncate(size_t Size)
 {
-	HANDLE_STATUS(Status_InOut);
+	BFH_HANDLE_STATUS(Status_InOut);
 	BFH_HANDLE_ENSURE(*Status_InOut, TXT("File operation continue with failed status"));
+	BFH_RECRSIVE_LOCK();
 
 	try
 	{
@@ -662,10 +658,12 @@ IFileHandle::OpRetType FBoostFileHandle::Truncate(size_t Size, OpStatusType Stat
 	return *this;
 }
 
-std::shared_ptr<IFFileStat> FBoostFileHandle::Stat(const FPath& FilePath, OpStatusType Status_InOut)
+std::shared_ptr<IFFileStat> FBoostFileHandle::Stat(const FPath& FilePath)
 {
 	std::shared_ptr<IFFileStat> Stat;
+	BFH_HANDLE_STATUS(Status_InOut);
 	BFH_HANDLE_ENSURE2(*Status_InOut, TXT("File operation continue with failed status"));
+	BFH_RECRSIVE_LOCK();
 
 	try
 	{

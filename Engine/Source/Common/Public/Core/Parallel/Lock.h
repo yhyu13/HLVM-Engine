@@ -16,24 +16,62 @@
 	#define HLVM_DEADLOCK_TIMER 0
 #endif // !HLVM_BUILD_RELEASE
 
-class FAtomicFlag;
 class FAtomicLockGuard
 {
 public:
 	NOCOPYMOVE(FAtomicLockGuard)
 	FAtomicLockGuard() = delete;
 	explicit FAtomicLockGuard(std::atomic_flag& flag) noexcept(!HLVM_DEADLOCK_TIMER);
-	explicit FAtomicLockGuard(FAtomicFlag& Flag) noexcept(!HLVM_DEADLOCK_TIMER);
-	explicit FAtomicLockGuard(std::optional<FAtomicFlag>& Flag) noexcept(!HLVM_DEADLOCK_TIMER);
-
 	~FAtomicLockGuard() noexcept;
 
 private:
-	std::atomic_flag* m_lock;
+	std::atomic_flag* mLock;
 };
 
-#define ATOMIC_LOCK_GUARD(x)            \
-	FAtomicLockGuard __lock_guard((x)); \
+template <typename T>
+concept Lockable = requires(T t) {
+	{
+		t.Lock()
+	} -> std::same_as<void>;
+	{
+		t.Unlock()
+	} -> std::same_as<void>;
+};
+
+template <Lockable T>
+class TAtomicLockGuard
+{
+public:
+	NOCOPYMOVE(TAtomicLockGuard)
+	TAtomicLockGuard() = delete;
+	explicit TAtomicLockGuard(T& Flag) noexcept(!HLVM_DEADLOCK_TIMER)
+		: mLock(&Flag)
+	{
+		mLock->Lock();
+	}
+	explicit TAtomicLockGuard(std::optional<T>& Flag) noexcept(!HLVM_DEADLOCK_TIMER)
+		: mLock(Flag.has_value() ? &Flag.value() : nullptr)
+	{
+		if (mLock)
+		{
+			mLock->Lock();
+		}
+	}
+	~TAtomicLockGuard() noexcept
+	{
+		if (mLock)
+		{
+			mLock->Unlock();
+		}
+	}
+
+private:
+	T* mLock;
+};
+
+#define ATOMIC_LOCK_GUARD(x)                                                                           \
+	TAtomicLockGuard<typename TOptionalRemoved<typename TReferenceRemoved<decltype((x))>::Type>::Type> \
+		__lock_guard((x));                                                                             \
 	ATOMIC_THREAD_FENCE()
 
 /**
@@ -48,7 +86,7 @@ public:
 	ATOMIC_THREAD_FENCE()
 
 	static void LockS() noexcept(!HLVM_DEADLOCK_TIMER);
-	static void UnLockS() noexcept;
+	static void UnlockS() noexcept;
 
 protected:
 	HLVM_CACHE_ALIGN inline static std::atomic_flag sc_flag{ 0 };
@@ -67,7 +105,7 @@ public:
 	ATOMIC_THREAD_FENCE()
 
 	static void LockNI() noexcept(!HLVM_DEADLOCK_TIMER);
-	static void UnLockNI() noexcept;
+	static void UnlockNI() noexcept;
 
 protected:
 	HLVM_CACHE_ALIGN inline static std::atomic_flag ni_flag{ 0 };
@@ -89,7 +127,7 @@ public:
 	FAtomicFlagNC() = default;
 
 	void LockNC() const noexcept(!HLVM_DEADLOCK_TIMER);
-	void UnLockNC() const noexcept;
+	void UnlockNC() const noexcept;
 
 protected:
 	// Prevent delete by this pointer type, this way compiler would not allow it
@@ -110,21 +148,21 @@ private:
 class FAtomicFlag
 {
 public:
-#define LOCK_GUARD()                        \
-	FAtomicLockGuard __lock_guard_(m_flag); \
+#define LOCK_GUARD()                       \
+	FAtomicLockGuard __lock_guard_(mFlag); \
 	ATOMIC_THREAD_FENCE()
 
 	FAtomicFlag() noexcept = default;
 	~FAtomicFlag() noexcept = default;
 
 	FAtomicFlag(const FAtomicFlag&) noexcept
-		: m_flag{ 0 }
+		: mFlag{ 0 }
 	{
 		// Trivial
 	}
 
 	FAtomicFlag(FAtomicFlag&&) noexcept
-		: m_flag{ 0 }
+		: mFlag{ 0 }
 	{
 		// Trivial
 	}
@@ -134,6 +172,7 @@ public:
 		// Trivial
 		return *this;
 	}
+
 	FAtomicFlag& operator=(FAtomicFlag&&) noexcept
 	{
 		// Trivial
@@ -141,15 +180,66 @@ public:
 	}
 
 	void Lock() const noexcept(!HLVM_DEADLOCK_TIMER);
-	void UnLock() const noexcept;
+	void Unlock() const noexcept;
 
 protected:
-	friend class FAtomicLockGuard;
-	mutable std::atomic_flag m_flag{ 0 };
+	mutable std::atomic_flag mFlag{ 0 };
 
 private:
 #if HLVM_ATOMIC_LOCK_ENABLE_PADDING
 	PADDING(HLVM_PLATFORM_CACHE_LINE - sizeof(std::atomic_flag));
 #endif
 };
+
+/**
+ * @class FRecursiveAtomicFlag
+ * @brief 一个允许同一线程内无需竞争锁的原子标志类
+ */
+class FRecursiveAtomicFlag
+{
+public:
+#define LOCK_GUARD_RECURSIVE()                                                                 \
+	TConstructorTrick __lock_guard_([this]() { this->Lock(); }, [this]() { this->Unlock(); }); \
+	ATOMIC_THREAD_FENCE()
+
+	FRecursiveAtomicFlag() noexcept = default;
+	~FRecursiveAtomicFlag() noexcept = default;
+
+	FRecursiveAtomicFlag(const FRecursiveAtomicFlag&) noexcept
+		: mFlag{ 0 }
+	{
+		// Trivial
+	}
+
+	FRecursiveAtomicFlag(FRecursiveAtomicFlag&&) noexcept
+		: mFlag{ 0 }
+	{
+		// Trivial
+	}
+
+	FRecursiveAtomicFlag& operator=(const FRecursiveAtomicFlag&) noexcept
+	{
+		// Trivial
+		return *this;
+	}
+	FRecursiveAtomicFlag& operator=(FRecursiveAtomicFlag&&) noexcept
+	{
+		// Trivial
+		return *this;
+	}
+
+	void Lock() const noexcept(!HLVM_DEADLOCK_TIMER);
+	void Unlock() const noexcept;
+
+protected:
+	mutable std::atomic_flag		  mFlag{ 0 };
+	mutable std::thread::id			  mOwner;
+	mutable std::atomic_uint_fast32_t mCount = 0;
+
+private:
+#if HLVM_ATOMIC_LOCK_ENABLE_PADDING
+	PADDING(HLVM_PLATFORM_CACHE_LINE - sizeof(std::atomic_flag));
+#endif
+};
+
 #undef HLVM_ATOMIC_LOCK_ENABLE_PADDING

@@ -5,7 +5,6 @@
 #pragma once
 
 #include "Platform/FileSystem/FileHandle.h"
-#include "Platform/FileSystem/Path.h"
 #include "Core/Parallel/Lock.h"
 
 #include <boost/iostreams/device/mapped_file.hpp>
@@ -35,26 +34,26 @@ private:
  * boost std:fbuf init file before mapping https://stackoverflow.com/questions/70480239/boost-mmaping-a-file-into-memory-for-readswrites
  */
 
-class FBoostFileHandle final : public IFileHandle
+class FBoostFileHandle final : public IFileHandle, public FAtomicFlagStatic
 {
 public:
 	FBoostFileHandle() = default;
 	~FBoostFileHandle() final override;
 
-	virtual OpRetType Open(const FPath& FilePath, const FFileOptions& Options = FFileOptions(), OpStatusType Status_InOut = nullptr) final override;
-	virtual OpRetType Close(OpStatusType Status_InOut = nullptr) final override;
-	virtual OpRetType Read(void* Buffer, size_t Size, const FFileSeekCtx& SeekCtx = FFileSeekCtx(), OpStatusType Status_InOut = nullptr) final override;
-	virtual OpRetType Write(const void* Buffer, size_t Size, const FFileSeekCtx& SeekCtx = FFileSeekCtx(), OpStatusType Status_InOut = nullptr) final override;
-	virtual OpRetType Flush(OpStatusType Status_InOut = nullptr) final override;
-	virtual OpRetType Seek(int64_t Offset, EWhence Whence = EWhence::Begin, OpStatusType Status_InOut = nullptr) final override;
-	virtual OpRetType Tell(int64_t& Offset, OpStatusType Status_InOut = nullptr) final override;
-	virtual OpRetType Size(size_t& Size, OpStatusType Status_InOut = nullptr) final override;
+	virtual OpRetType Open(const FPath& FilePath, const FFileOptions& Options = FFileOptions()) final override;
+	virtual OpRetType Close() final override;
+	virtual OpRetType Read(void* Buffer, size_t Size, const FFileSeekCtx& SeekCtx = FFileSeekCtx()) final override;
+	virtual OpRetType Write(const void* Buffer, size_t Size, const FFileSeekCtx& SeekCtx = FFileSeekCtx()) final override;
+	virtual OpRetType Flush() final override;
+	virtual OpRetType Seek(int64_t Offset, EWhence Whence = EWhence::Begin) final override;
+	virtual OpRetType Tell(int64_t& Offset) final override;
+	virtual OpRetType Size(size_t& Size) final override;
 
 	/**
 	 * These methods can be static methods, but since we require inheritance, they have to be member virtual methods
 	 */
-	virtual OpRetType								  Truncate(size_t Size, OpStatusType Status_InOut = nullptr) final override;
-	[[nodiscard]] virtual std::shared_ptr<IFFileStat> Stat(const FPath& FilePath, OpStatusType Status_InOut = nullptr) final override;
+	virtual OpRetType								  Truncate(size_t Size) final override;
+	[[nodiscard]] virtual std::shared_ptr<IFFileStat> Stat(const FPath& FilePath) final override;
 
 private:
 	void		MappedFileLazyInit();
@@ -62,10 +61,10 @@ private:
 	void*		MappedFileCurPos_W(int64_t Offset = 0);
 
 private:
-	std::optional<boost::iostreams::mapped_file>		  mMappedFile;
-	int64_t												  mMappedSeekPos{ 0 };
-	std::optional<std::fstream>							  mFStream;
-	mutable std::optional<FAtomicFlag>					  mLock;
-	mutable std::optional<boost::interprocess::file_lock> mFileLock;
+	boost::iostreams::mapped_file*				mMappedFile{ nullptr };
+	int64_t										mMappedSeekPos{ 0 };
+	std::fstream*								mFStream{ nullptr };
+	mutable std::optional<FRecursiveAtomicFlag> mRecursiveLock;
+	mutable boost::interprocess::file_lock*		mFileLock{ nullptr };
 	BIT_FLAG(mMappedLazyInit){ false };
 };

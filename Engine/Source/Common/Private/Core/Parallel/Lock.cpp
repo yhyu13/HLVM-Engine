@@ -53,30 +53,14 @@
 	(lock)->clear(std::memory_order_release)
 
 FAtomicLockGuard::FAtomicLockGuard(std::atomic_flag& flag) noexcept(!HLVM_DEADLOCK_TIMER)
-	: m_lock(&flag)
+	: mLock(&flag)
 {
-	LOCK_BODY(m_lock);
-}
-
-FAtomicLockGuard::FAtomicLockGuard(FAtomicFlag& Flag) noexcept(!HLVM_DEADLOCK_TIMER)
-	: m_lock(&Flag.m_flag)
-{
-	LOCK_BODY(m_lock);
-}
-
-FAtomicLockGuard::FAtomicLockGuard(std::optional<FAtomicFlag>& Flag) noexcept(!HLVM_DEADLOCK_TIMER)
-	: m_lock((Flag) ? &Flag->m_flag : nullptr)
-{
-	if (!m_lock) [[unlikely]]
-		return;
-	LOCK_BODY(m_lock);
+	LOCK_BODY(mLock);
 }
 
 FAtomicLockGuard::~FAtomicLockGuard() noexcept
 {
-	if (!m_lock) [[unlikely]]
-		return;
-	UNLOCK_BODY(m_lock);
+	UNLOCK_BODY(mLock);
 }
 
 void FAtomicFlagStatic::LockS() noexcept(!HLVM_DEADLOCK_TIMER)
@@ -84,7 +68,7 @@ void FAtomicFlagStatic::LockS() noexcept(!HLVM_DEADLOCK_TIMER)
 	LOCK_BODY(&sc_flag);
 }
 
-void FAtomicFlagStatic::UnLockS() noexcept
+void FAtomicFlagStatic::UnlockS() noexcept
 {
 	UNLOCK_BODY(&sc_flag);
 }
@@ -94,7 +78,7 @@ void FAtomicFlagNI::LockNI() noexcept(!HLVM_DEADLOCK_TIMER)
 	LOCK_BODY(&ni_flag);
 }
 
-void FAtomicFlagNI::UnLockNI() noexcept
+void FAtomicFlagNI::UnlockNI() noexcept
 {
 	UNLOCK_BODY(&ni_flag);
 }
@@ -104,17 +88,42 @@ void FAtomicFlagNC::LockNC() const noexcept(!HLVM_DEADLOCK_TIMER)
 	LOCK_BODY(&nc_flag);
 }
 
-void FAtomicFlagNC::UnLockNC() const noexcept
+void FAtomicFlagNC::UnlockNC() const noexcept
 {
 	UNLOCK_BODY(&nc_flag);
 }
 
 void FAtomicFlag::Lock() const noexcept(!HLVM_DEADLOCK_TIMER)
 {
-	LOCK_BODY(&m_flag);
+	LOCK_BODY(&mFlag);
 }
 
-void FAtomicFlag::UnLock() const noexcept
+void FAtomicFlag::Unlock() const noexcept
 {
-	UNLOCK_BODY(&m_flag);
+	UNLOCK_BODY(&mFlag);
+}
+
+void FRecursiveAtomicFlag::Lock() const noexcept(!HLVM_DEADLOCK_TIMER)
+{
+	if (mOwner == HLVM_CURRENT_THREAD_ID)
+	{
+		mCount.fetch_add(1, std::memory_order_relaxed);
+		return;
+	}
+
+	LOCK_BODY(&mFlag);
+
+	mOwner = HLVM_CURRENT_THREAD_ID;
+	mCount = 1;
+}
+
+void FRecursiveAtomicFlag::Unlock() const noexcept
+{
+	if (mCount.fetch_sub(1, std::memory_order_relaxed) > 1)
+	{
+		return;
+	}
+
+	mOwner = std::thread::id();
+	UNLOCK_BODY(&mFlag);
 }
