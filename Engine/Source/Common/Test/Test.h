@@ -35,7 +35,8 @@ std::function<void()> make_test_wrapper(const FString& name, Func test_function)
 }
 
 /** Macro to record a test function
- * Example : (1) use static method (2) function name prefix test_
+ * Requirement : (1) use static method in a .cpp test file
+ *               (2) function name prefix "test_"
  * static bool test_hash_test()
  * {
  *     ...

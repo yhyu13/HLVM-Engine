@@ -72,25 +72,37 @@ RECORD(packed_test)
 				ScopedFileHandle, void(), [&]() -> void { fileHandle.Open(PackedTokFile, Options); },
 				[&]() -> void { fileHandle.Close(); });
 
-			TCharArrayStr<4, TCHAR> Buffer{ HLVM_JSONL_LINE_SEPARATOR };
-
-			constexpr size_t size = 8;
-			for (size_t i = 0; i < size; ++i)
+			TVector<std::byte> TokenData;
+			constexpr int	   size = 8;
+			for (int i = 0; i < size; ++i)
 			{
 				FPackedTokenEntryData Entry;
-				Entry.StartPos = i * 8;
+				Entry.StartPos = static_cast<uint32_t>(i * 8);
 				Entry.Size = 8;
 				Entry.DecompressSize = 8;
 				Entry.EncryptType = EEncryptType::No;
 				Entry.CompressType = ECompressType::No;
 
 				FPackedTokenEntry Sample;
-				Sample.Path = FString::Format(TXT("test_{}.txt"), i);
-				Sample.Entry = MoveTemp(Entry);
+				Sample.PathHash = FPath{ FString::Format(TXT("test_{}.txt"), i) };
+				Sample.Data = MoveTemp(Entry);
 
-				auto buffer = struct_pack::serialize(Sample);
-				fileHandle.Write(buffer.data(), buffer.size());
-				fileHandle.Write(Buffer.data(), Buffer.Size);
+				std::byte			 buffer[FPackedTokenEntry_SerializedSize];
+				std::span<std::byte> buffer_span = buffer;
+				bool				 bSuccess = GetSerialized(Sample, buffer_span);
+				HLVM_ENSURE(bSuccess, TXT("GetSerialized failed"));
+
+				std::move(buffer_span.begin(), buffer_span.end(), std::back_inserter(TokenData));
+				std::copy(HLVM_JSONL_LINE_SEPARATOR_BUFFER.begin(), HLVM_JSONL_LINE_SEPARATOR_BUFFER.end(), std::back_inserter(TokenData));
+			}
+
+			// Compress and Encrypt
+			{
+				auto Compressed = FZstd::Compress(TokenData);
+				// Actually do not encrypt the token file as it cost too much time, 10x slower
+				// auto Encrypted = FRSA::HPCKS8_Encrypt(Compressed);
+				auto& Encrypted = Compressed;
+				fileHandle.Write(Encrypted.data(), Encrypted.size());
 			}
 		}
 

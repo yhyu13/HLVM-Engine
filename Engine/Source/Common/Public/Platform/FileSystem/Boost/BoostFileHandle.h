@@ -49,9 +49,6 @@ public:
 	virtual OpRetType Tell(int64_t& Offset) final override;
 	virtual OpRetType Size(size_t& Size) final override;
 
-	/**
-	 * These methods can be static methods, but since we require inheritance, they have to be member virtual methods
-	 */
 	virtual OpRetType								  Truncate(size_t Size) final override;
 	[[nodiscard]] virtual std::shared_ptr<IFFileStat> Stat(const FPath& FilePath) final override;
 

@@ -20,6 +20,12 @@
 	#error "HLVM_BUILD_RELEASE + HLVM_BUILD_DEBUG + HLVM_BUILD_DEVELOPMENT != 1"
 #endif
 
+#define HLVM_INLINE_FUNC inline
+#define HLVM_STATIC_FUNC static
+#define HLVM_INLINE_VAR inline
+#define HLVM_STATIC_VAR static
+#define HLVM_TLS_VAR thread_local
+
 // 定义一个类，禁止复制和移动
 #define NOCOPY(Class)             \
 	Class(const Class&) = delete; \
@@ -54,7 +60,7 @@
 		__VA_ARGS__,                     \
 		HLVM_NUM                         \
 	};                                   \
-	inline constexpr size_t enum_class##_NUM = static_cast<size_t>(enum_class::HLVM_NUM)
+	HLVM_INLINE_VAR constexpr size_t enum_class##_NUM = static_cast<size_t>(enum_class::HLVM_NUM)
 
 #define HLVM_ENUM_V(enum_class, enum_value) static_cast<std::underlying_type_t<enum_class>>(enum_class::enum_value)
 #define HLVM_ENUM_V_SIZE_T(enum_class, enum_value) static_cast<size_t>(enum_class::enum_value)
@@ -77,3 +83,15 @@
 		}                   \
 	}                       \
 	while (0)
+
+// Use char for best compatibility with other libraries
+#define TCHAR char8_t
+static_assert(sizeof(TCHAR) == sizeof(char), "TCHAR is not char");
+
+//  Use utf8 for all string literal
+//  U8_STRING("Hello World!")
+#define U8_STRING(str) u8##str
+#define TXT(str) U8_STRING(str)
+#define STRTIFY(x) TXT(#x)
+#define TO_TCHAR_STR(x) reinterpret_cast<const TCHAR*>((x))
+#define TO_CHAR_STR(x) reinterpret_cast<const char*>((x))

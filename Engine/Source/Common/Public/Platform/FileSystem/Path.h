@@ -97,6 +97,11 @@ public:
 		return mHash;
 	}
 
+    operator size_t() const noexcept
+    {
+        return GetHash();
+    }
+
 	FPath ChangeExtension(const FString& new_ext) const
 	{
 		FPath new_path = *this;
@@ -118,8 +123,8 @@ public:
 	static TSmallVector32<FPath> FindAllMatch(const FPath& root_dir, const FString& regex, bool recursive = false);
 	static FString				 DumpJson(const TSmallVector32<FPath>& paths);
 
-	inline static boost::regex					 PathReplacePattern{ R"(\$\{([^}]+)\})" };
-	inline static TMap<std::string, std::string> PathReplaceMap;
+	HLVM_INLINE_VAR HLVM_STATIC_VAR boost::regex PathReplacePattern{ R"(\$\{([^}]+)\})" };
+	HLVM_INLINE_VAR HLVM_STATIC_VAR TMap<std::string, std::string> PathReplaceMap;
 
 private:
 	/**

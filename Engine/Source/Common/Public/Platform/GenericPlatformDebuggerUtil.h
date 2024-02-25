@@ -40,7 +40,7 @@ public:
 protected:
 	virtual bool IsDebuggerPresentInternal() = 0;
 
-	static FGenericPlatformDebuggerUtil* s_instance;
+	HLVM_STATIC_VAR FGenericPlatformDebuggerUtil* s_instance;
 };
 
 #define HLVM_IS_DEBUGGER_PRESENT() FGenericPlatformDebuggerUtil::IsDebuggerPresent()

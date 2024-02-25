@@ -13,4 +13,4 @@
 /**
  * thread local storage declared here
  */
-thread_local inline std::thread::id HLVM_CURRENT_THREAD_ID = std::this_thread::get_id();
+HLVM_TLS_VAR HLVM_INLINE_VAR const std::thread::id HLVM_CURRENT_THREAD_ID = std::this_thread::get_id();

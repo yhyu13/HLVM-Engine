@@ -89,7 +89,7 @@ public:
 	static void UnlockS() noexcept;
 
 protected:
-	HLVM_CACHE_ALIGN inline static std::atomic_flag sc_flag{ 0 };
+	HLVM_CACHE_ALIGN HLVM_INLINE_VAR HLVM_STATIC_VAR std::atomic_flag sc_flag{ 0 };
 };
 
 /**
@@ -108,7 +108,7 @@ public:
 	static void UnlockNI() noexcept;
 
 protected:
-	HLVM_CACHE_ALIGN inline static std::atomic_flag ni_flag{ 0 };
+	HLVM_CACHE_ALIGN HLVM_INLINE_VAR HLVM_STATIC_VAR std::atomic_flag ni_flag{ 0 };
 };
 
 /**

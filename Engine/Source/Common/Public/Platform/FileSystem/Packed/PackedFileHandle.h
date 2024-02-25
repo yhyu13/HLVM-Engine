@@ -6,9 +6,8 @@
 
 #include "PackedDefinition.h"
 #include "Platform/FileSystem/FileHandle.h"
-#include "Core/Container/ContainerDefinition.h"
-#include "Core/Compress/CompressDefinition.h"
-#include "Core/Encrypt/EncryptDefinition.h"
+#include "Core/Compress/Zstd.h"
+#include "Core/Encrypt/RSA.h"
 
 #include <boost/iostreams/device/mapped_file.hpp>
 
@@ -22,9 +21,9 @@ HLVM_ENUM(EPackedFileType, uint8_t,
  */
 struct FPackedTokenEntryData
 {
-	size_t		  StartPos;
-	size_t		  Size;
-	size_t		  DecompressSize;
+	uint32_t	  StartPos;
+	uint32_t	  Size;
+	uint32_t	  DecompressSize;
 	EEncryptType  EncryptType{ EEncryptType::Unkown };
 	ECompressType CompressType{ ECompressType::Unkown };
 };
@@ -34,9 +33,13 @@ struct FPackedTokenEntryData
  */
 struct FPackedTokenEntry
 {
-	std::string			  Path; // RelativeToMountingPoint
-	FPackedTokenEntryData Entry;
+	FPackedTokenEntryData Data;
+	size_t				  PathHash; // RelativeToMountingPoint
 };
+
+HLVM_INLINE_VAR constexpr size_t FPackedTokenEntry_SerializedSize = sizeof(FPackedTokenEntry);
+bool							 GetSerialized(const FPackedTokenEntry& Data, std::span<std::byte>& Buffer);
+bool							 SetSerialized(FPackedTokenEntry& Data, const std::span<const std::byte>& Buffer);
 
 /**
  * mapped region https://live.boost.org/doc/libs/1_83_0/doc/html/boost/interprocess/mapped_region.html
@@ -70,16 +73,13 @@ public:
 	virtual OpRetType Tell(int64_t& Offset) final override;
 	virtual OpRetType Size(size_t& Size) final override;
 
-	/**
-	 * These methods can be static methods, but since we require inheritance, they have to be member virtual methods
-	 */
 	virtual OpRetType								  Truncate(size_t Size) final override;
 	[[nodiscard]] virtual std::shared_ptr<IFFileStat> Stat(const FPath& FilePath) final override;
 
 private:
 	const void* MappedFileCurPos_R(int64_t Offset) const;
 
-	TMap<FPath, FPackedTokenEntry> mTokenEntryMap;
-	boost::iostreams::mapped_file  mContainerMappedFile;
-	EPackedFileType				   mPackedFileType{ EPackedFileType::Unkown };
+	TMap<FPath, FPackedTokenEntryData> mTokenEntryMap;
+	boost::iostreams::mapped_file	   mContainerMappedFile;
+	EPackedFileType					   mPackedFileType{ EPackedFileType::Unkown };
 };

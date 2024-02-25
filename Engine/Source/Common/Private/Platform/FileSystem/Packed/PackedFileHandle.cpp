@@ -89,27 +89,21 @@ IFileHandle::OpRetType FPackedFileHandle::Open(const FPath& FilePath, const FFil
 					.Size(fileSize);
 				// Read binary
 				PFH_HANDLE_ASSERT(fileSize > 0, TXT("Packed token file size invalid {}"), fileSize);
-				TVector<std::byte> tokenData{ fileSize };
-				fileHandle.Read(tokenData.data(), tokenData.size(), { .Offset = 0, .Whence = EWhence::Begin })
+				TVector<std::byte> TokenData{ fileSize };
+				fileHandle.Read(TokenData.data(), TokenData.size(), { .Offset = 0, .Whence = EWhence::Begin })
 					.Close();
 
-				// Decryption
+				// Decryption & Decompression
 				{
-					// TODO
-				}
+					// Actually do not encrypt the token file as it cost too much time, 10x slower
+					// auto Decrypted = FRSA::PCKS8_Decrypt(TokenData);
+					auto& Decrypted = TokenData;
+					auto  Decompressed = FZstd::Decompress({ R_C(std::byte*, Decrypted.data()), Decrypted.size() });
 
-				// Decompression
-				{
-					// TODO
-				}
-
-				// Extrat line
-				{
-					auto		DecompressedData = MoveTemp(tokenData);
 					const char* lineSeparator = TO_CHAR_STR(HLVM_JSONL_LINE_SEPARATOR);
-					const char* lineStart = R_C(const char*, DecompressedData.data());
+					const char* lineStart = R_C(const char*, Decompressed.data());
 					const char* lineEnd = lineStart;
-					const char* tokenDataEnd = lineStart + DecompressedData.size();
+					const char* tokenDataEnd = lineStart + Decompressed.size();
 
 					while (lineEnd < tokenDataEnd)
 					{
@@ -118,9 +112,9 @@ IFileHandle::OpRetType FPackedFileHandle::Open(const FPath& FilePath, const FFil
 							std::cout << "Extracted line: " << std::string(lineStart, lineEnd) << std::endl;
 
 							FPackedTokenEntry Entry;
-							auto			  ec = struct_pack::deserialize_to(Entry, lineStart, S_C(size_t, lineEnd - lineStart));
-							assert(!ec);
-							std::cout << "Entry: " << Entry.Path << std::endl;
+							bool			  bSuccess = SetSerialized(Entry, std::span<const std::byte>{ R_C(const std::byte*, lineStart), S_C(size_t, lineEnd - lineStart) });
+							assert(bSuccess);
+							std::cout << "Entry: " << Entry.PathHash << std::endl;
 
 							lineStart = lineEnd + 3;
 							lineEnd = lineStart;
@@ -312,4 +306,18 @@ const void* FPackedFileHandle::MappedFileCurPos_R(int64_t Offset) const
 	auto _Size = static_cast<int64_t>(mContainerMappedFile.size());
 	PFH_HANDLE_ASSERT(_Offeset >= 0 && _Offeset < _Size, FString::Format(TXT("MappedFileCurPos_R {} out of range [0,{})"), _Offeset, _Size));
 	return (&(mContainerMappedFile.const_data()[_Offeset]));
+}
+
+bool GetSerialized(const FPackedTokenEntry& Data, std::span<std::byte>& Buffer)
+{
+	const bool bValid = Buffer.size() == FPackedTokenEntry_SerializedSize;
+	HLVM_ASSERT(bValid, TXT("Buffer size {} is not enough for serialized data size {}"), Buffer.size(), FPackedTokenEntry_SerializedSize);
+	return std::memcpy(Buffer.data(), &Data, FPackedTokenEntry_SerializedSize) == Buffer.data();
+}
+
+bool SetSerialized(FPackedTokenEntry& Data, const std::span<const std::byte>& Buffer)
+{
+	const bool bValid = Buffer.size() == FPackedTokenEntry_SerializedSize;
+	HLVM_ASSERT(bValid, TXT("Buffer size {} is not enough for serialized data size {}"), Buffer.size(), FPackedTokenEntry_SerializedSize);
+	return std::memcpy(&Data, Buffer.data(), FPackedTokenEntry_SerializedSize) == &Data;
 }

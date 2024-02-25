@@ -1,0 +1,42 @@
+/**
+ * Copyright (c) 2024. MIT License. All rights reserved.
+ */
+
+#include "Core/Compress/Zstd.h"
+
+TVector<std::byte> FZstd::Compress(const std::span<std::byte>& data, int compress_level, bool bShrinkOutputBuffer)
+{
+	size_t est_compress_size = ZSTD_compressBound(data.size());
+	HLVM_ENSURE(ZSTD_isError(est_compress_size) == 0, TXT("ZSTD_compressBound = {}, ErrMsg: {}"),
+		est_compress_size, TO_TCHAR_STR(ZSTD_getErrorName(est_compress_size)));
+
+	TVector<std::byte> comp_buffer;
+	comp_buffer.resize(est_compress_size);
+	auto compress_size = ZSTD_compress(comp_buffer.data(), est_compress_size, data.data(), data.size(), compress_level);
+	comp_buffer.resize(compress_size);
+	if (bShrinkOutputBuffer)
+	{
+		comp_buffer.shrink_to_fit();
+	}
+
+	return comp_buffer;
+}
+
+TVector<std::byte> FZstd::Decompress(const std::span<std::byte>& data, bool bShrinkOutputBuffer)
+{
+	auto const est_decomp_size = ZSTD_getFrameContentSize(data.data(), data.size());
+	HLVM_ENSURE(est_decomp_size != ZSTD_CONTENTSIZE_UNKNOWN, TXT("ZSTD_getFrameContentSize = {}, ErrMsg: {}"),
+		ZSTD_CONTENTSIZE_UNKNOWN, TXT("it's necessary to use streaming mode to decompress data"));
+	HLVM_ENSURE(est_decomp_size != ZSTD_CONTENTSIZE_ERROR, TXT("ZSTD_getFrameContentSize = {}, ErrMsg: {}"),
+		ZSTD_CONTENTSIZE_ERROR, TXT("an error occurred"));
+
+	TVector<std::byte> decomp_buffer;
+	decomp_buffer.resize(est_decomp_size);
+	size_t const decomp_size = ZSTD_decompress(decomp_buffer.data(), est_decomp_size, data.data(), data.size());
+	decomp_buffer.resize(decomp_size);
+	if (bShrinkOutputBuffer)
+	{
+		decomp_buffer.shrink_to_fit();
+	}
+	return decomp_buffer;
+}

@@ -14,8 +14,8 @@ DEFINE_LOG_CATEGORY(LogEditor)
 #if HLVM_SPDLOG_USE_ASYNC
 // Initialize the thread pool for asynchronous logging
 // Had to use global variable to avoid thread pool being released before program finishing
-static std::shared_ptr<spdlog::details::thread_pool> SpglogThreadPool = std::make_shared<spdlog::details::thread_pool>(
-	8192, 1, [] {}, [] {});
+HLVM_STATIC_VAR std::shared_ptr<spdlog::details::thread_pool>* SpglogThreadPool = new std::shared_ptr<spdlog::details::thread_pool>(new spdlog::details::thread_pool(
+	8192, 1, [] {}, [] {}));
 #endif
 
 FSpdlogConsoleDevice::FSpdlogConsoleDevice()
@@ -26,7 +26,7 @@ FSpdlogConsoleDevice::FSpdlogConsoleDevice()
 	std::vector<spdlog::sink_ptr> sinks{ stdout_sink };
 #if HLVM_SPDLOG_USE_ASYNC
 	// Create the asynchronous logger
-	AsyncLogger = std::make_shared<spdlog::async_logger>("CONSOLE", sinks.begin(), sinks.end(), SpglogThreadPool, spdlog::async_overflow_policy::block);
+	AsyncLogger = std::make_shared<spdlog::async_logger>("CONSOLE", sinks.begin(), sinks.end(), *SpglogThreadPool, spdlog::async_overflow_policy::block);
 #else
 	// Create the synchronous logger
 	AsyncLogger = std::make_shared<spdlog::logger>("CONSOLE", sinks.begin(), sinks.end());

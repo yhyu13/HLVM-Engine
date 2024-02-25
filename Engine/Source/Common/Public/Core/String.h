@@ -8,17 +8,7 @@
 #include <string>
 #include <fmt/xchar.h>
 #include <fmt/format.h>
-// Use char for best compatibility with other libraries
-#define TCHAR char8_t
-static_assert(sizeof(TCHAR) == sizeof(char), "TCHAR is not char");
 
-//  Use utf8 for all string literal
-//  U8_STRING("Hello World!")
-#define U8_STRING(str) u8##str
-#define TXT(str) U8_STRING(str)
-#define STRTIFY(x) TXT(#x)
-#define TO_TCHAR_STR(x) reinterpret_cast<const TCHAR*>((x))
-#define TO_CHAR_STR(x) reinterpret_cast<const char*>((x))
 #define TO_FSTRING(x) FString((x))
 
 class FString final : public std::basic_string<TCHAR>
