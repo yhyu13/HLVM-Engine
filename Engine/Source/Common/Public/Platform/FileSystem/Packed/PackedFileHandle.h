@@ -25,8 +25,8 @@ struct FPackedTokenEntryData
 	size_t		  StartPos;
 	size_t		  Size;
 	size_t		  DecompressSize;
-	EEncryptType  EncryptType;
-	ECompressType CompressType;
+	EEncryptType  EncryptType{ EEncryptType::Unkown };
+	ECompressType CompressType{ ECompressType::Unkown };
 };
 
 /**
@@ -34,8 +34,8 @@ struct FPackedTokenEntryData
  */
 struct FPackedTokenEntry
 {
-	FPath				  Path;
-	FPackedTokenEntryData Region;
+	std::string			  Path; // RelativeToMountingPoint
+	FPackedTokenEntryData Entry;
 };
 
 /**
@@ -45,14 +45,14 @@ struct FPackedTokenEntry
 class FPackedFileHandle final : public IFileHandle
 {
 public:
-	static constexpr FFileOptions sPackedFileOptions{
+	static constexpr FFileOptions sDefaultFileOptions{
 		.eFileMode = EFileMode::RB,
 		.eFileMapped = EFileMapped::Mapped,
 		.eFileAsync = EFileAsync::NoAsync,
 		.eFileLock = EFileLock::NoLock
 	};
 
-	static constexpr FFileSeekCtx sPackedFileSeekCtx{
+	static constexpr FFileSeekCtx sDefaultFileSeekCtx{
 		.Whence = EWhence::Begin,
 		.bResetPos = false,
 		.bEraseSeekPos = false,
@@ -61,10 +61,10 @@ public:
 	FPackedFileHandle() = default;
 	~FPackedFileHandle() final override;
 
-	virtual OpRetType Open(const FPath& FilePath, const FFileOptions& Options = sPackedFileOptions) final override;
+	virtual OpRetType Open(const FPath& FilePath, const FFileOptions& Options = sDefaultFileOptions) final override;
 	virtual OpRetType Close() final override;
-	virtual OpRetType Read(void* Buffer, size_t Size, const FFileSeekCtx& SeekCtx = sPackedFileSeekCtx) final override;
-	virtual OpRetType Write(const void* Buffer, size_t Size, const FFileSeekCtx& SeekCtx = sPackedFileSeekCtx) final override;
+	virtual OpRetType Read(void* Buffer, size_t Size, const FFileSeekCtx& SeekCtx = sDefaultFileSeekCtx) final override;
+	virtual OpRetType Write(const void* Buffer, size_t Size, const FFileSeekCtx& SeekCtx = sDefaultFileSeekCtx) final override;
 	virtual OpRetType Flush() final override;
 	virtual OpRetType Seek(int64_t Offset, EWhence Whence = EWhence::Begin) final override;
 	virtual OpRetType Tell(int64_t& Offset) final override;

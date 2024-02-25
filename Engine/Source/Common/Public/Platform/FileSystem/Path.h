@@ -97,6 +97,19 @@ public:
 		return mHash;
 	}
 
+	FPath ChangeExtension(const FString& new_ext) const
+	{
+		FPath new_path = *this;
+		new_path.replace_extension(new_ext.ToCharStr());
+		return new_path;
+	}
+
+	FPath& ChangeExtension_Inplace(const FString& new_ext)
+	{
+		this->replace_extension(new_ext.ToCharStr());
+		return *this;
+	}
+
 	/**
 	 * Static methods, internally calling generic platform api
 	 */
@@ -105,8 +118,7 @@ public:
 	static TSmallVector32<FPath> FindAllMatch(const FPath& root_dir, const FString& regex, bool recursive = false);
 	static FString				 DumpJson(const TSmallVector32<FPath>& paths);
 
-public:
-	inline static boost::regex					 PathReplacePattern{ ("\\$\\{([^}]+)\\}") };
+	inline static boost::regex					 PathReplacePattern{ R"(\$\{([^}]+)\})" };
 	inline static TMap<std::string, std::string> PathReplaceMap;
 
 private:

@@ -47,6 +47,8 @@
  * 3rd party includes
  */
 #include <ylt/struct_pack.hpp>
+#include <ylt/struct_json/json_reader.h>
+#include <ylt/struct_json/json_writer.h>
 #include <spdlog/spdlog.h>
 #include <spdlog/async.h>
 #include <magic_enum_all.hpp>

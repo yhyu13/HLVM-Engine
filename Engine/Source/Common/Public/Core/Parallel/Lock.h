@@ -198,8 +198,8 @@ private:
 class FRecursiveAtomicFlag
 {
 public:
-#define LOCK_GUARD_RECURSIVE()                                                                 \
-	TConstructorTrick __lock_guard_([this]() { this->Lock(); }, [this]() { this->Unlock(); }); \
+#define LOCK_GUARD_RECURSIVE()                                                                                                                             \
+	TScopedVariable<std::function<void()>, std::function<void()>> __lock_guard_([this]() -> void { this->Lock(); }, [this]() -> void { this->Unlock(); }); \
 	ATOMIC_THREAD_FENCE()
 
 	FRecursiveAtomicFlag() noexcept = default;

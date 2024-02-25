@@ -26,19 +26,25 @@ enum class EFileMode : uint8_t
 	WA = W | A | E,
 	WAB = W | A | E | B,
 	RB = R | B,
+	WB = W | T | B,
 };
 
-static bool operator&(EFileMode a, EFileMode b)
+inline bool operator&(EFileMode a, EFileMode b)
 {
 	return static_cast<uint8_t>(a) & static_cast<uint8_t>(b);
 }
 
-static bool operator==(EFileMode a, EFileMode b)
+inline uint8_t operator|(EFileMode a, EFileMode b)
+{
+	return static_cast<uint8_t>(a) | static_cast<uint8_t>(b);
+}
+
+inline bool operator==(EFileMode a, EFileMode b)
 {
 	return static_cast<uint8_t>(a) == static_cast<uint8_t>(b);
 }
 
-static bool operator!=(EFileMode a, EFileMode b)
+inline bool operator!=(EFileMode a, EFileMode b)
 {
 	return static_cast<uint8_t>(a) != static_cast<uint8_t>(b);
 }
@@ -63,7 +69,7 @@ enum class EFileLock : uint8_t
 	FullLock = ThreadLock | InterProcessLock
 };
 
-static bool operator&(EFileLock a, EFileLock b)
+inline bool operator&(EFileLock a, EFileLock b)
 {
 	return static_cast<uint8_t>(a) & static_cast<uint8_t>(b);
 }
@@ -151,7 +157,7 @@ enum class EWhence : uint8_t
 	End = std::ios::end,
 };
 
-static bool operator&(EWhence a, EWhence b)
+inline bool operator&(EWhence a, EWhence b)
 {
 	return static_cast<uint8_t>(a) == static_cast<uint8_t>(b);
 }

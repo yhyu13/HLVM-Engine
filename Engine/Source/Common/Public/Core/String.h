@@ -18,6 +18,7 @@ static_assert(sizeof(TCHAR) == sizeof(char), "TCHAR is not char");
 #define TXT(str) U8_STRING(str)
 #define STRTIFY(x) TXT(#x)
 #define TO_TCHAR_STR(x) reinterpret_cast<const TCHAR*>((x))
+#define TO_CHAR_STR(x) reinterpret_cast<const char*>((x))
 #define TO_FSTRING(x) FString((x))
 
 class FString final : public std::basic_string<TCHAR>
@@ -134,7 +135,7 @@ public:
 	}
 };
 
-template <size_t N>
+template <size_t N, typename CHAR = TCHAR>
 struct TCharArrayStr
 {
 	static constexpr size_t Capacity{ N };
@@ -147,21 +148,21 @@ struct TCharArrayStr
 	}
 
 	// 构造函数接受一个C风格字符串进行初始化
-	TCharArrayStr(const TCHAR* input)
+	explicit TCharArrayStr(const CHAR* input)
 	{
 		Size = std::strlen(reinterpret_cast<const char*>(input));
 		assert(Size <= Capacity);
-		std::strncpy(Buffer, input, Size);
+		std::strncpy(reinterpret_cast<char*>(Buffer), reinterpret_cast<const char*>(input), Size);
 		Buffer[Size + 1] = '\0'; // 确保总是以空字符结束
 	}
 
 	// 获取字符串内容
-	const TCHAR* c_str() const
+	const CHAR* c_str() const
 	{
 		return Buffer;
 	}
 
-	TCHAR* data()
+	CHAR* data()
 	{
 		return Buffer;
 	}

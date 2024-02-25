@@ -108,11 +108,6 @@ IFileHandle::OpRetType FBoostFileHandle::Open(const FPath& FilePath, const FFile
 		HLVM_NOT_IMPLEMENTED();
 	}
 
-	if (mFileOptions.eFileLock & EFileLock::InterProcessLock)
-	{
-		BFH_VERBOSE_LOG(TXT("Create interprocess file lock"));
-		mFileLock = new boost::interprocess::file_lock(FilePath);
-	}
 	if (mFileOptions.eFileLock & EFileLock::ThreadLock)
 	{
 		BFH_VERBOSE_LOG(TXT("Create thread lock"));
@@ -121,14 +116,12 @@ IFileHandle::OpRetType FBoostFileHandle::Open(const FPath& FilePath, const FFile
 
 	try
 	{
-		BFH_SCOPE_LOCK();
-
 		if (mFileOptions.eFileMapped == EFileMapped::Mapped)
 		{
 			mMappedLazyInit = false;
 			{
 				auto file = std::fstream();
-				file.open(FilePath, static_cast<std::ios::openmode>(mFileOptions.eFileMode));
+				file.open(FilePath, static_cast<std::ios::openmode>(mFileOptions.eFileMode | EFileMode::E));
 				BFH_HANDLE_ENSURE(file.is_open(), TXT("file open failed"));
 				if (file.tellg() <= 0)
 				{
@@ -151,6 +144,16 @@ IFileHandle::OpRetType FBoostFileHandle::Open(const FPath& FilePath, const FFile
 			mFStream->open(FilePath, static_cast<std::ios::openmode>(mFileOptions.eFileMode));
 			BFH_HANDLE_ENSURE(mFStream->is_open(), TXT("FStream open failed"));
 		}
+
+		/**
+		 * File lock can only init after success of open an existing file
+		 */
+		if (mFileOptions.eFileLock & EFileLock::InterProcessLock)
+		{
+			BFH_VERBOSE_LOG(TXT("Create interprocess file lock"));
+			mFileLock = new boost::interprocess::file_lock(FilePath);
+		}
+
 		mOpened = true;
 		Status_InOut->eFileOpStatus = EFileOpStatus::Success;
 		BFH_VERBOSE_LOG(TXT("Open success with mode {}"), TO_TCHAR_STR(magic_enum::enum_name(mFileOptions.eFileMode).data()));

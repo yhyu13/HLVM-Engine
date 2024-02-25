@@ -5,6 +5,8 @@
 #include "Test.h"
 
 #include <ylt/struct_pack.hpp>
+#include <ylt/struct_json/json_reader.h>
+#include <ylt/struct_json/json_writer.h>
 #include <ylt/thirdparty/async_simple/coro/Lazy.h>
 #include <spdlog/spdlog.h>
 #include <spdlog/async.h>
@@ -75,6 +77,18 @@ RECORD(spdlog_test)
 	SPDLOG_DEBUG("Some debug message");
 };
 
+struct json_person
+{
+	std::string name;
+	int			age;
+
+	bool operator==(const json_person& other) const
+	{
+		return name == other.name && age == other.age;
+	}
+};
+REFLECTION(json_person, name, age);
+
 RECORD(yalantinlibs_test)
 {
 	HLVM_LOG(LogTest, info, TXT("Yalantin test"));
@@ -103,6 +117,17 @@ RECORD(yalantinlibs_test)
 		auto   ec = struct_pack::deserialize_to(person2, buffer.data(), buffer.size());
 		assert(!ec);
 		assert(person1 == person2);
+	}
+
+	{
+		json_person p{ .name = "tom", .age = 20 };
+		std::string str;
+		struct_json::to_json(p, str); // {"name":"tom","age":20}
+
+		json_person p1;
+		struct_json::from_json(p1, str);
+
+		assert(p == p1);
 	}
 	{
 		auto task1 = [](int x) -> async_simple::coro::Lazy<int> {

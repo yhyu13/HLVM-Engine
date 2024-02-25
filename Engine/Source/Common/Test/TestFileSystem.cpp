@@ -5,6 +5,11 @@
 #include "Test.h"
 
 #include "Platform/FileSystem/Boost/BoostFileHandle.h"
+#include "Platform/FileSystem/Packed/PackedFileHandle.h"
+
+#include <ylt/struct_pack.hpp>
+#include <ylt/struct_json/json_reader.h>
+#include <ylt/struct_json/json_writer.h>
 
 DELCARE_LOG_CATEGORY(LogTest)
 DEFINE_LOG_CATEGORY(LogTest)
@@ -52,3 +57,48 @@ static void test_boostfile_test()
 	}
 }
 RECORD_TEST_FUNC(boostfile_test)
+
+RECORD(packed_test)
+{
+	HLVM_LOG(LogTest, info, TXT("Test PackedFileHandle"));
+
+	{
+		FPath PackedFileName = "./packed-test";
+		FPath PackedTokFile = PackedFileName.ChangeExtension(HLVM_PACKED_TOKEN_EXT);
+		{
+			FBoostFileHandle fileHandle;
+			FFileOptions	 Options{ .eFileMode = EFileMode::WB, .eFileMapped = EFileMapped::Mapped, .eFileLock = EFileLock::InterProcessLock };
+			HLVM_SCOPED_VARIABLE(
+				ScopedFileHandle, void(), [&]() -> void { fileHandle.Open(PackedTokFile, Options); },
+				[&]() -> void { fileHandle.Close(); });
+
+			TCharArrayStr<4, TCHAR> Buffer{ HLVM_JSONL_LINE_SEPARATOR };
+
+			constexpr size_t size = 8;
+			for (size_t i = 0; i < size; ++i)
+			{
+				FPackedTokenEntryData Entry;
+				Entry.StartPos = i * 8;
+				Entry.Size = 8;
+				Entry.DecompressSize = 8;
+				Entry.EncryptType = EEncryptType::No;
+				Entry.CompressType = ECompressType::No;
+
+				FPackedTokenEntry Sample;
+				Sample.Path = FString::Format(TXT("test_{}.txt"), i);
+				Sample.Entry = MoveTemp(Entry);
+
+				auto buffer = struct_pack::serialize(Sample);
+				fileHandle.Write(buffer.data(), buffer.size());
+				fileHandle.Write(Buffer.data(), Buffer.Size);
+			}
+		}
+
+		{
+			FPackedFileHandle fileHandle;
+			HLVM_SCOPED_VARIABLE(
+				ScopedFileHandle, void(), [&]() -> void { fileHandle.Open(PackedFileName); },
+				[&]() -> void { fileHandle.Close(); });
+		}
+	}
+}
