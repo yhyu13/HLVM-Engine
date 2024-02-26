@@ -74,21 +74,21 @@ IFileHandle::OpRetType FPackedFileHandle::Open(const FPath& FilePath, const FFil
 	try
 	{
 		{
-			// TODO
-			// Validate token and container file signature
+			// TODO: Validate token and container file signature
 			// Decompress and read and build all token entries (async?)
 			{
 				auto TokenFilePath = mFilePath.ChangeExtension(HLVM_PACKED_TOKEN_EXT);
-
+				// Check file exists
 				const bool exist = FPath::Exists(TokenFilePath);
-				PFH_HANDLE_ASSERT(exist, TXT("Packed token file does not exist"));
+				PFH_HANDLE_ENSURE(exist, TXT("Packed token file does not exist"));
 
+				// Open local file
 				FBoostFileHandle fileHandle;
 				size_t			 fileSize = 0;
 				fileHandle.Open(TokenFilePath, mFileOptions)
 					.Size(fileSize);
-				// Read binary
-				PFH_HANDLE_ASSERT(fileSize > 0, TXT("Packed token file size invalid {}"), fileSize);
+				// Read binary in 1 shot
+				PFH_HANDLE_ENSURE(fileSize > 0, TXT("Packed token file size invalid {}"), fileSize);
 				TVector<std::byte> TokenData{ fileSize };
 				fileHandle.Read(TokenData.data(), TokenData.size(), { .Offset = 0, .Whence = EWhence::Begin })
 					.Close();
@@ -96,42 +96,47 @@ IFileHandle::OpRetType FPackedFileHandle::Open(const FPath& FilePath, const FFil
 				// Decryption & Decompression
 				{
 					// Actually do not encrypt the token file as it cost too much time, 10x slower
-					// auto Decrypted = FRSA::PCKS8_Decrypt(TokenData);
 					auto& Decrypted = TokenData;
 					auto  Decompressed = FZstd::Decompress({ R_C(std::byte*, Decrypted.data()), Decrypted.size() });
 
-					const char* lineSeparator = TO_CHAR_STR(HLVM_JSONL_LINE_SEPARATOR);
 					const char* lineStart = R_C(const char*, Decompressed.data());
-					const char* lineEnd = lineStart;
+					const char* lineEnd = lineStart + FPackedTokenEntry_SerializedSize;
 					const char* tokenDataEnd = lineStart + Decompressed.size();
 
-					while (lineEnd < tokenDataEnd)
-					{
-						if (*lineEnd == lineSeparator[0] && *(lineEnd + 1) == lineSeparator[1] && *(lineEnd + 2) == lineSeparator[2])
-						{
-							std::cout << "Extracted line: " << std::string(lineStart, lineEnd) << std::endl;
-
-							FPackedTokenEntry Entry;
-							bool			  bSuccess = SetSerialized(Entry, std::span<const std::byte>{ R_C(const std::byte*, lineStart), S_C(size_t, lineEnd - lineStart) });
-							assert(bSuccess);
-							std::cout << "Entry: " << Entry.PathHash << std::endl;
-
-							lineStart = lineEnd + 3;
-							lineEnd = lineStart;
-						}
-						else
-						{
-							++lineEnd;
-						}
-					}
-					// Print the last line
-					if (lineStart != lineEnd)
-					{
+					auto Extract = [&](FPackedTokenEntry& Entry) {
 						std::cout << "Extracted line: " << std::string(lineStart, lineEnd) << std::endl;
+
+						bool bSuccess = SetSerialized(Entry, std::span<const std::byte>{ R_C(const std::byte*, lineStart), S_C(size_t, lineEnd - lineStart) });
+						assert(bSuccess);
+						std::cout << "Entry: " << Entry.PathHash << std::endl;
+					};
+
+					while (lineEnd <= tokenDataEnd)
+					{
+						FPackedTokenEntry Entry;
+						Extract(Entry);
+						auto result = mTokenEntryMap.insert_or_assign(MoveTemp(Entry.PathHash), MoveTemp(Entry.Data));
+						PFH_HANDLE_ENSURE(result.second, TXT("Key already exists, value updated from {} to {}"), R_C(intptr_t, lineStart), R_C(intptr_t, lineEnd));
+						lineStart = lineEnd;
+						lineEnd = lineStart + FPackedTokenEntry_SerializedSize;
 					}
+					// Sanity check on we reach finish correctly
+					assert(lineStart == tokenDataEnd);
+					PFH_VERBOSE_LOG(TXT("TokenEntryMap size: {}"), mTokenEntryMap.size());
 				}
 			}
-			auto ContainerFilePath = mFilePath.ChangeExtension(HLVM_PACKED_CONTAINER_EXT);
+			// Open container file with mmap
+			{
+				auto	   ContainerFilePath = mFilePath.ChangeExtension(HLVM_PACKED_CONTAINER_EXT);
+				const bool exist = FPath::Exists(ContainerFilePath);
+				PFH_HANDLE_ENSURE(exist, TXT("Packed token file does not exist"));
+
+				boost::iostreams::mapped_file_params params;
+				params.path = ContainerFilePath.ToCharStr();
+				params.flags = boost::iostreams::mapped_file::readonly;
+				mContainerMappedFile.open(params);
+				PFH_HANDLE_ENSURE(mContainerMappedFile.is_open(), TXT("MappedFile file open failed"));
+			}
 		}
 
 		mOpened = true;

@@ -65,48 +65,79 @@ RECORD(packed_test)
 	{
 		FPath PackedFileName = "./packed-test";
 		FPath PackedTokFile = PackedFileName.ChangeExtension(HLVM_PACKED_TOKEN_EXT);
+		FPath PackedCotFile = PackedFileName.ChangeExtension(HLVM_PACKED_CONTAINER_EXT);
+		HLVM_LOG(LogTest, info, TXT("Test PackedFileHandle write token file: {}"), *PackedTokFile);
 		{
-			FBoostFileHandle fileHandle;
+			FBoostFileHandle fileTokHandle, fileCotHandle;
 			FFileOptions	 Options{ .eFileMode = EFileMode::WB, .eFileMapped = EFileMapped::Mapped, .eFileLock = EFileLock::InterProcessLock };
 			HLVM_SCOPED_VARIABLE(
-				ScopedFileHandle, void(), [&]() -> void { fileHandle.Open(PackedTokFile, Options); },
-				[&]() -> void { fileHandle.Close(); });
+				ScopedFileHandle, void(), [&]() -> void {
+                    fileTokHandle.Open(PackedTokFile, Options);
+                    fileCotHandle.Open(PackedCotFile, Options); },
+				[&]() -> void {
+					fileTokHandle.Close();
+					fileCotHandle.Close();
+				});
+
+			constexpr size_t										   size = 8;
+			TVector<std::tuple<FPackedTokenEntry, TVector<std::byte>>> PackedData;
+			PackedData.resize(size);
+			size_t StartPos = 0;
+			for (size_t i = 0; i < size; ++i)
+			{
+				auto& Entry = get<0>(PackedData[i]);
+				Entry.Data.EncryptType = EEncryptType::No;
+				Entry.Data.CompressType = ECompressType::No;
+				auto& ContentBuffer = get<1>(PackedData[i]);
+				// Dummy content, should do some post-processing based on compress and encrypt type in production code
+				ContentBuffer.resize(8);
+
+				Entry.PathHash = FPath{ FString::Format(TXT("test_{}.txt"), i) };
+
+				HLVM_ENSURE(StartPos <= std::numeric_limits<uint32_t>::max(), TXT("Numeric overflow"));
+				Entry.Data.StartPos = static_cast<uint32_t>(StartPos);
+
+				HLVM_ENSURE(ContentBuffer.size() <= std::numeric_limits<uint32_t>::max(), TXT("Numeric overflow"));
+				Entry.Data.Size = static_cast<uint32_t>(ContentBuffer.size());
+
+				HLVM_ENSURE(ContentBuffer.size() <= std::numeric_limits<uint32_t>::max(), TXT("Numeric overflow"));
+				Entry.Data.DecompressSize = static_cast<uint32_t>(ContentBuffer.size());
+
+				StartPos += S_C(size_t, Entry.Data.Size);
+			}
 
 			TVector<std::byte> TokenData;
-			constexpr int	   size = 8;
-			for (int i = 0; i < size; ++i)
+			TVector<std::byte> CotData;
+			for (size_t i = 0; i < size; ++i)
 			{
-				FPackedTokenEntryData Entry;
-				Entry.StartPos = static_cast<uint32_t>(i * 8);
-				Entry.Size = 8;
-				Entry.DecompressSize = 8;
-				Entry.EncryptType = EEncryptType::No;
-				Entry.CompressType = ECompressType::No;
-
-				FPackedTokenEntry Sample;
-				Sample.PathHash = FPath{ FString::Format(TXT("test_{}.txt"), i) };
-				Sample.Data = MoveTemp(Entry);
-
-				std::byte			 buffer[FPackedTokenEntry_SerializedSize];
-				std::span<std::byte> buffer_span = buffer;
-				bool				 bSuccess = GetSerialized(Sample, buffer_span);
-				HLVM_ENSURE(bSuccess, TXT("GetSerialized failed"));
-
-				std::move(buffer_span.begin(), buffer_span.end(), std::back_inserter(TokenData));
-				std::copy(HLVM_JSONL_LINE_SEPARATOR_BUFFER.begin(), HLVM_JSONL_LINE_SEPARATOR_BUFFER.end(), std::back_inserter(TokenData));
+				const auto& Entry = get<0>(PackedData[i]);
+				const auto& ContentBuffer = get<1>(PackedData[i]);
+				{
+					std::byte			 buffer[FPackedTokenEntry_SerializedSize];
+					std::span<std::byte> buffer_span = buffer;
+					bool				 bSuccess = GetSerialized(Entry, buffer_span);
+					HLVM_ENSURE(bSuccess, TXT("GetSerialized failed"));
+					std::move(buffer_span.begin(), buffer_span.end(), std::back_inserter(TokenData));
+				}
+				{
+					std::move(ContentBuffer.begin(), ContentBuffer.end(), std::back_inserter(CotData));
+				}
 			}
 
 			// Compress and Encrypt
 			{
 				auto Compressed = FZstd::Compress(TokenData);
 				// Actually do not encrypt the token file as it cost too much time, 10x slower
-				// auto Encrypted = FRSA::HPCKS8_Encrypt(Compressed);
 				auto& Encrypted = Compressed;
-				fileHandle.Write(Encrypted.data(), Encrypted.size());
+				fileTokHandle.Write(Encrypted.data(), Encrypted.size());
+			}
+			{
+				fileCotHandle.Write(CotData.data(), CotData.size());
 			}
 		}
 
 		{
+			HLVM_LOG(LogTest, info, TXT("Test PackedFileHandle read token file: {}"), *PackedTokFile);
 			FPackedFileHandle fileHandle;
 			HLVM_SCOPED_VARIABLE(
 				ScopedFileHandle, void(), [&]() -> void { fileHandle.Open(PackedFileName); },

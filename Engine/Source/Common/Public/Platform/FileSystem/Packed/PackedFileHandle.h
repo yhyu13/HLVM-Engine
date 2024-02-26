@@ -79,7 +79,7 @@ public:
 private:
 	const void* MappedFileCurPos_R(int64_t Offset) const;
 
-	TMap<FPath, FPackedTokenEntryData> mTokenEntryMap;
-	boost::iostreams::mapped_file	   mContainerMappedFile;
-	EPackedFileType					   mPackedFileType{ EPackedFileType::Unkown };
+	TMap<size_t, FPackedTokenEntryData> mTokenEntryMap;
+	boost::iostreams::mapped_file		mContainerMappedFile;
+	EPackedFileType						mPackedFileType{ EPackedFileType::Unkown };
 };
