@@ -17,7 +17,7 @@ public:
 
 	virtual bool				  IsDirectory(const FPath& path);
 	virtual bool				  Exists(const FPath& path);
-	virtual TSmallVector32<FPath> FindAllMatch(const FPath& root_dir, const FString& regex, bool recursive = false);
+	virtual TSmallVector32<FPath> Find(const FPath& root_dir, const FString& regex, bool recursive = false);
 
 	static FGenericPlatformFile* Get();
 

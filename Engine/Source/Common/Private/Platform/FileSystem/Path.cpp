@@ -18,9 +18,9 @@ bool FPath::Exists(const FPath& path)
 	return FGenericPlatformFile::Get()->Exists(path);
 }
 
-TSmallVector32<FPath> FPath::FindAllMatch(const FPath& root_dir, const FString& regex, bool recursive)
+TSmallVector32<FPath> FPath::Find(const FPath& root_dir, const FString& regex, bool recursive)
 {
-	return FGenericPlatformFile::Get()->FindAllMatch(root_dir, regex, recursive);
+	return FGenericPlatformFile::Get()->Find(root_dir, regex, recursive);
 }
 
 FString FPath::DumpJson(const TSmallVector32<FPath>& paths)
@@ -31,6 +31,9 @@ FString FPath::DumpJson(const TSmallVector32<FPath>& paths)
 
 void FPath::ResolvePath()
 {
+	/**
+	 *   Replace with patterns:  ${...}
+	 */
 	if (boost::regex_match(this->ToCharStr(), PathReplacePattern))
 	{
 		HLVM_ASSERT(PathReplaceMap.size() > 0, TXT("PathReplaceMap is empty"));
@@ -40,19 +43,20 @@ void FPath::ResolvePath()
 		{
 			result = boost::regex_replace(result, PathReplacePattern, replacement.second, boost::match_default | boost::format_sed);
 		}
+		HLVM_LOG(LogFPath, trace, TXT("Path {} is resolved to {}"), *(*this), TO_TCHAR_STR(result.c_str()));
 		this->assign(MoveTemp(result));
 	}
 }
 
 size_t FPath::CalculateHash() const noexcept
 {
-	size_t hash = this->size() ^ static_cast<size_t>(mFileType);
+	size_t hash = this->size();
 	auto   last_slash = std::find(this->rbegin(), this->rend(), "/");
 	size_t start_index = (last_slash == this->rend()) ? 0 : this->size() - static_cast<size_t>(std::distance(this->rbegin(), last_slash)) - 1;
 	for (size_t i = start_index; i < this->size(); ++i)
 	{
 		hash = (hash * 31) ^ static_cast<size_t>(this->c_str()[i]);
 	}
-	HLVM_LOG(LogFPath, trace, TXT("Hash {} return {}"), *(*this), hash);
+	HLVM_LOG(LogFPath, trace, TXT("Path {} hash return {}"), *(*this), hash);
 	return hash;
 }

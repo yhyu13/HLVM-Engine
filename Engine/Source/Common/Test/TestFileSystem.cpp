@@ -52,8 +52,8 @@ static void test_boostfile_test()
 		HLVM_ENSURE(!FPath::IsDirectory("./test.txt"), TXT("Test failed"));
 		HLVM_ENSURE(FPath::Exists("./test.txt"), TXT("Test failed"));
 
-		auto all_matches = FPath::FindAllMatch("./", ".*Test.*", true);
-		HLVM_LOG(LogTest, info, TXT("Test FPath::FindAllMatch result:\n{}"), *FPath::DumpJson(all_matches));
+		auto all_matches = FPath::Find("./", R"(.*Test.*)", true);
+		HLVM_LOG(LogTest, info, TXT("Test FPath::Find result:\n{}"), *FPath::DumpJson(all_matches));
 	}
 }
 RECORD_TEST_FUNC(boostfile_test)
@@ -92,16 +92,10 @@ RECORD(packed_test)
 				// Dummy content, should do some post-processing based on compress and encrypt type in production code
 				ContentBuffer.resize(8);
 
-				Entry.PathHash = FPath{ FString::Format(TXT("test_{}.txt"), i) };
-
-				HLVM_ENSURE(StartPos <= std::numeric_limits<uint32_t>::max(), TXT("Numeric overflow"));
-				Entry.Data.StartPos = static_cast<uint32_t>(StartPos);
-
-				HLVM_ENSURE(ContentBuffer.size() <= std::numeric_limits<uint32_t>::max(), TXT("Numeric overflow"));
-				Entry.Data.Size = static_cast<uint32_t>(ContentBuffer.size());
-
-				HLVM_ENSURE(ContentBuffer.size() <= std::numeric_limits<uint32_t>::max(), TXT("Numeric overflow"));
-				Entry.Data.DecompressSize = static_cast<uint32_t>(ContentBuffer.size());
+				Entry.PathHash = FPath{ FString::Format(TXT("test_{}.txt"), i), EPlatformFileType::Packed };
+				Entry.Data.StartPos = StartPos;
+				Entry.Data.Size = ContentBuffer.size();
+				Entry.Data.DecompressSize = ContentBuffer.size();
 
 				StartPos += S_C(size_t, Entry.Data.Size);
 			}

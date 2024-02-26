@@ -21,44 +21,48 @@ class FPath final : public boost::filesystem::path
 {
 public:
 	FPath() = default;
-	FPath(const char* str)
-		: boost::filesystem::path(str)
+	FPath(const char* str, EPlatformFileType FileType = EPlatformFileType::Unkown)
+		: boost::filesystem::path(str), mFileType(FileType)
 	{
 		ResolvePath();
 	}
-	FPath(const TCHAR* str)
-		: boost::filesystem::path(reinterpret_cast<const char*>(str))
+	FPath(const TCHAR* str, EPlatformFileType FileType = EPlatformFileType::Unkown)
+		: boost::filesystem::path(reinterpret_cast<const char*>(str)), mFileType(FileType)
 	{
 		ResolvePath();
 	}
-	FPath(const boost::filesystem::path& str)
-		: boost::filesystem::path(str)
+	FPath(const boost::filesystem::path& str, EPlatformFileType FileType = EPlatformFileType::Unkown)
+		: boost::filesystem::path(str), mFileType(FileType)
 	{
 		ResolvePath();
 	}
-	FPath(const FString& str)
-		: boost::filesystem::path(str.ToCharStr())
+	FPath(const FString& str, EPlatformFileType FileType = EPlatformFileType::Unkown)
+		: boost::filesystem::path(str.ToCharStr()), mFileType(FileType)
 	{
 		ResolvePath();
 	}
 
 	// Move, copy constructor
 	FPath(FPath&& other) noexcept
-		: boost::filesystem::path(MoveTemp(other))
+		: boost::filesystem::path(MoveTemp(other)), mHash(MoveTemp(other.mHash)), mFileType(MoveTemp(other.mFileType))
 	{
 	}
 	FPath(const FPath& other) noexcept
-		: boost::filesystem::path(other)
+		: boost::filesystem::path(other), mHash(other.mHash), mFileType(other.mFileType)
 	{
 	}
 	FPath& operator=(FPath&& other) noexcept
 	{
 		boost::filesystem::path::operator=(MoveTemp(other));
+		mHash = MoveTemp(other.mHash);
+		mFileType = MoveTemp(other.mFileType);
 		return *this;
 	}
 	FPath& operator=(const FPath& other) noexcept
 	{
 		boost::filesystem::path::operator=(other);
+		mHash = other.mHash;
+		mFileType = other.mFileType;
 		return *this;
 	}
 
@@ -97,10 +101,10 @@ public:
 		return mHash;
 	}
 
-    operator size_t() const noexcept
-    {
-        return GetHash();
-    }
+	operator size_t() const noexcept
+	{
+		return GetHash();
+	}
 
 	FPath ChangeExtension(const FString& new_ext) const
 	{
@@ -120,7 +124,7 @@ public:
 	 */
 	static bool					 IsDirectory(const FPath& path);
 	static bool					 Exists(const FPath& path);
-	static TSmallVector32<FPath> FindAllMatch(const FPath& root_dir, const FString& regex, bool recursive = false);
+	static TSmallVector32<FPath> Find(const FPath& root_dir, const FString& regex, bool recursive = false);
 	static FString				 DumpJson(const TSmallVector32<FPath>& paths);
 
 	HLVM_INLINE_VAR HLVM_STATIC_VAR boost::regex PathReplacePattern{ R"(\$\{([^}]+)\})" };

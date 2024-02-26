@@ -21,9 +21,9 @@ HLVM_ENUM(EPackedFileType, uint8_t,
  */
 struct FPackedTokenEntryData
 {
-	uint32_t	  StartPos;
-	uint32_t	  Size;
-	uint32_t	  DecompressSize;
+	size_t		  StartPos;
+	size_t		  Size;
+	size_t		  DecompressSize;
 	EEncryptType  EncryptType{ EEncryptType::Unkown };
 	ECompressType CompressType{ ECompressType::Unkown };
 };

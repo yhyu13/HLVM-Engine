@@ -25,7 +25,7 @@ bool FBoostPlatformFile::Exists(const FPath& path)
 	return _Stat->Exists();
 }
 
-TSmallVector32<FPath> FBoostPlatformFile::FindAllMatch(const FPath& root_dir, const FString& regex, bool recursive)
+TSmallVector32<FPath> FBoostPlatformFile::Find(const FPath& root_dir, const FString& regex, bool recursive)
 {
 	TSmallVector32<FPath> Result;
 	boost::regex		  Regex{ regex.ToCharStr() };
@@ -43,7 +43,7 @@ TSmallVector32<FPath> FBoostPlatformFile::FindAllMatch(const FPath& root_dir, co
 			{
 				RECURSIVE_ALERT += RECURSIVE_ALERT;
 				HLVM_LOG(LogBoostPlatformFile, debug,
-					TXT("FBoostPlatformFile::FindAllMatch() - Recursive search {} is too for {}?"), RECURSIVE_ALERT, *root_dir);
+					TXT("FBoostPlatformFile::Find() - Recursive search {} is too for {}?"), RECURSIVE_ALERT, *root_dir);
 			}
 		}
 	}

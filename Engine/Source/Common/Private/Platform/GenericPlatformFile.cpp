@@ -35,7 +35,7 @@ bool FGenericPlatformFile::Exists(const FPath& path)
 	return S_C(FBoostPlatformFile*, sPlatformFileRedirector[HLVM_ENUM_V(EPlatformFileType, Local)])->Exists(path);
 }
 
-TSmallVector32<FPath> FGenericPlatformFile::FindAllMatch(const FPath& path, const FString& regex, bool recursive)
+TSmallVector32<FPath> FGenericPlatformFile::Find(const FPath& path, const FString& regex, bool recursive)
 {
-	return S_C(FBoostPlatformFile*, sPlatformFileRedirector[HLVM_ENUM_V(EPlatformFileType, Local)])->FindAllMatch(path, regex, recursive);
+	return S_C(FBoostPlatformFile*, sPlatformFileRedirector[HLVM_ENUM_V(EPlatformFileType, Local)])->Find(path, regex, recursive);
 }
