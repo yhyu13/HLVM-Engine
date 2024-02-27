@@ -9,3 +9,5 @@
 #include "PointerTemplate.tpp"
 #include "ExpressionTemplate.tpp"
 #include "FunctionTemplate.tpp"
+
+#include "Obfuscate/String.tpp"

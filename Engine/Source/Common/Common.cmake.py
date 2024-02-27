@@ -11,8 +11,7 @@ vcpkg_cxt = VcpkgContenxt(vcpkg_root_path='../Dependency/vcpkg',
                                                             "boost",
                                                             "elfutils",
                                                             "zstd",
-                                                            "botan",
-                                                            "advobfuscator"
+                                                            "botan"
                                                         ],
                                                         builtin_baseline='53bef8994c541b6561884a8395ea35715ece75db'))
 
@@ -57,13 +56,6 @@ zstd = FindPackage(name='zstd',
                    required=True,
                    target_link_libs=[
                        DomainValueModel(domain=DomainEnum.PUBLIC, values=['zstd::libzstd_static'])])
-
-# Find the zstd package with the specified options
-advobfuscator = FindPackage(name='Advobfuscator',
-                   config=False,
-                   required=True,
-                   target_include_dirs=[
-                       DomainValueModel(domain=DomainEnum.PUBLIC, values=['${ADVOBFUSCATOR_INCLUDE_DIRS}'])])
 
 # Fetch the Yalantinglibs package from GitHub with the specified options
 yalantinlibs = FetchContent(name='yalantinglibs',
@@ -124,7 +116,7 @@ class CommonModule(BaseModule):
                                          backward,
                                          parallel_hashmap,
                                          ctre,
-                                         string_pool
+                                         string_pool,
                                          ],
                          find_packages=[spdlog,
                                         mimalloc,
@@ -132,7 +124,6 @@ class CommonModule(BaseModule):
                                         Boost,
                                         botan3,
                                         zstd,
-                                        advobfuscator
                                         ]
                          )
         self.target_interface.add_compile_options(domain=DomainEnum.PUBLIC, values=[

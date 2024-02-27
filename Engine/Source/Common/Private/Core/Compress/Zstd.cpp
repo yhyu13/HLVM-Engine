@@ -3,6 +3,7 @@
  */
 
 #include "Core/Compress/Zstd.h"
+#include "Core/Assert.h"
 
 TVector<std::byte> FZstd::Compress(const std::span<std::byte>& data, int compress_level, bool bShrinkOutputBuffer)
 {

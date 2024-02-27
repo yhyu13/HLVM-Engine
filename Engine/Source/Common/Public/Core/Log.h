@@ -171,12 +171,12 @@ private:
 };
 
 // Macro for logging with category
-#define HLVM_LOG(_Category, _level, fmt, ...)                                                               \
-	FLogRedirector::Get()->Pump(FLogContext{                                                                \
-									.Category = &_Category,                                                 \
-									.LogLevel = spdlog::level::_level,                                      \
-									.FileName = TO_TCHAR_STR(&std::string_view(strrchr(__FILE__, '/'))[1]), \
-									.Line = __LINE__ },                                                     \
+#define HLVM_LOG(_Category, _level, fmt, ...)                                                                  \
+	FLogRedirector::Get()->Pump(FLogContext{                                                                   \
+									.Category = &_Category,                                                    \
+									.LogLevel = spdlog::level::_level,                                         \
+									.FileName = TO_TCHAR_STR(&std::string_view(ct_strrchr(__FILE__, '/'))[1]), \
+									.Line = __LINE__ },                                                        \
 		fmt, ##__VA_ARGS__)
 
 /**
