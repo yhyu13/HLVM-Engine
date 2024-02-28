@@ -107,11 +107,6 @@ public:
 		return mHash;
 	}
 
-	operator size_t() const noexcept
-	{
-		return GetHash();
-	}
-
 	FPath ChangeExtension(const FString& new_ext) const
 	{
 		FPath new_path = *this;

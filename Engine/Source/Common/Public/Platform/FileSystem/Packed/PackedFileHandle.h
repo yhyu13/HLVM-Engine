@@ -5,6 +5,7 @@
 #pragma once
 
 #include "PackedDefinition.h"
+#include "PackedToken.h"
 #include "Platform/FileSystem/FileHandle.h"
 #include "Core/Compress/Zstd.h"
 #include "Core/Encrypt/RSA.h"
@@ -17,31 +18,6 @@ HLVM_ENUM(EPackedFileType, uint8_t,
 	Base,
 	Patch,
 	Unkown);
-
-/**
- * Region of a file in a Cot file.
- */
-struct FPackedTokenEntryData
-{
-	size_t		  StartPos;
-	size_t		  Size;
-	size_t		  DecompressSize;
-	EEncryptType  EncryptType{ EEncryptType::Unkown };
-	ECompressType CompressType{ ECompressType::Unkown };
-};
-
-/**
- * Token data structure represented by each json object
- */
-struct FPackedTokenEntry
-{
-	FPackedTokenEntryData Data;
-	FPathHash			  PathHash; // RelativeToMountingPoint
-};
-
-HLVM_INLINE_VAR constexpr size_t FPackedTokenEntry_SerializedSize = sizeof(FPackedTokenEntry);
-bool							 GetSerialized(const FPackedTokenEntry& Data, std::span<std::byte>& Buffer);
-bool							 SetSerialized(FPackedTokenEntry& Data, const std::span<const std::byte>& Buffer);
 
 /**
  * mapped region https://live.boost.org/doc/libs/1_83_0/doc/html/boost/interprocess/mapped_region.html

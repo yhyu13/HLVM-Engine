@@ -333,17 +333,3 @@ const void* FPackedFileHandle::MappedFileCurPos_R(int64_t Offset) const
 	PFH_HANDLE_ASSERT(_Offeset >= 0 && _Offeset < _Size, FString::Format(TXT("MappedFileCurPos_R {} out of range [0,{})"), _Offeset, _Size));
 	return (&(mContainerMappedFile.data()[_Offeset]));
 }
-
-bool GetSerialized(const FPackedTokenEntry& Data, std::span<std::byte>& Buffer)
-{
-	const bool bValid = Buffer.size() == FPackedTokenEntry_SerializedSize;
-	HLVM_ASSERT(bValid, TXT("Buffer size {} is not enough for serialized data size {}"), Buffer.size(), FPackedTokenEntry_SerializedSize);
-	return std::memcpy(Buffer.data(), &Data, FPackedTokenEntry_SerializedSize) == Buffer.data();
-}
-
-bool SetSerialized(FPackedTokenEntry& Data, const std::span<const std::byte>& Buffer)
-{
-	const bool bValid = Buffer.size() == FPackedTokenEntry_SerializedSize;
-	HLVM_ASSERT(bValid, TXT("Buffer size {} is not enough for serialized data size {}"), Buffer.size(), FPackedTokenEntry_SerializedSize);
-	return std::memcpy(&Data, Buffer.data(), FPackedTokenEntry_SerializedSize) == &Data;
-}

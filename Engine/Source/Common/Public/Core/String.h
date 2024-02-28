@@ -3,13 +3,12 @@
  */
 
 #pragma once
+#include "GlobalDefinition.h"
 #include "Template/ReferenceTemplate.tpp"
 
 #include <string>
 #include <fmt/xchar.h>
 #include <fmt/format.h>
-
-#define TO_FSTRING(x) FString((x))
 
 class FString final : public std::basic_string<TCHAR>
 {

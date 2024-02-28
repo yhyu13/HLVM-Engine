@@ -66,50 +66,67 @@ RECORD(packed_test)
 		FPath PackedFileName = "./packed-test";
 		FPath PackedTokFile = PackedFileName.ChangeExtension(HLVM_PACKED_TOKEN_EXT);
 		FPath PackedCotFile = PackedFileName.ChangeExtension(HLVM_PACKED_CONTAINER_EXT);
+		FPath PackedJsonlFile = PackedFileName.ChangeExtension(TXT("jsonl"));
 		HLVM_LOG(LogTest, info, TXT("Test PackedFileHandle write token file: {}"), *PackedTokFile);
 		{
-			FBoostFileHandle fileTokHandle, fileCotHandle;
+			FBoostFileHandle fileTokHandle, fileCotHandle, fileJsonlHandle;
 			FFileOptions	 Options{ .eFileMode = EFileMode::WB, .eFileMapped = EFileMapped::Mapped, .eFileLock = EFileLock::InterProcessLock };
 			HLVM_SCOPED_VARIABLE(
 				ScopedFileHandle, [&]() -> void {
                     fileTokHandle.Open(PackedTokFile, Options);
-                    fileCotHandle.Open(PackedCotFile, Options); },
+                    fileCotHandle.Open(PackedCotFile, Options);
+                    fileJsonlHandle.Open(PackedJsonlFile, Options); },
 				[&]() -> void {
 					fileTokHandle.Close();
 					fileCotHandle.Close();
+					fileJsonlHandle.Close();
 				});
 
-			constexpr size_t										   size = 8;
-			TVector<std::tuple<FPackedTokenEntry, TVector<std::byte>>> PackedData;
+			constexpr size_t													   size = 8;
+			TVector<std::tuple<FPackedTokenEntry_Development, TVector<std::byte>>> PackedData;
 			PackedData.resize(size);
-			size_t StartPos = 0;
+			size_t _StartPos = 0;
 			for (size_t i = 0; i < size; ++i)
 			{
-				auto& Entry = get<0>(PackedData[i]);
-				Entry.Data.EncryptType = EEncryptType::No;
-				Entry.Data.CompressType = ECompressType::No;
+				FPath Path = FPath{ FString::Format(TXT("./test_{}.txt"), i), EPlatformFileType::Packed };
+				auto& Entry_Dev = get<0>(PackedData[i]);
 				auto& ContentBuffer = get<1>(PackedData[i]);
 				// Dummy content, should do some post-processing based on compress and encrypt type in production code
 				ContentBuffer.resize(8);
 
-				Entry.PathHash = FPath{ FString::Format(TXT("test_{}.txt"), i), EPlatformFileType::Packed };
-				Entry.Data.StartPos = StartPos;
-				Entry.Data.Size = ContentBuffer.size();
-				Entry.Data.DecompressSize = ContentBuffer.size();
+				Entry_Dev.Path = Path.string();
 
-				StartPos += S_C(size_t, Entry.Data.Size);
+				Entry_Dev.Entry.Data.EncryptType = EEncryptType::No;
+				Entry_Dev.Entry.Data.CompressType = ECompressType::No;
+
+				Entry_Dev.Entry.PathHash = Path.GetHash();
+				Entry_Dev.Entry.Data.StartPos = _StartPos;
+				Entry_Dev.Entry.Data.Size = ContentBuffer.size();
+				Entry_Dev.Entry.Data.DecompressSize = ContentBuffer.size();
+
+				_StartPos += S_C(size_t, Entry_Dev.Entry.Data.Size);
 			}
+
+			auto jsonl_job = std::thread([&]() {
+				for (size_t i = 0; i < PackedData.size(); ++i)
+				{
+					const auto& Entry_Dev = get<0>(PackedData[i]);
+					std::string json = ToJson(Entry_Dev);
+					json += "\n";
+					fileJsonlHandle.Write(json.c_str(), json.size());
+				}
+			});
 
 			TVector<std::byte> TokenData;
 			TVector<std::byte> CotData;
 			for (size_t i = 0; i < size; ++i)
 			{
-				const auto& Entry = get<0>(PackedData[i]);
+				const auto& Entry_Dev = get<0>(PackedData[i]);
 				const auto& ContentBuffer = get<1>(PackedData[i]);
 				{
 					std::byte			 buffer[FPackedTokenEntry_SerializedSize];
 					std::span<std::byte> buffer_span = buffer;
-					bool				 bSuccess = GetSerialized(Entry, buffer_span);
+					bool				 bSuccess = GetSerialized(Entry_Dev.Entry, buffer_span);
 					HLVM_ENSURE(bSuccess, TXT("GetSerialized failed"));
 					std::move(buffer_span.begin(), buffer_span.end(), std::back_inserter(TokenData));
 				}
@@ -127,6 +144,8 @@ RECORD(packed_test)
 			{
 				fileCotHandle.Write(CotData.data(), CotData.size());
 			}
+
+			jsonl_job.join();
 		}
 
 		{
