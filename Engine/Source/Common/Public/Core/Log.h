@@ -12,7 +12,7 @@
 	#undef SPDLOG_ACTIVE_LEVEL
 #endif
 #define SPDLOG_ACTIVE_LEVEL 0
-#define HLVM_SPDLOG_USE_ASYNC 1 //! HLVM_BUILD_DEBUG
+#define HLVM_SPDLOG_USE_ASYNC 1 //! TODO : Maybe consider no async log for HLVM_BUILD_DEBUG
 #include <spdlog/spdlog.h>
 #if HLVM_SPDLOG_USE_ASYNC
 	#include <spdlog/async.h>
@@ -26,17 +26,26 @@ struct FLogCatgegory
 {
 	NOCOPYMOVE(FLogCatgegory)
 	FLogCatgegory() = delete;
-	explicit FLogCatgegory(const TCHAR* CategoryName, const spdlog::level::level_enum Level = spdlog::level::trace)
+	constexpr explicit FLogCatgegory(const TCHAR* CategoryName,
+		const spdlog::level::level_enum			  Level =
+#if !HLVM_BUILD_RELEASE
+			spdlog::level::trace
+#else
+			spdlog::level::info
+#endif
+		)
 		: Name(CategoryName), LogLevel(Level)
 	{
 	}
-	const TCHAR*			  Name;
-	spdlog::level::level_enum LogLevel;
+	const TCHAR*					Name;
+	const spdlog::level::level_enum LogLevel;
 };
 
 // Macro for declare a log category
 #define DELCARE_LOG_CATEGORY(category) \
-	extern const FLogCatgegory category;
+	HLVM_INLINE_VAR constexpr FLogCatgegory category = FLogCatgegory(TXT(#category));
+#define DELCARE_LOG_CATEGORY2(category, _level) \
+	HLVM_INLINE_VAR constexpr FLogCatgegory category = FLogCatgegory(TXT(#category), spdlog::level::_level);
 
 DELCARE_LOG_CATEGORY(LogAssert)
 DELCARE_LOG_CATEGORY(LogTemp)
@@ -44,11 +53,10 @@ DELCARE_LOG_CATEGORY(LogEngine)
 DELCARE_LOG_CATEGORY(LogGame)
 DELCARE_LOG_CATEGORY(LogEditor)
 
-// Define a logger category in Log.cpp file or other .cpp file
-#define DEFINE_LOG_CATEGORY(category) \
-	const FLogCatgegory category = FLogCatgegory(TXT(#category));
-#define DEFINE_LOG_CATEGORY2(category, _level) \
-	const FLogCatgegory category = FLogCatgegory(TXT(#category), spdlog::level::_level);
+/**
+ * DEPRECATED: Dummy place holder for defining a log category (since we use inline constexpr, this is deprecated)
+ */
+#define DEFINE_LOG_CATEGORY(...)
 
 /**
  * @brief FLogContext is a structure that contains information about a log message,
@@ -57,10 +65,10 @@ DELCARE_LOG_CATEGORY(LogEditor)
  */
 struct FLogContext
 {
-	const FLogCatgegory*	  Category;
-	spdlog::level::level_enum LogLevel;
-	const TCHAR*			  FileName;
-	int						  Line;
+	const FLogCatgegory*			Category;
+	const spdlog::level::level_enum LogLevel;
+	const TCHAR*					FileName;
+	const int						Line;
 };
 
 /**
@@ -171,13 +179,19 @@ private:
 };
 
 // Macro for logging with category
-#define HLVM_LOG(_Category, _level, fmt, ...)                                                                  \
-	FLogRedirector::Get()->Pump(FLogContext{                                                                   \
-									.Category = &_Category,                                                    \
-									.LogLevel = spdlog::level::_level,                                         \
-									.FileName = TO_TCHAR_STR(&std::string_view(ct_strrchr(__FILE__, '/'))[1]), \
-									.Line = __LINE__ },                                                        \
-		fmt, ##__VA_ARGS__)
+#define HLVM_LOG(_Category, _level, fmt, ...)                                                          \
+	do                                                                                                 \
+	{                                                                                                  \
+		if constexpr (static_cast<int>(spdlog::level::_level) >= static_cast<int>(_Category.LogLevel)) \
+			FLogRedirector::Get()                                                                      \
+				->Pump(FLogContext{                                                                    \
+						   .Category = &_Category,                                                     \
+						   .LogLevel = spdlog::level::_level,                                          \
+						   .FileName = TO_TCHAR_STR(&std::string_view(ct_strrchr(__FILE__, '/'))[1]),  \
+						   .Line = __LINE__ },                                                         \
+					fmt, ##__VA_ARGS__);                                                               \
+	}                                                                                                  \
+	while (0)
 
 /**
  * @brief FSpdlogConsoleDevice is a log device that logs to the console.

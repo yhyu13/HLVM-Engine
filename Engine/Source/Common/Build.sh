@@ -1,5 +1,6 @@
 #!/bin/bash
 
+time {
 ROOT_DIR=$(pwd)
 # 定义要构建的目标目录
 directories=("./Build/Debug" "./Build/RelWithDebInfo" "./Build/Release")
@@ -20,3 +21,4 @@ for dir in "${directories[@]}"; do
 done
 
 echo "Finished building all targets"
+}

@@ -13,6 +13,11 @@ public:
 	NOCOPYMOVE(FBoostPlatformFile)
 	FBoostPlatformFile() = default;
 
+	/**
+	 * Called inside FGenericPlatformFile::Get()
+	 */
+	static void Init();
+
 	virtual bool				  IsDirectory(const FPath& path) final override;
 	virtual bool				  Exists(const FPath& path) final override;
 	virtual TSmallVector32<FPath> Find(const FPath& root_dir, const FString& regex, bool recursive = false) final override;

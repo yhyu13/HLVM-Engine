@@ -71,7 +71,7 @@ RECORD(packed_test)
 			FBoostFileHandle fileTokHandle, fileCotHandle;
 			FFileOptions	 Options{ .eFileMode = EFileMode::WB, .eFileMapped = EFileMapped::Mapped, .eFileLock = EFileLock::InterProcessLock };
 			HLVM_SCOPED_VARIABLE(
-				ScopedFileHandle, void(), [&]() -> void {
+				ScopedFileHandle, [&]() -> void {
                     fileTokHandle.Open(PackedTokFile, Options);
                     fileCotHandle.Open(PackedCotFile, Options); },
 				[&]() -> void {
@@ -121,8 +121,7 @@ RECORD(packed_test)
 			// Compress and Encrypt
 			{
 				auto Compressed = FZstd::Compress(TokenData);
-				// Actually do not encrypt the token file as it cost too much time, 10x slower
-				auto& Encrypted = Compressed;
+				auto Encrypted = FRSA::EncryptPCKS8(Compressed);
 				fileTokHandle.Write(Encrypted.data(), Encrypted.size());
 			}
 			{
@@ -134,7 +133,7 @@ RECORD(packed_test)
 			HLVM_LOG(LogTest, info, TXT("Test PackedFileHandle read token file: {}"), *PackedTokFile);
 			FPackedFileHandle fileHandle;
 			HLVM_SCOPED_VARIABLE(
-				ScopedFileHandle, void(), [&]() -> void { fileHandle.Open(PackedFileName); },
+				ScopedFileHandle, [&]() -> void { fileHandle.Open(PackedFileName); },
 				[&]() -> void { fileHandle.Close(); });
 		}
 	}

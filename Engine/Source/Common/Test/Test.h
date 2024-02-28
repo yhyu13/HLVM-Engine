@@ -5,7 +5,7 @@
 #include "Core/Log.h"
 #include "Core/String.h"
 #include "Core/Assert.h"
-#include "Ultility/Timer.h"
+#include "Utility/Timer.h"
 
 #include <iostream>
 #include <vector>

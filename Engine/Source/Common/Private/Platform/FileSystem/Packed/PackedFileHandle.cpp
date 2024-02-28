@@ -6,6 +6,7 @@
 #include "Platform/FileSystem/Boost/BoostFileHandle.h"
 #include "Core/Log.h"
 
+#include <boost/interprocess/mapped_region.hpp>
 #include <magic_enum_all.hpp>
 
 DELCARE_LOG_CATEGORY(LogPackedFileHandle)
@@ -44,19 +45,36 @@ FPackedFileHandle::~FPackedFileHandle()
 	}
 }
 
-IFileHandle::OpRetType FPackedFileHandle::Open(const FPath& FilePath, const FFileOptions&)
+IFileHandle::OpRetType FPackedFileHandle::Open(const FPath& FilePath, const FFileOptions& Options)
 {
 	PFH_HANDLE_STATUS(Status_InOut);
 	PFH_HANDLE_ENSURE(*Status_InOut, TXT("File operation continue with failed status"));
 	PFH_HANDLE_ASSERT(!mOpened, TXT("File operation begin with another already open file"));
+	PFH_HANDLE_ASSERT(Options.eFileMode == sDefaultFileOptions.eFileMode, TXT("File option eFileMode invalid {}"), TO_TCHAR_STR(magic_enum::enum_name(Options.eFileMode).data()));
+	PFH_HANDLE_ASSERT(Options.eFileMapped == sDefaultFileOptions.eFileMapped, TXT("File option eFileMapped invalid {}"), TO_TCHAR_STR(magic_enum::enum_name(Options.eFileMapped).data()));
+	PFH_HANDLE_ASSERT(Options.eFileAsync == sDefaultFileOptions.eFileAsync, TXT("File option eFileAsync invalid {}"), TO_TCHAR_STR(magic_enum::enum_name(Options.eFileAsync).data()));
+	PFH_HANDLE_ASSERT(Options.eFileLock == sDefaultFileOptions.eFileLock, TXT("File option eFileLock invalid {}"), TO_TCHAR_STR(magic_enum::enum_name(Options.eFileLock).data()));
 
-	mFileOptions = sDefaultFileOptions;
+	mFileOptions = Options;
 	mFilePath = FilePath;
 	const bool _noExtension = !mFilePath.has_extension();
 	PFH_HANDLE_ASSERT(_noExtension, TXT("Packed file path input should not have extension"));
 	if (boost::regex_search(mFilePath.ToCharStr(), HLVM_PACKED_PATCH_FILE_PATTERN))
 	{
 		mPackedFileType = EPackedFileType::Patch;
+		boost::smatch matches;
+		boost::regex_match(mFilePath.string(), matches, HLVM_PACKED_PATCH_FILE_PATTERN);
+		const bool bValid = matches.size() == 2;
+		PFH_HANDLE_ASSERT(bValid, TXT("Patch regex matching failed with wrong size {}"), matches.size());
+		try
+		{
+			mMountOrder = std::stoull(matches[1]);
+			PFH_VERBOSE_LOG(TXT("Mount order: {}"), mMountOrder);
+		}
+		catch (const std::invalid_argument& e)
+		{
+			PFH_HANDLE_ENSURE(false, TXT("Invalid input: {}"), TO_TCHAR_STR(e.what()));
+		}
 	}
 	else if (boost::regex_search(mFilePath.ToCharStr(), HLVM_PACKED_FILE_PATTERN))
 	{
@@ -64,7 +82,7 @@ IFileHandle::OpRetType FPackedFileHandle::Open(const FPath& FilePath, const FFil
 	}
 	else
 	{
-		PFH_HANDLE_ENSURE(false, TXT("Packed file path does not match any pack file type"));
+		PFH_HANDLE_ASSERT(false, TXT("Packed file path does not match any pack file type"));
 	}
 
 	{
@@ -77,10 +95,13 @@ IFileHandle::OpRetType FPackedFileHandle::Open(const FPath& FilePath, const FFil
 			// TODO: Validate token and container file signature
 			// Decompress and read and build all token entries (async?)
 			{
-				auto TokenFilePath = mFilePath.ChangeExtension(HLVM_PACKED_TOKEN_EXT);
+				FPath TokenFilePath = mFilePath.ChangeExtension(HLVM_PACKED_TOKEN_EXT);
 				// Check file exists
 				const bool exist = FPath::Exists(TokenFilePath);
 				PFH_HANDLE_ENSURE(exist, TXT("Packed token file does not exist"));
+
+				boost::interprocess::file_lock _Lock(TokenFilePath);
+				mTokenFileLock = MoveTemp(boost::interprocess::sharable_lock<boost::interprocess::file_lock>(_Lock));
 
 				// Open local file
 				FBoostFileHandle fileHandle;
@@ -95,9 +116,8 @@ IFileHandle::OpRetType FPackedFileHandle::Open(const FPath& FilePath, const FFil
 
 				// Decryption & Decompression
 				{
-					// Actually do not encrypt the token file as it cost too much time, 10x slower
-					auto& Decrypted = TokenData;
-					auto  Decompressed = FZstd::Decompress({ R_C(std::byte*, Decrypted.data()), Decrypted.size() });
+					auto Decrypted = FRSA::DecryptPCKS8(TokenData);
+					auto Decompressed = FZstd::Decompress({ R_C(std::byte*, Decrypted.data()), Decrypted.size() });
 
 					const char* lineStart = R_C(const char*, Decompressed.data());
 					const char* lineEnd = lineStart + FPackedTokenEntry_SerializedSize;
@@ -131,11 +151,12 @@ IFileHandle::OpRetType FPackedFileHandle::Open(const FPath& FilePath, const FFil
 				const bool exist = FPath::Exists(ContainerFilePath);
 				PFH_HANDLE_ENSURE(exist, TXT("Packed token file does not exist"));
 
-				boost::iostreams::mapped_file_params params;
-				params.path = ContainerFilePath.ToCharStr();
-				params.flags = boost::iostreams::mapped_file::readonly;
-				mContainerMappedFile.open(params);
-				PFH_HANDLE_ENSURE(mContainerMappedFile.is_open(), TXT("MappedFile file open failed"));
+				boost::interprocess::file_lock _Lock(ContainerFilePath);
+				mContainerFileLock = MoveTemp(boost::interprocess::sharable_lock<boost::interprocess::file_lock>(_Lock));
+
+				std::error_code ec;
+				mContainerMappedFile.map(ContainerFilePath.ToCharStr(), ec);
+				PFH_HANDLE_ENSURE(mContainerMappedFile.is_open() && !ec, TXT("MappedFile file open failed"));
 			}
 		}
 
@@ -168,7 +189,7 @@ IFileHandle::OpRetType FPackedFileHandle::Close()
 		PFH_SCOPE_LOCK();
 
 		{
-			mContainerMappedFile.close();
+			mContainerMappedFile.unmap();
 		}
 
 		if (Status_InOut->bCancelByUser) [[unlikely]]
@@ -310,7 +331,7 @@ const void* FPackedFileHandle::MappedFileCurPos_R(int64_t Offset) const
 	auto _Offeset = Offset;
 	auto _Size = static_cast<int64_t>(mContainerMappedFile.size());
 	PFH_HANDLE_ASSERT(_Offeset >= 0 && _Offeset < _Size, FString::Format(TXT("MappedFileCurPos_R {} out of range [0,{})"), _Offeset, _Size));
-	return (&(mContainerMappedFile.const_data()[_Offeset]));
+	return (&(mContainerMappedFile.data()[_Offeset]));
 }
 
 bool GetSerialized(const FPackedTokenEntry& Data, std::span<std::byte>& Buffer)

@@ -6,7 +6,7 @@
 
 #ifdef PLATFORM_LINUXGNU
 	#include "Platform/GenericPlatformDebuggerUtil.h"
-	#include "Ultility/Timer.h"
+	#include "Utility/Timer.h"
 	#include "Core/Parallel/Lock.h"
 
 // https://opensource.com/article/18/1/how-debuggers-work

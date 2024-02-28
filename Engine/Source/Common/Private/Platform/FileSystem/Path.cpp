@@ -37,8 +37,7 @@ void FPath::ResolvePath()
 	if (boost::regex_match(this->ToCharStr(), PathReplacePattern))
 	{
 		HLVM_ASSERT(PathReplaceMap.size() > 0, TXT("PathReplaceMap is empty"));
-		boost::smatch match;
-		std::string	  result = this->ToCharStr();
+		std::string result = this->ToCharStr();
 		for (auto const& replacement : PathReplaceMap)
 		{
 			result = boost::regex_replace(result, PathReplacePattern, replacement.second, boost::match_default | boost::format_sed);
@@ -48,7 +47,7 @@ void FPath::ResolvePath()
 	}
 }
 
-size_t FPath::CalculateHash() const noexcept
+FPathHash FPath::CalculateHash() const noexcept
 {
 	size_t hash = this->size();
 	auto   last_slash = std::find(this->rbegin(), this->rend(), "/");

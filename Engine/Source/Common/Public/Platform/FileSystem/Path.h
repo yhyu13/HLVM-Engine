@@ -17,6 +17,7 @@ HLVM_ENUM(EPlatformFileType, uint8_t,
 /**
  * boost path usage : https://blog.csdn.net/toby54king/article/details/81334962
  */
+using FPathHash = size_t;
 class FPath final : public boost::filesystem::path
 {
 public:
@@ -92,6 +93,11 @@ public:
 		return static_cast<const char*>(*this);
 	}
 
+	EPlatformFileType Type() const
+	{
+		return mFileType;
+	}
+
 	size_t GetHash() const noexcept
 	{
 		if (mHash == 0)
@@ -140,9 +146,9 @@ private:
 	 * Calculate hash
 	 * @return Fast Hash value
 	 */
-	size_t CalculateHash() const noexcept;
+	FPathHash CalculateHash() const noexcept;
 
-	mutable size_t	  mHash{ 0 };
+	mutable FPathHash mHash{ 0 };
 	EPlatformFileType mFileType{ EPlatformFileType::Unkown };
 };
 

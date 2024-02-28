@@ -4,7 +4,7 @@
 
 #include "Core/Parallel/Lock.h"
 #include "Core/Assert.h"
-#include "Ultility/Timer.h"
+#include "Utility/Timer.h"
 
 #include <emmintrin.h>
 
@@ -105,7 +105,7 @@ void FAtomicFlag::Unlock() const noexcept
 
 void FRecursiveAtomicFlag::Lock() const noexcept(!HLVM_DEADLOCK_TIMER)
 {
-	if (mOwner == HLVM_CURRENT_THREAD_ID)
+	if (mOwner == GCurrentThreadID)
 	{
 		mCount.fetch_add(1, std::memory_order_relaxed);
 		return;
@@ -113,7 +113,7 @@ void FRecursiveAtomicFlag::Lock() const noexcept(!HLVM_DEADLOCK_TIMER)
 
 	LOCK_BODY(&mFlag);
 
-	mOwner = HLVM_CURRENT_THREAD_ID;
+	mOwner = GCurrentThreadID;
 	mCount = 1;
 }
 

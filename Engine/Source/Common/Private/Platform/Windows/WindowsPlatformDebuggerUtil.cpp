@@ -6,7 +6,7 @@
 
 #ifdef PLATFORM_WINDOWS
 	#include "Platform/GenericPlatformDebuggerUtil.h"
-	#include "Ultility/Timer.h"
+	#include "Utility/Timer.h"
 	#include "Core/Parallel/Lock.h"
 
 	// https://medium.com/@X3non_C0der/anti-debugging-techniques-eda1868e0503

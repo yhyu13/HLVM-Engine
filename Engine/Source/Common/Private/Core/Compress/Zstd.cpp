@@ -4,9 +4,14 @@
 
 #include "Core/Compress/Zstd.h"
 #include "Core/Assert.h"
+#include "Utility/ScopedTimer.h"
+
+DELCARE_LOG_CATEGORY(LogZstd)
 
 TVector<std::byte> FZstd::Compress(const std::span<std::byte>& data, int compress_level, bool bShrinkOutputBuffer)
 {
+	HLVM_SCOPED_TIMER(FString::Format(TXT("Zstd compress size {} level {}"), data.size(), compress_level));
+
 	size_t est_compress_size = ZSTD_compressBound(data.size());
 	HLVM_ENSURE(ZSTD_isError(est_compress_size) == 0, TXT("ZSTD_compressBound = {}, ErrMsg: {}"),
 		est_compress_size, TO_TCHAR_STR(ZSTD_getErrorName(est_compress_size)));
@@ -20,11 +25,16 @@ TVector<std::byte> FZstd::Compress(const std::span<std::byte>& data, int compres
 		comp_buffer.shrink_to_fit();
 	}
 
+	HLVM_LOG(LogZstd, trace, TXT("Zstd compress size {} level {}, est_compress_size {} compress_size {}"),
+		data.size(), compress_level, est_compress_size, compress_size);
+
 	return comp_buffer;
 }
 
 TVector<std::byte> FZstd::Decompress(const std::span<std::byte>& data, bool bShrinkOutputBuffer)
 {
+	HLVM_SCOPED_TIMER(FString::Format(TXT("Zstd decompress size {}"), data.size()));
+
 	auto const est_decomp_size = ZSTD_getFrameContentSize(data.data(), data.size());
 	HLVM_ENSURE(est_decomp_size != ZSTD_CONTENTSIZE_UNKNOWN, TXT("ZSTD_getFrameContentSize = {}, ErrMsg: {}"),
 		ZSTD_CONTENTSIZE_UNKNOWN, TXT("it's necessary to use streaming mode to decompress data"));
@@ -39,5 +49,9 @@ TVector<std::byte> FZstd::Decompress(const std::span<std::byte>& data, bool bShr
 	{
 		decomp_buffer.shrink_to_fit();
 	}
+
+	HLVM_LOG(LogZstd, trace, TXT("Zstd decompress size {}, est_decomp_size {} decomp_size {}"),
+		data.size(), est_decomp_size, decomp_size);
+
 	return decomp_buffer;
 }

@@ -5,8 +5,8 @@
 #include "Test.h"
 
 #include "Core/Log.h"
-#include "Ultility/Timer.h"
-#include "Ultility/Hash.h"
+#include "Utility/Timer.h"
+#include "Utility/Hash.h"
 
 #include <boost/chrono.hpp>
 #include <boost/thread/thread.hpp>

@@ -38,8 +38,8 @@
 // zstd
 #include <zstd.h>
 
-//// Advobfuscator
-// #include <Lib/MetaString.h>
+// rapidjson
+#include <rapidjson/document.h>
 
 DELCARE_LOG_CATEGORY(LogTest)
 DEFINE_LOG_CATEGORY(LogTest)
@@ -387,4 +387,18 @@ RECORD(test_zstd)
 	std::cout << std::endl;
 	std::cout << "Decompressed: " << output << std::endl;
 	assert(input == output);
+}
+
+RECORD(test_rapidjson)
+{
+	using namespace std;
+	using namespace rapidjson;
+	const char json[] = R"({ "hello" : "world\nand you?" })";
+	Document   document;
+	document.Parse(json);
+
+	assert(document.HasMember("hello"));
+	const Value& hello = document["hello"];
+	assert(hello.IsString());
+	cout << "Hello: " << hello.GetString() << endl;
 }

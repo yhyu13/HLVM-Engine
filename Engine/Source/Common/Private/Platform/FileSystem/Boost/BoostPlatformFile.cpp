@@ -11,6 +11,13 @@
 DELCARE_LOG_CATEGORY(LogBoostPlatformFile)
 DEFINE_LOG_CATEGORY(LogBoostPlatformFile)
 
+void FBoostPlatformFile::Init()
+{
+	HLVM_ASSERT(!sPlatformFileRedirector[HLVM_ENUM_V(EPlatformFileType, Local)], TXT("Platform file is already registered"));
+	sPlatformFileRedirector[HLVM_ENUM_V(EPlatformFileType, Local)] = new FBoostPlatformFile();
+	HLVM_LOG(LogBoostPlatformFile, debug, TXT("FGenericPlatformFile init FBoostPlatformFile"));
+}
+
 bool FBoostPlatformFile::IsDirectory(const FPath& path)
 {
 	std::shared_ptr<FBoostFileStat> _Stat = SP_C(FBoostFileStat, mFileHandle.Stat(path));
@@ -43,7 +50,7 @@ TSmallVector32<FPath> FBoostPlatformFile::Find(const FPath& root_dir, const FStr
 			{
 				RECURSIVE_ALERT += RECURSIVE_ALERT;
 				HLVM_LOG(LogBoostPlatformFile, debug,
-					TXT("FBoostPlatformFile::Find() - Recursive search {} is too for {}?"), RECURSIVE_ALERT, *root_dir);
+					TXT("FBoostPlatformFile::Find() - Recursive search exceed {} for {}?"), RECURSIVE_ALERT, *root_dir);
 			}
 		}
 	}

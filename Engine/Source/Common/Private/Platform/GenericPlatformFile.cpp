@@ -13,29 +13,63 @@ FGenericPlatformFile* FGenericPlatformFile::sPlatformFileRedirector[EPlatformFil
 
 FGenericPlatformFile* FGenericPlatformFile::Get()
 {
-	static FGenericPlatformFile File;
-	static std::once_flag		once;
+	static FGenericPlatformFile* FilePtr = new FGenericPlatformFile();
+	static std::once_flag		 once;
 	std::call_once(once, []() {
 		{
-			HLVM_ASSERT(!sPlatformFileRedirector[HLVM_ENUM_V(EPlatformFileType, Local)], TXT("Platform file is already registered"));
-			sPlatformFileRedirector[HLVM_ENUM_V(EPlatformFileType, Local)] = new FBoostPlatformFile();
-			HLVM_LOG(LogGenericPlatformFile, debug, TXT("FGenericPlatformFile init FBoostPlatformFile"));
+			/**
+			 * Init all sub platform file here
+			 */
+			FBoostPlatformFile::Init();
 		}
 	});
-	return &File;
+	return FilePtr;
 }
 
 bool FGenericPlatformFile::IsDirectory(const FPath& path)
 {
-	return S_C(FBoostPlatformFile*, sPlatformFileRedirector[HLVM_ENUM_V(EPlatformFileType, Local)])->IsDirectory(path);
+	if (path.Type() == EPlatformFileType::Local)
+	{
+		return S_C(FBoostPlatformFile*, sPlatformFileRedirector[HLVM_ENUM_V(EPlatformFileType, Local)])->IsDirectory(path);
+	}
+	else if (path.Type() == EPlatformFileType::Packed)
+	{
+		return S_C(FBoostPlatformFile*, sPlatformFileRedirector[HLVM_ENUM_V(EPlatformFileType, Packed)])->IsDirectory(path);
+	}
+	else
+	{
+		return S_C(FBoostPlatformFile*, sPlatformFileRedirector[HLVM_ENUM_V(EPlatformFileType, Local)])->IsDirectory(path);
+	}
 }
 
 bool FGenericPlatformFile::Exists(const FPath& path)
 {
-	return S_C(FBoostPlatformFile*, sPlatformFileRedirector[HLVM_ENUM_V(EPlatformFileType, Local)])->Exists(path);
+	if (path.Type() == EPlatformFileType::Local)
+	{
+		return S_C(FBoostPlatformFile*, sPlatformFileRedirector[HLVM_ENUM_V(EPlatformFileType, Local)])->Exists(path);
+	}
+	else if (path.Type() == EPlatformFileType::Packed)
+	{
+		return S_C(FBoostPlatformFile*, sPlatformFileRedirector[HLVM_ENUM_V(EPlatformFileType, Packed)])->Exists(path);
+	}
+	else
+	{
+		return S_C(FBoostPlatformFile*, sPlatformFileRedirector[HLVM_ENUM_V(EPlatformFileType, Local)])->Exists(path);
+	}
 }
 
 TSmallVector32<FPath> FGenericPlatformFile::Find(const FPath& path, const FString& regex, bool recursive)
 {
-	return S_C(FBoostPlatformFile*, sPlatformFileRedirector[HLVM_ENUM_V(EPlatformFileType, Local)])->Find(path, regex, recursive);
+	if (path.Type() == EPlatformFileType::Local)
+	{
+		return S_C(FBoostPlatformFile*, sPlatformFileRedirector[HLVM_ENUM_V(EPlatformFileType, Local)])->Find(path, regex, recursive);
+	}
+	else if (path.Type() == EPlatformFileType::Packed)
+	{
+		return S_C(FBoostPlatformFile*, sPlatformFileRedirector[HLVM_ENUM_V(EPlatformFileType, Packed)])->Find(path, regex, recursive);
+	}
+	else
+	{
+		return S_C(FBoostPlatformFile*, sPlatformFileRedirector[HLVM_ENUM_V(EPlatformFileType, Local)])->Find(path, regex, recursive);
+	}
 }

@@ -9,7 +9,9 @@
 #include "Core/Compress/Zstd.h"
 #include "Core/Encrypt/RSA.h"
 
-#include <boost/iostreams/device/mapped_file.hpp>
+#include <boost/interprocess/sync/file_lock.hpp>
+#include <boost/interprocess/sync/sharable_lock.hpp>
+#include <mio/mmap.hpp>
 
 HLVM_ENUM(EPackedFileType, uint8_t,
 	Base,
@@ -34,7 +36,7 @@ struct FPackedTokenEntryData
 struct FPackedTokenEntry
 {
 	FPackedTokenEntryData Data;
-	size_t				  PathHash; // RelativeToMountingPoint
+	FPathHash			  PathHash; // RelativeToMountingPoint
 };
 
 HLVM_INLINE_VAR constexpr size_t FPackedTokenEntry_SerializedSize = sizeof(FPackedTokenEntry);
@@ -52,7 +54,7 @@ public:
 		.eFileMode = EFileMode::RB,
 		.eFileMapped = EFileMapped::Mapped,
 		.eFileAsync = EFileAsync::NoAsync,
-		.eFileLock = EFileLock::NoLock
+		.eFileLock = EFileLock::InterProcessLock
 	};
 
 	static constexpr FFileSeekCtx sDefaultFileSeekCtx{
@@ -76,10 +78,25 @@ public:
 	virtual OpRetType								  Truncate(size_t Size) final override;
 	[[nodiscard]] virtual std::shared_ptr<IFFileStat> Stat(const FPath& FilePath) final override;
 
+	//	/**
+	//	 * Shrink mmap file to mimimal
+	//	 */
+	//	void Shrink();
+
+	friend bool operator>(const FPackedFileHandle& Lhs, const FPackedFileHandle& Rhs) noexcept
+	{
+		return Lhs.mMountOrder > Rhs.mMountOrder;
+	}
+
 private:
 	const void* MappedFileCurPos_R(int64_t Offset) const;
 
-	TMap<size_t, FPackedTokenEntryData> mTokenEntryMap;
-	boost::iostreams::mapped_file		mContainerMappedFile;
-	EPackedFileType						mPackedFileType{ EPackedFileType::Unkown };
+	mio::mmap_source												   mContainerMappedFile;
+	TMap<FPathHash, FPackedTokenEntryData>							   mTokenEntryMap;
+	boost::interprocess::sharable_lock<boost::interprocess::file_lock> mTokenFileLock;
+	boost::interprocess::sharable_lock<boost::interprocess::file_lock> mContainerFileLock;
+	EPackedFileType													   mPackedFileType{ EPackedFileType::Unkown };
+	uint64_t														   mMountOrder{ 0 }; // Mounting order, the larger the prior when searching for files
 };
+
+HLVM_INLINE_VAR TVector<std::unique_ptr<FPackedFileHandle>> GMountedPackedFileHandles;
