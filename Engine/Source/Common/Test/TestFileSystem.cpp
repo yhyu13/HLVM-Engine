@@ -82,8 +82,8 @@ RECORD(packed_test)
 					fileJsonlHandle.Close();
 				});
 
-			constexpr size_t													   size = 8;
-			TVector<std::tuple<FPackedTokenEntry_Development, TVector<std::byte>>> PackedData;
+			constexpr size_t												 size = 8;
+			TVector<std::tuple<FPackedTokenEntry_Debug, TVector<std::byte>>> PackedData;
 			PackedData.resize(size);
 			size_t _StartPos = 0;
 			for (size_t i = 0; i < size; ++i)

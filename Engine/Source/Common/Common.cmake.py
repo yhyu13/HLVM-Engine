@@ -12,8 +12,7 @@ vcpkg_cxt = VcpkgContenxt(vcpkg_root_path='../Dependency/vcpkg',
                                                             "elfutils",
                                                             "zstd",
                                                             "botan",
-                                                            "rapidjson",
-                                                            "mio"
+                                                            "rapidjson"
                                                         ],
                                                         builtin_baseline='53bef8994c541b6561884a8395ea35715ece75db'))
 
@@ -65,13 +64,6 @@ rapidjson = FindPackage(name='RapidJSON',
                   required=True,
                   target_link_libs=[
                       DomainValueModel(domain=DomainEnum.PUBLIC, values=['rapidjson'])])
-
-# Find the mio package with the specified options
-mio = FindPackage(name='mio',
-                   config=True,
-                   required=True,
-                   target_link_libs=[
-                       DomainValueModel(domain=DomainEnum.PUBLIC, values=['mio::mio mio::mio-headers'])])
 
 # Fetch the Yalantinglibs package from GitHub with the specified options
 yalantinlibs = FetchContent(name='yalantinglibs',
@@ -140,8 +132,7 @@ class CommonModule(BaseModule):
                                         Boost,
                                         botan3,
                                         zstd,
-                                        rapidjson,
-                                        mio,
+                                        rapidjson
                                         ]
                          )
         self.target_interface.add_compile_options(domain=DomainEnum.PUBLIC, values=[

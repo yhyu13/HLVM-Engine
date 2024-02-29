@@ -21,7 +21,7 @@ bool SetSerialized(FPackedTokenEntry& Data, const std::span<const std::byte>& Bu
 	return std::memcpy(&Data, Buffer.data(), FPackedTokenEntry_SerializedSize) == &Data;
 }
 
-std::string ToJson(const FPackedTokenEntry_Development& Data)
+std::string ToJson(const FPackedTokenEntry_Debug& Data)
 {
 	using namespace rapidjson;
 	StringBuffer			   sb;

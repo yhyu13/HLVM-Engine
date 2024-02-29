@@ -35,9 +35,9 @@ bool							 SetSerialized(FPackedTokenEntry& Data, const std::span<const std::by
 /**
  * Debug data that will serialized to json for debugging propose
  */
-struct FPackedTokenEntry_Development
+struct FPackedTokenEntry_Debug
 {
 	FPackedTokenEntry Entry;
 	std::string		  Path;
 };
-std::string ToJson(const FPackedTokenEntry_Development& Data);
+std::string ToJson(const FPackedTokenEntry_Debug& Data);

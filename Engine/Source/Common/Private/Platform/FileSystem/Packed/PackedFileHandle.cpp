@@ -47,6 +47,8 @@ FPackedFileHandle::~FPackedFileHandle()
 
 IFileHandle::OpRetType FPackedFileHandle::Open(const FPath& FilePath, const FFileOptions& Options)
 {
+	using namespace boost::interprocess;
+
 	PFH_HANDLE_STATUS(Status_InOut);
 	PFH_HANDLE_ENSURE(*Status_InOut, TXT("File operation continue with failed status"));
 	PFH_HANDLE_ASSERT(!mOpened, TXT("File operation begin with another already open file"));
@@ -100,8 +102,8 @@ IFileHandle::OpRetType FPackedFileHandle::Open(const FPath& FilePath, const FFil
 				const bool exist = FPath::Exists(TokenFilePath);
 				PFH_HANDLE_ENSURE(exist, TXT("Packed token file does not exist"));
 
-				boost::interprocess::file_lock _Lock(TokenFilePath);
-				mTokenFileLock = MoveTemp(boost::interprocess::sharable_lock<boost::interprocess::file_lock>(_Lock));
+				file_lock _Lock(TokenFilePath);
+				mTokenFileLock = MoveTemp(sharable_lock<file_lock>(_Lock));
 
 				// Open local file
 				FBoostFileHandle fileHandle;
@@ -131,17 +133,42 @@ IFileHandle::OpRetType FPackedFileHandle::Open(const FPath& FilePath, const FFil
 						std::cout << "Entry: " << Entry.PathHash << std::endl;
 					};
 
+					// Init containers
+					mContainerFragments.clear();
+					mContainerFragments.push_back(MoveTemp(FPackedContainerFragment()));
+					mTokenEntryMap.clear();
+
+					bool bCurrentFragmentInit = false;
 					while (lineEnd <= tokenDataEnd)
 					{
 						FPackedTokenEntry Entry;
 						Extract(Entry);
-						auto result = mTokenEntryMap.insert_or_assign(MoveTemp(Entry.PathHash), MoveTemp(Entry.Data));
-						PFH_HANDLE_ENSURE(result.second, TXT("Key already exists, value updated from {} to {}"), R_C(intptr_t, lineStart), R_C(intptr_t, lineEnd));
+
+						auto& CurrentFragment = mContainerFragments.back();
+						if (!bCurrentFragmentInit)
+						{
+							bCurrentFragmentInit = true;
+							CurrentFragment.FragmentStartPos = Entry.Data.StartPos;
+						}
+
+						if ((CurrentFragment.FragmentSize += Entry.Data.Size) >= FPackedContainerFragment::sSuggestedFragmentSize)
+						{
+							mContainerFragments.push_back(MoveTemp(FPackedContainerFragment()));
+							bCurrentFragmentInit = false;
+						}
+
+						{
+							size_t CurrentFragmentID = mContainerFragments.size() - 1;
+							auto   result = mTokenEntryMap.insert_or_assign(MoveTemp(Entry.PathHash), { MoveTemp(Entry.Data), CurrentFragmentID });
+							PFH_HANDLE_ENSURE(result.second, TXT("Key already exists, value updated from {} to {}"), R_C(intptr_t, lineStart), R_C(intptr_t, lineEnd));
+						}
 						lineStart = lineEnd;
 						lineEnd = lineStart + FPackedTokenEntry_SerializedSize;
 					}
+
+					mContainerFragments.shrink_to_fit();
 					// Sanity check on we reach finish correctly
-					assert(lineStart == tokenDataEnd);
+					PFH_HANDLE_ENSURE(lineStart == tokenDataEnd, TXT("Token data end not reached lineStart {} tokenDataEnd {}"), R_C(intptr_t, lineStart), R_C(intptr_t, tokenDataEnd));
 					PFH_VERBOSE_LOG(TXT("TokenEntryMap size: {}"), mTokenEntryMap.size());
 				}
 			}
@@ -151,12 +178,11 @@ IFileHandle::OpRetType FPackedFileHandle::Open(const FPath& FilePath, const FFil
 				const bool exist = FPath::Exists(ContainerFilePath);
 				PFH_HANDLE_ENSURE(exist, TXT("Packed token file does not exist"));
 
-				boost::interprocess::file_lock _Lock(ContainerFilePath);
-				mContainerFileLock = MoveTemp(boost::interprocess::sharable_lock<boost::interprocess::file_lock>(_Lock));
+				file_lock _Lock(ContainerFilePath);
+				mContainerFileLock = MoveTemp(sharable_lock<file_lock>(_Lock));
 
-				std::error_code ec;
-				mContainerMappedFile.map(ContainerFilePath.ToCharStr(), ec);
-				PFH_HANDLE_ENSURE(mContainerMappedFile.is_open() && !ec, TXT("MappedFile file open failed"));
+				mContainerMappedFile = MoveTemp(file_mapping(ContainerFilePath.ToCharStr(), read_only));
+				PFH_HANDLE_ENSURE(mContainerMappedFile.get_mapping_handle().handle, TXT("MappedFile file open failed"));
 			}
 		}
 
@@ -180,6 +206,8 @@ IFileHandle::OpRetType FPackedFileHandle::Open(const FPath& FilePath, const FFil
 
 IFileHandle::OpRetType FPackedFileHandle::Close()
 {
+	using namespace boost::interprocess;
+
 	PFH_HANDLE_STATUS(Status_InOut);
 	PFH_HANDLE_ENSURE(*Status_InOut, TXT("File operation continue with failed status"));
 	PFH_HANDLE_ASSERT(mOpened, TXT("File operation continue w/o open"));
@@ -189,7 +217,12 @@ IFileHandle::OpRetType FPackedFileHandle::Close()
 		PFH_SCOPE_LOCK();
 
 		{
-			mContainerMappedFile.unmap();
+			mContainerFragments.clear();
+			mTokenEntryMap.clear();
+			auto Dummy = file_mapping();
+			mContainerMappedFile.swap(Dummy);
+			mTokenFileLock.release();
+			mContainerFileLock.release();
 		}
 
 		if (Status_InOut->bCancelByUser) [[unlikely]]
@@ -217,63 +250,10 @@ IFileHandle::OpRetType FPackedFileHandle::Close()
 	return *this;
 }
 
-IFileHandle::OpRetType FPackedFileHandle::Read(void* Buffer, size_t Size, const FFileSeekCtx& SeekCtx)
+IFileHandle::OpRetType FPackedFileHandle::Read(void*, size_t, const FFileSeekCtx&)
 {
-	PFH_HANDLE_STATUS(Status_InOut);
-	PFH_HANDLE_ENSURE(*Status_InOut, TXT("File operation continue with failed status"));
-	PFH_HANDLE_ASSERT(mOpened, TXT("File operation continue w/o open"));
-	PFH_HANDLE_ASSERT(mFileOptions.eFileMode & EFileMode::R, TXT("File operation cannot read"));
-	PFH_HANDLE_ASSERT(Size > 0, TXT("Buffer size invalid {}"), Size);
-
-	int64_t mContainerMappedSeekPos = SeekCtx.Offset;
-	// validate seek
-	PFH_HANDLE_ASSERT(SeekCtx.Whence == sDefaultFileSeekCtx.Whence, TXT("Seek ctx whence invalid {}"), TO_TCHAR_STR(magic_enum::enum_name(SeekCtx.Whence).data()));
-	PFH_HANDLE_ASSERT(SeekCtx.bResetPos == sDefaultFileSeekCtx.bResetPos, TXT("Seek ctx bResetPos invalid {}"), SeekCtx.bResetPos);
-	PFH_HANDLE_ASSERT(SeekCtx.bEraseSeekPos == sDefaultFileSeekCtx.bEraseSeekPos, TXT("Seek ctx bEraseSeekPos invalid {}"), SeekCtx.bEraseSeekPos);
-
-	try
-	{
-		PFH_SCOPE_LOCK();
-
-		{
-			size_t	FileSize = mContainerMappedFile.size();
-			int64_t rest_size = static_cast<int64_t>(FileSize) - (mContainerMappedSeekPos);
-			// Check space avilable for reading
-			const bool available = rest_size >= static_cast<int64_t>(Size);
-			PFH_HANDLE_ASSERT(available, TXT("mMappedFile size is not enough for read. SeekPos {}, File Size {}, available size {} Buffer Size {}"),
-				mContainerMappedSeekPos, FileSize, rest_size, Size);
-
-			auto readPos = MappedFileCurPos_R(mContainerMappedSeekPos);
-			// Check buffer and mmap no overlapping
-			const bool overlap = IsPointerOverlap(Buffer, Size, readPos, static_cast<size_t>(rest_size));
-			PFH_HANDLE_ASSERT(!overlap, TXT("mMappedFile overlap with read region. SeekPos {}, File Size {}, available size {} Buffer Size {}"),
-				mContainerMappedSeekPos, FileSize, rest_size, Size);
-
-			// do the mmap
-			std::memcpy(Buffer, readPos, Size);
-		}
-
-		if (Status_InOut->bCancelByUser) [[unlikely]]
-		{
-			Status_InOut->eFileOpStatus = EFileOpStatus::Canceled;
-		}
-		else [[likely]]
-		{
-			Status_InOut->eFileOpStatus = EFileOpStatus::Success;
-		}
-		PFH_VERBOSE_LOG(TXT("Read file success with {} bytes"), Size);
-	}
-	catch (std::exception& Exception)
-	{
-		Status_InOut->eFileOpStatus = EFileOpStatus::Failed;
-		PFH_HANDLE_EXCPETIONS();
-	}
-	catch (...)
-	{
-		Status_InOut->eFileOpStatus = EFileOpStatus::Failed;
-		PFH_HANDLE_EXCPETIONS2();
-	}
-
+	// No point to implement this
+	HLVM_NOT_IMPLEMENTED();
 	return *this;
 }
 
@@ -324,12 +304,4 @@ std::shared_ptr<IFFileStat> FPackedFileHandle::Stat(const FPath&)
 	// No point to implement this
 	HLVM_NOT_IMPLEMENTED();
 	return nullptr;
-}
-
-const void* FPackedFileHandle::MappedFileCurPos_R(int64_t Offset) const
-{
-	auto _Offeset = Offset;
-	auto _Size = static_cast<int64_t>(mContainerMappedFile.size());
-	PFH_HANDLE_ASSERT(_Offeset >= 0 && _Offeset < _Size, FString::Format(TXT("MappedFileCurPos_R {} out of range [0,{})"), _Offeset, _Size));
-	return (&(mContainerMappedFile.data()[_Offeset]));
 }
