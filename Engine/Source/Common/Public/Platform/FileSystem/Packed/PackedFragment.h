@@ -26,7 +26,7 @@ struct FPackedContainerFragment
 	size_t							   FragmentStartPos{ 0 };
 	size_t							   FragmentSize{ 0 };
 
-	void					   Open(const boost::interprocess::file_mapping& fm);
-	void					   Close();
-	std::span<const std::byte> GetSubRegion(const FPackedTokenEntryData& Data) const;
+	void			 Open(const boost::interprocess::file_mapping& fm);
+	void			 Close();
+	FConstByteBuffer GetSubRegion(const FPackedTokenEntryData& Data) const;
 };

@@ -5,7 +5,7 @@
 #pragma once
 
 #include "Index.tpp"
-#include "Random.tpp"
+#include "MetaRandom.tpp"
 
 namespace andrivet
 {
@@ -123,7 +123,7 @@ namespace andrivet
 
 #define OBFUSCATED_SHORT(str) []() -> const char* { \
 	static auto		   _str = DEF_OBFUSCATED(str);  \
-	static const char* ptr = _str.Deobfuscate();    \
+	static const char* ptr = _str.decrypt();        \
 	return ptr;                                     \
 }()
 

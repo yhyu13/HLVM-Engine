@@ -39,3 +39,18 @@ using TStableMap = phmap::node_hash_map<Key, Value>;
 #define HLVM_MAP_FIND(iter, map, key) \
 	auto iter = (map).find((key));    \
 	(iter) != (map).end()
+
+using TByte = std::byte;
+using FByteVector = TVector<TByte>;
+using FByteBuffer = std::span<TByte>;
+using FConstByteBuffer = std::span<const TByte>;
+#define TO_SPAN(array, size) \
+	std::span                \
+	{                        \
+		(array), size        \
+	}
+#define TO_CONST_BYTE_BUFFER(vec)                     \
+	FConstByteBuffer                                  \
+	{                                                 \
+		R_C(const TByte*, (vec).data()), (vec).size() \
+	}

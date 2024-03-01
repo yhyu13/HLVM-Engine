@@ -59,3 +59,26 @@ FPathHash FPath::CalculateHash() const noexcept
 	HLVM_LOG(LogFPath, trace, TXT("Path {} hash return {}"), *(*this), hash);
 	return hash;
 }
+
+FPath FPath::ChangeExtension(const FString& new_ext) const
+{
+	HLVM_ASSERT(new_ext[0] == TXT('.'), TXT("{} must start with '.'"), new_ext);
+	FPath new_path = *this;
+	new_path.replace_extension(new_ext.ToCharStr());
+	return new_path;
+}
+
+FPath& FPath::ChangeExtension_Inplace(const FString& new_ext)
+{
+	HLVM_ASSERT(new_ext[0] == TXT('.'), TXT("{} must start with '.'"), new_ext);
+	this->replace_extension(new_ext.ToCharStr());
+	return *this;
+}
+
+FPath FPath::AppendExtension(const FString& new_ext) const
+{
+	HLVM_ASSERT(new_ext[0] == TXT('.'), TXT("{} must start with '.'"), new_ext);
+	std::string new_path = this->string();
+	new_path += new_ext;
+	return FPath{ new_path, this->mFileType };
+}

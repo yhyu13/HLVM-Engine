@@ -95,42 +95,74 @@ IFileHandle::OpRetType FPackedFileHandle::Open(const FPath& FilePath, const FFil
 	{
 		{
 			// TODO: Validate token and container file signature
-			// Decompress and read and build all token entries (async?)
+			auto cot_job = std::thread(
+				[&]() {
+					// Open container file with mmap
+					{
+						// Exist container file
+						auto	   ContainerFilePath = mFilePath.ChangeExtension(HLVM_PACKED_CONTAINER_EXT);
+						const bool exist = FPath::Exists(ContainerFilePath);
+						PFH_HANDLE_ENSURE(exist, TXT("Packed container file does not exist"));
+
+						// Verify container file signature
+						{
+							PFH_HANDLE_ENSURE(FRSA::VerifyFileSign(ContainerFilePath, ContainerFilePath.AppendExtension(HLVM_RSA_SIGNATURE_EXT)),
+								TXT("Packed container file signature verification failed"));
+						}
+
+						// Lock container file
+						file_lock _Lock(ContainerFilePath);
+						mContainerFileLock = MoveTemp(sharable_lock<file_lock>(_Lock));
+
+						// Open container file
+						mContainerMappedFile = MoveTemp(file_mapping(ContainerFilePath.ToCharStr(), read_only));
+						PFH_HANDLE_ENSURE(mContainerMappedFile.get_mapping_handle().handle, TXT("MappedFile file open failed"));
+						PFH_VERBOSE_LOG(TXT("Container file opened {}"), *ContainerFilePath);
+					}
+				});
+
+			// Decompress and read and build all token entries
 			{
-				FPath TokenFilePath = mFilePath.ChangeExtension(HLVM_PACKED_TOKEN_EXT);
-				// Check file exists
+				// Exists Token file path
+				FPath	   TokenFilePath = mFilePath.ChangeExtension(HLVM_PACKED_TOKEN_EXT);
 				const bool exist = FPath::Exists(TokenFilePath);
 				PFH_HANDLE_ENSURE(exist, TXT("Packed token file does not exist"));
 
+				// Verify Token file signature
+				{
+					PFH_HANDLE_ENSURE(FRSA::VerifyFileSign(TokenFilePath, TokenFilePath.AppendExtension(HLVM_RSA_SIGNATURE_EXT)),
+						TXT("Packed token file signature verification failed"));
+				}
+
+				// Lock token file
 				file_lock _Lock(TokenFilePath);
 				mTokenFileLock = MoveTemp(sharable_lock<file_lock>(_Lock));
 
-				// Open local file
+				// Open token file
 				FBoostFileHandle fileHandle;
 				size_t			 fileSize = 0;
 				fileHandle.Open(TokenFilePath, mFileOptions)
 					.Size(fileSize);
-				// Read binary in 1 shot
+				// Read token file in 1 shot
 				PFH_HANDLE_ENSURE(fileSize > 0, TXT("Packed token file size invalid {}"), fileSize);
 				TVector<std::byte> TokenData{ fileSize };
-				fileHandle.Read(TokenData.data(), TokenData.size(), { .Offset = 0, .Whence = EWhence::Begin })
-					.Close();
+				fileHandle.Read(TokenData.data(), TokenData.size(), { .Offset = 0, .Whence = EWhence::Begin });
 
 				// Decryption & Decompression
 				{
-					auto Decrypted = FRSA::DecryptPCKS8(TokenData);
+					auto Decrypted = FRSA::Decrypt(TokenData);
 					auto Decompressed = FZstd::Decompress({ R_C(std::byte*, Decrypted.data()), Decrypted.size() });
 
-					const char* lineStart = R_C(const char*, Decompressed.data());
-					const char* lineEnd = lineStart + FPackedTokenEntry_SerializedSize;
-					const char* tokenDataEnd = lineStart + Decompressed.size();
+					const std::byte* lineStart = Decompressed.data();
+					const std::byte* lineEnd = lineStart + FPackedTokenEntry_SerializedSize;
+					const std::byte* tokenDataEnd = lineStart + Decompressed.size();
 
-					auto Extract = [&](FPackedTokenEntry& Entry) {
-						std::cout << "Extracted line: " << std::string(lineStart, lineEnd) << std::endl;
-
-						bool bSuccess = SetSerialized(Entry, std::span<const std::byte>{ R_C(const std::byte*, lineStart), S_C(size_t, lineEnd - lineStart) });
-						assert(bSuccess);
-						std::cout << "Entry: " << Entry.PathHash << std::endl;
+					size_t Num = 0;
+					auto   ExtractTokenEntry = [&](FPackedTokenEntry& Entry) {
+						  bool bSuccess = SerializeFrom(Entry, FConstByteBuffer{ lineStart, S_C(size_t, lineEnd - lineStart) });
+						  PFH_HANDLE_ENSURE(bSuccess, TXT("Failed to deserialize entry #{}"), Num);
+						  PFH_VERBOSE_LOG(TXT("Entry #{}:\n{}"), Num, TO_TCHAR_STR(ToJson(Entry).c_str()));
+						  ++Num;
 					};
 
 					// Init containers
@@ -138,12 +170,14 @@ IFileHandle::OpRetType FPackedFileHandle::Open(const FPath& FilePath, const FFil
 					mContainerFragments.push_back(MoveTemp(FPackedContainerFragment()));
 					mTokenEntryMap.clear();
 
+					// Iterate through token entries
 					bool bCurrentFragmentInit = false;
 					while (lineEnd <= tokenDataEnd)
 					{
 						FPackedTokenEntry Entry;
-						Extract(Entry);
+						ExtractTokenEntry(Entry);
 
+						// Init fragment if necessary
 						auto& CurrentFragment = mContainerFragments.back();
 						if (!bCurrentFragmentInit)
 						{
@@ -151,12 +185,14 @@ IFileHandle::OpRetType FPackedFileHandle::Open(const FPath& FilePath, const FFil
 							CurrentFragment.FragmentStartPos = Entry.Data.StartPos;
 						}
 
+						// Fragment full, initiate another fragment
 						if ((CurrentFragment.FragmentSize += Entry.Data.Size) >= FPackedContainerFragment::sSuggestedFragmentSize)
 						{
 							mContainerFragments.push_back(MoveTemp(FPackedContainerFragment()));
 							bCurrentFragmentInit = false;
 						}
 
+						// Insert token entry
 						{
 							size_t CurrentFragmentID = mContainerFragments.size() - 1;
 							auto   result = mTokenEntryMap.insert_or_assign(MoveTemp(Entry.PathHash), { MoveTemp(Entry.Data), CurrentFragmentID });
@@ -166,24 +202,14 @@ IFileHandle::OpRetType FPackedFileHandle::Open(const FPath& FilePath, const FFil
 						lineEnd = lineStart + FPackedTokenEntry_SerializedSize;
 					}
 
-					mContainerFragments.shrink_to_fit();
 					// Sanity check on we reach finish correctly
 					PFH_HANDLE_ENSURE(lineStart == tokenDataEnd, TXT("Token data end not reached lineStart {} tokenDataEnd {}"), R_C(intptr_t, lineStart), R_C(intptr_t, tokenDataEnd));
 					PFH_VERBOSE_LOG(TXT("TokenEntryMap size: {}"), mTokenEntryMap.size());
+					mContainerFragments.shrink_to_fit();
+					PFH_VERBOSE_LOG(TXT("ContainerFragments size: {}"), mContainerFragments.size());
 				}
 			}
-			// Open container file with mmap
-			{
-				auto	   ContainerFilePath = mFilePath.ChangeExtension(HLVM_PACKED_CONTAINER_EXT);
-				const bool exist = FPath::Exists(ContainerFilePath);
-				PFH_HANDLE_ENSURE(exist, TXT("Packed token file does not exist"));
-
-				file_lock _Lock(ContainerFilePath);
-				mContainerFileLock = MoveTemp(sharable_lock<file_lock>(_Lock));
-
-				mContainerMappedFile = MoveTemp(file_mapping(ContainerFilePath.ToCharStr(), read_only));
-				PFH_HANDLE_ENSURE(mContainerMappedFile.get_mapping_handle().handle, TXT("MappedFile file open failed"));
-			}
+			cot_job.join();
 		}
 
 		mOpened = true;
@@ -219,8 +245,11 @@ IFileHandle::OpRetType FPackedFileHandle::Close()
 		{
 			mContainerFragments.clear();
 			mTokenEntryMap.clear();
-			auto Dummy = file_mapping();
-			mContainerMappedFile.swap(Dummy);
+			{
+				// Using swap dummy to unmap file on dummy destruction
+				auto Dummy = file_mapping();
+				mContainerMappedFile.swap(Dummy);
+			}
 			mTokenFileLock.release();
 			mContainerFileLock.release();
 		}

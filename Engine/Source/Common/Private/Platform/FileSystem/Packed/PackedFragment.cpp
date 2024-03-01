@@ -29,9 +29,9 @@ void FPackedContainerFragment::Close()
 	Region.swap(dummy);
 }
 
-std::span<const std::byte> FPackedContainerFragment::GetSubRegion(const FPackedTokenEntryData& Data) const
+FConstByteBuffer FPackedContainerFragment::GetSubRegion(const FPackedTokenEntryData& Data) const
 {
 	size_t Offset = Data.StartPos - FragmentStartPos;
 	HLVM_ASSERT(Data.StartPos >= FragmentStartPos && Offset + Data.Size <= FragmentSize, TXT("Offset out of bounds"));
-	return std::span<const std::byte>(R_C(const std::byte*, Region.get_address()) + Offset, Data.Size);
+	return FConstByteBuffer(R_C(const std::byte*, Region.get_address()) + Offset, Data.Size);
 }

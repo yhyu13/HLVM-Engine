@@ -107,18 +107,9 @@ public:
 		return mHash;
 	}
 
-	FPath ChangeExtension(const FString& new_ext) const
-	{
-		FPath new_path = *this;
-		new_path.replace_extension(new_ext.ToCharStr());
-		return new_path;
-	}
-
-	FPath& ChangeExtension_Inplace(const FString& new_ext)
-	{
-		this->replace_extension(new_ext.ToCharStr());
-		return *this;
-	}
+	FPath  ChangeExtension(const FString& new_ext) const;
+	FPath& ChangeExtension_Inplace(const FString& new_ext);
+	FPath  AppendExtension(const FString& new_ext) const;
 
 	/**
 	 * Static methods, internally calling generic platform api

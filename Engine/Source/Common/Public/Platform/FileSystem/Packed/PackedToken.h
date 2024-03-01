@@ -29,15 +29,16 @@ struct FPackedTokenEntry
 	FPathHash			  PathHash; // RelativeToMountingPoint
 };
 HLVM_INLINE_VAR constexpr size_t FPackedTokenEntry_SerializedSize = sizeof(FPackedTokenEntry);
-bool							 GetSerialized(const FPackedTokenEntry& Data, std::span<std::byte>& Buffer);
-bool							 SetSerialized(FPackedTokenEntry& Data, const std::span<const std::byte>& Buffer);
+bool							 SerializeTo(const FPackedTokenEntry& Data, FByteBuffer& Buffer);
+bool							 SerializeFrom(FPackedTokenEntry& Data, const FConstByteBuffer& Buffer);
+std::string						 ToJson(const FPackedTokenEntry& Data);
 
 /**
  * Debug data that will serialized to json for debugging propose
  */
-struct FPackedTokenEntry_Debug
+struct FPackedTokenEntryWithPath
 {
 	FPackedTokenEntry Entry;
 	std::string		  Path;
 };
-std::string ToJson(const FPackedTokenEntry_Debug& Data);
+std::string ToJson(const FPackedTokenEntryWithPath& Data);

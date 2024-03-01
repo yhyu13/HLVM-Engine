@@ -8,7 +8,7 @@
 
 DELCARE_LOG_CATEGORY(LogZstd)
 
-TVector<std::byte> FZstd::Compress(const std::span<std::byte>& data, int compress_level, bool bShrinkOutputBuffer)
+TVector<std::byte> FZstd::Compress(const FByteBuffer& data, int compress_level, bool bShrinkOutputBuffer)
 {
 	HLVM_SCOPED_TIMER(FString::Format(TXT("Zstd compress size {} level {}"), data.size(), compress_level));
 
@@ -31,7 +31,7 @@ TVector<std::byte> FZstd::Compress(const std::span<std::byte>& data, int compres
 	return comp_buffer;
 }
 
-TVector<std::byte> FZstd::Decompress(const std::span<std::byte>& data, bool bShrinkOutputBuffer)
+TVector<std::byte> FZstd::Decompress(const FByteBuffer& data, bool bShrinkOutputBuffer)
 {
 	HLVM_SCOPED_TIMER(FString::Format(TXT("Zstd decompress size {}"), data.size()));
 

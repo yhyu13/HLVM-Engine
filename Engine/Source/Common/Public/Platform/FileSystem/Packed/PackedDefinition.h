@@ -5,13 +5,14 @@
 #pragma once
 
 #include "GlobalDefinition.h"
+#include <boost/regex/v5/regex_search.hpp>
 
 #ifndef HLVM_PACKED_TOKEN_EXT
-	#define HLVM_PACKED_TOKEN_EXT TXT("tok")
+	#define HLVM_PACKED_TOKEN_EXT TXT(".tok")
 #endif
 
 #ifndef HLVM_PACKED_CONTAINER_EXT
-	#define HLVM_PACKED_CONTAINER_EXT TXT("cot")
+	#define HLVM_PACKED_CONTAINER_EXT TXT(".cot")
 #endif
 
 #ifndef HLVM_PACKED_FILE_PATTERN

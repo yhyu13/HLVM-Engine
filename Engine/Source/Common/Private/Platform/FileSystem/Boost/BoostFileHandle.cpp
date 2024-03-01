@@ -75,9 +75,6 @@ FBoostFileHandle::~FBoostFileHandle()
 	{
 		Close();
 	}
-	HLVM_DELETE(mMappedFile);
-	HLVM_DELETE(mFStream);
-	HLVM_DELETE(mFileLock);
 }
 
 IFileHandle::OpRetType FBoostFileHandle::Open(const FPath& FilePath, const FFileOptions& Options)
@@ -192,6 +189,14 @@ IFileHandle::OpRetType FBoostFileHandle::Close()
 			BFH_HANDLE_ENSURE(!mFStream->fail(), TXT("File operation failed"));
 		}
 
+		{
+			mMappedSeekPos = 0;
+			HLVM_DELETE(mMappedFile);
+			HLVM_DELETE(mFStream);
+			HLVM_DELETE(mFileLock);
+			mMappedLazyInit = false;
+		}
+
 		if (Status_InOut->bCancelByUser) [[unlikely]]
 		{
 			Status_InOut->eFileOpStatus = EFileOpStatus::Canceled;
@@ -247,7 +252,7 @@ IFileHandle::OpRetType FBoostFileHandle::Read(void* Buffer, size_t Size, const F
 			BFH_HANDLE_ASSERT(!mMappedLazyInit, TXT("Mapped file not init!"));
 			size_t	FileSize = mMappedFile->size();
 			int64_t rest_size = static_cast<int64_t>(FileSize) - (mMappedSeekPos);
-			// Check space avilable for reading
+			// Check space available for reading
 			const bool available = rest_size >= static_cast<int64_t>(Size);
 			BFH_HANDLE_ASSERT(available, TXT("mMappedFile size is not enough for read. SeekPos {}, File Size {}, available size {} Buffer Size {}"),
 				mMappedSeekPos, FileSize, rest_size, Size);
@@ -697,6 +702,17 @@ std::shared_ptr<IFFileStat> FBoostFileHandle::Stat(const FPath& FilePath)
 	}
 
 	return Stat;
+}
+
+FConstByteBuffer FBoostFileHandle::GetMappedBufferReadOnly() const
+{
+	BFH_HANDLE_ASSERT(mOpened, TXT("File operation continue w/o open"));
+	BFH_HANDLE_ASSERT(mMappedFile, TXT("MappedFile file null"));
+	BFH_HANDLE_ASSERT(!mMappedLazyInit, TXT("MappedFile still not init"));
+	BFH_HANDLE_ASSERT(mFileOptions.eFileMode & EFileMode::R && !(mFileOptions.eFileMode & EFileMode::W), TXT("File operation cannot flush"));
+	return FConstByteBuffer{
+		reinterpret_cast<const TByte*>(mMappedFile->const_data()), mMappedFile->size()
+	};
 }
 
 void FBoostFileHandle::MappedFileLazyInit()

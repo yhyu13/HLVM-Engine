@@ -66,9 +66,11 @@ RECORD(packed_test)
 		FPath PackedFileName = "./packed-test";
 		FPath PackedTokFile = PackedFileName.ChangeExtension(HLVM_PACKED_TOKEN_EXT);
 		FPath PackedCotFile = PackedFileName.ChangeExtension(HLVM_PACKED_CONTAINER_EXT);
-		FPath PackedJsonlFile = PackedFileName.ChangeExtension(TXT("jsonl"));
+		FPath PackedJsonlFile = PackedFileName.ChangeExtension(HLVM_JSONL_FILE_EXT);
 		HLVM_LOG(LogTest, info, TXT("Test PackedFileHandle write token file: {}"), *PackedTokFile);
 		{
+			std::vector<std::thread> jobs;
+			jobs.reserve(4);
 			FBoostFileHandle fileTokHandle, fileCotHandle, fileJsonlHandle;
 			FFileOptions	 Options{ .eFileMode = EFileMode::WB, .eFileMapped = EFileMapped::Mapped, .eFileLock = EFileLock::InterProcessLock };
 			HLVM_SCOPED_VARIABLE(
@@ -82,8 +84,8 @@ RECORD(packed_test)
 					fileJsonlHandle.Close();
 				});
 
-			constexpr size_t												 size = 8;
-			TVector<std::tuple<FPackedTokenEntry_Debug, TVector<std::byte>>> PackedData;
+			constexpr size_t											size = 8;
+			TVector<std::tuple<FPackedTokenEntryWithPath, FByteVector>> PackedData;
 			PackedData.resize(size);
 			size_t _StartPos = 0;
 			for (size_t i = 0; i < size; ++i)
@@ -107,7 +109,7 @@ RECORD(packed_test)
 				_StartPos += S_C(size_t, Entry_Dev.Entry.Data.Size);
 			}
 
-			auto jsonl_job = std::thread([&]() {
+			jobs.emplace_back([&]() {
 				for (size_t i = 0; i < PackedData.size(); ++i)
 				{
 					const auto& Entry_Dev = get<0>(PackedData[i]);
@@ -117,17 +119,17 @@ RECORD(packed_test)
 				}
 			});
 
-			TVector<std::byte> TokenData;
-			TVector<std::byte> CotData;
+			FByteVector TokenData;
+			FByteVector CotData;
 			for (size_t i = 0; i < size; ++i)
 			{
 				const auto& Entry_Dev = get<0>(PackedData[i]);
 				const auto& ContentBuffer = get<1>(PackedData[i]);
 				{
-					std::byte			 buffer[FPackedTokenEntry_SerializedSize];
-					std::span<std::byte> buffer_span = buffer;
-					bool				 bSuccess = GetSerialized(Entry_Dev.Entry, buffer_span);
-					HLVM_ENSURE(bSuccess, TXT("GetSerialized failed"));
+					std::byte	buffer[FPackedTokenEntry_SerializedSize];
+					FByteBuffer buffer_span = buffer;
+					bool		bSuccess = SerializeTo(Entry_Dev.Entry, buffer_span);
+					HLVM_ENSURE(bSuccess, TXT("SerializeTo failed"));
 					std::move(buffer_span.begin(), buffer_span.end(), std::back_inserter(TokenData));
 				}
 				{
@@ -137,23 +139,40 @@ RECORD(packed_test)
 
 			// Compress and Encrypt
 			{
-				auto Compressed = FZstd::Compress(TokenData);
-				auto Encrypted = FRSA::EncryptPCKS8(Compressed);
-				fileTokHandle.Write(Encrypted.data(), Encrypted.size());
-			}
-			{
 				fileCotHandle.Write(CotData.data(), CotData.size());
+				FRSA::SignToFile(TO_CONST_BYTE_BUFFER(CotData), PackedCotFile.AppendExtension(HLVM_RSA_SIGNATURE_EXT));
 			}
 
-			jsonl_job.join();
+			{
+				auto Compressed = FZstd::Compress(TokenData);
+				auto Encrypted = FRSA::Encrypt(Compressed);
+				fileTokHandle.Write(Encrypted.data(), Encrypted.size());
+				FRSA::SignToFile(TO_CONST_BYTE_BUFFER(Encrypted), PackedTokFile.AppendExtension(HLVM_RSA_SIGNATURE_EXT));
+				/**
+				 * Compress, Encrypt and sign must be in the same thread
+				 */
+				//				jobs.emplace_back([&]() {
+				//					auto Compressed = FZstd::Compress(TokenData);
+				//					auto Encrypted = FRSA::Encrypt(Compressed);
+				//					fileTokHandle.Write(Encrypted.data(), Encrypted.size());
+				//					FRSA::SignToFile(TO_CONST_BYTE_BUFFER(Encrypted), PackedTokFile.AppendExtension(HLVM_RSA_SIGNATURE_EXT));
+				//				});
+			}
+
+			for (auto& job : jobs)
+			{
+				job.join();
+			}
 		}
 
 		{
-			HLVM_LOG(LogTest, info, TXT("Test PackedFileHandle read token file: {}"), *PackedTokFile);
-			FPackedFileHandle fileHandle;
-			HLVM_SCOPED_VARIABLE(
-				ScopedFileHandle, [&]() -> void { fileHandle.Open(PackedFileName); },
-				[&]() -> void { fileHandle.Close(); });
+			std::thread([&]() {
+				HLVM_LOG(LogTest, info, TXT("Test PackedFileHandle read token file: {}"), *PackedTokFile);
+				FPackedFileHandle fileHandle;
+				HLVM_SCOPED_VARIABLE(
+					ScopedFileHandle, [&]() -> void { fileHandle.Open(PackedFileName); },
+					[&]() -> void { fileHandle.Close(); });
+			}).join();
 		}
 	}
 }

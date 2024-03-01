@@ -34,7 +34,7 @@ private:
  * boost std:fbuf init file before mapping https://stackoverflow.com/questions/70480239/boost-mmaping-a-file-into-memory-for-readswrites
  */
 
-class FBoostFileHandle final : public IFileHandle, public FAtomicFlagStatic
+class FBoostFileHandle final : public IFileHandle
 {
 public:
 	FBoostFileHandle() = default;
@@ -51,6 +51,11 @@ public:
 
 	virtual OpRetType								  Truncate(size_t Size) final override;
 	[[nodiscard]] virtual std::shared_ptr<IFFileStat> Stat(const FPath& FilePath) final override;
+
+	/**
+	 * For read only mapped file, we can use this to get the buffer range
+	 */
+	FConstByteBuffer GetMappedBufferReadOnly() const;
 
 private:
 	void		MappedFileLazyInit();

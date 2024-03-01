@@ -6,7 +6,11 @@
 
 #include "GlobalDefinition.h"
 
+#ifndef HLVM_JSONL_FILE_EXT
+	#define HLVM_JSONL_FILE_EXT TXT(".jsonl")
+#endif
+
 #ifndef HLVM_JSONL_LINE_SEPARATOR
 	#define HLVM_JSONL_LINE_SEPARATOR TXT("\r\t\n")
-// HLVM_INLINE_VAR const std::span<const std::byte> HLVM_JSONL_LINE_SEPARATOR_BUFFER{ R_C(const std::byte*, HLVM_JSONL_LINE_SEPARATOR), 3 };
+// HLVM_INLINE_VAR const FConstByteBuffer HLVM_JSONL_LINE_SEPARATOR_BUFFER{ R_C(const std::byte*, HLVM_JSONL_LINE_SEPARATOR), 3 };
 #endif
