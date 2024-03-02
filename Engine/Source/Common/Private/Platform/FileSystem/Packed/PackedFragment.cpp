@@ -29,7 +29,7 @@ void FPackedContainerFragment::Close()
 	Region.swap(dummy);
 }
 
-FConstByteBuffer FPackedContainerFragment::GetSubRegion(const FPackedTokenEntryData& Data) const
+HLVM_NODISCARD FConstByteBuffer FPackedContainerFragment::GetSubRegion(const FPackedTokenEntryData& Data) const
 {
 	size_t Offset = Data.StartPos - FragmentStartPos;
 	HLVM_ASSERT(Data.StartPos >= FragmentStartPos && Offset + Data.Size <= FragmentSize, TXT("Offset out of bounds"));

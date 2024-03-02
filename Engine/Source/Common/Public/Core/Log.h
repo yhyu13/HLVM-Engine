@@ -49,9 +49,6 @@ struct FLogCatgegory
 
 DELCARE_LOG_CATEGORY(LogAssert)
 DELCARE_LOG_CATEGORY(LogTemp)
-DELCARE_LOG_CATEGORY(LogEngine)
-DELCARE_LOG_CATEGORY(LogGame)
-DELCARE_LOG_CATEGORY(LogEditor)
 
 /**
  * DEPRECATED: Dummy place holder for defining a log category (since we use inline constexpr, this is deprecated)

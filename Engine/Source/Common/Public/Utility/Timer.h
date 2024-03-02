@@ -55,14 +55,14 @@ public:
 	inline ret_type Mark(bool reset = false) noexcept
 	{
 		auto now = std::chrono::steady_clock::now();
-		if (!m_init) [[unlikely]]
+		if (!m_init) HLVM_UNLIKELY
 		{
 			m_last = now;
 			m_init = true;
 			return 0;
 		}
 		auto ret = std::chrono::duration<ret_type, ratio>(now - m_last).count();
-		if (reset) [[unlikely]]
+		if (reset) HLVM_UNLIKELY
 		{
 			m_last = now;
 		}

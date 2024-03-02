@@ -8,7 +8,7 @@
 
 DELCARE_LOG_CATEGORY(LogZstd)
 
-TVector<std::byte> FZstd::Compress(const FByteBuffer& data, int compress_level, bool bShrinkOutputBuffer)
+HLVM_NODISCARD TVector<std::byte> FZstd::Compress(const FConstByteBuffer& data, int compress_level, bool bShrink)
 {
 	HLVM_SCOPED_TIMER(FString::Format(TXT("Zstd compress size {} level {}"), data.size(), compress_level));
 
@@ -20,7 +20,8 @@ TVector<std::byte> FZstd::Compress(const FByteBuffer& data, int compress_level, 
 	comp_buffer.resize(est_compress_size);
 	auto compress_size = ZSTD_compress(comp_buffer.data(), est_compress_size, data.data(), data.size(), compress_level);
 	comp_buffer.resize(compress_size);
-	if (bShrinkOutputBuffer)
+
+	if (bShrink)
 	{
 		comp_buffer.shrink_to_fit();
 	}
@@ -31,7 +32,7 @@ TVector<std::byte> FZstd::Compress(const FByteBuffer& data, int compress_level, 
 	return comp_buffer;
 }
 
-TVector<std::byte> FZstd::Decompress(const FByteBuffer& data, bool bShrinkOutputBuffer)
+HLVM_NODISCARD TVector<std::byte> FZstd::Decompress(const FConstByteBuffer& data, bool bShrink)
 {
 	HLVM_SCOPED_TIMER(FString::Format(TXT("Zstd decompress size {}"), data.size()));
 
@@ -45,7 +46,8 @@ TVector<std::byte> FZstd::Decompress(const FByteBuffer& data, bool bShrinkOutput
 	decomp_buffer.resize(est_decomp_size);
 	size_t const decomp_size = ZSTD_decompress(decomp_buffer.data(), est_decomp_size, data.data(), data.size());
 	decomp_buffer.resize(decomp_size);
-	if (bShrinkOutputBuffer)
+
+	if (bShrink)
 	{
 		decomp_buffer.shrink_to_fit();
 	}

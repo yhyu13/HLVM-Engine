@@ -6,11 +6,9 @@
 #include "Core/Log.h"
 #include "Platform/GenericPlatformDebuggerUtil.h"
 
-[[noreturn]] void hlvm_internal_assert(const TCHAR* Expression, FString&& Message, const TCHAR* File, int Line)
+HLVM_NORETURN void hlvm_internal_assert(const TCHAR* Expression, FString&& Message, const TCHAR* File, int Line)
 {
-	const FCharStringView& StackTrace = FGenericPlatformDebuggerUtil::GetStackTrace();
-	const FString&		   msg = FString::Format(TXT("{1} with '{2}' at {3}:{4}\n{0}"), *StackTrace, Expression,
-				Message, File, Line);
+	const FString& msg = FString::Format(TXT("{1} with '{2}' at {3}:{4}\n{0}"), *FGenericPlatformDebuggerUtil::GetStackTrace(), Expression, Message, File, Line);
 	HLVM_LOG(LogAssert, critical, *msg);
 	HLVM_TRY_DEBUG_BREAK();
 	throw std::runtime_error(msg.ToCharStr());

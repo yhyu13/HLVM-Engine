@@ -197,14 +197,16 @@ IFileHandle::OpRetType FBoostFileHandle::Close()
 			mMappedLazyInit = false;
 		}
 
-		if (Status_InOut->bCancelByUser) [[unlikely]]
-		{
-			Status_InOut->eFileOpStatus = EFileOpStatus::Canceled;
-		}
-		else [[likely]]
-		{
-			Status_InOut->eFileOpStatus = EFileOpStatus::Success;
-		}
+		if (Status_InOut->bCancelByUser)
+			HLVM_UNLIKELY
+			{
+				Status_InOut->eFileOpStatus = EFileOpStatus::Canceled;
+			}
+		else
+			HLVM_LIKELY
+			{
+				Status_InOut->eFileOpStatus = EFileOpStatus::Success;
+			}
 		mOpened = false;
 		BFH_VERBOSE_LOG(TXT("Close file success"));
 	}
@@ -273,14 +275,16 @@ IFileHandle::OpRetType FBoostFileHandle::Read(void* Buffer, size_t Size, const F
 			BFH_HANDLE_ENSURE(!mFStream->fail(), TXT("File operation failed"));
 		}
 
-		if (Status_InOut->bCancelByUser) [[unlikely]]
-		{
-			Status_InOut->eFileOpStatus = EFileOpStatus::Canceled;
-		}
-		else [[likely]]
-		{
-			Status_InOut->eFileOpStatus = EFileOpStatus::Success;
-		}
+		if (Status_InOut->bCancelByUser)
+			HLVM_UNLIKELY
+			{
+				Status_InOut->eFileOpStatus = EFileOpStatus::Canceled;
+			}
+		else
+			HLVM_LIKELY
+			{
+				Status_InOut->eFileOpStatus = EFileOpStatus::Success;
+			}
 		BFH_VERBOSE_LOG(TXT("Read file success with {} bytes"), Size);
 	}
 	catch (std::exception& Exception)
@@ -296,10 +300,11 @@ IFileHandle::OpRetType FBoostFileHandle::Read(void* Buffer, size_t Size, const F
 
 	// Reset if necessary
 	if (SeekCtx.bResetPos)
-	{
-		BFH_VERBOSE_LOG(TXT("bResetPos after read"));
-		Seek(Prev_Tell, EWhence::Begin);
-	}
+		HLVM_UNLIKELY
+		{
+			BFH_VERBOSE_LOG(TXT("bResetPos after read"));
+			Seek(Prev_Tell, EWhence::Begin);
+		}
 	// Erase if necessary
 	else if (SeekCtx.bEraseSeekPos)
 	{
@@ -388,14 +393,16 @@ IFileHandle::OpRetType FBoostFileHandle::Write(const void* Buffer, size_t Size, 
 			BFH_HANDLE_ENSURE(!mFStream->fail(), TXT("File operation failed"));
 		}
 
-		if (Status_InOut->bCancelByUser) [[unlikely]]
-		{
-			Status_InOut->eFileOpStatus = EFileOpStatus::Canceled;
-		}
-		else [[likely]]
-		{
-			Status_InOut->eFileOpStatus = EFileOpStatus::Success;
-		}
+		if (Status_InOut->bCancelByUser)
+			HLVM_UNLIKELY
+			{
+				Status_InOut->eFileOpStatus = EFileOpStatus::Canceled;
+			}
+		else
+			HLVM_LIKELY
+			{
+				Status_InOut->eFileOpStatus = EFileOpStatus::Success;
+			}
 		BFH_VERBOSE_LOG(TXT("Write file success with {} bytes"), Size);
 	}
 	catch (std::exception& Exception)
@@ -446,14 +453,16 @@ IFileHandle::OpRetType FBoostFileHandle::Flush()
 			BFH_HANDLE_ENSURE(!mFStream->fail(), TXT("File operation failed"));
 		}
 
-		if (Status_InOut->bCancelByUser) [[unlikely]]
-		{
-			Status_InOut->eFileOpStatus = EFileOpStatus::Canceled;
-		}
-		else [[likely]]
-		{
-			Status_InOut->eFileOpStatus = EFileOpStatus::Success;
-		}
+		if (Status_InOut->bCancelByUser)
+			HLVM_UNLIKELY
+			{
+				Status_InOut->eFileOpStatus = EFileOpStatus::Canceled;
+			}
+		else
+			HLVM_LIKELY
+			{
+				Status_InOut->eFileOpStatus = EFileOpStatus::Success;
+			}
 		BFH_VERBOSE_LOG(TXT("Flush file"));
 	}
 	catch (std::exception& Exception)
@@ -503,14 +512,16 @@ IFileHandle::OpRetType FBoostFileHandle::Seek(int64_t Offset, EWhence Whence)
 			BFH_HANDLE_ENSURE(!mFStream->fail(), TXT("File operation failed"));
 		}
 
-		if (Status_InOut->bCancelByUser) [[unlikely]]
-		{
-			Status_InOut->eFileOpStatus = EFileOpStatus::Canceled;
-		}
-		else [[likely]]
-		{
-			Status_InOut->eFileOpStatus = EFileOpStatus::Success;
-		}
+		if (Status_InOut->bCancelByUser)
+			HLVM_UNLIKELY
+			{
+				Status_InOut->eFileOpStatus = EFileOpStatus::Canceled;
+			}
+		else
+			HLVM_LIKELY
+			{
+				Status_InOut->eFileOpStatus = EFileOpStatus::Success;
+			}
 		BFH_VERBOSE_LOG(TXT("Seek success given offset {} with {}"), Offset, TO_TCHAR_STR(magic_enum::enum_name(Whence).data()));
 	}
 	catch (std::exception& Exception)
@@ -548,14 +559,16 @@ IFileHandle::IFileHandle::OpRetType FBoostFileHandle::Tell(int64_t& Offset)
 			BFH_HANDLE_ENSURE(!mFStream->fail(), TXT("File operation failed"));
 		}
 
-		if (Status_InOut->bCancelByUser) [[unlikely]]
-		{
-			Status_InOut->eFileOpStatus = EFileOpStatus::Canceled;
-		}
-		else [[likely]]
-		{
-			Status_InOut->eFileOpStatus = EFileOpStatus::Success;
-		}
+		if (Status_InOut->bCancelByUser)
+			HLVM_UNLIKELY
+			{
+				Status_InOut->eFileOpStatus = EFileOpStatus::Canceled;
+			}
+		else
+			HLVM_LIKELY
+			{
+				Status_InOut->eFileOpStatus = EFileOpStatus::Success;
+			}
 		BFH_VERBOSE_LOG(TXT("Tell success with offset {}"), Offset);
 	}
 	catch (std::exception& Exception)
@@ -594,14 +607,16 @@ IFileHandle::OpRetType FBoostFileHandle::Size(size_t& Size)
 			BFH_HANDLE_ENSURE(!mFStream->fail(), TXT("File operation failed"));
 		}
 
-		if (Status_InOut->bCancelByUser) [[unlikely]]
-		{
-			Status_InOut->eFileOpStatus = EFileOpStatus::Canceled;
-		}
-		else [[likely]]
-		{
-			Status_InOut->eFileOpStatus = EFileOpStatus::Success;
-		}
+		if (Status_InOut->bCancelByUser)
+			HLVM_UNLIKELY
+			{
+				Status_InOut->eFileOpStatus = EFileOpStatus::Canceled;
+			}
+		else
+			HLVM_LIKELY
+			{
+				Status_InOut->eFileOpStatus = EFileOpStatus::Success;
+			}
 		BFH_VERBOSE_LOG(TXT("Size success with size {}"), Size);
 	}
 	catch (std::exception& Exception)
@@ -642,14 +657,16 @@ IFileHandle::OpRetType FBoostFileHandle::Truncate(size_t Size)
 			}
 		}
 
-		if (Status_InOut->bCancelByUser) [[unlikely]]
-		{
-			Status_InOut->eFileOpStatus = EFileOpStatus::Canceled;
-		}
-		else [[likely]]
-		{
-			Status_InOut->eFileOpStatus = EFileOpStatus::Success;
-		}
+		if (Status_InOut->bCancelByUser)
+			HLVM_UNLIKELY
+			{
+				Status_InOut->eFileOpStatus = EFileOpStatus::Canceled;
+			}
+		else
+			HLVM_LIKELY
+			{
+				Status_InOut->eFileOpStatus = EFileOpStatus::Success;
+			}
 		BFH_VERBOSE_LOG(TXT("Truncate success with size {}"), Size);
 	}
 	catch (std::exception& Exception)
@@ -666,7 +683,7 @@ IFileHandle::OpRetType FBoostFileHandle::Truncate(size_t Size)
 	return *this;
 }
 
-std::shared_ptr<IFFileStat> FBoostFileHandle::Stat(const FPath& FilePath)
+HLVM_NODISCARD std::shared_ptr<IFFileStat> FBoostFileHandle::Stat(const FPath& FilePath)
 {
 	std::shared_ptr<IFFileStat> Stat;
 	BFH_HANDLE_STATUS(Status_InOut);
@@ -680,14 +697,16 @@ std::shared_ptr<IFFileStat> FBoostFileHandle::Stat(const FPath& FilePath)
 			Stat = std::make_shared<FBoostFileStat>(FilePath);
 		}
 
-		if (Status_InOut->bCancelByUser) [[unlikely]]
-		{
-			Status_InOut->eFileOpStatus = EFileOpStatus::Canceled;
-		}
-		else [[likely]]
-		{
-			Status_InOut->eFileOpStatus = EFileOpStatus::Success;
-		}
+		if (Status_InOut->bCancelByUser)
+			HLVM_UNLIKELY
+			{
+				Status_InOut->eFileOpStatus = EFileOpStatus::Canceled;
+			}
+		else
+			HLVM_LIKELY
+			{
+				Status_InOut->eFileOpStatus = EFileOpStatus::Success;
+			}
 		BFH_VERBOSE_LOG2(TXT("Stat success"));
 	}
 	catch (std::exception& Exception)
@@ -704,7 +723,7 @@ std::shared_ptr<IFFileStat> FBoostFileHandle::Stat(const FPath& FilePath)
 	return Stat;
 }
 
-FConstByteBuffer FBoostFileHandle::GetMappedBufferReadOnly() const
+HLVM_NODISCARD FConstByteBuffer FBoostFileHandle::GetMappedBufferReadOnly() const
 {
 	BFH_HANDLE_ASSERT(mOpened, TXT("File operation continue w/o open"));
 	BFH_HANDLE_ASSERT(mMappedFile, TXT("MappedFile file null"));

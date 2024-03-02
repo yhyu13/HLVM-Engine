@@ -68,7 +68,6 @@ enum class EFileLock : uint8_t
 	InterProcessLock = 1 << 1,
 	FullLock = ThreadLock | InterProcessLock
 };
-
 inline bool operator&(EFileLock a, EFileLock b)
 {
 	return static_cast<uint8_t>(a) & static_cast<uint8_t>(b);
@@ -83,6 +82,12 @@ struct FFileOptions
 	EFileMapped eFileMapped{ EFileMapped::Mapped };
 	EFileAsync	eFileAsync{ EFileAsync::NoAsync };
 	EFileLock	eFileLock{ EFileLock::NoLock };
+};
+HLVM_INLINE_VAR const FFileOptions GReadOnlyFileOptions{
+	.eFileMode = EFileMode::R,
+	.eFileMapped = EFileMapped::Mapped,
+	.eFileAsync = EFileAsync::NoAsync,
+	.eFileLock = EFileLock::NoLock,
 };
 
 /**
@@ -156,7 +161,6 @@ enum class EWhence : uint8_t
 	Current = std::ios::cur,
 	End = std::ios::end,
 };
-
 inline bool operator&(EWhence a, EWhence b)
 {
 	return static_cast<uint8_t>(a) == static_cast<uint8_t>(b);
@@ -166,8 +170,8 @@ struct FFileSeekCtx
 {
 	int64_t Offset{ 0 };
 	EWhence Whence{ EWhence::Current };
-	BIT_FLAG(bResetPos){ false };	  // Reset seek pos to location before (offset, whence) is applied. This will override bEraseSeekPos
-	BIT_FLAG(bEraseSeekPos){ false }; // Reset seek pos to (offset, whence) right before r/w. Otherwise, advance file pointer
+	BIT_FLAG(bResetPos){ false };	  // Reset seek pos to previous location after reading and writing, so to ignore the effect of this file seeking
+	BIT_FLAG(bEraseSeekPos){ false }; // Erase the effect of advancing seek pos when reading and writing, so to keep our seek pos unchanged
 
 	/**
 	 * see if non trivial seek, which requires extra calling seek
@@ -177,6 +181,9 @@ struct FFileSeekCtx
 		return !(Offset == 0 && Whence == EWhence::Current);
 	}
 };
+HLVM_INLINE_VAR const FFileSeekCtx GFileSeekBegCtx{ 0, EWhence::Begin, false, false };
+HLVM_INLINE_VAR const FFileSeekCtx GFileSeekEndCtx{ 0, EWhence::End, false, false };
+HLVM_INLINE_VAR const FFileSeekCtx GFileSeekCurCtx{ 0, EWhence::Current, false, false };
 
 class IFFileStat
 {
@@ -201,10 +208,10 @@ public:
 	IFileHandle() = default;
 	virtual ~IFileHandle() = default;
 
-	virtual OpRetType Open(const FPath& FilePath, const FFileOptions& Options = FFileOptions()) = 0;
+	virtual OpRetType Open(const FPath& FilePath, const FFileOptions& Options = GReadOnlyFileOptions) = 0;
 	virtual OpRetType Close() = 0;
-	virtual OpRetType Read(void* Buffer, size_t Size, const FFileSeekCtx& SeekCtx = FFileSeekCtx()) = 0;
-	virtual OpRetType Write(const void* Buffer, size_t Size, const FFileSeekCtx& SeekCtx = FFileSeekCtx()) = 0;
+	virtual OpRetType Read(void* Buffer, size_t Size, const FFileSeekCtx& SeekCtx = GFileSeekCurCtx) = 0;
+	virtual OpRetType Write(const void* Buffer, size_t Size, const FFileSeekCtx& SeekCtx = GFileSeekCurCtx) = 0;
 	virtual OpRetType Flush() = 0;
 	virtual OpRetType Seek(int64_t Offset, EWhence Whence = EWhence::Begin) = 0;
 	virtual OpRetType Tell(int64_t& Offset) = 0;
@@ -214,7 +221,7 @@ public:
 	 * These methods can be static methods, but since we require inheritance, they have to be member virtual methods
 	 */
 	virtual OpRetType								  Truncate(size_t Size) = 0;
-	[[nodiscard]] virtual std::shared_ptr<IFFileStat> Stat(const FPath& FilePath) = 0;
+	HLVM_NODISCARD virtual std::shared_ptr<IFFileStat> Stat(const FPath& FilePath) = 0;
 
 public:
 	operator bool() const noexcept

@@ -21,6 +21,8 @@
 #include <parallel_hashmap/phmap.h>
 #pragma clang diagnostic pop
 
+#define HLVM_CONTAINER_SHRINK false
+
 template <typename T, size_t N>
 using TSmallVector = boost::container::small_vector<T, N>;
 

@@ -119,9 +119,6 @@ public:
 	static TSmallVector32<FPath> Find(const FPath& root_dir, const FString& regex, bool recursive = false);
 	static FString				 DumpJson(const TSmallVector32<FPath>& paths);
 
-	HLVM_INLINE_VAR HLVM_STATIC_VAR boost::regex PathReplacePattern{ R"(\$\{([^}]+)\})" };
-	HLVM_INLINE_VAR HLVM_STATIC_VAR TMap<std::string, std::string> PathReplaceMap;
-
 private:
 	/**
 	 * Resolve path ${XXX} with certain values
@@ -152,3 +149,6 @@ namespace std
 		}
 	};
 } // namespace std
+
+HLVM_INLINE_VAR const boost::regex PathReplacePattern{ R"(\$\{([^}]+)\})" };
+HLVM_INLINE_VAR TMap<std::string, std::string> PathReplaceMap;

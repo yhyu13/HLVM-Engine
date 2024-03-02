@@ -7,7 +7,7 @@
 #include "Core/String.h"
 #include "Template/ExpressionTemplate.tpp"
 
-[[noreturn]] void hlvm_internal_assert(const TCHAR* Expression, FString&& Message, const TCHAR* File, int Line);
+HLVM_NORETURN void hlvm_internal_assert(const TCHAR* Expression, FString&& Message, const TCHAR* File, int Line);
 
 #ifndef HLVM_ASSERT_EVEN_IN_RELEASE
 	#define HLVM_ASSERT_EVEN_IN_RELEASE 0

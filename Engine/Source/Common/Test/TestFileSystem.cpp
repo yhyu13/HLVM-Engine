@@ -19,6 +19,10 @@ DEFINE_LOG_CATEGORY(LogTest)
 */
 static void test_boostfile_test()
 {
+	HLVM_SCOPED_VARIABLE(
+		ScopedMallocator, [&]() -> void { SwapMallocator(&GStdMllocator); },
+		[&]() -> void { SwapMallocator(); });
+
 	HLVM_LOG(LogTest, info, TXT("Test BoostFileHandle"));
 	{
 		FBoostFileHandle fileHandle;
@@ -60,6 +64,10 @@ RECORD_TEST_FUNC(boostfile_test)
 
 RECORD(packed_test)
 {
+	HLVM_SCOPED_VARIABLE(
+		ScopedMallocator, [&]() -> void { SwapMallocator(&GStdMllocator); },
+		[&]() -> void { SwapMallocator(); });
+
 	HLVM_LOG(LogTest, info, TXT("Test PackedFileHandle"));
 
 	{
@@ -140,14 +148,22 @@ RECORD(packed_test)
 			// Compress and Encrypt
 			{
 				fileCotHandle.Write(CotData.data(), CotData.size());
+#if HLVM_PACKED_FILE_WITH_SIGNATURE
 				FRSA::SignToFile(TO_CONST_BYTE_BUFFER(CotData), PackedCotFile.AppendExtension(HLVM_RSA_SIGNATURE_EXT));
+#endif
 			}
 
 			{
-				auto Compressed = FZstd::Compress(TokenData);
-				auto Encrypted = FRSA::Encrypt(Compressed);
+				const auto Compressed = FZstd::Compress(TokenData);
+#if HLVM_PACKED_TOKEN_FILE_WITH_ENCRYPTION
+				const auto Encrypted = FRSA::Encrypt(Compressed);
+#else
+				const auto& Encrypted = Compressed;
+#endif
 				fileTokHandle.Write(Encrypted.data(), Encrypted.size());
+#if HLVM_PACKED_FILE_WITH_SIGNATURE
 				FRSA::SignToFile(TO_CONST_BYTE_BUFFER(Encrypted), PackedTokFile.AppendExtension(HLVM_RSA_SIGNATURE_EXT));
+#endif
 				/**
 				 * Compress, Encrypt and sign must be in the same thread
 				 */

@@ -9,5 +9,5 @@
 #include "PointerTemplate.tpp"
 #include "ExpressionTemplate.tpp"
 #include "FunctionTemplate.tpp"
-
+#include "PrintTemplate.tpp"
 #include "Obfuscate/MetaString.tpp"

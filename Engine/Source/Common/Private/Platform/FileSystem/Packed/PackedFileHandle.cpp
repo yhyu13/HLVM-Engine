@@ -104,11 +104,11 @@ IFileHandle::OpRetType FPackedFileHandle::Open(const FPath& FilePath, const FFil
 						const bool exist = FPath::Exists(ContainerFilePath);
 						PFH_HANDLE_ENSURE(exist, TXT("Packed container file does not exist"));
 
+#if HLVM_PACKED_FILE_WITH_SIGNATURE
 						// Verify container file signature
-						{
-							PFH_HANDLE_ENSURE(FRSA::VerifyFileSign(ContainerFilePath, ContainerFilePath.AppendExtension(HLVM_RSA_SIGNATURE_EXT)),
-								TXT("Packed container file signature verification failed"));
-						}
+						PFH_HANDLE_ENSURE(FRSA::VerifyFileSignature(ContainerFilePath, ContainerFilePath.AppendExtension(HLVM_RSA_SIGNATURE_EXT)),
+							TXT("Packed container file signature verification failed"));
+#endif
 
 						// Lock container file
 						file_lock _Lock(ContainerFilePath);
@@ -128,12 +128,6 @@ IFileHandle::OpRetType FPackedFileHandle::Open(const FPath& FilePath, const FFil
 				const bool exist = FPath::Exists(TokenFilePath);
 				PFH_HANDLE_ENSURE(exist, TXT("Packed token file does not exist"));
 
-				// Verify Token file signature
-				{
-					PFH_HANDLE_ENSURE(FRSA::VerifyFileSign(TokenFilePath, TokenFilePath.AppendExtension(HLVM_RSA_SIGNATURE_EXT)),
-						TXT("Packed token file signature verification failed"));
-				}
-
 				// Lock token file
 				file_lock _Lock(TokenFilePath);
 				mTokenFileLock = MoveTemp(sharable_lock<file_lock>(_Lock));
@@ -148,10 +142,19 @@ IFileHandle::OpRetType FPackedFileHandle::Open(const FPath& FilePath, const FFil
 				TVector<std::byte> TokenData{ fileSize };
 				fileHandle.Read(TokenData.data(), TokenData.size(), { .Offset = 0, .Whence = EWhence::Begin });
 
+#if HLVM_PACKED_FILE_WITH_SIGNATURE
+				// Verify Token file signature
+				PFH_HANDLE_ENSURE(FRSA::VerifyFileSignature(TokenData, TokenFilePath.AppendExtension(HLVM_RSA_SIGNATURE_EXT)),
+					TXT("Packed token file signature verification failed"));
+#endif
 				// Decryption & Decompression
 				{
-					auto Decrypted = FRSA::Decrypt(TokenData);
-					auto Decompressed = FZstd::Decompress({ R_C(std::byte*, Decrypted.data()), Decrypted.size() });
+#if HLVM_PACKED_TOKEN_FILE_WITH_ENCRYPTION
+					const auto Decrypted = FRSA::Decrypt(TokenData);
+#else
+					const auto& Decrypted = TokenData;
+#endif
+					const auto Decompressed = FZstd::Decompress({ R_C(const std::byte*, Decrypted.data()), Decrypted.size() });
 
 					const std::byte* lineStart = Decompressed.data();
 					const std::byte* lineEnd = lineStart + FPackedTokenEntry_SerializedSize;
@@ -196,14 +199,14 @@ IFileHandle::OpRetType FPackedFileHandle::Open(const FPath& FilePath, const FFil
 						{
 							size_t CurrentFragmentID = mContainerFragments.size() - 1;
 							auto   result = mTokenEntryMap.insert_or_assign(MoveTemp(Entry.PathHash), { MoveTemp(Entry.Data), CurrentFragmentID });
-							PFH_HANDLE_ENSURE(result.second, TXT("Key already exists, value updated from {} to {}"), R_C(intptr_t, lineStart), R_C(intptr_t, lineEnd));
+							PFH_HANDLE_ENSURE(result.second, TXT("Key already exists, value updated from {} to {}"), R_C(uintptr_t, lineStart), R_C(uintptr_t, lineEnd));
 						}
 						lineStart = lineEnd;
 						lineEnd = lineStart + FPackedTokenEntry_SerializedSize;
 					}
 
 					// Sanity check on we reach finish correctly
-					PFH_HANDLE_ENSURE(lineStart == tokenDataEnd, TXT("Token data end not reached lineStart {} tokenDataEnd {}"), R_C(intptr_t, lineStart), R_C(intptr_t, tokenDataEnd));
+					PFH_HANDLE_ENSURE(lineStart == tokenDataEnd, TXT("Token data end not reached lineStart {} tokenDataEnd {}"), R_C(uintptr_t, lineStart), R_C(uintptr_t, tokenDataEnd));
 					PFH_VERBOSE_LOG(TXT("TokenEntryMap size: {}"), mTokenEntryMap.size());
 					mContainerFragments.shrink_to_fit();
 					PFH_VERBOSE_LOG(TXT("ContainerFragments size: {}"), mContainerFragments.size());
@@ -254,14 +257,16 @@ IFileHandle::OpRetType FPackedFileHandle::Close()
 			mContainerFileLock.release();
 		}
 
-		if (Status_InOut->bCancelByUser) [[unlikely]]
-		{
-			Status_InOut->eFileOpStatus = EFileOpStatus::Canceled;
-		}
-		else [[likely]]
-		{
-			Status_InOut->eFileOpStatus = EFileOpStatus::Success;
-		}
+		if (Status_InOut->bCancelByUser)
+			HLVM_UNLIKELY
+			{
+				Status_InOut->eFileOpStatus = EFileOpStatus::Canceled;
+			}
+		else
+			HLVM_LIKELY
+			{
+				Status_InOut->eFileOpStatus = EFileOpStatus::Success;
+			}
 		mOpened = false;
 		PFH_VERBOSE_LOG(TXT("Close file success"));
 	}
@@ -328,7 +333,7 @@ IFileHandle::OpRetType FPackedFileHandle::Truncate(size_t)
 	return *this;
 }
 
-std::shared_ptr<IFFileStat> FPackedFileHandle::Stat(const FPath&)
+HLVM_NODISCARD std::shared_ptr<IFFileStat> FPackedFileHandle::Stat(const FPath&)
 {
 	// No point to implement this
 	HLVM_NOT_IMPLEMENTED();

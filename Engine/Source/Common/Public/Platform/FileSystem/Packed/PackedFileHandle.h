@@ -46,7 +46,7 @@ public:
 	virtual OpRetType Size(size_t& Size) final override;
 
 	virtual OpRetType								  Truncate(size_t Size) final override;
-	[[nodiscard]] virtual std::shared_ptr<IFFileStat> Stat(const FPath& FilePath) final override;
+	HLVM_NODISCARD virtual std::shared_ptr<IFFileStat> Stat(const FPath& FilePath) final override;
 
 	friend bool operator>(const FPackedFileHandle& Lhs, const FPackedFileHandle& Rhs) noexcept
 	{

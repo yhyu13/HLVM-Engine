@@ -33,29 +33,28 @@ private:
  * boost mapped file https://beta.boost.org/doc/libs/1_83_0/libs/iostreams/doc/classes/mapped_file.html
  * boost std:fbuf init file before mapping https://stackoverflow.com/questions/70480239/boost-mmaping-a-file-into-memory-for-readswrites
  */
-
 class FBoostFileHandle final : public IFileHandle
 {
 public:
 	FBoostFileHandle() = default;
 	~FBoostFileHandle() final override;
 
-	virtual OpRetType Open(const FPath& FilePath, const FFileOptions& Options = FFileOptions()) final override;
+	virtual OpRetType Open(const FPath& FilePath, const FFileOptions& Options = GReadOnlyFileOptions) final override;
 	virtual OpRetType Close() final override;
-	virtual OpRetType Read(void* Buffer, size_t Size, const FFileSeekCtx& SeekCtx = FFileSeekCtx()) final override;
-	virtual OpRetType Write(const void* Buffer, size_t Size, const FFileSeekCtx& SeekCtx = FFileSeekCtx()) final override;
+	virtual OpRetType Read(void* Buffer, size_t Size, const FFileSeekCtx& SeekCtx = GFileSeekCurCtx) final override;
+	virtual OpRetType Write(const void* Buffer, size_t Size, const FFileSeekCtx& SeekCtx = GFileSeekCurCtx) final override;
 	virtual OpRetType Flush() final override;
 	virtual OpRetType Seek(int64_t Offset, EWhence Whence = EWhence::Begin) final override;
 	virtual OpRetType Tell(int64_t& Offset) final override;
 	virtual OpRetType Size(size_t& Size) final override;
 
-	virtual OpRetType								  Truncate(size_t Size) final override;
-	[[nodiscard]] virtual std::shared_ptr<IFFileStat> Stat(const FPath& FilePath) final override;
+	virtual OpRetType								   Truncate(size_t Size) final override;
+	HLVM_NODISCARD virtual std::shared_ptr<IFFileStat> Stat(const FPath& FilePath) final override;
 
 	/**
 	 * For read only mapped file, we can use this to get the buffer range
 	 */
-	FConstByteBuffer GetMappedBufferReadOnly() const;
+	HLVM_NODISCARD FConstByteBuffer GetMappedBufferReadOnly() const;
 
 private:
 	void		MappedFileLazyInit();
@@ -66,7 +65,7 @@ private:
 	boost::iostreams::mapped_file*				mMappedFile{ nullptr };
 	int64_t										mMappedSeekPos{ 0 };
 	std::fstream*								mFStream{ nullptr };
-	mutable std::optional<FRecursiveAtomicFlag> mRecursiveLock;
 	mutable boost::interprocess::file_lock*		mFileLock{ nullptr };
+	mutable std::optional<FRecursiveAtomicFlag> mRecursiveLock;
 	BIT_FLAG(mMappedLazyInit){ false };
 };

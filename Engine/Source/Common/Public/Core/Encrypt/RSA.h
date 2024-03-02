@@ -44,23 +44,15 @@ HLVM_INLINE_VAR const char* 密钥一 = OBFUSCATED_LONG("-----BEGIN PRIVATE KEY-
 													 "fAHoeqUUsEqkp4lJIXvMrw0/\n"
 													 "-----END PRIVATE KEY-----");
 
-HLVM_INLINE_VAR HLVM_TLS_VAR Botan::AutoSeeded_RNG 随机;
+HLVM_INLINE_VAR Botan::AutoSeeded_RNG 随机;
 // load keypair
 HLVM_INLINE_VAR Botan::secure_vector<uint8_t> in{ 密钥一, 密钥一 + std::strlen(密钥一) };
 
-HLVM_INLINE_VAR std::unique_ptr<Botan::Private_Key> 私钥 = Botan::PKCS8::load_key(in);
-HLVM_INLINE_VAR std::unique_ptr<Botan::Public_Key> 公钥 = 私钥->public_key();
+HLVM_INLINE_VAR std::unique_ptr<Botan::Private_Key>* 私钥 = new std::unique_ptr<Botan::Private_Key>(Botan::PKCS8::load_key(in));
+HLVM_INLINE_VAR std::unique_ptr<Botan::Public_Key>* 公钥 = new std::unique_ptr<Botan::Public_Key>((*私钥)->public_key());
 
 HLVM_INLINE_VAR const char* 算法一 = OBFUSCATED_SHORT("OAEP(SHA-256)");
-// encrypt with pk
-HLVM_INLINE_VAR HLVM_TLS_VAR Botan::PK_Encryptor_EME enc(*公钥, 随机, 算法一);
-// decrypt with pk
-HLVM_INLINE_VAR HLVM_TLS_VAR Botan::PK_Decryptor_EME dec(*私钥, 随机, 算法一);
-
-// Signature
-HLVM_INLINE_VAR const char*	 算法二 = OBFUSCATED_SHORT("EMSA_PKCS1(SHA-256)");
-HLVM_INLINE_VAR HLVM_TLS_VAR Botan::PK_Signer 签名(*私钥, 随机, 算法二);
-HLVM_INLINE_VAR HLVM_TLS_VAR Botan::PK_Verifier 验证(*公钥, 算法二);
+HLVM_INLINE_VAR const char* 算法二 = OBFUSCATED_SHORT("EMSA_PKCS1(SHA-256)");
 
 #ifndef HLVM_RSA_SIGNATURE_EXT
 	#define HLVM_RSA_SIGNATURE_EXT TXT(".sig")
@@ -69,9 +61,11 @@ HLVM_INLINE_VAR HLVM_TLS_VAR Botan::PK_Verifier 验证(*公钥, 算法二);
 class FRSA
 {
 public:
-	HLVM_STATIC_FUNC std::vector<uint8_t> Encrypt(const FConstByteBuffer& Buffer);
-	HLVM_STATIC_FUNC Botan::secure_vector<uint8_t> Decrypt(const FConstByteBuffer& Buffer);
+	HLVM_NODISCARD HLVM_STATIC_FUNC std::vector<uint8_t> Encrypt(const FConstByteBuffer& Buffer);
+	HLVM_NODISCARD HLVM_STATIC_FUNC Botan::secure_vector<uint8_t> Decrypt(const FConstByteBuffer& Buffer);
 
-	HLVM_STATIC_FUNC void SignToFile(const FConstByteBuffer& Buffer, const FPath& signature_path);
-	HLVM_STATIC_FUNC bool VerifyFileSign(const FPath& FilePath, const FPath& signature_path);
+	HLVM_STATIC_FUNC void				 SignToFile(const FConstByteBuffer& Buffer, const FPath& signature_path);
+	HLVM_STATIC_FUNC void				 SignToFile(const FPath& FilePath, const FPath& signature_path);
+	HLVM_NODISCARD HLVM_STATIC_FUNC bool VerifyFileSignature(const FConstByteBuffer& FilePath, const FPath& signature_path);
+	HLVM_NODISCARD HLVM_STATIC_FUNC bool VerifyFileSignature(const FPath& FilePath, const FPath& signature_path);
 };
