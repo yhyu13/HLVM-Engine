@@ -5,6 +5,7 @@
 #pragma once
 
 #include "ParallelDefinition.h"
+#include "Platform/GenericPlatformAtomicPointer.h"
 
 #ifndef HLVM_ATOMIC_LOCK_ENABLE_PADDING
 	#define HLVM_ATOMIC_LOCK_ENABLE_PADDING 0
@@ -85,8 +86,8 @@ public:
 	FAtomicLockGuard __lock_guard_s(sc_flag); \
 	ATOMIC_THREAD_FENCE()
 
-	static void LockS() noexcept(!HLVM_DEADLOCK_TIMER);
-	static void UnlockS() noexcept;
+	static void Lock() noexcept(!HLVM_DEADLOCK_TIMER);
+	static void Unlock() noexcept;
 
 protected:
 	HLVM_CACHE_ALIGN HLVM_INLINE_VAR HLVM_STATIC_VAR std::atomic_flag sc_flag{ 0 };
@@ -104,8 +105,8 @@ public:
 	FAtomicLockGuard __lock_guard_ni(ni_flag); \
 	ATOMIC_THREAD_FENCE()
 
-	static void LockNI() noexcept(!HLVM_DEADLOCK_TIMER);
-	static void UnlockNI() noexcept;
+	static void Lock() noexcept(!HLVM_DEADLOCK_TIMER);
+	static void Unlock() noexcept;
 
 protected:
 	HLVM_CACHE_ALIGN HLVM_INLINE_VAR HLVM_STATIC_VAR std::atomic_flag ni_flag{ 0 };
@@ -120,19 +121,16 @@ class FAtomicFlagNC
 public:
 	NOCOPYMOVE(FAtomicFlagNC)
 
-#define LOCK_GUARD_NC()                        \
+#define LOCK_GUARD_()                          \
 	FAtomicLockGuard __lock_guard_nc(nc_flag); \
 	ATOMIC_THREAD_FENCE()
 
 	FAtomicFlagNC() = default;
 
-	void LockNC() const noexcept(!HLVM_DEADLOCK_TIMER);
-	void UnlockNC() const noexcept;
+	void Lock() const noexcept(!HLVM_DEADLOCK_TIMER);
+	void Unlock() const noexcept;
 
 protected:
-	// Prevent delete by this pointer type, this way compiler would not allow it
-	~FAtomicFlagNC() noexcept = default;
-
 	mutable std::atomic_flag nc_flag{ 0 };
 
 private:
@@ -241,5 +239,64 @@ private:
 	PADDING(HLVM_PLATFORM_CACHE_LINE - sizeof(std::atomic_flag));
 #endif
 };
+
+/**
+ * Define 2 rival groups, threads from only one rival group could enter the critical section
+ *  This is useful for the parallelism of excluding reader-writer from each other.
+ */
+class FRWRivalLock
+{
+public:
+	enum Group
+	{
+		Read = 0,
+		Write = 1,
+		NUM_GROUPS = 2
+	};
+
+	NOCOPYMOVE(FRWRivalLock)
+	FRWRivalLock() = default;
+
+	void Lock(int group) const noexcept(!HLVM_DEADLOCK_TIMER);
+	void Unlock() const noexcept;
+
+private:
+	HLVM_CACHE_ALIGN mutable TAtomicPointer<Group*> mCurrentGroupPtr{ nullptr };
+	Group											mGroups[NUM_GROUPS]{ Read, Write };
+	mutable std::atomic_uint_fast32_t				mProgramCounter{ 0 };
+};
+
+// Conditionally apply rival lock. If not enabled, rival lock would not take actual effect.
+template <typename RivalGroupType>
+struct RivialLockGuardCond
+{
+	NOCOPYMOVE(RivialLockGuardCond)
+	RivialLockGuardCond() = delete;
+
+	explicit RivialLockGuardCond(RivalGroupType& flag, int group, bool enabled = true)
+		: mLock(&flag), mEnabled(enabled)
+	{
+		if (mEnabled)
+		{
+			mLock->Lock(group);
+		}
+	}
+
+	~RivialLockGuardCond()
+	{
+		if (mEnabled)
+		{
+			mLock->Unlock();
+		}
+	}
+
+private:
+	RivalGroupType* mLock;
+	BIT_FLAG(mEnabled);
+};
+
+#define LOCK_GUARD_RIVAL(lock, group, ...)                                           \
+	RivialLockGuardCond<FRWRivalLock> __lock_rival_cond(lock, group, ##__VA_ARGS__); \
+	ATOMIC_THREAD_FENCE()
 
 #undef HLVM_ATOMIC_LOCK_ENABLE_PADDING

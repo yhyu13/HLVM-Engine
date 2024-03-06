@@ -17,9 +17,9 @@ static void test_string_test()
 {
 	HLVM_LOG(LogTest, trace, TXT("Test performance impact on different order of formatting!"));
 	{
-		const FCharStringView& StackTrace = FGenericPlatformDebuggerUtil::GetStackTrace();
-		auto				   Message = FString::Format(TXT("Ensure failed: {0}, with '{1}'"), TXT("1!=1"),
-							  FString::Format(TXT("1!=1")));
+		const FStdString& StackTrace = FGenericPlatformDebuggerUtil::GetStackTrace();
+		auto			  Message = FString::Format(TXT("Ensure failed: {0}, with '{1}'"), TXT("1!=1"),
+						 FString::Format(TXT("1!=1")));
 
 		constexpr int kNumThreads = 1;
 		constexpr int kNumIterations = 10;

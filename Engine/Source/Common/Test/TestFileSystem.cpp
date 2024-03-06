@@ -4,8 +4,8 @@
 
 #include "Test.h"
 
-#include "Platform/FileSystem/Boost/BoostFileHandle.h"
-#include "Platform/FileSystem/Packed/PackedFileHandle.h"
+#include "Platform/FileSystem/Boost/BoostPlatformFile.h"
+#include "Platform/FileSystem/Packed/PackedPlatformFile.h"
 
 #include <ylt/struct_pack.hpp>
 #include <ylt/struct_json/json_reader.h>
@@ -19,8 +19,9 @@ DEFINE_LOG_CATEGORY(LogTest)
 */
 static void test_boostfile_test()
 {
+	FMiMallocator MiMallocator{ { .bNewHeap = true } };
 	HLVM_SCOPED_VARIABLE(
-		ScopedMallocator, [&]() -> void { SwapMallocator(&GStdMllocator); },
+		ScopedMallocator, [&]() -> void { SwapMallocator(&MiMallocator); },
 		[&]() -> void { SwapMallocator(); });
 
 	HLVM_LOG(LogTest, info, TXT("Test BoostFileHandle"));
@@ -64,8 +65,9 @@ RECORD_TEST_FUNC(boostfile_test)
 
 RECORD(packed_test)
 {
+	FMiMallocator MiMallocator{ { .bNewHeap = true } };
 	HLVM_SCOPED_VARIABLE(
-		ScopedMallocator, [&]() -> void { SwapMallocator(&GStdMllocator); },
+		ScopedMallocator, [&]() -> void { SwapMallocator(&MiMallocator); },
 		[&]() -> void { SwapMallocator(); });
 
 	HLVM_LOG(LogTest, info, TXT("Test PackedFileHandle"));
@@ -184,10 +186,15 @@ RECORD(packed_test)
 		{
 			std::thread([&]() {
 				HLVM_LOG(LogTest, info, TXT("Test PackedFileHandle read token file: {}"), *PackedTokFile);
-				FPackedFileHandle fileHandle;
-				HLVM_SCOPED_VARIABLE(
-					ScopedFileHandle, [&]() -> void { fileHandle.Open(PackedFileName); },
-					[&]() -> void { fileHandle.Close(); });
+				//				FPackedFileHandle fileHandle;
+				//				HLVM_SCOPED_VARIABLE(
+				//					ScopedFileHandle, [&]() -> void { fileHandle.Open(PackedFileName); },
+				//					[&]() -> void { fileHandle.Close(); });
+
+				FPackedPlatformFile::Get()->Mount(PackedFileName);
+
+				FPackedEntryHandle entryHandle;
+				entryHandle.Open(TXT("./test_0.txt"));
 			}).join();
 		}
 	}

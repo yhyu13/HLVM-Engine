@@ -11,11 +11,18 @@
 DELCARE_LOG_CATEGORY(LogBoostPlatformFile)
 DEFINE_LOG_CATEGORY(LogBoostPlatformFile)
 
+static FBoostPlatformFile SBoostPlatformFile{};
+
 void FBoostPlatformFile::Init()
 {
-	HLVM_ASSERT(!sPlatformFileRedirector[HLVM_ENUM_V(EPlatformFileType, Local)], TXT("Platform file is already registered"));
-	sPlatformFileRedirector[HLVM_ENUM_V(EPlatformFileType, Local)] = new FBoostPlatformFile();
+	HLVM_ASSERT(!sPlatformFileRedirector[HLVM_ENUM_V(EPlatformFileType, Local)], TXT("Local Platform file is already registered"));
+	sPlatformFileRedirector[HLVM_ENUM_V(EPlatformFileType, Local)] = FBoostPlatformFile::Get();
 	HLVM_LOG(LogBoostPlatformFile, debug, TXT("FGenericPlatformFile init FBoostPlatformFile"));
+}
+
+FBoostPlatformFile* FBoostPlatformFile::Get()
+{
+	return &SBoostPlatformFile;
 }
 
 bool FBoostPlatformFile::IsDirectory(const FPath& path)

@@ -31,20 +31,18 @@ FString FPath::DumpJson(const TSmallVector32<FPath>& paths)
 
 void FPath::ResolvePath()
 {
-	/**
-	 *   Replace with patterns:  ${...}
-	 */
 	if (boost::regex_match(this->ToCharStr(), PathReplacePattern))
-	{
-		HLVM_ASSERT(PathReplaceMap.size() > 0, TXT("PathReplaceMap is empty"));
-		std::string result = this->ToCharStr();
-		for (auto const& replacement : PathReplaceMap)
+		HLVM_UNLIKELY
 		{
-			result = boost::regex_replace(result, PathReplacePattern, replacement.second, boost::match_default | boost::format_sed);
+			HLVM_ASSERT(PathReplaceMap.size() > 0, TXT("PathReplaceMap is empty"));
+			std::string result = this->ToCharStr();
+			for (auto const& replacement : PathReplaceMap)
+			{
+				result = boost::regex_replace(result, PathReplacePattern, replacement.second, boost::match_default | boost::format_sed);
+			}
+			HLVM_LOG(LogFPath, trace, TXT("Path {} is resolved to {}"), *(*this), TO_TCHAR_STR(result.c_str()));
+			this->assign(MoveTemp(result));
 		}
-		HLVM_LOG(LogFPath, trace, TXT("Path {} is resolved to {}"), *(*this), TO_TCHAR_STR(result.c_str()));
-		this->assign(MoveTemp(result));
-	}
 }
 
 FPathHash FPath::CalculateHash() const noexcept

@@ -20,21 +20,28 @@ public:
 	FGenericPlatformDebuggerUtil() = default;
 	virtual ~FGenericPlatformDebuggerUtil() = default;
 
+	/**
+	 * Generic Platform method that check if any debugger is attached, might be slow depdending on implementation
+	 */
 	inline static bool IsDebuggerPresent()
 	{
 		return s_instance->IsDebuggerPresentInternal();
 	}
 
-	inline static FCharStringView GetStackTrace()
+	/**
+	 * Generic Platform method that get the stack trace string
+	 * @param skip number of frame to skip, counting from bottom
+	 * @return FStdString of the stack trace
+	 */
+	inline static FStdString GetStackTrace(size_t skip = 0)
 	{
 		backward::StackTrace st;
 		st.load_here(32);
+		st.skip_n_firsts(1 + skip); // Skip the first frame of backward to get our frame
+		std::ostringstream os;
 		backward::Printer  p;
-		std::ostringstream ss;
-		p.print(st, ss);
-		// TODO: maybe re-implement st load_here with parameter to skip first n frames,
-		//  so that we can skip the stack trace of inner backward callings
-		return FCharStringView(MoveTemp(ss.str()));
+		p.print(st, os);
+		return FStdString(MoveTemp(os.str()));
 	}
 
 protected:

@@ -32,6 +32,7 @@
 #define HLVM_LIKELY [[likely]]
 #define HLVM_NORETURN [[noreturn]]
 #define HLVM_NODISCARD [[nodiscard]]
+#define HLVM_MAYBEUNUSED [[maybe_unused]]
 
 // 定义一个类，禁止复制和移动
 #define NOCOPY(Class)             \
@@ -70,7 +71,7 @@
 	HLVM_INLINE_VAR constexpr size_t enum_class##_NUM = static_cast<size_t>(enum_class::HLVM_NUM)
 
 #define HLVM_ENUM_V(enum_class, enum_value) static_cast<std::underlying_type_t<enum_class>>(enum_class::enum_value)
-#define HLVM_ENUM_V_SIZE_T(enum_class, enum_value) static_cast<size_t>(enum_class::enum_value)
+#define HLVM_ENUM_V_SIZE_T(enum_class, enum_value) static_cast<size_t>(enum_value)
 
 #define S_C(type, value) static_cast<type>(value)
 #define SP_C(type, value) static_pointer_cast<type>(value)
@@ -102,3 +103,5 @@ static_assert(sizeof(TCHAR) == sizeof(char), "TCHAR is not char");
 #define STRTIFY(x) TXT(#x)
 #define TO_TCHAR_STR(x) reinterpret_cast<const TCHAR*>((x))
 #define TO_CHAR_STR(x) reinterpret_cast<const char*>((x))
+
+#include "UserPredefined.gen.h"

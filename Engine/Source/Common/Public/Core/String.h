@@ -97,16 +97,16 @@ public:
  * FStdStringView is just a wrapper around a already allocated std::string whose sole purpose is to
  * be used as a const TCHAR* later, and thus avoid copying into FString.
  */
-class FCharStringView final : public std::basic_string<char>
+class FStdString final : public std::basic_string<char>
 {
 public:
-	FCharStringView() = delete;
+	FStdString() = delete;
 	// Move constructor
-	explicit FCharStringView(std::basic_string<char>&& other) noexcept
+	explicit FStdString(std::basic_string<char>&& other) noexcept
 		: std::basic_string<char>(MoveTemp(other))
 	{
 	}
-	FCharStringView& operator=(FCharStringView&& other) noexcept
+	FStdString& operator=(FStdString&& other) noexcept
 	{
 		std::basic_string<char>::operator=(MoveTemp(other));
 		return *this;
@@ -118,7 +118,7 @@ public:
 		return reinterpret_cast<const TCHAR*>(this->data());
 	}
 
-	friend const TCHAR* operator*(const FCharStringView& fs)
+	friend const TCHAR* operator*(const FStdString& fs)
 	{
 		return static_cast<const TCHAR*>(fs);
 	}

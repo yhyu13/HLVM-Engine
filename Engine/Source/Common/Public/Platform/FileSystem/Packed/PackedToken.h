@@ -16,8 +16,8 @@ struct FPackedTokenEntryData
 	size_t		  StartPos;
 	size_t		  Size;
 	size_t		  DecompressSize;
-	EEncryptType  EncryptType{ EEncryptType::Unkown };
-	ECompressType CompressType{ ECompressType::Unkown };
+	EEncryptType  EncryptType : 4 { EEncryptType::Unkown };
+	ECompressType CompressType : 4 { ECompressType::Unkown };
 };
 
 /**

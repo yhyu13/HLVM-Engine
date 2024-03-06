@@ -57,7 +57,7 @@ FSpdlogConsoleDevice::~FSpdlogConsoleDevice()
 }
 
 // Log the message
-void FSpdlogConsoleDevice::Sink(const FLogContext& Context, const FString& Message) const
+HLVM_INLINE_FUNC void FSpdlogConsoleDevice::Sink(const FLogContext& Context, const FString& Message) const
 {
 	// Get the loggers
 	spdlog::logger* Loggers[2] = { AsyncLogger.get(), ImmediateLogger.get() };

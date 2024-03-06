@@ -13,6 +13,7 @@ constexpr size_t SignatureDigestSize = 4096;
 
 HLVM_NODISCARD std::vector<uint8_t> FRSA::Encrypt(const FConstByteBuffer& Buffer)
 {
+	using namespace hlvm_private;
 	HLVM_SCOPED_TIMER(FString::Format(TXT("RSA Encrypt size {}"), Buffer.size()));
 	const bool bValidBuffer = Buffer.size() > 0;
 	HLVM_ASSERT(bValidBuffer, TXT("Buffer must has content"));
@@ -29,6 +30,7 @@ HLVM_NODISCARD std::vector<uint8_t> FRSA::Encrypt(const FConstByteBuffer& Buffer
 
 HLVM_NODISCARD Botan::secure_vector<uint8_t> FRSA::Decrypt(const FConstByteBuffer& Buffer)
 {
+	using namespace hlvm_private;
 	HLVM_SCOPED_TIMER(FString::Format(TXT("RSA Decrypt size {}"), Buffer.size()));
 	const bool bValidBuffer = Buffer.size() > 0;
 	HLVM_ASSERT(bValidBuffer, TXT("Buffer must has content"));
@@ -45,6 +47,7 @@ HLVM_NODISCARD Botan::secure_vector<uint8_t> FRSA::Decrypt(const FConstByteBuffe
 
 static void digest_buffer(const FConstByteBuffer& Buffer, std::span<uint8_t>& output_buffer)
 {
+	using namespace hlvm_private;
 	auto   input_buffer = R_C(const uint8_t*, Buffer.data());
 	auto   input_len = Buffer.size();
 	size_t per_offset = input_len / SignatureDigestSize + (input_len % SignatureDigestSize == 0 ? 0 : 1);
@@ -58,6 +61,7 @@ static void digest_buffer(const FConstByteBuffer& Buffer, std::span<uint8_t>& ou
 
 void FRSA::SignToFile(const FConstByteBuffer& Buffer, const FPath& signature_path)
 {
+	using namespace hlvm_private;
 	HLVM_SCOPED_TIMER(FString::Format(TXT("RSA SignToFile size {} path {}"), Buffer.size(), *signature_path));
 	const bool bValidBuffer = Buffer.size() > 0;
 	HLVM_ASSERT(bValidBuffer, TXT("Buffer must has content"));
@@ -94,6 +98,7 @@ void FRSA::SignToFile(const FPath& FilePath, const FPath& signature_path)
 
 HLVM_NODISCARD bool FRSA::VerifyFileSignature(const FConstByteBuffer& Buffer, const FPath& signature_path)
 {
+	using namespace hlvm_private;
 	HLVM_SCOPED_TIMER(FString::Format(TXT("RSA VerifyFromFile size {} path {}"), Buffer.size(), *signature_path));
 	const bool bValidBuffer = Buffer.size() > 0;
 	HLVM_ASSERT(bValidBuffer, TXT("Buffer must has content"));

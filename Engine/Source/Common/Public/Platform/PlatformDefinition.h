@@ -25,6 +25,8 @@
 	#define HLVM_PLATFORM_CACHE_LINE 64
 	#define HLVM_CACHE_ALIGN __declspec(align(PLATFORM_CACHE_LINE))
 
+	#define HLVM_NOINLINE_FUNC __declspec(noinline)
+
 #elif defined(PLATFORM_LINUXGNU)
 	#include <signal.h>
 	#define HLVM_DEBUG_BREAK() raise(SIGTRAP)
@@ -36,6 +38,7 @@
 	#define HLVM_PLATFORM_CACHE_LINE 64
 	#define HLVM_CACHE_ALIGN alignas(HLVM_PLATFORM_CACHE_LINE)
 
+	#define HLVM_NOINLINE_FUNC __attribute__((noinline))
 #else
 	#error "Not implemented for uknown platform"
 #endif

@@ -16,7 +16,8 @@ public:
 	/**
 	 * Called inside FGenericPlatformFile::Get()
 	 */
-	static void Init();
+	static void				   Init();
+	static FBoostPlatformFile* Get();
 
 	virtual bool				  IsDirectory(const FPath& path) final override;
 	virtual bool				  Exists(const FPath& path) final override;

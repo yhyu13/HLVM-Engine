@@ -10,28 +10,36 @@
  */
 size_t FPackedContainerFragment::sSuggestedFragmentSize = 4 * 1024 * 1024;
 
-void FPackedContainerFragment::Open(const boost::interprocess::file_mapping& fm)
+void FPackedContainerFragment::Open()
 {
 	using namespace boost::interprocess;
-	/**
-	 * Move construct our Region of interest
-	 */
-	Region = MoveTemp(mapped_region(fm, read_only, S_C(offset_t, FragmentStartPos), FragmentSize, nullptr, default_map_options));
+	if (FramgentRefCount.fetch_add(1, std::memory_order_relaxed) == 0)
+	{
+		/**
+		 * Move construct our Region of interest
+		 */
+		Region = MoveTemp(mapped_region(*FileMapping, read_only, S_C(offset_t, FragmentStartPos), FragmentSize, nullptr, default_map_options));
+	}
 }
 
 void FPackedContainerFragment::Close()
 {
+	// TODO : Consider delay freeing, instead, push freeing to free queue and regularly free in period
 	using namespace boost::interprocess;
-	/**
-	 * Swap Region with dummy Region to umap the Region on dummy destruction
-	 */
-	auto dummy = mapped_region();
-	Region.swap(dummy);
+	if (FramgentRefCount.fetch_sub(1, std::memory_order_relaxed) == 1)
+	{
+		/**
+		 * Swap Region with dummy Region to umap the Region on dummy destruction
+		 */
+		auto dummy = mapped_region();
+		Region.swap(dummy);
+	}
 }
 
 HLVM_NODISCARD FConstByteBuffer FPackedContainerFragment::GetSubRegion(const FPackedTokenEntryData& Data) const
 {
-	size_t Offset = Data.StartPos - FragmentStartPos;
-	HLVM_ASSERT(Data.StartPos >= FragmentStartPos && Offset + Data.Size <= FragmentSize, TXT("Offset out of bounds"));
+	size_t	   Offset = Data.StartPos - FragmentStartPos;
+	const bool bValid = Region.get_size() > 0;
+	HLVM_ASSERT(bValid && Data.StartPos >= FragmentStartPos && Offset + Data.Size <= FragmentSize, TXT("Offset out of bounds"));
 	return FConstByteBuffer(R_C(const std::byte*, Region.get_address()) + Offset, Data.Size);
 }

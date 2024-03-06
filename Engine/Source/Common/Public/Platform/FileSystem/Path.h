@@ -121,7 +121,7 @@ public:
 
 private:
 	/**
-	 * Resolve path ${XXX} with certain values
+	 * Resolve path ${XXX} pattern with registered values
 	 */
 	void ResolvePath();
 

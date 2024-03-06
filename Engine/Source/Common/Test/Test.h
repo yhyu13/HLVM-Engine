@@ -98,8 +98,13 @@ inline double RunTestAndCalculateAvg(const TestFuncType& func, int num_iteration
 
 int main()
 {
-	auto LogDevice = std::make_shared<FSpdlogConsoleDevice>();
-	FLogRedirector::Get()->AddDevice(LogDevice);
+	{
+		InitMallocator();
+	}
+	{
+		auto LogDevice = std::make_shared<FSpdlogConsoleDevice>();
+		FLogRedirector::Get()->AddDevice(LogDevice);
+	}
 
 	// Run all registered test functions
 	for (auto& test_function : recorded_test_functions)

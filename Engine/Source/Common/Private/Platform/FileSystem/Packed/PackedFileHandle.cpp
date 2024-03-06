@@ -94,7 +94,6 @@ IFileHandle::OpRetType FPackedFileHandle::Open(const FPath& FilePath, const FFil
 	try
 	{
 		{
-			// TODO: Validate token and container file signature
 			auto cot_job = std::thread(
 				[&]() {
 					// Open container file with mmap
@@ -156,6 +155,9 @@ IFileHandle::OpRetType FPackedFileHandle::Open(const FPath& FilePath, const FFil
 #endif
 					const auto Decompressed = FZstd::Decompress({ R_C(const std::byte*, Decrypted.data()), Decrypted.size() });
 
+					/**
+					 * Deserialize token entry from file buffer
+					 */
 					const std::byte* lineStart = Decompressed.data();
 					const std::byte* lineEnd = lineStart + FPackedTokenEntry_SerializedSize;
 					const std::byte* tokenDataEnd = lineStart + Decompressed.size();
@@ -170,8 +172,8 @@ IFileHandle::OpRetType FPackedFileHandle::Open(const FPath& FilePath, const FFil
 
 					// Init containers
 					mContainerFragments.clear();
-					mContainerFragments.push_back(MoveTemp(FPackedContainerFragment()));
-					mTokenEntryMap.clear();
+					mContainerFragments.emplace_back(MoveTemp(FPackedContainerFragment()));
+					mTokenEntryFragmentMap.clear();
 
 					// Iterate through token entries
 					bool bCurrentFragmentInit = false;
@@ -181,24 +183,25 @@ IFileHandle::OpRetType FPackedFileHandle::Open(const FPath& FilePath, const FFil
 						ExtractTokenEntry(Entry);
 
 						// Init fragment if necessary
-						auto& CurrentFragment = mContainerFragments.back();
+						FPackedContainerFragment& CurrentFragment = mContainerFragments.back();
 						if (!bCurrentFragmentInit)
 						{
 							bCurrentFragmentInit = true;
 							CurrentFragment.FragmentStartPos = Entry.Data.StartPos;
+							CurrentFragment.FileMapping = &mContainerMappedFile;
 						}
 
 						// Fragment full, initiate another fragment
 						if ((CurrentFragment.FragmentSize += Entry.Data.Size) >= FPackedContainerFragment::sSuggestedFragmentSize)
 						{
-							mContainerFragments.push_back(MoveTemp(FPackedContainerFragment()));
+							mContainerFragments.emplace_back(MoveTemp(FPackedContainerFragment()));
 							bCurrentFragmentInit = false;
 						}
 
 						// Insert token entry
 						{
-							size_t CurrentFragmentID = mContainerFragments.size() - 1;
-							auto   result = mTokenEntryMap.insert_or_assign(MoveTemp(Entry.PathHash), { MoveTemp(Entry.Data), CurrentFragmentID });
+							auto CurrentFragmentID = mContainerFragments.size() - 1;
+							auto result = mTokenEntryFragmentMap.insert_or_assign(MoveTemp(Entry.PathHash), { MoveTemp(Entry.Data), S_C(uint32_t, CurrentFragmentID) });
 							PFH_HANDLE_ENSURE(result.second, TXT("Key already exists, value updated from {} to {}"), R_C(uintptr_t, lineStart), R_C(uintptr_t, lineEnd));
 						}
 						lineStart = lineEnd;
@@ -207,9 +210,9 @@ IFileHandle::OpRetType FPackedFileHandle::Open(const FPath& FilePath, const FFil
 
 					// Sanity check on we reach finish correctly
 					PFH_HANDLE_ENSURE(lineStart == tokenDataEnd, TXT("Token data end not reached lineStart {} tokenDataEnd {}"), R_C(uintptr_t, lineStart), R_C(uintptr_t, tokenDataEnd));
-					PFH_VERBOSE_LOG(TXT("TokenEntryMap size: {}"), mTokenEntryMap.size());
+					PFH_VERBOSE_LOG(TXT("TokenEntryMap elements: {}"), mTokenEntryFragmentMap.size());
 					mContainerFragments.shrink_to_fit();
-					PFH_VERBOSE_LOG(TXT("ContainerFragments size: {}"), mContainerFragments.size());
+					PFH_VERBOSE_LOG(TXT("ContainerFragments elements: {}"), mContainerFragments.size());
 				}
 			}
 			cot_job.join();
@@ -247,7 +250,7 @@ IFileHandle::OpRetType FPackedFileHandle::Close()
 
 		{
 			mContainerFragments.clear();
-			mTokenEntryMap.clear();
+			mTokenEntryFragmentMap.clear();
 			{
 				// Using swap dummy to unmap file on dummy destruction
 				auto Dummy = file_mapping();

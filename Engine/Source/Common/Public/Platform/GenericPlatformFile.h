@@ -19,8 +19,11 @@ public:
 	virtual bool				  Exists(const FPath& path);
 	virtual TSmallVector32<FPath> Find(const FPath& root_dir, const FString& regex, bool recursive = false);
 
-	static FGenericPlatformFile* Get();
+	static FGenericPlatformFile* Get(EPlatformFileType PlatformFileType = EPlatformFileType::Unkown);
 
 protected:
 	static FGenericPlatformFile* sPlatformFileRedirector[EPlatformFileType_NUM];
+
+private:
+	static void Init();
 };

@@ -23,6 +23,7 @@ HLVM_ENUM(EPackedFileType, uint8_t,
  * mapped region https://live.boost.org/doc/libs/1_83_0/doc/html/boost/interprocess/mapped_region.html
  */
 
+class FPackedPlatformFile;
 class FPackedFileHandle final : public IFileHandle
 {
 public:
@@ -36,17 +37,16 @@ public:
 	FPackedFileHandle() = default;
 	~FPackedFileHandle() final override;
 
-	virtual OpRetType Open(const FPath& FilePath, const FFileOptions& Options = sDefaultFileOptions) final override;
-	virtual OpRetType Close() final override;
-	virtual OpRetType Read(void* Buffer, size_t Size, const FFileSeekCtx& SeekCtx) final override;
-	virtual OpRetType Write(const void* Buffer, size_t Size, const FFileSeekCtx& SeekCtx) final override;
-	virtual OpRetType Flush() final override;
-	virtual OpRetType Seek(int64_t Offset, EWhence Whence = EWhence::Begin) final override;
-	virtual OpRetType Tell(int64_t& Offset) final override;
-	virtual OpRetType Size(size_t& Size) final override;
-
-	virtual OpRetType								  Truncate(size_t Size) final override;
-	HLVM_NODISCARD virtual std::shared_ptr<IFFileStat> Stat(const FPath& FilePath) final override;
+	virtual OpRetType				   Open(const FPath& FilePath, const FFileOptions& Options = sDefaultFileOptions) final override;
+	virtual OpRetType				   Close() final override;
+	HLVM_MAYBEUNUSED virtual OpRetType Read(void* Buffer, size_t Size, const FFileSeekCtx& SeekCtx) final override;
+	HLVM_MAYBEUNUSED virtual OpRetType Write(const void* Buffer, size_t Size, const FFileSeekCtx& SeekCtx) final override;
+	HLVM_MAYBEUNUSED virtual OpRetType Flush() final override;
+	HLVM_MAYBEUNUSED virtual OpRetType Seek(int64_t Offset, EWhence Whence = EWhence::Begin) final override;
+	HLVM_MAYBEUNUSED virtual OpRetType Tell(int64_t& Offset) final override;
+	HLVM_MAYBEUNUSED virtual OpRetType Size(size_t& Size) final override;
+	HLVM_MAYBEUNUSED virtual OpRetType Truncate(size_t Size) final override;
+	HLVM_MAYBEUNUSED HLVM_NODISCARD virtual std::shared_ptr<IFFileStat> Stat(const FPath& FilePath) final override;
 
 	friend bool operator>(const FPackedFileHandle& Lhs, const FPackedFileHandle& Rhs) noexcept
 	{
@@ -54,18 +54,20 @@ public:
 	}
 
 private:
+    friend FPackedPlatformFile;
+
 	boost::interprocess::file_mapping					mContainerMappedFile;
 	TVector<FPackedContainerFragment>					mContainerFragments;
-	TMap<FPathHash, FPackedTokenEntryDataAndFragmentID> mTokenEntryMap;
+	TMap<FPathHash, FPackedTokenEntryDataAndFragmentID> mTokenEntryFragmentMap;
 
 	boost::interprocess::sharable_lock<boost::interprocess::file_lock> mTokenFileLock;
 	boost::interprocess::sharable_lock<boost::interprocess::file_lock> mContainerFileLock;
 
-	// Identify packed file type
-	EPackedFileType mPackedFileType{ EPackedFileType::Unkown };
+	// Counting total opened packed entry handle that use data in this file handle
+	// used to identify whether or not we can close this file
+	std::atomic_uint_fast32_t mPackedEntryRefCount{ 0 };
 	// Mounting order, the larger the prior when searching for files
 	uint64_t mMountOrder{ 0 };
+	// Identify packed file type
+	EPackedFileType mPackedFileType{ EPackedFileType::Unkown };
 };
-
-// TODO : packed file search and load
-HLVM_INLINE_VAR TVector<std::unique_ptr<FPackedFileHandle>> GMountedPackedFileHandles;
