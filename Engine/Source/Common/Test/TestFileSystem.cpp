@@ -6,6 +6,7 @@
 
 #include "Platform/FileSystem/Boost/BoostPlatformFile.h"
 #include "Platform/FileSystem/Packed/PackedPlatformFile.h"
+#include "Core/Parallel/WorkStealThreadPool.h"
 
 #include <ylt/struct_pack.hpp>
 #include <ylt/struct_json/json_reader.h>
@@ -78,8 +79,10 @@ RECORD(packed_test)
 		FPath PackedCotFile = PackedFileName.ChangeExtension(HLVM_PACKED_CONTAINER_EXT);
 		FPath PackedJsonlFile = PackedFileName.ChangeExtension(HLVM_JSONL_FILE_EXT);
 		HLVM_LOG(LogTest, info, TXT("Test PackedFileHandle write token file: {}"), *PackedTokFile);
+
+		constexpr size_t NumEntries = 8;
 		{
-			std::vector<std::thread> jobs;
+			std::vector<std::future<void>> jobs;
 			jobs.reserve(4);
 			FBoostFileHandle fileTokHandle, fileCotHandle, fileJsonlHandle;
 			FFileOptions	 Options{ .eFileMode = EFileMode::WB, .eFileMapped = EFileMapped::Mapped, .eFileLock = EFileLock::InterProcessLock };
@@ -94,11 +97,10 @@ RECORD(packed_test)
 					fileJsonlHandle.Close();
 				});
 
-			constexpr size_t											size = 8;
 			TVector<std::tuple<FPackedTokenEntryWithPath, FByteVector>> PackedData;
-			PackedData.resize(size);
+			PackedData.resize(NumEntries);
 			size_t _StartPos = 0;
-			for (size_t i = 0; i < size; ++i)
+			for (size_t i = 0; i < NumEntries; ++i)
 			{
 				FPath Path = FPath{ FString::Format(TXT("./test_{}.txt"), i), EPlatformFileType::Packed };
 				auto& Entry_Dev = get<0>(PackedData[i]);
@@ -118,8 +120,7 @@ RECORD(packed_test)
 
 				_StartPos += S_C(size_t, Entry_Dev.Entry.Data.Size);
 			}
-
-			jobs.emplace_back([&]() {
+			jobs.emplace_back(FWorkStealThreadPool::Get()->EnqueuTask([&]() {
 				for (size_t i = 0; i < PackedData.size(); ++i)
 				{
 					const auto& Entry_Dev = get<0>(PackedData[i]);
@@ -127,11 +128,11 @@ RECORD(packed_test)
 					json += "\n";
 					fileJsonlHandle.Write(json.c_str(), json.size());
 				}
-			});
+			}));
 
 			FByteVector TokenData;
 			FByteVector CotData;
-			for (size_t i = 0; i < size; ++i)
+			for (size_t i = 0; i < NumEntries; ++i)
 			{
 				const auto& Entry_Dev = get<0>(PackedData[i]);
 				const auto& ContentBuffer = get<1>(PackedData[i]);
@@ -179,23 +180,21 @@ RECORD(packed_test)
 
 			for (auto& job : jobs)
 			{
-				job.join();
+				job.wait();
 			}
 		}
 
 		{
-			std::thread([&]() {
-				HLVM_LOG(LogTest, info, TXT("Test PackedFileHandle read token file: {}"), *PackedTokFile);
-				//				FPackedFileHandle fileHandle;
-				//				HLVM_SCOPED_VARIABLE(
-				//					ScopedFileHandle, [&]() -> void { fileHandle.Open(PackedFileName); },
-				//					[&]() -> void { fileHandle.Close(); });
-
-				FPackedPlatformFile::Get()->Mount(PackedFileName);
-
-				FPackedEntryHandle entryHandle;
-				entryHandle.Open(TXT("./test_0.txt"));
-			}).join();
+			FWorkStealThreadPool::Get()->EnqueuTask([&]() {
+										   HLVM_LOG(LogTest, info, TXT("Test PackedFileHandle read token file: {}"), *PackedTokFile);
+										   FPackedPlatformFile::Get()->Mount(PackedFileName);
+										   for (size_t i = 0; i < NumEntries; ++i)
+										   {
+											   FPackedEntryHandle entryHandle;
+											   entryHandle.Open(FString::Format(TXT("./test_{}.txt"), i));
+										   }
+									   })
+				.wait();
 		}
 	}
 }

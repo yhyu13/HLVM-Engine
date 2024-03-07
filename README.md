@@ -23,3 +23,27 @@ https://zhuanlan.zhihu.com/p/677704467
 ./Setup.sh
 ./GenerateCMakeProjects.sh
 ```
+
+## Features
+
+ - Build system using CMake
+ - Unit testing with CTest
+ - Platform-specific code for Linux and Windows
+ - File system handling with Boost and custom implementations
+ - Compression using Zstd
+ - Encryption using RSA
+ - Logging system
+ - Custom memory management with Mimalloc allocators
+ - Templated utility functions for common tasks
+ - Obfuscation techniques for strings and expressions
+ - Performance testing with ScopedTimer and Timer
+ - Custom build and clean scripts
+ - Custom preprocessor macros for platform-specific code
+ - Custom string handling
+ - Custom file system handling with packing support
+ - Custom exception handling
+ - Custom parallel processing with locking mechanisms
+ - Boost hashing functions
+ - Custom template meta-programming for common tasks
+ - Debugging utilities for Linux and Windows
+ - Work Steal thread pool

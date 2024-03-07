@@ -68,29 +68,31 @@ private:
 		QueueNode() = default;
 
 		explicit QueueNode(const T& InItem) noexcept
-			: m_item(CopyTemp(InItem))
+			: mItem(InItem)
 		{
 		}
 
 		explicit QueueNode(T&& InItem) noexcept
-			: m_item(MoveTemp(InItem))
+			: mItem(InItem)
 		{
 		}
 
 		~QueueNode() noexcept
 		{
 			/**
-			 * Call Release manually to avoid delete m_nextNode
-			 * which might trigger recursive delete on chained QueueNode* and their m_nextNode)
+			 * Call Release manually to avoid delete mNextNode
+			 * which might trigger recursive delete on chained QueueNode* and their mNextNode)
 			 */
-			m_nextNode.Release();
+			mNextNode.Release();
 		}
 
-		TAtomicPointer<QueueNode*> m_nextNode{ nullptr };
-		T						   m_item;
+		TAtomicPointer<QueueNode*> mNextNode{ nullptr };
+		T						   mItem;
 	};
 
 public:
+	NOCOPYMOVE(TConcurrentQueue)
+
 	TConcurrentQueue()
 	{
 		mHead = mTail = new QueueNode();
@@ -112,20 +114,22 @@ public:
 
 		while (QueueNode* temp = mTail)
 		{
-			mTail = mTail->m_nextNode;
+			mTail = mTail->mNextNode;
 			ATOMIC_THREAD_FENCE();
 			delete temp;
 		}
 	}
 
 	void Push(const T& item) noexcept
+		requires(std::is_copy_constructible_v<T>)
 	{
-		push_internal(new QueueNode(item));
+		PushInternal(new QueueNode(CopyTemp(item)));
 	}
 
 	void Push(T&& item) noexcept
+		requires(std::is_move_constructible_v<T>)
 	{
-		push_internal(new QueueNode(item));
+		PushInternal(new QueueNode(MoveTemp(item)));
 	}
 
 	/**
@@ -135,33 +139,55 @@ public:
 	 */
 	T& PeekFront() const noexcept
 	{
-		HLVM_ASSERT(mTail->m_nextNode, TXT("mTail is null"));
-		return mTail->m_nextNode->m_item;
+		HLVM_ASSERT(mTail->mNextNode, TXT("Queue Tail is null"));
+		return mTail->mNextNode->mItem;
 	}
 
+	template <bool bTryPop = false>
 	bool PopFront(T& ret) noexcept
 	{
 		if constexpr (bBlockPopOnEmpty)
 		{
 			while (Empty() && !mbStopFlagByUser)
 			{
-				std::unique_lock<std::mutex> lock(*mMutex);
-				mCV->wait(lock, [] {
-					return true;
-				});
+				/**
+				 * If only try pop, we should immediate exit with false on empty queue
+				 */
+				if constexpr (bTryPop)
+				{
+					return false;
+				}
+				else
+				{
+					std::unique_lock<std::mutex> lock(*mMutex);
+					mCV->wait(lock, [] {
+						return true;
+					});
+				}
 			}
 		}
 
-		if (QueueNode* poped_node = mTail->m_nextNode)
+		if (QueueNode* PopedNode = mTail->mNextNode)
 		{
 			if constexpr (IS_SC)
 			{
 				// Step1 swap tail pointer
 				QueueNode* old_tail = mTail;
-				mTail = poped_node;
+				mTail = PopedNode;
 
 				// Step2 assign value
-				ret = MoveTemp(poped_node->m_item);
+				if constexpr (std::is_move_constructible_v<T>)
+				{
+					ret = MoveTemp(PopedNode->mItem);
+				}
+				else if (std::is_copy_constructible_v<T>)
+				{
+					ret = CopyTemp(PopedNode->mItem);
+				}
+				else
+				{
+					assert(false);
+				}
 
 				// Step3 delete old tail
 				delete old_tail;
@@ -176,11 +202,22 @@ public:
 			{
 				QueueNode* old_tail = mTail;
 				// Step1 swap tail pointer
-				if (old_tail->m_nextNode == poped_node
-					&& FGenericPlatformAtomicPointer::AtomicCompareExchange(&mTail, &old_tail, poped_node))
+				if (old_tail->mNextNode == PopedNode
+					&& FGenericPlatformAtomicPointer::AtomicCompareExchange(&mTail, &old_tail, PopedNode))
 				{
 					// Step2 assign value
-					ret = MoveTemp(poped_node->m_item);
+					if constexpr (std::is_move_constructible_v<T>)
+					{
+						ret = MoveTemp(PopedNode->mItem);
+					}
+					else if (std::is_copy_constructible_v<T>)
+					{
+						ret = CopyTemp(PopedNode->mItem);
+					}
+					else
+					{
+						assert(false);
+					}
 
 					// Step3 delete old tail
 					delete old_tail;
@@ -194,12 +231,15 @@ public:
 			}
 		}
 
+		/**
+		 * return false on empty queue
+		 */
 		return false;
 	}
 
 	bool Empty() const noexcept
 	{
-		return mTail->m_nextNode == nullptr;
+		return mTail->mNextNode == nullptr;
 	}
 
 	/**
@@ -236,7 +276,7 @@ public:
 	}
 
 private:
-	void push_internal(QueueNode* NewNode) noexcept
+	void PushInternal(QueueNode* NewNode) noexcept
 	{
 		QueueNode* old_head;
 		if constexpr (IS_MP)
@@ -244,7 +284,7 @@ private:
 			// Step1, swap pointer
 			old_head = FGenericPlatformAtomicPointer::AtomicExchange(&mHead, NewNode);
 			// Step2, chain pointer
-			FGenericPlatformAtomicPointer::AtomicExchange(&old_head->m_nextNode, NewNode);
+			FGenericPlatformAtomicPointer::AtomicExchange(&old_head->mNextNode, NewNode);
 		}
 		else
 		{
@@ -255,7 +295,7 @@ private:
 			// Step2, chain pointer
 			// Prevent compiler reordering step2 into step1
 			ATOMIC_THREAD_FENCE();
-			old_head->m_nextNode = NewNode;
+			old_head->mNextNode = NewNode;
 		}
 
 		if constexpr (bCountSize)
