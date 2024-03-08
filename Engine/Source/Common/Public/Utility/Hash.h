@@ -8,19 +8,36 @@
 
 #include <boost/algorithm/hex.hpp>
 #include <boost/uuid/detail/md5.hpp>
+#include <boost/uuid/detail/sha1.hpp>
+
+struct FMD5Digest
+{
+	std::byte digest[16];
+
+	FMD5Digest() = default;
+	explicit FMD5Digest(boost::uuids::detail::md5::digest_type&& data);
+
+	FString ToString() const;
+};
 
 class FMD5Hash
 {
 public:
-	struct MD5Digest
-	{
-		std::byte digest[16];
+	static FMD5Digest Hash(const void* data, size_t size);
+};
 
-		MD5Digest() = default;
-		explicit MD5Digest(boost::uuids::detail::md5::digest_type&& data);
+struct FSHA1Digest
+{
+	std::byte digest[20];
 
-		FString ToString() const;
-	};
+	FSHA1Digest() = default;
+	explicit FSHA1Digest(boost::uuids::detail::sha1::digest_type&& data);
 
-	static MD5Digest Hash(const void* data, size_t size);
+	FString ToString() const;
+};
+
+class FSHA1Hash
+{
+public:
+	static FSHA1Digest Hash(const void* data, size_t size);
 };

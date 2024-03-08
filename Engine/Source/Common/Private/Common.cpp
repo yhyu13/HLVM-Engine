@@ -26,6 +26,10 @@ HLVM_INLINE_FUNC bool FMiMallocator::Owened(void* ptr) noexcept
 	#define HLVM_MALLOC_OVERRIDE 1
 #endif
 
+#ifndef HLVM_MALLOC_USE_STACK_ALLCOATOR
+	#define HLVM_MALLOC_USE_STACK_ALLCOATOR 0
+#endif
+
 #if HLVM_MALLOC_OVERRIDE
 
 HLVM_TLS_VAR IMallocator* GMallocatorTLS = &GMiMallocatorTLS;
@@ -47,6 +51,15 @@ void InitMallocator()
 		if (GMallocatorTLS->Type == EMallocator::Mimalloc) \
 		HLVM_LIKELY
 
+	#if HLVM_MALLOC_USE_STACK_ALLCOATOR
+		#define HLVM_STACK_USE()                            \
+			if (GMallocatorTLS->Type == EMallocator::Stack) \
+			HLVM_LIKELY
+	#else
+		#define HLVM_STACK_USE() \
+			if (false)
+	#endif
+
 /**
  * Mimalloc checks thread local allocated pointer as well as non thread local allocated pointer.
  * So just let mimalloc does its job on freeing w/o checking owner ship
@@ -54,6 +67,15 @@ void InitMallocator()
 	#define HLVM_MIMALLOC_OWNED(p)                         \
 		if (GMallocatorTLS->Type == EMallocator::Mimalloc) \
 		HLVM_LIKELY
+
+	#if HLVM_MALLOC_USE_STACK_ALLCOATOR
+		#define HLVM_STACK_OWNED(p)                         \
+			if (GMallocatorTLS->Type == EMallocator::Stack) \
+			HLVM_LIKELY
+	#else
+		#define HLVM_STACK_OWNED(p) \
+			if (false)
+	#endif
 
 	#pragma clang diagnostic push
 	#pragma clang diagnostic ignored "-Wmissing-prototypes"
@@ -88,6 +110,11 @@ void operator delete(void* p) noexcept
 		S_C(FMiMallocator*, GMallocatorTLS)->Free(p);
 		return;
 	}
+	HLVM_STACK_OWNED(p)
+	{
+		GMallocatorTLS->Free(p);
+		return;
+	}
 	GMiMallocatorTLS.Free(p);
 };
 void operator delete[](void* p) noexcept
@@ -96,6 +123,11 @@ void operator delete[](void* p) noexcept
 	HLVM_MIMALLOC_OWNED(p)
 	{
 		S_C(FMiMallocator*, GMallocatorTLS)->Free(p);
+		return;
+	}
+	HLVM_STACK_OWNED(p)
+	{
+		GMallocatorTLS->Free(p);
 		return;
 	}
 	GMiMallocatorTLS.Free(p);
@@ -109,6 +141,11 @@ void operator delete(void* p, const std::nothrow_t&) noexcept
 		S_C(FMiMallocator*, GMallocatorTLS)->Free(p);
 		return;
 	}
+	HLVM_STACK_OWNED(p)
+	{
+		GMallocatorTLS->Free(p);
+		return;
+	}
 	GMiMallocatorTLS.Free(p);
 }
 void operator delete[](void* p, const std::nothrow_t&) noexcept
@@ -117,6 +154,11 @@ void operator delete[](void* p, const std::nothrow_t&) noexcept
 	HLVM_MIMALLOC_OWNED(p)
 	{
 		S_C(FMiMallocator*, GMallocatorTLS)->Free(p);
+		return;
+	}
+	HLVM_STACK_OWNED(p)
+	{
+		GMallocatorTLS->Free(p);
 		return;
 	}
 	GMiMallocatorTLS.Free(p);
@@ -130,6 +172,11 @@ mi_decl_new(n) void* operator new(std::size_t n) noexcept(false)
 		void* p = S_C(FMiMallocator*, GMallocatorTLS)->Malloc(n);
 		return p;
 	}
+	HLVM_STACK_USE()
+	{
+		void* p = GMallocatorTLS->Malloc(n);
+		return p;
+	}
 	void* p = GMiMallocatorTLS.Malloc(n);
 	return p;
 }
@@ -139,6 +186,11 @@ mi_decl_new(n) void* operator new[](std::size_t n) noexcept(false)
 	HLVM_MIMALLOC_USE()
 	{
 		void* p = S_C(FMiMallocator*, GMallocatorTLS)->Malloc(n);
+		return p;
+	}
+	HLVM_STACK_USE()
+	{
+		void* p = GMallocatorTLS->Malloc(n);
 		return p;
 	}
 	void* p = GMiMallocatorTLS.Malloc(n);
@@ -153,6 +205,11 @@ mi_decl_new_nothrow(n) void* operator new(std::size_t n, const std::nothrow_t&) 
 		void* p = S_C(FMiMallocator*, GMallocatorTLS)->Malloc2(n);
 		return p;
 	}
+	HLVM_STACK_USE()
+	{
+		void* p = GMallocatorTLS->Malloc2(n);
+		return p;
+	}
 	void* p = GMiMallocatorTLS.Malloc2(n);
 	return p;
 }
@@ -162,6 +219,11 @@ mi_decl_new_nothrow(n) void* operator new[](std::size_t n, const std::nothrow_t&
 	HLVM_MIMALLOC_USE()
 	{
 		void* p = S_C(FMiMallocator*, GMallocatorTLS)->Malloc2(n);
+		return p;
+	}
+	HLVM_STACK_USE()
+	{
+		void* p = GMallocatorTLS->Malloc2(n);
 		return p;
 	}
 	void* p = GMiMallocatorTLS.Malloc2(n);
@@ -176,6 +238,11 @@ void operator delete(void* p, std::size_t n) noexcept
 		S_C(FMiMallocator*, GMallocatorTLS)->FreeSize(p, n);
 		return;
 	}
+	HLVM_STACK_OWNED(p)
+	{
+		GMallocatorTLS->FreeSize(p, n);
+		return;
+	}
 	GMiMallocatorTLS.FreeSize(p, n);
 };
 void operator delete[](void* p, std::size_t n) noexcept
@@ -183,6 +250,11 @@ void operator delete[](void* p, std::size_t n) noexcept
 	HLVM_MIMALLOC_OWNED(p)
 	{
 		S_C(FMiMallocator*, GMallocatorTLS)->FreeSize(p, n);
+		return;
+	}
+	HLVM_STACK_OWNED(p)
+	{
+		GMallocatorTLS->FreeSize(p, n);
 		return;
 	}
 	GMiMallocatorTLS.FreeSize(p, n);
@@ -198,6 +270,11 @@ void operator delete(void* p, std::align_val_t al) noexcept
 		S_C(FMiMallocator*, GMallocatorTLS)->FreeAligned(p, n);
 		return;
 	}
+	HLVM_STACK_OWNED(p)
+	{
+		GMallocatorTLS->FreeAligned(p, n);
+		return;
+	}
 	GMiMallocatorTLS.FreeAligned(p, n);
 }
 void operator delete[](void* p, std::align_val_t al) noexcept
@@ -206,6 +283,11 @@ void operator delete[](void* p, std::align_val_t al) noexcept
 	HLVM_MIMALLOC_OWNED(p)
 	{
 		S_C(FMiMallocator*, GMallocatorTLS)->FreeAligned(p, n);
+		return;
+	}
+	HLVM_STACK_OWNED(p)
+	{
+		GMallocatorTLS->FreeAligned(p, n);
 		return;
 	}
 	GMiMallocatorTLS.FreeAligned(p, n);
@@ -218,6 +300,11 @@ void operator delete(void* p, std::size_t n, std::align_val_t al) noexcept
 		S_C(FMiMallocator*, GMallocatorTLS)->FreeSizeAligned(p, n, align);
 		return;
 	}
+	HLVM_STACK_OWNED(p)
+	{
+		GMallocatorTLS->FreeSizeAligned(p, n, align);
+		return;
+	}
 	GMiMallocatorTLS.FreeSizeAligned(p, n, align);
 };
 void operator delete[](void* p, std::size_t n, std::align_val_t al) noexcept
@@ -226,6 +313,11 @@ void operator delete[](void* p, std::size_t n, std::align_val_t al) noexcept
 	HLVM_MIMALLOC_OWNED(p)
 	{
 		S_C(FMiMallocator*, GMallocatorTLS)->FreeSizeAligned(p, n, align);
+		return;
+	}
+	HLVM_STACK_OWNED(p)
+	{
+		GMallocatorTLS->FreeSizeAligned(p, n, align);
 		return;
 	}
 	GMiMallocatorTLS.FreeSizeAligned(p, n, align);
@@ -238,6 +330,11 @@ void operator delete(void* p, std::align_val_t al, const std::nothrow_t&) noexce
 		S_C(FMiMallocator*, GMallocatorTLS)->FreeAligned(p, n);
 		return;
 	}
+	HLVM_STACK_OWNED(p)
+	{
+		GMallocatorTLS->FreeAligned(p, n);
+		return;
+	}
 	GMiMallocatorTLS.FreeAligned(p, n);
 }
 void operator delete[](void* p, std::align_val_t al, const std::nothrow_t&) noexcept
@@ -246,6 +343,11 @@ void operator delete[](void* p, std::align_val_t al, const std::nothrow_t&) noex
 	HLVM_MIMALLOC_OWNED(p)
 	{
 		S_C(FMiMallocator*, GMallocatorTLS)->FreeAligned(p, n);
+		return;
+	}
+	HLVM_STACK_OWNED(p)
+	{
+		GMallocatorTLS->FreeAligned(p, n);
 		return;
 	}
 	GMiMallocatorTLS.FreeAligned(p, n);
@@ -259,6 +361,11 @@ void* operator new(std::size_t n, std::align_val_t al) noexcept(false)
 		void* p = S_C(FMiMallocator*, GMallocatorTLS)->MallocAligned(n, align);
 		return p;
 	}
+	HLVM_STACK_USE()
+	{
+		void* p = GMallocatorTLS->MallocAligned(n, align);
+		return p;
+	}
 	void* p = GMiMallocatorTLS.MallocAligned(n, align);
 	return p;
 }
@@ -268,6 +375,11 @@ void* operator new[](std::size_t n, std::align_val_t al) noexcept(false)
 	HLVM_MIMALLOC_USE()
 	{
 		void* p = S_C(FMiMallocator*, GMallocatorTLS)->MallocAligned(n, align);
+		return p;
+	}
+	HLVM_STACK_USE()
+	{
+		void* p = GMallocatorTLS->MallocAligned(n, align);
 		return p;
 	}
 	void* p = GMiMallocatorTLS.MallocAligned(n, align);
@@ -281,6 +393,11 @@ void* operator new(std::size_t n, std::align_val_t al, const std::nothrow_t&) no
 		void* p = S_C(FMiMallocator*, GMallocatorTLS)->MallocAligned2(n, align);
 		return p;
 	}
+	HLVM_STACK_USE()
+	{
+		void* p = GMallocatorTLS->MallocAligned2(n, align);
+		return p;
+	}
 	void* p = GMiMallocatorTLS.MallocAligned2(n, align);
 	return p;
 }
@@ -290,6 +407,11 @@ void* operator new[](std::size_t n, std::align_val_t al, const std::nothrow_t&) 
 	HLVM_MIMALLOC_USE()
 	{
 		void* p = S_C(FMiMallocator*, GMallocatorTLS)->MallocAligned2(n, align);
+		return p;
+	}
+	HLVM_STACK_USE()
+	{
+		void* p = GMallocatorTLS->MallocAligned2(n, align);
 		return p;
 	}
 	void* p = GMiMallocatorTLS.MallocAligned2(n, align);

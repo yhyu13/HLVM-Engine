@@ -21,6 +21,7 @@ DEFINE_LOG_CATEGORY(LogTest)
 static void test_boostfile_test()
 {
 	FMiMallocator MiMallocator{ { .bNewHeap = true } };
+	// FStackMallocator<> StackMallocator{ { .bMonolithic = true } };
 	HLVM_SCOPED_VARIABLE(
 		ScopedMallocator, [&]() -> void { SwapMallocator(&MiMallocator); },
 		[&]() -> void { SwapMallocator(); });

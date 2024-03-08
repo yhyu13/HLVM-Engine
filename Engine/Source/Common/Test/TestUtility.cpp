@@ -20,7 +20,7 @@ DEFINE_LOG_CATEGORY(LogTest)
 static bool test_timer_test()
 {
 	using namespace std::chrono_literals;
-	HLVM_LOG(LogTest, debug, TXT("Timer Test"));
+	HLVM_LOG(LogTest, info, TXT("Timer Test"));
 	{
 		// Trivially construct w/o reset, and no period given
 		FTimer Timer;
@@ -51,7 +51,7 @@ static bool test_timer_test()
 		HLVM_ENSURE(Timer.Check() == false, TXT("Timer check should be false for period not reached"));
 		boost::this_thread::sleep_for(boost::chrono::milliseconds(501));
 		HLVM_ENSURE(Timer.Check() == true, TXT("Timer check should be false for period reached"));
-		HLVM_LOG(LogTest, debug, TXT("Timer mark on sleep finished {0}"), Timer.Mark());
+		HLVM_LOG(LogTest, info, TXT("Timer mark on sleep finished {0}"), Timer.Mark());
 	}
 	return true;
 };
@@ -60,9 +60,15 @@ RECORD_TEST_FUNC(timer_test);
 static bool test_hash_test()
 {
 	// Generate some text data
-	std::string			TextData = "Hello World";
-	FMD5Hash::MD5Digest Digest = FMD5Hash::Hash(TextData.c_str(), TextData.length());
-	HLVM_LOG(LogTest, debug, TXT("Hash digest for {0} is {1}"), TO_TCHAR_STR(TextData.c_str()), *Digest.ToString());
+	std::string TextData = "Hello World";
+	{
+		FMD5Digest Digest = FMD5Hash::Hash(TextData.c_str(), TextData.length());
+		HLVM_LOG(LogTest, info, TXT("MD5 Hash digest for {0} is {1}"), TO_TCHAR_STR(TextData.c_str()), *Digest.ToString());
+	}
+	{
+		FSHA1Digest Digest = FSHA1Hash::Hash(TextData.c_str(), TextData.length());
+		HLVM_LOG(LogTest, info, TXT("SHA1 Hash digest for {0} is {1}"), TO_TCHAR_STR(TextData.c_str()), *Digest.ToString());
+	}
 	return true;
 };
 RECORD_TEST_FUNC(hash_test);
