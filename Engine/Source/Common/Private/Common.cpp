@@ -22,10 +22,18 @@ HLVM_INLINE_FUNC bool FMiMallocator::Owened(void* ptr) noexcept
 	}
 }
 
+/**
+ * Override new and delete operator
+ */
 #ifndef HLVM_MALLOC_OVERRIDE
 	#define HLVM_MALLOC_OVERRIDE 1
 #endif
 
+/**
+ * Use stack allocator as general propose allocator
+ * CAUTION : not recommanded, as long life time object e.g. share ptr counter, could lead to crash on free
+ * turn off by default
+ */
 #ifndef HLVM_MALLOC_USE_STACK_ALLCOATOR
 	#define HLVM_MALLOC_USE_STACK_ALLCOATOR 0
 #endif

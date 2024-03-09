@@ -21,7 +21,8 @@ DEFINE_LOG_CATEGORY(LogTest)
 static void test_boostfile_test()
 {
 	FMiMallocator MiMallocator{ { .bNewHeap = true } };
-	// FStackMallocator<> StackMallocator{ { .bMonolithic = true } };
+	// Try use StackMallocator and you will have lifetime object crash on free
+	// FStackMallocator<> StackMallocator{ { .bMonolithic = false, .bValidate = true } };
 	HLVM_SCOPED_VARIABLE(
 		ScopedMallocator, [&]() -> void { SwapMallocator(&MiMallocator); },
 		[&]() -> void { SwapMallocator(); });
@@ -68,6 +69,8 @@ RECORD_TEST_FUNC(boostfile_test)
 RECORD(packed_test)
 {
 	FMiMallocator MiMallocator{ { .bNewHeap = true } };
+	// Try use StackMallocator and you will have lifetime object crash on free
+	// FStackMallocator<> StackMallocator{ { .bMonolithic = false, .bValidate = true } };
 	HLVM_SCOPED_VARIABLE(
 		ScopedMallocator, [&]() -> void { SwapMallocator(&MiMallocator); },
 		[&]() -> void { SwapMallocator(); });

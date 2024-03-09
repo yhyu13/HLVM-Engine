@@ -730,7 +730,7 @@ HLVM_NODISCARD FConstByteBuffer FBoostFileHandle::GetMappedBufferReadOnly() cons
 	BFH_HANDLE_ASSERT(!mMappedLazyInit, TXT("MappedFile still not init"));
 	BFH_HANDLE_ASSERT(mFileOptions.eFileMode & EFileMode::R && !(mFileOptions.eFileMode & EFileMode::W), TXT("File operation cannot flush"));
 	return FConstByteBuffer{
-		reinterpret_cast<const TByte*>(mMappedFile->const_data()), mMappedFile->size()
+		reinterpret_cast<const TBYTE*>(mMappedFile->const_data()), mMappedFile->size()
 	};
 }
 

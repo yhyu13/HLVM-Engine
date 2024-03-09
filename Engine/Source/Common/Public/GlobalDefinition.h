@@ -71,13 +71,13 @@
 	HLVM_INLINE_VAR constexpr size_t enum_class##_NUM = static_cast<size_t>(enum_class::HLVM_NUM)
 
 #define HLVM_ENUM_V(enum_class, enum_value) static_cast<std::underlying_type_t<enum_class>>(enum_class::enum_value)
-#define HLVM_ENUM_V_SIZE_T(enum_class, enum_value) static_cast<size_t>(enum_value)
+#define HLVM_ENUM_V_SIZE_T(enum_class, enum_value) static_cast<size_t>((enum_value))
 
-#define S_C(type, value) static_cast<type>(value)
-#define SP_C(type, value) static_pointer_cast<type>(value)
-#define D_C(type, value) dynamic_cast<type>(value)
-#define C_C(type, value) const_cast<type>(value)
-#define R_C(type, value) reinterpret_cast<type>(value)
+#define S_C(type, value) static_cast<type>((value))
+#define SP_C(type, value) static_pointer_cast<type>((value))
+#define D_C(type, value) dynamic_cast<type>((value))
+#define C_C(type, value) const_cast<type>((value))
+#define R_C(type, value) reinterpret_cast<type>((value))
 
 #define HLVM_NOT_IMPLEMENTED() assert(false)
 
@@ -94,7 +94,7 @@
 
 // Use char for best compatibility with other libraries
 #define TCHAR char8_t
-static_assert(sizeof(TCHAR) == sizeof(char), "TCHAR is not char");
+static_assert(sizeof(TCHAR) == sizeof(char), "TCHAR is not char in size");
 
 //  Use utf8 for all string literal
 //  U8_STRING("Hello World!")
@@ -103,5 +103,8 @@ static_assert(sizeof(TCHAR) == sizeof(char), "TCHAR is not char");
 #define STRTIFY(x) TXT(#x)
 #define TO_TCHAR_STR(x) reinterpret_cast<const TCHAR*>((x))
 #define TO_CHAR_STR(x) reinterpret_cast<const char*>((x))
+
+#define TBYTE std::byte
+static_assert(sizeof(TBYTE) == sizeof(char), "TBYTE is not char in size");
 
 #include "UserPredefined.gen.h"

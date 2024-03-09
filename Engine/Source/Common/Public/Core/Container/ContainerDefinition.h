@@ -42,10 +42,9 @@ using TStableMap = phmap::node_hash_map<Key, Value>;
 	if (auto iter = (map).find((key)); \
 		iter != (map).end())
 
-using TByte = std::byte;
-using FByteVector = TVector<TByte>;
-using FByteBuffer = std::span<TByte>;
-using FConstByteBuffer = std::span<const TByte>;
+using FByteVector = TVector<TBYTE>;
+using FByteBuffer = std::span<TBYTE>;
+using FConstByteBuffer = std::span<const TBYTE>;
 #define TO_SPAN(array, size) \
 	std::span                \
 	{                        \
@@ -54,5 +53,5 @@ using FConstByteBuffer = std::span<const TByte>;
 #define TO_CONST_BYTE_BUFFER(vec)                     \
 	FConstByteBuffer                                  \
 	{                                                 \
-		R_C(const TByte*, (vec).data()), (vec).size() \
+		R_C(const TBYTE*, (vec).data()), (vec).size() \
 	}
