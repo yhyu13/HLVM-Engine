@@ -2,13 +2,14 @@
  * Copyright (c) 2024. MIT License. All rights reserved.
  */
 
-#include "Common.h"
+#include "Core/Mallocator/StackMallocator.h"
 #include "Core/Log.h"
 #include "Platform/GenericPlatformDebuggerUtil.h"
+#include "Template/PrintTemplate.tpp"
 
-DELCARE_LOG_CATEGORY(LogMia)
+DELCARE_LOG_CATEGORY(LogMiMallocator)
 
-HLVM_INLINE_FUNC bool FMiMallocator::Owened(void* ptr) noexcept
+bool FMiMallocator::Owened(void* ptr) noexcept
 {
 	try
 	{
@@ -17,27 +18,12 @@ HLVM_INLINE_FUNC bool FMiMallocator::Owened(void* ptr) noexcept
 	catch (std::exception& e)
 	{
 		const FStdString& Stack = FGenericPlatformDebuggerUtil::GetStackTrace();
-		HLVM_LOG(LogMia, err, TXT("Owened exception : {} at\n{}"), TO_TCHAR_STR(e.what()), *Stack);
+		HLVM_LOG(LogMiMallocator, err, TXT("Owened exception : {} at\n{}"), TO_TCHAR_STR(e.what()), *Stack);
 		return false;
 	}
 }
 
-/**
- * Override new and delete operator
- */
-#ifndef HLVM_MALLOC_OVERRIDE
-	#define HLVM_MALLOC_OVERRIDE 1
-#endif
-
-/**
- * Use stack allocator as general propose allocator
- * CAUTION : not recommanded, as long life time object e.g. share ptr counter, could lead to crash on free
- * turn off by default
- */
-#ifndef HLVM_MALLOC_USE_STACK_ALLCOATOR
-	#define HLVM_MALLOC_USE_STACK_ALLCOATOR 0
-#endif
-
+// TODO : throw std::bad_alloc(); on nullptr malloc
 #if HLVM_MALLOC_OVERRIDE
 
 HLVM_TLS_VAR IMallocator* GMallocatorTLS = &GMiMallocatorTLS;
@@ -49,6 +35,20 @@ void InitMallocator()
 	mi_option_enable(mi_option_t::mi_option_show_stats);
 	mi_option_enable(mi_option_t::mi_option_verbose);
 	#endif
+}
+
+void SwapMallocator(IMallocator* Mallocator)
+{
+	if (hlvm_private::GMallocatorTLSSwap == nullptr)
+	{
+		hlvm_private::GMallocatorTLSSwap = GMallocatorTLS;
+		GMallocatorTLS = Mallocator;
+	}
+	else
+	{
+		GMallocatorTLS = hlvm_private::GMallocatorTLSSwap;
+		hlvm_private::GMallocatorTLSSwap = nullptr;
+	}
 }
 
 // Guide to override global new and delete : https://microsoft.github.io/mimalloc/using.html
@@ -68,10 +68,10 @@ void InitMallocator()
 			if (false)
 	#endif
 
-/**
- * Mimalloc checks thread local allocated pointer as well as non thread local allocated pointer.
- * So just let mimalloc does its job on freeing w/o checking owner ship
- */
+	/**
+	 * Mimalloc checks thread local allocated pointer as well as non thread local allocated pointer.
+	 * So just let mimalloc does its job on freeing w/o checking owner ship
+	 */
 	#define HLVM_MIMALLOC_OWNED(p)                         \
 		if (GMallocatorTLS->Type == EMallocator::Mimalloc) \
 		HLVM_LIKELY
@@ -102,7 +102,7 @@ void InitMallocator()
 		#include <mimalloc.h>
 
 		#if defined(_MSC_VER) && defined(_Ret_notnull_) && defined(_Post_writable_byte_size_)
-			// stay consistent with VCRT definitions
+		// stay consistent with VCRT definitions
 			#define mi_decl_new(n) mi_decl_nodiscard mi_decl_restrict _Ret_notnull_ _Post_writable_byte_size_(n)
 			#define mi_decl_new_nothrow(n) mi_decl_nodiscard mi_decl_restrict _Ret_maybenull_ _Success_(return != NULL) _Post_writable_byte_size_(n)
 		#else
@@ -434,6 +434,9 @@ void* operator new[](std::size_t n, std::align_val_t al, const std::nothrow_t&) 
 
 HLVM_TLS_VAR IMallocator* GMallocatorTLS = nullptr;
 void					  InitMallocator()
+{
+}
+void SwapMallocator(IMallocator* Mallocator)
 {
 }
 

@@ -152,7 +152,6 @@ IFileHandle::OpRetType FPackedEntryHandle::Close()
 	{
 		PEH_SCOPE_LOCK();
 
-		// TODO
 		{
 			auto Fragment = mQuickFind.Fragment;
 			Fragment->Close();
