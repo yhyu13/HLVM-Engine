@@ -23,10 +23,24 @@
 	#define HLVM_PACKED_PATCH_FILE_PATTERN boost::regex(R"(packed-\S*-\d+-pat)")
 #endif
 
+/**
+ * Gen signature file for both token and container file
+ */
 #ifndef HLVM_PACKED_FILE_WITH_SIGNATURE
 	#define HLVM_PACKED_FILE_WITH_SIGNATURE 1
 #endif
 
+/**
+ * Encrypt token file for as a curties protection
+ */
 #ifndef HLVM_PACKED_TOKEN_FILE_WITH_ENCRYPTION
 	#define HLVM_PACKED_TOKEN_FILE_WITH_ENCRYPTION 1
+#endif
+
+/**
+ * Use token file debug json of as the token file instead of using packed token file
+ * Not recommanded unless you are required to query the pack file for file and directory status
+ */
+#ifndef HLVM_PACKED_TOKEN_FILE_USE_DEBUG_JSON_INSTAED
+	#define HLVM_PACKED_TOKEN_FILE_USE_DEBUG_JSON_INSTAED 0
 #endif

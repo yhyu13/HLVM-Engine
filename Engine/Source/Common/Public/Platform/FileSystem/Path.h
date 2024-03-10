@@ -116,7 +116,7 @@ public:
 	 */
 	static bool					 IsDirectory(const FPath& path);
 	static bool					 Exists(const FPath& path);
-	static TSmallVector32<FPath> Find(const FPath& root_dir, const FString& regex, bool recursive = false);
+	static TSmallVector32<FPath> Glob(const FPath& root_dir, const FString& regex, bool recursive = false);
 	static FString				 DumpJson(const TSmallVector32<FPath>& paths);
 
 private:

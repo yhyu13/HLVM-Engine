@@ -11,36 +11,6 @@
 #include <spdlog/spdlog.h>
 #include <spdlog/async.h>
 #include <magic_enum_all.hpp>
-#include <backward.hpp>
-#include <ctre.hpp>
-
-/**
- * phmap has alot of unconventional warnings, pretty bad code though
- */
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wcomma"
-#pragma clang diagnostic ignored "-Wold-style-cast"
-#pragma clang diagnostic ignored "-Wsign-conversion"
-#pragma clang diagnostic ignored "-Wmissing-noreturn"
-#include <parallel_hashmap/phmap.h>
-#pragma clang diagnostic pop
-
-/**
- * Baton
- */
-#include <botan/auto_rng.h>
-#include <botan/hex.h>
-#include <botan/pk_keys.h>
-#include <botan/pkcs8.h>
-#include <botan/pubkey.h>
-#include <botan/rng.h>
-#include <botan/base64.h>
-
-// zstd
-#include <zstd.h>
-
-// rapidjson
-#include <rapidjson/document.h>
 
 DELCARE_LOG_CATEGORY(LogTest)
 DEFINE_LOG_CATEGORY(LogTest)
@@ -200,6 +170,8 @@ RECORD(magic_enum_test)
 	}
 };
 
+#include <backward.hpp>
+
 RECORD(backward_test)
 {
 	using namespace backward;
@@ -210,6 +182,17 @@ RECORD(backward_test)
 		p.print(st);
 	}
 };
+
+/**
+ * phmap has alot of unconventional warnings, pretty bad code though
+ */
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wcomma"
+#pragma clang diagnostic ignored "-Wold-style-cast"
+#pragma clang diagnostic ignored "-Wsign-conversion"
+#pragma clang diagnostic ignored "-Wmissing-noreturn"
+#include <parallel_hashmap/phmap.h>
+#pragma clang diagnostic pop
 
 RECORD(phmap_test)
 {
@@ -275,6 +258,8 @@ RECORD(phmap_test)
 	}
 };
 
+#include <ctre.hpp>
+
 constexpr auto match(std::string_view sv) noexcept
 {
 	return ctre::match<"h.*">(sv);
@@ -298,6 +283,16 @@ RECORD(test_ctre)
 	HLVM_ENSURE(match_assignment("a() = 1"), TXT("Failed"));
 	HLVM_ENSURE(!match_assignment("bool(a == 1)"), TXT("Failed"));
 };
+
+/**
+ * Baton
+ */
+#include <botan/auto_rng.h>
+#include <botan/hex.h>
+#include <botan/pk_keys.h>
+#include <botan/pkcs8.h>
+#include <botan/pubkey.h>
+#include <botan/base64.h>
 
 RECORD(test_botan)
 {
@@ -381,6 +376,9 @@ RECORD(test_botan)
 	}
 };
 
+// zstd
+#include <zstd.h>
+
 RECORD(test_zstd)
 {
 	std::string		  input = "This is a test string to compress.";
@@ -418,6 +416,9 @@ RECORD(test_zstd)
 	assert(input == output);
 }
 
+// rapidjson
+#include <rapidjson/document.h>
+
 RECORD(test_rapidjson)
 {
 	using namespace std;
@@ -430,4 +431,89 @@ RECORD(test_rapidjson)
 	const Value& hello = document["hello"];
 	assert(hello.IsString());
 	cout << "Hello: " << hello.GetString() << endl;
+}
+
+// opentelemetry
+#include <opentelemetry/exporters/otlp/otlp_grpc_exporter_factory.h>
+#include <opentelemetry/sdk/common/global_log_handler.h>
+#include <opentelemetry/sdk/resource/semantic_conventions.h>
+#include <opentelemetry/sdk/trace/processor.h>
+#include <opentelemetry/sdk/trace/simple_processor_factory.h>
+#include <opentelemetry/sdk/trace/tracer_provider_factory.h>
+#include <opentelemetry/trace/provider.h>
+#include <opentelemetry/sdk/resource/resource.h>
+
+namespace trace = opentelemetry::trace;
+namespace trace_sdk = opentelemetry::sdk::trace;
+namespace otlp = opentelemetry::exporter::otlp;
+namespace internal_log = opentelemetry::sdk::common::internal_log;
+namespace resource = opentelemetry::sdk::resource;
+namespace nostd = opentelemetry::nostd;
+
+namespace
+{
+
+	opentelemetry::exporter::otlp::OtlpGrpcExporterOptions opts;
+	void												   InitTracer()
+	{
+		opts.endpoint = "<gRPC-endpoint>";
+		opts.metadata.insert(std::pair<std::string, std::string>("authentication", "<gRPC-token>"));
+
+		// 创建OTLP exporter
+		auto exporter = otlp::OtlpGrpcExporterFactory::Create(opts);
+		auto processor = trace_sdk::SimpleSpanProcessorFactory::Create(std::move(exporter));
+
+		resource::ResourceAttributes attributes = {
+			{ resource::SemanticConventions::kServiceName, "<your-service-name>" },
+			{ resource::SemanticConventions::kHostName, "<your-host-name>" }
+		};
+		auto resource = opentelemetry::sdk::resource::Resource::Create(attributes);
+
+		std::shared_ptr<opentelemetry::trace::TracerProvider> provider =
+			trace_sdk::TracerProviderFactory::Create(std::move(processor), std::move(resource));
+
+		// 设置全局的trace provider
+		trace::Provider::SetTracerProvider(provider);
+	}
+
+	void CleanupTracer()
+	{
+		std::shared_ptr<opentelemetry::trace::TracerProvider> none;
+		trace::Provider::SetTracerProvider(none);
+	}
+
+	nostd::shared_ptr<trace::Tracer> get_tracer()
+	{
+		auto provider = trace::Provider::GetTracerProvider();
+		return provider->GetTracer("library name to trace", OPENTELEMETRY_SDK_VERSION);
+	}
+
+	void f1()
+	{
+		auto scoped_span = trace::Scope(get_tracer()->StartSpan("f1"));
+	}
+
+	void f2()
+	{
+		auto scoped_span = trace::Scope(get_tracer()->StartSpan("f2"));
+
+		f1();
+		f1();
+	}
+
+	void foo_library()
+	{
+		auto scoped_span = trace::Scope(get_tracer()->StartSpan("library"));
+
+		f2();
+	}
+}; // namespace
+
+RECORD(opentelemtry_test)
+{
+	InitTracer();
+
+	foo_library();
+
+	CleanupTracer();
 }

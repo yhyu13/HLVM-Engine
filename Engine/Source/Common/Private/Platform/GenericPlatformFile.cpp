@@ -71,19 +71,19 @@ bool FGenericPlatformFile::Exists(const FPath& path)
 	}
 }
 
-TSmallVector32<FPath> FGenericPlatformFile::Find(const FPath& path, const FString& regex, bool recursive)
+TSmallVector32<FPath> FGenericPlatformFile::Glob(const FPath& path, const FString& regex, bool recursive)
 {
 	if (path.Type() == EPlatformFileType::Local)
 	{
-		return S_C(FBoostPlatformFile*, sPlatformFileRedirector[HLVM_ENUM_V(EPlatformFileType, Local)])->Find(path, regex, recursive);
+		return S_C(FBoostPlatformFile*, sPlatformFileRedirector[HLVM_ENUM_V(EPlatformFileType, Local)])->Glob(path, regex, recursive);
 	}
 	else if (path.Type() == EPlatformFileType::Packed)
 	{
-		return S_C(FPackedPlatformFile*, sPlatformFileRedirector[HLVM_ENUM_V(EPlatformFileType, Packed)])->Find(path, regex, recursive);
+		return S_C(FPackedPlatformFile*, sPlatformFileRedirector[HLVM_ENUM_V(EPlatformFileType, Packed)])->Glob(path, regex, recursive);
 	}
 	else
 	{
 		// TODO
-		return S_C(FBoostPlatformFile*, sPlatformFileRedirector[HLVM_ENUM_V(EPlatformFileType, Local)])->Find(path, regex, recursive);
+		return S_C(FBoostPlatformFile*, sPlatformFileRedirector[HLVM_ENUM_V(EPlatformFileType, Local)])->Glob(path, regex, recursive);
 	}
 }

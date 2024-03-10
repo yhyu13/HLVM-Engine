@@ -21,7 +21,7 @@ public:
 
 	virtual bool				  IsDirectory(const FPath& path) final override;
 	virtual bool				  Exists(const FPath& path) final override;
-	virtual TSmallVector32<FPath> Find(const FPath& root_dir, const FString& regex, bool recursive = false) final override;
+	virtual TSmallVector32<FPath> Glob(const FPath& root_dir, const FString& regex, bool recursive = false) final override;
 
 private:
 	FBoostFileHandle mFileHandle; // Dummy file handle just to get file stat

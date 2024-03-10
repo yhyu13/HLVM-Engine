@@ -6,13 +6,16 @@ vcpkg_cxt = VcpkgContenxt(vcpkg_root_path='../Dependency/vcpkg',
                                                         version='0.1.0',
                                                         dependencies=[
                                                             "spdlog",
-                                                            "mimalloc",
+                                                            VcpkgPackage(name="mimalloc", features=["asm", "secure"],
+                                                                         default_features=False),
                                                             "magic-enum",
                                                             "boost",
                                                             "elfutils",
                                                             "zstd",
                                                             "botan",
-                                                            "rapidjson"
+                                                            "rapidjson",
+                                                            VcpkgPackage(name="opentelemetry-cpp",
+                                                                         features=["otlp-grpc"], default_features=True),
                                                         ],
                                                         builtin_baseline='53bef8994c541b6561884a8395ea35715ece75db'))
 
@@ -60,10 +63,31 @@ zstd = FindPackage(name='zstd',
 
 # Find the rapidjson package with the specified options
 rapidjson = FindPackage(name='RapidJSON',
-                  config=True,
-                  required=True,
-                  target_link_libs=[
-                      DomainValueModel(domain=DomainEnum.PUBLIC, values=['rapidjson'])])
+                        config=True,
+                        required=True,
+                        target_link_libs=[
+                            DomainValueModel(domain=DomainEnum.PUBLIC, values=['rapidjson'])])
+
+# Find the opentelemtry package with the specified options
+opentelemetry = FindPackage(name='opentelemetry-cpp',
+                            config=True,
+                            required=True,
+                            target_include_dirs=[DomainValueModel(domain=DomainEnum.PUBLIC,
+                                                                  values=['${OPENTELEMETRY_CPP_INCLUDE_DIRS}'])],
+                            target_link_libs=[
+                                DomainValueModel(domain=DomainEnum.PUBLIC, values=['${OPENTELEMETRY_CPP_LIBRARIES}'])])
+protobuf = FindPackage(name='protobuf',
+                       config=False,
+                       required=True)
+grpc = FindPackage(name='gRPC',
+                   config=False,
+                   required=True)
+curl = FindPackage(name='CURL',
+                   config=False,
+                   required=True)
+nlohmann_json = FindPackage(name='nlohmann_json',
+                            config=False,
+                            required=True)
 
 # Fetch the Yalantinglibs package from GitHub with the specified options
 yalantinlibs = FetchContent(name='yalantinglibs',
@@ -132,7 +156,12 @@ class CommonModule(BaseModule):
                                         Boost,
                                         botan3,
                                         zstd,
-                                        rapidjson
+                                        rapidjson,
+                                        opentelemetry,
+                                        protobuf,
+                                        grpc,
+                                        curl,
+                                        nlohmann_json,
                                         ]
                          )
         self.target_interface.add_compile_options(domain=DomainEnum.PUBLIC, values=[

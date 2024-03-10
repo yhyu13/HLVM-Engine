@@ -18,9 +18,9 @@ bool FPath::Exists(const FPath& path)
 	return FGenericPlatformFile::Get()->Exists(path);
 }
 
-TSmallVector32<FPath> FPath::Find(const FPath& root_dir, const FString& regex, bool recursive)
+TSmallVector32<FPath> FPath::Glob(const FPath& root_dir, const FString& regex, bool recursive)
 {
-	return FGenericPlatformFile::Get()->Find(root_dir, regex, recursive);
+	return FGenericPlatformFile::Get()->Glob(root_dir, regex, recursive);
 }
 
 FString FPath::DumpJson(const TSmallVector32<FPath>& paths)

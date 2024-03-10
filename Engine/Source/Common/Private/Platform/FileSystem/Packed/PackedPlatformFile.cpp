@@ -34,7 +34,7 @@ bool FPackedPlatformFile::Exists(const FPath&)
 	return true;
 }
 
-TSmallVector32<FPath> FPackedPlatformFile::Find(const FPath&, const FString&, bool)
+TSmallVector32<FPath> FPackedPlatformFile::Glob(const FPath&, const FString&, bool)
 {
 	LOCK_GUARD_RIVAL(mMountedPackedFileHandlesLock, FRWRivalLock::Group::Read);
 	// TODO : actually we should set Find for packed file to N/A

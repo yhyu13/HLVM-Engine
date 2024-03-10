@@ -7,7 +7,7 @@
 #include "StackMallocator.h"
 #include "Core/Log.h"
 
-DELCARE_LOG_CATEGORY(LogMallocator)
+DELCARE_LOG_CATEGORY(LogPMR)
 
 #ifndef HVLM_MALLOCATOR_DEATIL_TRACE
 	#define HVLM_MALLOCATOR_DEATIL_TRACE 1
@@ -26,7 +26,7 @@ namespace hlvm_private
 template <class T>
 struct TMallocator
 {
-	HLVM_INLINE_VAR HLVM_STATIC_VAR const TCHAR* sTypeName = TO_TCHAR_STR(typeid(T).name());
+	HLVM_INLINE_VAR HLVM_STATIC_VAR FString sTypeName{ typeid(T).name() };
 
 	using value_type = T;
 	using size_type = std::size_t;
@@ -53,12 +53,12 @@ struct TMallocator
 
 	HLVM_NODISCARD T* allocate(std::size_t n)
 	{
-		T*	 p = nullptr;
-		auto realSize = n * sizeof(T);
+		void*  p = nullptr;
+		size_t realSize = n * sizeof(T);
 		if (Mallocator)
 		{
 			// Using static_cast instead of reinterpret_cast because malloc might return nullptr or NULL
-			p = S_C(T*, Mallocator->Malloc(realSize));
+			p = Mallocator->Malloc(realSize);
 		}
 		else
 		{
@@ -70,17 +70,18 @@ struct TMallocator
 				throw std::bad_alloc();
 			}
 #if HVLM_MALLOCATOR_DEATIL_TRACE
-		auto _allocSize = hlvm_private::GPMRAllocatedSize.fetch_and(realSize, std::memory_order_relaxed);
+		size_t _allocSize = hlvm_private::GPMRAllocatedSize.fetch_add(realSize, std::memory_order_relaxed);
 		_allocSize += realSize;
-		HLVM_LOG(LogMallocator, trace, TXT("Malloc {} {} {} {} {}"),
-			sTypeName, n, sizeof(T), realSize, _allocSize);
+		HLVM_LOG(LogPMR, trace, TXT("Malloc {} {} {} {:p} {}"),
+			*sTypeName, n, sizeof(T), p, _allocSize);
 #endif
-		return p;
+		return R_C(T*, p);
 	}
 
-	void deallocate(T* p, std::size_t n) noexcept
+	void deallocate(T* _p, std::size_t n) noexcept
 	{
-		auto realSize = n * sizeof(T);
+		void*  p = R_C(void*, _p);
+		size_t realSize = n * sizeof(T);
 		if (Mallocator)
 		{
 			Mallocator->FreeSize(p, realSize);
@@ -90,10 +91,10 @@ struct TMallocator
 			std::free(p);
 		}
 #if HVLM_MALLOCATOR_DEATIL_TRACE
-		auto _allocSize = hlvm_private::GPMRAllocatedSize.fetch_sub(realSize, std::memory_order_relaxed);
+		size_t _allocSize = hlvm_private::GPMRAllocatedSize.fetch_sub(realSize, std::memory_order_relaxed);
 		_allocSize -= realSize;
-		HLVM_LOG(LogMallocator, trace, TXT("Free {} {} {} {} {}"),
-			sTypeName, n, sizeof(T), realSize, _allocSize);
+		HLVM_LOG(LogPMR, trace, TXT("Free {} {} {} {:p} {}"),
+			*sTypeName, n, sizeof(T), p, _allocSize);
 #endif
 	}
 

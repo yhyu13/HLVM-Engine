@@ -60,7 +60,7 @@ static void test_boostfile_test()
 		HLVM_ENSURE(!FPath::IsDirectory("./test.txt"), TXT("Test failed"));
 		HLVM_ENSURE(FPath::Exists("./test.txt"), TXT("Test failed"));
 
-		auto all_matches = FPath::Find("./", R"(.*Test.*)", true);
+		auto all_matches = FPath::Glob("./", R"(.*Test.*)", true);
 		HLVM_LOG(LogTest, info, TXT("Test FPath::Find result:\n{}"), *FPath::DumpJson(all_matches));
 	}
 }
