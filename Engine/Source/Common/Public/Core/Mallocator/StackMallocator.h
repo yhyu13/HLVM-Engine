@@ -14,6 +14,7 @@ struct FStackMallocatorContext
 {
 	bool bMonolithic{ false };
 	BIT_FLAG(bAllowOverflowToHeap){ true }; // Use mimallocator for overflowed allocation
+	BIT_FLAG(bDefragment){ false };
 #if !HLVM_BUILD_RELEASE
 	BIT_FLAG(bValidate){ true };
 #else
@@ -108,12 +109,12 @@ private:
 
 	void* InternalMalloc(size_t size)
 	{
-		HLVM_ASSERT(size < N, TXT("Required size {} is greater than stack size {}"), size, N);
-		HLVM_ASSERT(mFreeBlockHead->prevFreeBlock == nullptr, TXT("Free block head should have null prev pointer"));
+		assert(size < N);
+		assert(mFreeBlockHead->prevFreeBlock == nullptr);
 		FBlock* FreeBlock = mFreeBlockHead;
 		while (FreeBlock->nextFreeBlock != nullptr)
 		{
-			HLVM_ASSERT(FreeBlock->free, TXT("Free block not freed"));
+			assert(FreeBlock->free);
 			if (FreeBlock->size >= size + sizeof(FBlock))
 			{
 				auto NextFreeBlock = FreeBlock->nextFreeBlock;
@@ -126,7 +127,7 @@ private:
 				auto NewFreeBlock = R_C(FBlock*, R_C(TBYTE*, FreeBlock) + sizeof(FBlock) + size);
 				*NewFreeBlock = FBlock();
 				NewFreeBlock->size = FreeBlock->size - sizeof(FBlock) - size;
-				HLVM_ASSERT(NewFreeBlock->size < N, TXT("Free block exceed stack size"));
+				assert(NewFreeBlock->size < N);
 				if (NewFreeBlock->size == 0)
 					HLVM_UNLIKELY
 					{
@@ -135,21 +136,11 @@ private:
 						if (PrevFreeBlock)
 						{
 							PrevFreeBlock->nextFreeBlock = NextFreeBlock;
-							// If prev free exists, assign head to prev,
-							// and iterate until we reach a head whose prev free block is null
-							mFreeBlockHead = PrevFreeBlock;
-							while (mFreeBlockHead->prevFreeBlock)
-							{
-								const bool bValid = mFreeBlockHead != mFreeBlockHead->prevFreeBlock;
-								HLVM_ASSERT(bValid, TXT("Free block head should not have self dependency"));
-								mFreeBlockHead = mFreeBlockHead->prevFreeBlock;
-							}
 						}
 						else
 						{
 							// Otherwise, assign head to next
 							mFreeBlockHead = NextFreeBlock;
-							mFreeBlockHead->prevFreeBlock = nullptr;
 						}
 					}
 				else
@@ -162,23 +153,14 @@ private:
 						if (PrevFreeBlock)
 						{
 							PrevFreeBlock->nextFreeBlock = NewFreeBlock;
-							// If prev free exists, assign head to prev,
-							// and iterate until we reach a head whose prev free block is null
-							mFreeBlockHead = PrevFreeBlock;
-							while (mFreeBlockHead->prevFreeBlock)
-							{
-								const bool bValid = mFreeBlockHead != mFreeBlockHead->prevFreeBlock;
-								HLVM_ASSERT(bValid, TXT("Free block head should not have self dependency"));
-								mFreeBlockHead = mFreeBlockHead->prevFreeBlock;
-							}
 						}
 						else
 						{
 							// Otherwise, assign head to new
 							mFreeBlockHead = NewFreeBlock;
-							mFreeBlockHead->prevFreeBlock = nullptr;
 						}
 					}
+				assert(mFreeBlockHead->prevFreeBlock == nullptr);
 
 				// Allocate current free block
 				FreeBlock->size = size;
@@ -221,16 +203,39 @@ private:
 			{
 				// Reset new block to free
 				FBlock* FreeBlock = R_C(FBlock*, ptr - sizeof(FBlock));
-				HLVM_ASSERT(FreeBlock->size > 0, TXT("Free block should have non zero size"));
-				HLVM_ASSERT(!FreeBlock->free, TXT("Free block double freed"));
+				assert(FreeBlock->size > 0);
+				assert(!FreeBlock->free);
+
 				FreeBlock->free = true;
 				FreeBlock->prevFreeBlock = nullptr;
 
 				// Exchange new free block with free head
-				HLVM_ASSERT(mFreeBlockHead->prevFreeBlock == nullptr, TXT("Free block head shoul not have prev pointer"));
 				mFreeBlockHead->prevFreeBlock = FreeBlock;
 				FreeBlock->nextFreeBlock = mFreeBlockHead;
 				mFreeBlockHead = FreeBlock;
+
+				// Defragmentation next physical block if it is free
+				if (mCtx.bDefragment)
+				{
+					FBlock* NextBlock = R_C(FBlock*, R_C(TBYTE*, FreeBlock) + sizeof(FBlock) + FreeBlock->size);
+					while (NextBlock->free && NextBlock->size > 0)
+					{
+						// Sanity checks
+						auto NextBlockPrevFreeBlock = NextBlock->prevFreeBlock;
+						assert(NextBlockPrevFreeBlock && NextBlockPrevFreeBlock != NextBlock && NextBlockPrevFreeBlock->nextFreeBlock == NextBlock);
+						auto NextBlockNextFreeBlock = NextBlock->nextFreeBlock;
+						assert(NextBlockNextFreeBlock && NextBlockNextFreeBlock != NextBlock && NextBlockNextFreeBlock->prevFreeBlock == NextBlock);
+
+						// Eliminate Next block by connect prev and next
+						NextBlockPrevFreeBlock->nextFreeBlock = NextBlockNextFreeBlock;
+						NextBlockNextFreeBlock->prevFreeBlock = NextBlockPrevFreeBlock;
+
+						// Defragment FreeBlock and move on to next block once more
+						FreeBlock->size += NextBlock->size + sizeof(FBlock);
+						NextBlock = R_C(FBlock*, R_C(TBYTE*, FreeBlock) + sizeof(FBlock) + FreeBlock->size);
+					}
+				}
+				assert(mFreeBlockHead->prevFreeBlock == nullptr);
 
 				/**
 				 * Check free block validity
@@ -240,8 +245,11 @@ private:
 					FreeBlock = mFreeBlockHead->nextFreeBlock;
 					while (FreeBlock->nextFreeBlock)
 					{
-						HLVM_ENSURE(FreeBlock->prevFreeBlock != nullptr, TXT("non head free block should have prev pointer"));
-						HLVM_ENSURE(FreeBlock->prevFreeBlock != FreeBlock->nextFreeBlock, TXT("free block should not have self dependency"));
+						HLVM_ENSURE(FreeBlock->prevFreeBlock != nullptr
+								&& FreeBlock->prevFreeBlock != FreeBlock->nextFreeBlock
+								&& FreeBlock->prevFreeBlock != FreeBlock
+								&& FreeBlock->nextFreeBlock != FreeBlock,
+							TXT("non head free block dependency error"));
 						FreeBlock = FreeBlock->nextFreeBlock;
 					}
 				}

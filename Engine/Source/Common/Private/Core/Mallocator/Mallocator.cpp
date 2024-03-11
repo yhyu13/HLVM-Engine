@@ -59,7 +59,7 @@ void SwapMallocator(IMallocator* Mallocator)
 		if (GMallocatorTLS->Type == EMallocator::Mimalloc) \
 		HLVM_LIKELY
 
-	#if HLVM_MALLOC_USE_STACK_ALLCOATOR
+	#if HLVM_MALLOC_USE_GENERAL_PURPOSE_STACK_ALLOCATOR
 		#define HLVM_STACK_USE()                            \
 			if (GMallocatorTLS->Type == EMallocator::Stack) \
 			HLVM_LIKELY
@@ -76,7 +76,7 @@ void SwapMallocator(IMallocator* Mallocator)
 		if (GMallocatorTLS->Type == EMallocator::Mimalloc) \
 		HLVM_LIKELY
 
-	#if HLVM_MALLOC_USE_STACK_ALLCOATOR
+	#if HLVM_MALLOC_USE_GENERAL_PURPOSE_STACK_ALLOCATOR
 		#define HLVM_STACK_OWNED(p)                         \
 			if (GMallocatorTLS->Type == EMallocator::Stack) \
 			HLVM_LIKELY

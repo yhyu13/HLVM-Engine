@@ -15,23 +15,34 @@
 DELCARE_LOG_CATEGORY(LogTest)
 DEFINE_LOG_CATEGORY(LogTest)
 
+#define TEST_STACK_ALLOCATOR 0
+
 /*
 	<test method>
 */
 static void test_boostfile_test()
 {
+#if TEST_STACK_ALLOCATOR
+	//  Try use StackMallocator and you will have lifetime object crash on free
+	FStackMallocator<> StackMallocator{ {
+		.bMonolithic = false,
+		.bDefragment = true,
+		.bValidate = true,
+	} };
+	HLVM_SCOPED_VARIABLE(
+		ScopedMallocator, [&]() -> void { SwapMallocator(&StackMallocator); },
+		[&]() -> void { SwapMallocator(); });
+#else
 	FMiMallocator MiMallocator{ { .bNewHeap = true } };
-	// Try use StackMallocator and you will have lifetime object crash on free
-	// FStackMallocator<> StackMallocator{ { .bMonolithic = false, .bValidate = true } };
 	HLVM_SCOPED_VARIABLE(
 		ScopedMallocator, [&]() -> void { SwapMallocator(&MiMallocator); },
 		[&]() -> void { SwapMallocator(); });
+#endif
 
 	HLVM_LOG(LogTest, info, TXT("Test BoostFileHandle"));
 	{
 		FBoostFileHandle fileHandle;
 		FFileOptions	 Options{ .eFileMode = EFileMode::RW, .eFileMapped = EFileMapped::NoMapped, .eFileLock = EFileLock::FullLock };
-		FFileOpStatus	 Status;
 		TCharArrayStr<4> Buffer;
 		fileHandle.Open(TXT("./test.txt"), Options)
 			.Write("test", 4, { .bEraseSeekPos = true })
@@ -68,12 +79,22 @@ RECORD_TEST_FUNC(boostfile_test)
 
 RECORD(packed_test)
 {
+#if TEST_STACK_ALLOCATOR
+	//  Try use StackMallocator and you will have lifetime object crash on free
+	FStackMallocator<> StackMallocator{ {
+		.bMonolithic = false,
+		.bDefragment = true,
+		.bValidate = true,
+	} };
+	HLVM_SCOPED_VARIABLE(
+		ScopedMallocator, [&]() -> void { SwapMallocator(&StackMallocator); },
+		[&]() -> void { SwapMallocator(); });
+#else
 	FMiMallocator MiMallocator{ { .bNewHeap = true } };
-	// Try use StackMallocator and you will have lifetime object crash on free
-	// FStackMallocator<> StackMallocator{ { .bMonolithic = false, .bValidate = true } };
 	HLVM_SCOPED_VARIABLE(
 		ScopedMallocator, [&]() -> void { SwapMallocator(&MiMallocator); },
 		[&]() -> void { SwapMallocator(); });
+#endif
 
 	HLVM_LOG(LogTest, info, TXT("Test PackedFileHandle"));
 
