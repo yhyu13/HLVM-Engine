@@ -27,7 +27,6 @@ static void test_boostfile_test()
 	FStackMallocator<> StackMallocator{ {
 		.bMonolithic = false,
 		.bDefragment = true,
-		.bValidate = true,
 	} };
 	HLVM_SCOPED_VARIABLE(
 		ScopedMallocator, [&]() -> void { SwapMallocator(&StackMallocator); },
@@ -84,7 +83,6 @@ RECORD(packed_test)
 	FStackMallocator<> StackMallocator{ {
 		.bMonolithic = false,
 		.bDefragment = true,
-		.bValidate = true,
 	} };
 	HLVM_SCOPED_VARIABLE(
 		ScopedMallocator, [&]() -> void { SwapMallocator(&StackMallocator); },

@@ -35,7 +35,9 @@ RECORD(mallocator_test)
 	}
 	{
 		// Try use StackMallocator and you will have lifetime object crash on free
-		FStackMallocator<4 * 1024> StackMallocator{ { .bMonolithic = false, .bValidate = true } };
+		FStackMallocator<4 * 1024> StackMallocator{ {
+			.bMonolithic = false,
+		} };
 		HLVM_SCOPED_VARIABLE(
 			ScopedMallocator, [&]() -> void { SwapMallocator(&StackMallocator); },
 			[&]() -> void { SwapMallocator(); });
