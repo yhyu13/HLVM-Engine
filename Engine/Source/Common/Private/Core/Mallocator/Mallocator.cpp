@@ -7,6 +7,32 @@
 #include "Platform/GenericPlatformDebuggerUtil.h"
 #include "Template/PrintTemplate.tpp"
 
+/**
+ * Override new and delete operator
+ */
+#ifndef HLVM_MALLOC_OVERRIDE
+	#define HLVM_MALLOC_OVERRIDE 1
+#endif
+
+/**
+ * Use stack allocator as general propose allocator
+ * CAUTION : not recommanded, as long life time object e.g. share ptr counter, could lead to crash on free
+ * turn off by default
+ */
+#ifndef HLVM_MALLOC_USE_GENERAL_PURPOSE_STACK_ALLOCATOR
+	#define HLVM_MALLOC_USE_GENERAL_PURPOSE_STACK_ALLOCATOR 0
+#endif
+
+#ifndef HLVM_MALLOC_USE_CALLOC
+	#define HLVM_MALLOC_USE_CALLOC HLVM_BUILD_DEBUG
+#endif
+
+#if HLVM_MALLOC_USE_CALLOC
+	#define CALLOC(p, n) std::memset(p, 0, n)
+#else
+	#define CALLOC(...)
+#endif
+
 DELCARE_LOG_CATEGORY(LogMiMallocator)
 
 bool FMiMallocator::Owened(void* ptr) noexcept
@@ -84,6 +110,9 @@ void SwapMallocator(IMallocator* Mallocator)
 		#define HLVM_STACK_OWNED(p) \
 			if (false)
 	#endif
+
+// Below is the implementation of the new and delete operators copied from mimalloc
+//*************************************************************************************************
 
 	#pragma clang diagnostic push
 	#pragma clang diagnostic ignored "-Wmissing-prototypes"
@@ -178,14 +207,17 @@ mi_decl_new(n) void* operator new(std::size_t n) noexcept(false)
 	HLVM_MIMALLOC_USE()
 	{
 		void* p = S_C(FMiMallocator*, GMallocatorTLS)->Malloc(n);
+		CALLOC(p, n);
 		return p;
 	}
 	HLVM_STACK_USE()
 	{
 		void* p = GMallocatorTLS->Malloc(n);
+		CALLOC(p, n);
 		return p;
 	}
 	void* p = GMiMallocatorTLS.Malloc(n);
+	CALLOC(p, n);
 	return p;
 }
 mi_decl_new(n) void* operator new[](std::size_t n) noexcept(false)
@@ -194,14 +226,17 @@ mi_decl_new(n) void* operator new[](std::size_t n) noexcept(false)
 	HLVM_MIMALLOC_USE()
 	{
 		void* p = S_C(FMiMallocator*, GMallocatorTLS)->Malloc(n);
+		CALLOC(p, n);
 		return p;
 	}
 	HLVM_STACK_USE()
 	{
 		void* p = GMallocatorTLS->Malloc(n);
+		CALLOC(p, n);
 		return p;
 	}
 	void* p = GMiMallocatorTLS.Malloc(n);
+	CALLOC(p, n);
 	return p;
 }
 
@@ -211,14 +246,17 @@ mi_decl_new_nothrow(n) void* operator new(std::size_t n, const std::nothrow_t&) 
 	HLVM_MIMALLOC_USE()
 	{
 		void* p = S_C(FMiMallocator*, GMallocatorTLS)->Malloc2(n);
+		CALLOC(p, n);
 		return p;
 	}
 	HLVM_STACK_USE()
 	{
 		void* p = GMallocatorTLS->Malloc2(n);
+		CALLOC(p, n);
 		return p;
 	}
 	void* p = GMiMallocatorTLS.Malloc2(n);
+	CALLOC(p, n);
 	return p;
 }
 mi_decl_new_nothrow(n) void* operator new[](std::size_t n, const std::nothrow_t&) noexcept
@@ -227,14 +265,17 @@ mi_decl_new_nothrow(n) void* operator new[](std::size_t n, const std::nothrow_t&
 	HLVM_MIMALLOC_USE()
 	{
 		void* p = S_C(FMiMallocator*, GMallocatorTLS)->Malloc2(n);
+		CALLOC(p, n);
 		return p;
 	}
 	HLVM_STACK_USE()
 	{
 		void* p = GMallocatorTLS->Malloc2(n);
+		CALLOC(p, n);
 		return p;
 	}
 	void* p = GMiMallocatorTLS.Malloc2(n);
+	CALLOC(p, n);
 	return p;
 }
 
@@ -367,14 +408,17 @@ void* operator new(std::size_t n, std::align_val_t al) noexcept(false)
 	HLVM_MIMALLOC_USE()
 	{
 		void* p = S_C(FMiMallocator*, GMallocatorTLS)->MallocAligned(n, align);
+		CALLOC(p, n);
 		return p;
 	}
 	HLVM_STACK_USE()
 	{
 		void* p = GMallocatorTLS->MallocAligned(n, align);
+		CALLOC(p, n);
 		return p;
 	}
 	void* p = GMiMallocatorTLS.MallocAligned(n, align);
+	CALLOC(p, n);
 	return p;
 }
 void* operator new[](std::size_t n, std::align_val_t al) noexcept(false)
@@ -383,14 +427,17 @@ void* operator new[](std::size_t n, std::align_val_t al) noexcept(false)
 	HLVM_MIMALLOC_USE()
 	{
 		void* p = S_C(FMiMallocator*, GMallocatorTLS)->MallocAligned(n, align);
+		CALLOC(p, n);
 		return p;
 	}
 	HLVM_STACK_USE()
 	{
 		void* p = GMallocatorTLS->MallocAligned(n, align);
+		CALLOC(p, n);
 		return p;
 	}
 	void* p = GMiMallocatorTLS.MallocAligned(n, align);
+	CALLOC(p, n);
 	return p;
 }
 void* operator new(std::size_t n, std::align_val_t al, const std::nothrow_t&) noexcept
@@ -399,14 +446,17 @@ void* operator new(std::size_t n, std::align_val_t al, const std::nothrow_t&) no
 	HLVM_MIMALLOC_USE()
 	{
 		void* p = S_C(FMiMallocator*, GMallocatorTLS)->MallocAligned2(n, align);
+		CALLOC(p, n);
 		return p;
 	}
 	HLVM_STACK_USE()
 	{
 		void* p = GMallocatorTLS->MallocAligned2(n, align);
+		CALLOC(p, n);
 		return p;
 	}
 	void* p = GMiMallocatorTLS.MallocAligned2(n, align);
+	CALLOC(p, n);
 	return p;
 }
 void* operator new[](std::size_t n, std::align_val_t al, const std::nothrow_t&) noexcept
@@ -415,14 +465,17 @@ void* operator new[](std::size_t n, std::align_val_t al, const std::nothrow_t&) 
 	HLVM_MIMALLOC_USE()
 	{
 		void* p = S_C(FMiMallocator*, GMallocatorTLS)->MallocAligned2(n, align);
+		CALLOC(p, n);
 		return p;
 	}
 	HLVM_STACK_USE()
 	{
 		void* p = GMallocatorTLS->MallocAligned2(n, align);
+		CALLOC(p, n);
 		return p;
 	}
 	void* p = GMiMallocatorTLS.MallocAligned2(n, align);
+	CALLOC(p, n);
 	return p;
 }
 		#endif

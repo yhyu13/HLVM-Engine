@@ -47,14 +47,20 @@ void FPath::ResolvePath()
 
 FPathHash FPath::CalculateHash() const noexcept
 {
+	// 1. Hash by string size
 	size_t hash = this->size();
-	auto   last_slash = std::find(this->rbegin(), this->rend(), "/");
-	size_t start_index = (last_slash == this->rend()) ? 0 : this->size() - static_cast<size_t>(std::distance(this->rbegin(), last_slash)) - 1;
-	for (size_t i = start_index; i < this->size(); ++i)
+	// 2. Hash by every size_t bytes
+	size_t i = 0;
+	for (; i + sizeof(size_t) < this->size(); i += sizeof(size_t))
 	{
-		hash = (hash * 31) ^ static_cast<size_t>(this->c_str()[i]);
+		hash = (hash * 31) ^ *R_C(const size_t*, this->c_str() + i);
 	}
-	HLVM_LOG(LogFPath, trace, TXT("Path {} hash return {}"), *(*this), hash);
+	// 3. Hash by reset of bytes
+	for (; i < this->size(); ++i)
+	{
+		hash = (hash * 31) ^ S_C(size_t, this->c_str()[i]);
+	}
+	HLVM_LOG(LogFPath, trace, TXT("Path {} hash value {}"), *(*this), hash);
 	return hash;
 }
 
