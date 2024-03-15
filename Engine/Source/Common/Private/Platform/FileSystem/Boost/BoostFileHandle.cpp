@@ -153,7 +153,7 @@ IFileHandle::OpRetType FBoostFileHandle::Open(const FPath& FilePath, const FFile
 
 		mOpened = true;
 		Status_InOut->eFileOpStatus = EFileOpStatus::Success;
-		BFH_VERBOSE_LOG(TXT("Open success with mode {}"), TO_TCHAR_STR(magic_enum::enum_name(mFileOptions.eFileMode).data()));
+		BFH_VERBOSE_LOG(TXT("Open success with mode {}"), HLVM_ENUM_TCHAR_STR(mFileOptions.eFileMode));
 	}
 	catch (std::exception& Exception)
 	{
@@ -522,7 +522,7 @@ IFileHandle::OpRetType FBoostFileHandle::Seek(int64_t Offset, EWhence Whence)
 			{
 				Status_InOut->eFileOpStatus = EFileOpStatus::Success;
 			}
-		BFH_VERBOSE_LOG(TXT("Seek success given offset {} with {}"), Offset, TO_TCHAR_STR(magic_enum::enum_name(Whence).data()));
+		BFH_VERBOSE_LOG(TXT("Seek success given offset {} with {}"), Offset, HLVM_ENUM_TCHAR_STR(Whence));
 	}
 	catch (std::exception& Exception)
 	{

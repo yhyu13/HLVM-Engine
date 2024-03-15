@@ -35,6 +35,15 @@
 
 DELCARE_LOG_CATEGORY(LogMiMallocator)
 
+void InitMallocator()
+{
+#if !HLVM_BUILD_RELEASE
+	mi_option_enable(mi_option_t::mi_option_show_errors);
+	mi_option_enable(mi_option_t::mi_option_show_stats);
+	mi_option_enable(mi_option_t::mi_option_verbose);
+#endif
+}
+
 bool FMiMallocator::Owened(void* ptr) noexcept
 {
 	try
@@ -51,19 +60,8 @@ bool FMiMallocator::Owened(void* ptr) noexcept
 
 // TODO : throw std::bad_alloc(); on nullptr malloc
 #if HLVM_MALLOC_OVERRIDE
-
 HLVM_TLS_VAR IMallocator* GMallocatorTLS = &GMiMallocatorTLS;
-
-void InitMallocator()
-{
-	#if !HLVM_BUILD_RELEASE
-	mi_option_enable(mi_option_t::mi_option_show_errors);
-	mi_option_enable(mi_option_t::mi_option_show_stats);
-	mi_option_enable(mi_option_t::mi_option_verbose);
-	#endif
-}
-
-void SwapMallocator(IMallocator* Mallocator)
+void					  SwapMallocator(IMallocator* Mallocator)
 {
 	if (hlvm_private::GMallocatorTLSSwap == nullptr)
 	{
@@ -486,10 +484,7 @@ void* operator new[](std::size_t n, std::align_val_t al, const std::nothrow_t&) 
 #else
 
 HLVM_TLS_VAR IMallocator* GMallocatorTLS = nullptr;
-void					  InitMallocator()
-{
-}
-void SwapMallocator(IMallocator* Mallocator)
+void					  SwapMallocator(IMallocator*)
 {
 }
 

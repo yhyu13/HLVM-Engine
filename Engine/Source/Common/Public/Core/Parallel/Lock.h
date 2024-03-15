@@ -135,7 +135,7 @@ protected:
 
 private:
 #if HLVM_ATOMIC_LOCK_ENABLE_PADDING
-	PADDING(HLVM_PLATFORM_CACHE_LINE - sizeof(std::atomic_flag));
+	PADDING(HLVM_CACHE_LINE_SIZE - sizeof(std::atomic_flag));
 #endif
 };
 
@@ -185,7 +185,7 @@ protected:
 
 private:
 #if HLVM_ATOMIC_LOCK_ENABLE_PADDING
-	PADDING(HLVM_PLATFORM_CACHE_LINE - sizeof(std::atomic_flag));
+	PADDING(HLVM_CACHE_LINE_SIZE - sizeof(std::atomic_flag));
 #endif
 };
 
@@ -236,7 +236,7 @@ protected:
 
 private:
 #if HLVM_ATOMIC_LOCK_ENABLE_PADDING
-	PADDING(HLVM_PLATFORM_CACHE_LINE - sizeof(std::atomic_flag));
+	PADDING(HLVM_CACHE_LINE_SIZE - sizeof(std::atomic_flag));
 #endif
 };
 

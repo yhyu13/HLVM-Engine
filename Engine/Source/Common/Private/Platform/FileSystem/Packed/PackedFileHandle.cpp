@@ -52,10 +52,10 @@ IFileHandle::OpRetType FPackedFileHandle::Open(const FPath& FilePath, const FFil
 	PFH_HANDLE_STATUS(Status_InOut);
 	PFH_HANDLE_ENSURE(*Status_InOut, TXT("File operation continue with failed status"));
 	PFH_HANDLE_ASSERT(!mOpened, TXT("File operation begin with another already open file"));
-	PFH_HANDLE_ASSERT(Options.eFileMode == sDefaultFileOptions.eFileMode, TXT("File option eFileMode invalid {}"), TO_TCHAR_STR(magic_enum::enum_name(Options.eFileMode).data()));
-	PFH_HANDLE_ASSERT(Options.eFileMapped == sDefaultFileOptions.eFileMapped, TXT("File option eFileMapped invalid {}"), TO_TCHAR_STR(magic_enum::enum_name(Options.eFileMapped).data()));
-	PFH_HANDLE_ASSERT(Options.eFileAsync == sDefaultFileOptions.eFileAsync, TXT("File option eFileAsync invalid {}"), TO_TCHAR_STR(magic_enum::enum_name(Options.eFileAsync).data()));
-	PFH_HANDLE_ASSERT(Options.eFileLock == sDefaultFileOptions.eFileLock, TXT("File option eFileLock invalid {}"), TO_TCHAR_STR(magic_enum::enum_name(Options.eFileLock).data()));
+	PFH_HANDLE_ASSERT(Options.eFileMode == sDefaultFileOptions.eFileMode, TXT("File option eFileMode invalid {}"), HLVM_ENUM_TCHAR_STR(Options.eFileMode));
+	PFH_HANDLE_ASSERT(Options.eFileMapped == sDefaultFileOptions.eFileMapped, TXT("File option eFileMapped invalid {}"), HLVM_ENUM_TCHAR_STR(Options.eFileMapped));
+	PFH_HANDLE_ASSERT(Options.eFileAsync == sDefaultFileOptions.eFileAsync, TXT("File option eFileAsync invalid {}"), HLVM_ENUM_TCHAR_STR(Options.eFileAsync));
+	PFH_HANDLE_ASSERT(Options.eFileLock == sDefaultFileOptions.eFileLock, TXT("File option eFileLock invalid {}"), HLVM_ENUM_TCHAR_STR(Options.eFileLock));
 
 	mFileOptions = Options;
 	mFilePath = FilePath;
@@ -220,7 +220,7 @@ IFileHandle::OpRetType FPackedFileHandle::Open(const FPath& FilePath, const FFil
 
 		mOpened = true;
 		Status_InOut->eFileOpStatus = EFileOpStatus::Success;
-		PFH_VERBOSE_LOG(TXT("Open success with mode {}"), TO_TCHAR_STR(magic_enum::enum_name(mFileOptions.eFileMode).data()));
+		PFH_VERBOSE_LOG(TXT("Open success with mode {}"), HLVM_ENUM_TCHAR_STR(mFileOptions.eFileMode));
 	}
 	catch (std::exception& Exception)
 	{

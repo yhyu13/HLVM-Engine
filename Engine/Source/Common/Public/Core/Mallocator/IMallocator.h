@@ -3,6 +3,7 @@
  */
 
 #pragma once
+
 #include "GlobalDefinition.h"
 #include "MallocatorDefinition.h"
 

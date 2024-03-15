@@ -28,8 +28,14 @@ template <typename T,
 	bool				 bCountSize = false>
 class TConcurrentQueue
 {
-#define IS_MP Mode == EConcurrentQueueMode::Mpsc || Mode == EConcurrentQueueMode::Mpmc
-#define IS_SC Mode == EConcurrentQueueMode::Mpsc || Mode == EConcurrentQueueMode::Spsc
+#define IS_MP (Mode == EConcurrentQueueMode::Mpsc || Mode == EConcurrentQueueMode::Mpmc)
+#define IS_SC (Mode == EConcurrentQueueMode::Mpsc || Mode == EConcurrentQueueMode::Spsc)
+	/**
+	 * Actually use atomic pointer is significantly faster (2x) than using raw ptr,
+	 * Try turn this on/off and compare TestParallel benchmark
+	 */
+#define QUEUE_NODE_USE_ATOMIC_PTR 1
+
 	/*
 	 *  Concurrent Queue : Emulation
 	 *  mHead = mTail
@@ -76,7 +82,7 @@ private:
 			: mItem(InItem)
 		{
 		}
-
+#if QUEUE_NODE_USE_ATOMIC_PTR
 		~QueueNode() noexcept
 		{
 			/**
@@ -85,9 +91,11 @@ private:
 			 */
 			mNextNode.Release();
 		}
-
 		TAtomicPointer<QueueNode*> mNextNode{ nullptr };
-		T						   mItem;
+#else
+		QueueNode* mNextNode{ nullptr };
+#endif
+		T mItem;
 	};
 
 public:
@@ -284,7 +292,12 @@ private:
 			// Step1, swap pointer
 			old_head = FGenericPlatformAtomicPointer::AtomicExchange(&mHead, NewNode);
 			// Step2, chain pointer
+#if QUEUE_NODE_USE_ATOMIC_PTR
 			FGenericPlatformAtomicPointer::AtomicExchange(&old_head->mNextNode, NewNode);
+#else
+			ATOMIC_THREAD_FENCE();
+			old_head->mNextNode = NewNode;
+#endif
 		}
 		else
 		{
@@ -326,4 +339,5 @@ private:
 
 #undef IS_MP
 #undef IS_SC
+#undef QUEUE_NODE_USE_ATOMIC_PTR
 };

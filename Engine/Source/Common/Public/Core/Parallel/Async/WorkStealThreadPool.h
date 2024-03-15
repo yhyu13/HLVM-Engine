@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include "Lock.h"
-#include "ConcurrentQueue.h"
+#include "Core/Parallel/Lock.h"
+#include "Core/Parallel/ConcurrentQueue.h"
 
 class FWorkStealThreadPool
 {

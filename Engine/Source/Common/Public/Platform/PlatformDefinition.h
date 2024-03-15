@@ -22,7 +22,7 @@
 	#define MS_ALIGN(N) __declspec(align(N))
 	#define GCC_ALIGN(N)
 
-	#define HLVM_PLATFORM_CACHE_LINE 64
+	#define HLVM_CACHE_LINE_SIZE 64
 	#define HLVM_CACHE_ALIGN __declspec(align(PLATFORM_CACHE_LINE))
 
 	#define HLVM_NOINLINE_FUNC __declspec(noinline)
@@ -35,8 +35,8 @@
 	#define MS_ALIGN(N)
 	#define GCC_ALIGN(N) __attribute__((aligned(N)))
 
-	#define HLVM_PLATFORM_CACHE_LINE 64
-	#define HLVM_CACHE_ALIGN alignas(HLVM_PLATFORM_CACHE_LINE)
+	#define HLVM_CACHE_LINE_SIZE 64
+	#define HLVM_CACHE_ALIGN alignas(HLVM_CACHE_LINE_SIZE)
 
 	#define HLVM_NOINLINE_FUNC __attribute__((noinline))
 #else

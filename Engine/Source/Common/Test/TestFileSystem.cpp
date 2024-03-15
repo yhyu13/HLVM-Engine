@@ -6,7 +6,7 @@
 
 #include "Platform/FileSystem/Boost/BoostPlatformFile.h"
 #include "Platform/FileSystem/Packed/PackedPlatformFile.h"
-#include "Core/Parallel/WorkStealThreadPool.h"
+#include "Core/Parallel/Async/WorkStealThreadPool.h"
 
 #include <ylt/struct_pack.hpp>
 #include <ylt/struct_json/json_reader.h>

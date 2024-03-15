@@ -104,6 +104,8 @@ static_assert(sizeof(TCHAR) == sizeof(char), "TCHAR is not char in size");
 #define TO_TCHAR_STR(x) reinterpret_cast<const TCHAR*>((x))
 #define TO_CHAR_STR(x) reinterpret_cast<const char*>((x))
 
+#define HLVM_ENUM_TCHAR_STR(value) TO_TCHAR_STR(magic_enum::enum_name((value)).data())
+
 #define TBYTE std::byte
 static_assert(sizeof(TBYTE) == sizeof(char), "TBYTE is not char in size");
 
