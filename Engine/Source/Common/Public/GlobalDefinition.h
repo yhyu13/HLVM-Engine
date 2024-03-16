@@ -109,4 +109,14 @@ static_assert(sizeof(TCHAR) == sizeof(char), "TCHAR is not char in size");
 #define TBYTE std::byte
 static_assert(sizeof(TBYTE) == sizeof(char), "TBYTE is not char in size");
 
+#define HLVM_CONSTEXPR_ASSERT(cond, x) \
+	do                                 \
+	{                                  \
+		if constexpr ((cond))          \
+		{                              \
+			assert((x));               \
+		}                              \
+	}                                  \
+	while (0)
+
 #include "UserPredefined.gen.h"

@@ -15,7 +15,7 @@
 DELCARE_LOG_CATEGORY(LogTest)
 DEFINE_LOG_CATEGORY(LogTest)
 
-#define TEST_STACK_ALLOCATOR 0
+#define TEST_STACK_ALLOCATOR 1
 
 /*
 	<test method>
@@ -24,10 +24,7 @@ static void test_boostfile_test()
 {
 #if TEST_STACK_ALLOCATOR
 	//  Try use StackMallocator and you will have lifetime object crash on free
-	FStackMallocator<> StackMallocator{ {
-		.bMonolithic = false,
-		.bDefragment = true,
-	} };
+	TStackMallocator<> StackMallocator{};
 	HLVM_SCOPED_VARIABLE(
 		ScopedMallocator, [&]() -> void { SwapMallocator(&StackMallocator); },
 		[&]() -> void { SwapMallocator(); });
@@ -80,10 +77,7 @@ RECORD(packed_test)
 {
 #if TEST_STACK_ALLOCATOR
 	//  Try use StackMallocator and you will have lifetime object crash on free
-	FStackMallocator<> StackMallocator{ {
-		.bMonolithic = false,
-		.bDefragment = true,
-	} };
+	TStackMallocator<> StackMallocator{};
 	HLVM_SCOPED_VARIABLE(
 		ScopedMallocator, [&]() -> void { SwapMallocator(&StackMallocator); },
 		[&]() -> void { SwapMallocator(); });

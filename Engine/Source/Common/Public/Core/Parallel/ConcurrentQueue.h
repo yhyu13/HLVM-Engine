@@ -91,7 +91,7 @@ private:
 			 */
 			mNextNode.Release();
 		}
-		TAtomicPointer<QueueNode*> mNextNode{ nullptr };
+		TAtomicPointer<QueueNode*> mNextNode;
 #else
 		QueueNode* mNextNode{ nullptr };
 #endif
@@ -103,7 +103,8 @@ public:
 
 	TConcurrentQueue()
 	{
-		mHead = mTail = new QueueNode();
+		auto temp = new QueueNode();
+		mHead = mTail = temp;
 
 		if constexpr (bBlockPopOnEmpty)
 		{
@@ -324,9 +325,9 @@ private:
 
 private:
 	/** Holds a pointer to the head (back) of the list. */
-	HLVM_CACHE_ALIGN TAtomicPointer<QueueNode*> mHead{ nullptr };
+	HLVM_CACHE_ALIGN TAtomicPointer<QueueNode*> mHead;
 	/** Holds a pointer to the tail (front) of the list. */
-	TAtomicPointer<QueueNode*> mTail{ nullptr };
+	TAtomicPointer<QueueNode*> mTail;
 
 	/** mMutex for blocking pop. */
 	std::mutex*				 mMutex;

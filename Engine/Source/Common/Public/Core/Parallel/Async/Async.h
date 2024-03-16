@@ -15,6 +15,8 @@ HLVM_ENUM(EThreadPriority, uint8_t,
 	Prioritized // Prioritized thread
 );
 
+// https://man7.org/linux/man-pages/man3/pthread_setaffinity_np.3.html
+// https://eli.thegreenplace.net/2016/c11-threads-affinity-and-hyperthreading/
 HLVM_ENUM(ECoreCapability, uint8_t,
 	P1, // Performance 1
 	P2, // Performance 2
@@ -124,6 +126,58 @@ struct FThreadAffinityMask3
 /**
  * Thread affinity mask
  */
-using TThreadAffinityMask = std::variant<FThreadAffinityMask1,
-	FThreadAffinityMask2,
-	FThreadAffinityMask3>;
+class FThreadAffinityMask : public std::variant<FThreadAffinityMask1, FThreadAffinityMask2, FThreadAffinityMask3>
+{
+public:
+	FThreadAffinityMask() = delete;
+	explicit FThreadAffinityMask(const FThreadAffinityMask1& Mask1)
+		: std::variant<FThreadAffinityMask1,
+			FThreadAffinityMask2,
+			FThreadAffinityMask3>(Mask1)
+	{
+	}
+	explicit FThreadAffinityMask(const FThreadAffinityMask2& Mask2)
+		: std::variant<FThreadAffinityMask1,
+			FThreadAffinityMask2, FThreadAffinityMask3>(Mask2)
+	{
+	}
+	explicit FThreadAffinityMask(const FThreadAffinityMask3& Mask3)
+		: std::variant<FThreadAffinityMask1,
+			FThreadAffinityMask2,
+			FThreadAffinityMask3>(Mask3)
+	{
+	}
+
+	bool IsValid() const
+	{
+		if (const auto* val = std::get_if<0>(this))
+		{
+			return val->IsValid();
+		}
+		if (const auto* val = std::get_if<1>(this))
+		{
+			return val->IsValid();
+		}
+		if (const auto* val = std::get_if<2>(this))
+		{
+			return val->IsValid();
+		}
+		return false;
+	}
+	FString ToString() const
+	{
+		if (const auto* val = std::get_if<0>(this))
+		{
+			return val->ToString();
+		}
+		if (const auto* val = std::get_if<1>(this))
+		{
+			return val->ToString();
+		}
+		if (const auto* val = std::get_if<1>(this))
+		{
+			return val->ToString();
+		}
+		return FString{};
+	}
+};

@@ -150,5 +150,5 @@ namespace std
 	};
 } // namespace std
 
-HLVM_INLINE_VAR const boost::regex PathReplacePattern{ R"(\$\{([^}]+)\})" };
+HLVM_INLINE_VAR const std::regex PathReplacePattern{ R"(\$\{([^}]+)\})" };
 HLVM_INLINE_VAR TMap<std::string, std::string> PathReplaceMap;

@@ -70,7 +70,6 @@
  * Boost include
  */
 #include <boost/filesystem.hpp>
-#include <boost/regex.hpp>
 
 /**
  * Common lib

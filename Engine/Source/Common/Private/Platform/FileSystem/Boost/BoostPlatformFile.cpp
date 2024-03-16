@@ -5,7 +5,7 @@
 #include "Core/Assert.h"
 #include "Platform/FileSystem/Boost/BoostPlatformFile.h"
 
-#include <boost/regex.hpp>
+#include <regex>
 #include <boost/filesystem/directory.hpp>
 
 DELCARE_LOG_CATEGORY(LogBoostPlatformFile)
@@ -42,14 +42,14 @@ bool FBoostPlatformFile::Exists(const FPath& path)
 TSmallVector32<FPath> FBoostPlatformFile::Glob(const FPath& root_dir, const FString& regex, bool recursive)
 {
 	TSmallVector32<FPath> Result;
-	boost::regex		  Regex{ regex.ToCharStr() };
+	std::regex			  Regex{ regex.ToCharStr() };
 
 	if (recursive)
 	{
 		size_t RECURSIVE_ALERT = 100;
 		for (boost::filesystem::recursive_directory_iterator it(root_dir), end; it != end; ++it)
 		{
-			if (boost::filesystem::is_regular_file(it->path()) && boost::regex_match(it->path().c_str(), Regex))
+			if (boost::filesystem::is_regular_file(it->path()) && std::regex_match(it->path().c_str(), Regex))
 			{
 				Result.push_back(FPath(it->path()));
 			}
@@ -65,7 +65,7 @@ TSmallVector32<FPath> FBoostPlatformFile::Glob(const FPath& root_dir, const FStr
 	{
 		for (boost::filesystem::directory_iterator it(root_dir), end; it != end; ++it)
 		{
-			if (boost::filesystem::is_regular_file(it->path()) && boost::regex_match(it->path().c_str(), Regex))
+			if (boost::filesystem::is_regular_file(it->path()) && std::regex_match(it->path().c_str(), Regex))
 			{
 				Result.push_back(FPath(it->path()));
 			}

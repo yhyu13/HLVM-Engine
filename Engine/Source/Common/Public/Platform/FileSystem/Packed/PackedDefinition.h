@@ -5,7 +5,7 @@
 #pragma once
 
 #include "GlobalDefinition.h"
-#include <boost/regex/v5/regex_search.hpp>
+#include <regex>
 
 #ifndef HLVM_PACKED_TOKEN_EXT
 	#define HLVM_PACKED_TOKEN_EXT TXT(".tok")
@@ -16,11 +16,11 @@
 #endif
 
 #ifndef HLVM_PACKED_FILE_PATTERN
-	#define HLVM_PACKED_FILE_PATTERN boost::regex(R"(packed-\S*)")
+	#define HLVM_PACKED_FILE_PATTERN std::regex(R"(packed-\S*)")
 #endif
 
 #ifndef HLVM_PACKED_PATCH_FILE_PATTERN
-	#define HLVM_PACKED_PATCH_FILE_PATTERN boost::regex(R"(packed-\S*-\d+-pat)")
+	#define HLVM_PACKED_PATCH_FILE_PATTERN std::regex(R"(packed-\S*-\d+-pat)")
 #endif
 
 /**
