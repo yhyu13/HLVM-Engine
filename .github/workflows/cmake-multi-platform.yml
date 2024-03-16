@@ -66,8 +66,9 @@ jobs:
         id: strings
         shell: bash
         run: |
-          echo "build-output-dir=${{ common-src-dir }}/Build" >> "$GITHUB_OUTPUT" |
-          echo "common-src-dir=${{ github.workspace }}/Engine/Source/Common"  >> "$GITHUB_OUTPUT"
+          common_src_dir="${{ github.workspace }}/Engine/Source/Common"
+          echo "build-output-dir=${common_src_dir}/Build" >> "$GITHUB_OUTPUT"
+          echo "common-src-dir=${common_src_dir}" >> "$GITHUB_OUTPUT"
 
       - name: Configure CMake
         # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
