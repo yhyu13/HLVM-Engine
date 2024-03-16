@@ -5,16 +5,16 @@ eval "$('conda' 'shell.bash' 'hook')"
 ROOT_DIR=$(pwd)
 
 # install conda env
-conda env create -f ./env.yaml
+#conda env create -f ./env.yaml
 conda activate hlvm
 
-# Setup
-git submodule update --init --recursive
-
-# vcpkg
-cd ./Engine/Source/Dependency/vcpkg || exit
-./bootstrap-vcpkg.sh
-cd "$ROOT_DIR" || exit
+## Setup
+#git submodule update --init --recursive
+#
+## vcpkg
+#cd ./Engine/Source/Dependency/vcpkg || exit
+#./bootstrap-vcpkg.sh
+#cd "$ROOT_DIR" || exit
 
 # Execute all setup scripts
 find ./Engine/ -name "Dependency" -type d -prune -o -name "Setup.sh" -print | while IFS= read -r file; do
@@ -27,7 +27,9 @@ find ./Engine/ -name "Dependency" -type d -prune -o -name "Setup.sh" -print | wh
     # Execute the script with bash (assuming it is a bash script)
     if ! eval "./$(basename "$file")"; then
         echo "Script at '$file' failed with an error."
+        exit 1
     fi
+    echo "Script at '$file' success."
 
     # Return to the original working directory after execution
     cd "$ROOT_DIR" || exit
