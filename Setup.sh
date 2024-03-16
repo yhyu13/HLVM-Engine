@@ -1,9 +1,12 @@
 #!/bin/bash
 
+eval "$('conda' 'shell.bash' 'hook')"
+
 ROOT_DIR=$(pwd)
 
 # install conda env
 conda env create -f ./env.yaml
+conda activate hlvm
 
 # Setup
 git submodule update --init --recursive
