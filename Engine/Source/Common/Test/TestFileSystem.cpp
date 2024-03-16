@@ -15,7 +15,7 @@
 DELCARE_LOG_CATEGORY(LogTest)
 DEFINE_LOG_CATEGORY(LogTest)
 
-#define TEST_STACK_ALLOCATOR 1
+#define TEST_STACK_ALLOCATOR 0
 
 /*
 	<test method>

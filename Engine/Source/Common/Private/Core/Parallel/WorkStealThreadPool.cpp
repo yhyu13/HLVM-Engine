@@ -20,6 +20,28 @@ FWorkStealThreadPool::FWorkStealThreadPool(uint32_t NumThreads)
 	}
 	for (uint32_t i = 0; i < NumThreads; ++i)
 	{
+#if HLVM_THREAD_USE_BOOST
+		HLVM_ENSURE(mThreads.create_thread(
+						[this, index = i] {
+							for (;;)
+							{
+								ProcType task;
+								for (uint32_t n = 0; n < mCount * K; ++n)
+								{
+									if (mQueues[(index + n) % mCount]->PopFront<true>(task))
+									{
+										break;
+									}
+								}
+								if (!task && !mQueues[index]->PopFront<false>(task))
+								{
+									break;
+								}
+								task();
+							}
+						}),
+			TXT("Thread creation failed at {}, NumThreads {}"), i, NumThreads);
+#else
 		mThreads.emplace_back(
 			[this, index = i] {
 				for (;;)
@@ -39,6 +61,7 @@ FWorkStealThreadPool::FWorkStealThreadPool(uint32_t NumThreads)
 					task();
 				}
 			});
+#endif
 	}
 }
 
@@ -48,8 +71,12 @@ FWorkStealThreadPool::~FWorkStealThreadPool()
 	{
 		queue->SignalStop();
 	}
+#if HLVM_THREAD_USE_BOOST
+	mThreads.join_all();
+#else
 	for (auto& thread : mThreads)
 	{
 		thread.join();
 	}
+#endif
 }

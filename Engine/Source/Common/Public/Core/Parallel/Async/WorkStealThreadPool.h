@@ -7,6 +7,12 @@
 #include "Core/Parallel/Lock.h"
 #include "Core/Parallel/ConcurrentQueue.h"
 
+#include <boost/thread/thread.hpp>
+
+#ifndef HLVM_THREAD_USE_BOOST
+	#define HLVM_THREAD_USE_BOOST 1
+#endif
+
 class FWorkStealThreadPool
 {
 public:
@@ -39,7 +45,11 @@ private:
 	using ProcType = std::function<void(void)>;
 	using QueueType = TConcurrentQueue<ProcType, EConcurrentQueueMode::Mpmc, true>;
 	using QueuesType = TVector<std::unique_ptr<QueueType>>;
+#if HLVM_THREAD_USE_BOOST
+	using ThreadsType = boost::thread_group;
+#else
 	using ThreadsType = TVector<std::thread>;
+#endif
 
 	QueuesType				  mQueues;
 	ThreadsType				  mThreads;
