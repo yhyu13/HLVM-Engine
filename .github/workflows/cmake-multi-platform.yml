@@ -53,11 +53,10 @@ jobs:
           update-conda: false
           python-version: 3.11
           conda-channels: anaconda, conda-forge
-        run: |
-          conda --version |
-          which python
       - name: Install dependencies
         run: |
+          conda --version |
+          which python |
           ${{ github.workspace }}/Setup.sh
       - name: Generate Cmake project
         run: ${{ github.workspace }}/GenerateCMakeProjects.sh
