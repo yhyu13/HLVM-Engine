@@ -57,8 +57,7 @@ jobs:
         run: |
           conda --version
           ${{ github.workspace }}/Setup.sh
-          which python
-          conda env export
+          conda env list && conda activate hlvm && which python && conda env export
       - name: Generate Cmake project
         run: ${{ github.workspace }}/GenerateCMakeProjects.sh
 
