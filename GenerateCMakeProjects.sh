@@ -1,7 +1,7 @@
 #!/bin/bash
 
 eval "$('conda' 'shell.bash' 'hook')"
-conda activate hlvm
+conda init && conda activate hlvm
 
 #source .env
 
