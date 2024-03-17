@@ -5,6 +5,8 @@
 #pragma once
 
 #include "Core/Mallocator/MallocatorDefinition.h"
+#include "SmallBinnedMallocator.h"
+#include "HeapMallocator.h"
 
 #ifndef HLVM_VMA_DEFAULT_HEAP_SIZE
 	#define HLVM_VMA_DEFAULT_HEAP_SIZE 1 * 1024 * 1024
@@ -20,27 +22,30 @@
  */
 class FVMArena
 {
-public:
-	using SizeType = int32_t;
+	HLVM_INLINE_VAR HLVM_STATIC_VAR constexpr bool bValidate = HLVM_MALLOC_VALIDATION;
 
-	NOCOPYMOVE(FVMArena);
-	FVMArena() = default;
-	FVMArena(SizeType DefaultHeapSize = HLVM_VMA_DEFAULT_HEAP_SIZE,
-		SizeType	  LargeHeapSize = HLVM_VMA_DEFAULT_HEAP_SIZE * HLVM_VMA_LARGE_HEAP_SIZE_FACTOR);
+public:
+	NOCOPYMOVE(FVMArena)
+	FVMArena(FMiMallocator* _MiMallocator = &GMiMallocatorTLS,
+		size_t				_DefaultHeapSize = HLVM_VMA_DEFAULT_HEAP_SIZE,
+		size_t				_LargeHeapSize = HLVM_VMA_DEFAULT_HEAP_SIZE * HLVM_VMA_LARGE_HEAP_SIZE_FACTOR);
 	~FVMArena();
 
-	void* malloc(SizeType size);
-	void  free(void* ptr);
+	void* Malloc(size_t size);
+	void* MallocSmall(size_t size);
+	void  Free(void* p);
+	void  FreeSmall(void* p, uint8_t size);
 
 private:
-	struct FHeapBlock
+	struct FHeapChain
 	{
-		void*		mHeap{ nullptr };
-		SizeType	mSize{ 0 };
-		FHeapBlock* pNextBlock{ nullptr };
+		FHeapMallocator HeapAllocator{};
+		FHeapChain*		Next{ nullptr };
 	};
 
-	FHeapBlock mHeapBlockHead{};
-	SizeType   mDefaultHeapSize{ HLVM_VMA_DEFAULT_HEAP_SIZE };
-	SizeType   mLargeHeapSize{ HLVM_VMA_DEFAULT_HEAP_SIZE * HLVM_VMA_LARGE_HEAP_SIZE_FACTOR };
+	FSmallBinnedMallocator mSmallBinnedMallocators[HLVM_SMALL_ALLOC_THRESHOLD / HLVM_SMALL_ALLOC_ALIGNMENT];
+	FMiMallocator*		   MiMallocator{ nullptr };
+	FHeapChain*			   mHeapChainHead{ nullptr };
+	size_t				   mDefaultHeapSize{ HLVM_VMA_DEFAULT_HEAP_SIZE };
+	size_t				   mLargeHeapSize{ HLVM_VMA_DEFAULT_HEAP_SIZE * HLVM_VMA_LARGE_HEAP_SIZE_FACTOR };
 };

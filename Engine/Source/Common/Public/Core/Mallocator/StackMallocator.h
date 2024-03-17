@@ -18,7 +18,7 @@ template <int32_t N = HLVM_STACK_MALLOCATOR_DEFAULT_SIZE,
 	bool		  bMonolithic = false,
 	bool		  bDefragment = true,
 	bool		  bAllowOverflowToHeap = true,
-	bool		  bValidate = !HLVM_BUILD_RELEASE>
+	bool		  bValidate = HLVM_MALLOC_VALIDATION>
 class TStackMallocator final : public IMallocator
 {
 public:
@@ -109,57 +109,74 @@ private:
 	HLVM_STATIC_VAR constexpr SizeType FBlock_Size = S_C(SizeType, sizeof(FBlock));
 	static_assert(N - 2 * FBlock_Size > 0);
 
-	void* InternalMalloc(size_t _size)
+	void* InternalMalloc(size_t _size) noexcept(bValidate)
 	{
 		SizeType size = S_C(SizeType, _size);
 		HLVM_CONSTEXPR_ASSERT(bValidate, size > 0 && size <= N - 2 * FBlock_Size);
 		HLVM_CONSTEXPR_ASSERT(bValidate, mFreeBlockHead->prevFreeBlock == nullptr);
-		FBlock* FreeBlock = mFreeBlockHead;
-		while (FreeBlock->nextFreeBlock != nullptr)
-		{
-			HLVM_CONSTEXPR_ASSERT(bValidate, FreeBlock->GetFree());
-			if (FreeBlock->size > size + FBlock_Size)
+		if (mFreeSizeUpperBound < 0 || size <= mFreeSizeUpperBound)
+			HLVM_LIKELY
 			{
-				FBlock* NextFreeBlock = FreeBlock->nextFreeBlock;
-				HLVM_CONSTEXPR_ASSERT(bValidate, NextFreeBlock && NextFreeBlock->prevFreeBlock == FreeBlock && (NextFreeBlock == mTail || NextFreeBlock->size > 0));
-				FBlock* PrevFreeBlock = FreeBlock->prevFreeBlock;
-
-				FBlock* NewFreeBlock = R_C(FBlock*, R_C(TBYTE*, FreeBlock) + FBlock_Size + size);
-				NewFreeBlock->size = (FreeBlock->size - FBlock_Size - size);
-				HLVM_CONSTEXPR_ASSERT(bValidate, NewFreeBlock->size > 0);
+				FBlock* FreeBlock = mFreeBlockHead;
+				while (FreeBlock->nextFreeBlock != nullptr)
 				{
-					NewFreeBlock->nextFreeBlock = NextFreeBlock;
-					NewFreeBlock->prevFreeBlock = PrevFreeBlock;
-					// Otherwise, connect next and prev to new free block
-					NextFreeBlock->prevFreeBlock = NewFreeBlock;
-					if (PrevFreeBlock)
+					HLVM_CONSTEXPR_ASSERT(bValidate, FreeBlock->GetFree());
+					if (FreeBlock->size > size + FBlock_Size)
 					{
-						HLVM_CONSTEXPR_ASSERT(bValidate, PrevFreeBlock && PrevFreeBlock->nextFreeBlock == FreeBlock && PrevFreeBlock->size > 0);
-						PrevFreeBlock->nextFreeBlock = NewFreeBlock;
+						FBlock* NextFreeBlock = FreeBlock->nextFreeBlock;
+						HLVM_CONSTEXPR_ASSERT(bValidate, NextFreeBlock && NextFreeBlock->prevFreeBlock == FreeBlock && (NextFreeBlock == mTail || NextFreeBlock->size > 0));
+						FBlock* PrevFreeBlock = FreeBlock->prevFreeBlock;
+
+						FBlock* NewFreeBlock = R_C(FBlock*, R_C(TBYTE*, FreeBlock) + FBlock_Size + size);
+						NewFreeBlock->size = (FreeBlock->size - FBlock_Size - size);
+						HLVM_CONSTEXPR_ASSERT(bValidate, NewFreeBlock->size > 0);
+						{
+							NewFreeBlock->nextFreeBlock = NextFreeBlock;
+							NewFreeBlock->prevFreeBlock = PrevFreeBlock;
+							// Otherwise, connect next and prev to new free block
+							NextFreeBlock->prevFreeBlock = NewFreeBlock;
+							if (PrevFreeBlock)
+							{
+								HLVM_CONSTEXPR_ASSERT(bValidate,
+									PrevFreeBlock && PrevFreeBlock->nextFreeBlock == FreeBlock && PrevFreeBlock->size > 0);
+								PrevFreeBlock->nextFreeBlock = NewFreeBlock;
+							}
+							else
+							{
+								// Otherwise, assign head to new free block
+								mFreeBlockHead = NewFreeBlock;
+							}
+						}
+						HLVM_CONSTEXPR_ASSERT(bValidate, mFreeBlockHead->prevFreeBlock == nullptr);
+						HLVM_CONSTEXPR_ASSERT(bValidate, mFreeBlockHead != FreeBlock);
+
+						// Mark current free block not free anymore
+						FreeBlock->size = (-size);
+						HLVM_CONSTEXPR_ASSERT(bValidate, FreeBlock->size < 0);
+
+						// Reset free size upper bound since allocation success
+						mFreeSizeUpperBound = -1;
+
+						// Return actual pointer address
+						TBYTE* ptr = R_C(TBYTE*, FreeBlock) + FBlock_Size;
+						return ptr;
 					}
 					else
 					{
-						// Otherwise, assign head to new free block
-						mFreeBlockHead = NewFreeBlock;
+						// Try out next free block
+						FreeBlock = FreeBlock->nextFreeBlock;
 					}
 				}
-				HLVM_CONSTEXPR_ASSERT(bValidate, mFreeBlockHead->prevFreeBlock == nullptr);
-				HLVM_CONSTEXPR_ASSERT(bValidate, mFreeBlockHead != FreeBlock);
-
-				// Mark current free block not free anymore
-				FreeBlock->size = (-size);
-				HLVM_CONSTEXPR_ASSERT(bValidate, FreeBlock->size < 0);
-
-				// Return actual pointer address
-				TBYTE* ptr = R_C(TBYTE*, FreeBlock) + FBlock_Size;
-				return ptr;
+				HLVM_CONSTEXPR_ASSERT(bValidate, FreeBlock == mTail);
+				// Could not find a available free block, then update the upper bound
+				mFreeSizeUpperBound = -1;
+				FreeBlock = mFreeBlockHead;
+				while (FreeBlock->nextFreeBlock != nullptr)
+				{
+					mFreeSizeUpperBound = std::max(mFreeSizeUpperBound, FreeBlock->size);
+					FreeBlock = FreeBlock->nextFreeBlock;
+				}
 			}
-			else
-			{
-				// Try out next free block
-				FreeBlock = FreeBlock->nextFreeBlock;
-			}
-		}
 		// Running out of free blocks in stack, try heap
 		if constexpr (bAllowOverflowToHeap)
 		{
@@ -171,7 +188,8 @@ private:
 		}
 	}
 
-	void InternalFree(void* _ptr)
+	void
+	InternalFree(void* _ptr) noexcept(bValidate)
 	{
 		auto ptr = R_C(TBYTE*, _ptr);
 		if (InStackBound(ptr))
@@ -245,8 +263,11 @@ private:
 										PrevBlock->size += NextBlock->size + FBlock_Size;
 										HLVM_CONSTEXPR_ASSERT(bValidate, PrevBlock->size > 0 && PrevBlock->size <= N - 2 * FBlock_Size);
 
-										NextBlock->prevFreeBlock = nullptr;
-										NextBlock->nextFreeBlock = nullptr;
+										// Update upper bound if necessary
+										if (!(mFreeSizeUpperBound < 0) && mFreeSizeUpperBound < PrevBlock->size)
+										{
+											mFreeSizeUpperBound = PrevBlock->size;
+										}
 
 										NextBlock = R_C(FBlock*, R_C(TBYTE*, NextBlock) + FBlock_Size + NextBlock->size);
 										HLVM_CONSTEXPR_ASSERT(bValidate, NextBlock == R_C(FBlock*, R_C(TBYTE*, PrevBlock) + FBlock_Size + PrevBlock->size));
@@ -319,12 +340,17 @@ private:
 		return ptr >= mLowerBound && ptr < mTail;
 	}
 
-	TBYTE	mStack[N];
-	FBlock* mFreeBlockHead{ nullptr };
-	FBlock* mDefragmentHead{ nullptr };
-	FBlock* mTail{ nullptr };
-	void*	mLowerBound{ nullptr };
+	TBYTE	 mStack[N];
+	FBlock*	 mFreeBlockHead{ nullptr };
+	FBlock*	 mDefragmentHead{ nullptr };
+	FBlock*	 mTail{ nullptr };
+	void*	 mLowerBound{ nullptr };
+	SizeType mFreeSizeUpperBound{ -1 };
 };
 
+/**
+ * Default Stack allocator is no monolithic,
+ * So we create a monolithic variant
+ */
 template <int32_t N = HLVM_STACK_MALLOCATOR_DEFAULT_SIZE>
-using TMonoStackAllocator = TStackMallocator<N, true>;
+using TStackMonolithicAllocator = TStackMallocator<N, true>;
