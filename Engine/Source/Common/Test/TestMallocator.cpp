@@ -64,7 +64,7 @@ RECORD(malloc_test)
 {
 
 	const size_t MAX_THREADS = 10;
-	const size_t MAX_ITERATIONS = 1000;
+	const size_t MAX_ITERATIONS = 10000;
 	size_t		 MAX_BLOCK_SIZE = 1024 * 1024; // 1 MB
 
 	auto allocate_and_deallocate = [&](size_t thread_id) {
@@ -140,7 +140,7 @@ RECORD(malloc_test)
 
 		for (size_t size : block_sizes)
 		{
-			void* ptr = malloc(size);
+			TBYTE* ptr = new TBYTE[size];
 			assert(ptr != nullptr);
 
 			// Write data to the allocated memory
@@ -152,7 +152,7 @@ RECORD(malloc_test)
 				assert(static_cast<unsigned char*>(ptr)[i] == 0xAA);
 			}
 
-			free(ptr);
+			delete[] (ptr);
 		}
 
 		std::cout << "Different block size tests passed!" << std::endl;
@@ -160,7 +160,7 @@ RECORD(malloc_test)
 
 	{
 		HLVM_LOG(LogTest, info, TXT("Test mimallocator"));
-		FMiMallocator MiMallocator{ { .bNewHeap = true } };
+		FMiMallocator MiMallocator{ { .bNewHeap = true, .bDestory = true } };
 		HLVM_SCOPED_VARIABLE(
 			ScopedMallocator, [&]() -> void { SwapMallocator(&MiMallocator); MAX_BLOCK_SIZE = 1024; },
 			[&]() -> void { SwapMallocator(); MAX_BLOCK_SIZE = 1024 * 1024; });
@@ -169,7 +169,7 @@ RECORD(malloc_test)
 
 	{
 		HLVM_LOG(LogTest, info, TXT("Test stack mallocator"));
-		TStackMallocator<16 * 1024> StackMallocator{};
+		TStackMallocator<32 * 1024> StackMallocator{};
 		HLVM_SCOPED_VARIABLE(
 			ScopedMallocator, [&]() -> void { SwapMallocator(&StackMallocator); MAX_BLOCK_SIZE = 1024; },
 			[&]() -> void { SwapMallocator(); MAX_BLOCK_SIZE = 1024 * 1024; });

@@ -5,7 +5,7 @@
 #pragma once
 
 #include "Core/Mallocator/MallocatorDefinition.h"
-#include "SmallBinnedMallocator.h"
+#include "ISmallBinnedMallocator.h"
 #include "HeapMallocator.h"
 
 #ifndef HLVM_VMA_DEFAULT_HEAP_SIZE
@@ -43,9 +43,9 @@ private:
 		FHeapChain*		Next{ nullptr };
 	};
 
-	FSmallBinnedMallocator mSmallBinnedMallocators[HLVM_SMALL_ALLOC_THRESHOLD / HLVM_SMALL_ALLOC_ALIGNMENT];
-	FMiMallocator*		   MiMallocator{ nullptr };
-	FHeapChain*			   mHeapChainHead{ nullptr };
-	size_t				   mDefaultHeapSize{ HLVM_VMA_DEFAULT_HEAP_SIZE };
-	size_t				   mLargeHeapSize{ HLVM_VMA_DEFAULT_HEAP_SIZE * HLVM_VMA_LARGE_HEAP_SIZE_FACTOR };
+	ISmallBinnedMallocator* mSmallBinnedMallocators[HLVM_SMALL_ALLOC_THRESHOLD / HLVM_SMALL_ALLOC_ALIGNMENT];
+	FMiMallocator*			MiMallocator{ nullptr };
+	FHeapChain*				mHeapChainHead{ nullptr };
+	size_t					mDefaultHeapSize{ HLVM_VMA_DEFAULT_HEAP_SIZE };
+	size_t					mLargeHeapSize{ HLVM_VMA_DEFAULT_HEAP_SIZE * HLVM_VMA_LARGE_HEAP_SIZE_FACTOR };
 };

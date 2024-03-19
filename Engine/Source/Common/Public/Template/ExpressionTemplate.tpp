@@ -28,3 +28,16 @@ constexpr const char* ct_strrchr(const char* str, int ch)
 	}
 	return last;
 };
+
+/**
+ * https://artificial-mind.net/blog/2020/10/31/constexpr-for
+ */
+template <auto Start, auto End, auto Inc, class IteraType, class F>
+constexpr void ct_for(F&& f)
+{
+	if constexpr (Start < End)
+	{
+		f(std::integral_constant<IteraType, Start>());
+		ct_for<Start + Inc, End, Inc, IteraType>(f);
+	}
+}

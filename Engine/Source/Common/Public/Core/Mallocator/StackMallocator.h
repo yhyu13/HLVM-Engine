@@ -117,6 +117,7 @@ private:
 		if (mFreeSizeUpperBound < 0 || size <= mFreeSizeUpperBound)
 			HLVM_LIKELY
 			{
+				mFreeSizeUpperBound = -1;
 				FBlock* FreeBlock = mFreeBlockHead;
 				while (FreeBlock->nextFreeBlock != nullptr)
 				{
@@ -164,18 +165,11 @@ private:
 					else
 					{
 						// Try out next free block
+						mFreeSizeUpperBound = std::max(mFreeSizeUpperBound, FreeBlock->size);
 						FreeBlock = FreeBlock->nextFreeBlock;
 					}
 				}
 				HLVM_CONSTEXPR_ASSERT(bValidate, FreeBlock == mTail);
-				// Could not find a available free block, then update the upper bound
-				mFreeSizeUpperBound = -1;
-				FreeBlock = mFreeBlockHead;
-				while (FreeBlock->nextFreeBlock != nullptr)
-				{
-					mFreeSizeUpperBound = std::max(mFreeSizeUpperBound, FreeBlock->size);
-					FreeBlock = FreeBlock->nextFreeBlock;
-				}
 			}
 		// Running out of free blocks in stack, try heap
 		if constexpr (bAllowOverflowToHeap)
