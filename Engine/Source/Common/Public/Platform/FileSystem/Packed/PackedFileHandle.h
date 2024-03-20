@@ -14,7 +14,7 @@
 #include <boost/interprocess/sync/file_lock.hpp>
 #include <boost/interprocess/sync/sharable_lock.hpp>
 
-HLVM_ENUM(EPackedFileType, uint8_t,
+HLVM_ENUM(EPackedFileType, TUINT8,
 	Base,
 	Patch,
 	Unkown);

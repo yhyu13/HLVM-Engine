@@ -9,7 +9,7 @@
 
 #include <boost/filesystem/path.hpp>
 
-HLVM_ENUM(EPlatformFileType, uint8_t,
+HLVM_ENUM(EPlatformFileType, TUINT8,
 	Local,
 	Packed,
 	Unkown);

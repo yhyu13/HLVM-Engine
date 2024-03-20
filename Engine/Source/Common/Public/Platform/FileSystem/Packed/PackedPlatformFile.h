@@ -19,7 +19,7 @@ public:
 	/**
 	 * Called inside FGenericPlatformFile::Get()
 	 */
-	static void					Init();
+	static void					_Init();
 	static FPackedPlatformFile* Get();
 
 	virtual bool				  IsDirectory(const FPath& path) final override;

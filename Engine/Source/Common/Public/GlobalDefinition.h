@@ -108,6 +108,10 @@ static_assert(sizeof(TCHAR) == sizeof(char), "TCHAR is not char in size");
 
 #define TBYTE std::byte
 static_assert(sizeof(TBYTE) == sizeof(char), "TBYTE is not char in size");
+#define TUINT8 std::uint8_t
+static_assert(sizeof(TUINT8) == sizeof(char), "TUINT8 is not char in size");
+#define TUINT32 std::uint32_t
+static_assert(sizeof(TUINT32) == 4 * sizeof(char), "uint32_t is not char in size");
 
 #define HLVM_CONSTEXPR_ASSERT(cond, x) \
 	do                                 \

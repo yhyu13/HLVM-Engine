@@ -48,7 +48,7 @@ namespace hlvm_private
 
 	HLVM_INLINE_VAR Botan::AutoSeeded_RNG 随机;
 	// load keypair
-	HLVM_INLINE_VAR Botan::secure_vector<uint8_t> in{ 密钥一, 密钥一 + std::strlen(密钥一) };
+	HLVM_INLINE_VAR Botan::secure_vector<TUINT8> in{ 密钥一, 密钥一 + std::strlen(密钥一) };
 
 	HLVM_INLINE_VAR std::unique_ptr<Botan::Private_Key>* 私钥 = new std::unique_ptr<Botan::Private_Key>(
 		Botan::PKCS8::load_key(in));
@@ -66,8 +66,8 @@ namespace hlvm_private
 class FRSA
 {
 public:
-	HLVM_NODISCARD HLVM_STATIC_FUNC std::vector<uint8_t> Encrypt(const FConstByteBuffer& Buffer);
-	HLVM_NODISCARD HLVM_STATIC_FUNC Botan::secure_vector<uint8_t> Decrypt(const FConstByteBuffer& Buffer);
+	HLVM_NODISCARD HLVM_STATIC_FUNC std::vector<TUINT8> Encrypt(const FConstByteBuffer& Buffer);
+	HLVM_NODISCARD HLVM_STATIC_FUNC Botan::secure_vector<TUINT8> Decrypt(const FConstByteBuffer& Buffer);
 
 	HLVM_STATIC_FUNC void				 SignToFile(const FConstByteBuffer& Buffer, const FPath& signature_path);
 	HLVM_STATIC_FUNC void				 SignToFile(const FPath& FilePath, const FPath& signature_path);

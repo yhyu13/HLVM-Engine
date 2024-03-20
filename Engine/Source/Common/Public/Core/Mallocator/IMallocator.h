@@ -7,7 +7,7 @@
 #include "GlobalDefinition.h"
 #include "MallocatorDefinition.h"
 
-HLVM_ENUM(EMallocator, uint8_t,
+HLVM_ENUM(EMallocator, TUINT8,
 	Mimalloc,
 	Stack,
 	Unkown);

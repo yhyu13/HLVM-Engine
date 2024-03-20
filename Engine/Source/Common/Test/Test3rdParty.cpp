@@ -299,7 +299,7 @@ RECORD(test_botan)
 	std::string plaintext(
 		"Your great-grandfather gave this watch to your granddad for good luck. "
 		"Unfortunately, Dane's luck wasn't as good as his old man's.");
-	std::vector<uint8_t>  pt(plaintext.data(), plaintext.data() + plaintext.length());
+	std::vector<TUINT8>  pt(plaintext.data(), plaintext.data() + plaintext.length());
 	Botan::AutoSeeded_RNG rng;
 
 	const char* pk = OBFUSCATED_LONG("-----BEGIN PRIVATE KEY-----\n"
@@ -332,39 +332,39 @@ RECORD(test_botan)
 									 "-----END PRIVATE KEY-----");
 
 	// load keypair
-	Botan::secure_vector<uint8_t> in{ pk, pk + std::strlen(pk) };
+	Botan::secure_vector<TUINT8> in{ pk, pk + std::strlen(pk) };
 	auto						  kp = Botan::PKCS8::load_key(in);
 	auto						  kpp = kp->public_key();
 	{
 		// encrypt with pk
 		Botan::PK_Encryptor_EME enc(*kpp, rng, "OAEP(SHA-256)");
-		std::vector<uint8_t>	ct = enc.encrypt(pt, rng);
+		std::vector<TUINT8>	ct = enc.encrypt(pt, rng);
 
 		// decrypt with sk
 		Botan::PK_Decryptor_EME		  dec(*kp, rng, "OAEP(SHA-256)");
-		Botan::secure_vector<uint8_t> pt2 = dec.decrypt(ct);
+		Botan::secure_vector<TUINT8> pt2 = dec.decrypt(ct);
 		const char*					  pt2_str = R_C(const char*, pt2.data());
 		assert(strcmp(pt2_str, plaintext.c_str()) == 0);
 
 		std::cout << "\nenc: " << Botan::hex_encode(ct) << "\ndec: " << pt2_str << std::endl;
 	}
 	{
-		auto sign_file = [&](const std::vector<uint8_t>& data, const std::string& signature_path, Botan::Private_Key* private_key) {
+		auto sign_file = [&](const std::vector<TUINT8>& data, const std::string& signature_path, Botan::Private_Key* private_key) {
 			Botan::PK_Signer signer(*private_key, rng, "EMSA_PKCS1(SHA-256)");
 			signer.update(data);
-			std::vector<uint8_t> signature = signer.signature(rng);
+			std::vector<TUINT8> signature = signer.signature(rng);
 
 			std::ofstream signature_file(signature_path);
 			signature_file << Botan::base64_encode(signature);
 			signature_file.close();
 		};
 
-		auto verify_signature = [&](const std::vector<uint8_t>& data, const std::string& signature_path, Botan::Public_Key* public_key)
+		auto verify_signature = [&](const std::vector<TUINT8>& data, const std::string& signature_path, Botan::Public_Key* public_key)
 			-> bool {
 			std::ifstream signature_file(signature_path);
 			std::string	  base64_signature((std::istreambuf_iterator<char>(signature_file)), std::istreambuf_iterator<char>());
 			signature_file.close();
-			Botan::secure_vector<uint8_t> signature = Botan::base64_decode(base64_signature);
+			Botan::secure_vector<TUINT8> signature = Botan::base64_decode(base64_signature);
 
 			Botan::PK_Verifier verifier(*public_key, "EMSA_PKCS1(SHA-256)");
 			verifier.update(data);

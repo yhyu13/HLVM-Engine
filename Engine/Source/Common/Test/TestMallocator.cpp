@@ -149,7 +149,7 @@ RECORD(malloc_test)
 			// Read data from the allocated memory and verify
 			for (size_t i = 0; i < size; ++i)
 			{
-				assert(static_cast<unsigned char*>(ptr)[i] == 0xAA);
+				assert(reinterpret_cast<unsigned char*>(ptr)[i] == 0xAA);
 			}
 
 			delete[] (ptr);

@@ -25,7 +25,7 @@ public:
 	 */
 	inline static bool IsDebuggerPresent()
 	{
-		return s_instance->IsDebuggerPresentInternal();
+		return sInstance->InternalIsDebuggerPresent();
 	}
 
 	/**
@@ -45,9 +45,9 @@ public:
 	}
 
 protected:
-	virtual bool IsDebuggerPresentInternal() = 0;
+	virtual bool InternalIsDebuggerPresent() = 0;
 
-	HLVM_STATIC_VAR FGenericPlatformDebuggerUtil* s_instance;
+	HLVM_STATIC_VAR FGenericPlatformDebuggerUtil* sInstance;
 };
 
 #define HLVM_IS_DEBUGGER_PRESENT() FGenericPlatformDebuggerUtil::IsDebuggerPresent()

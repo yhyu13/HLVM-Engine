@@ -6,7 +6,7 @@
 
 #include "VMArena.h"
 
-template <uint8_t Alignment>
+template <TUINT8 Alignment>
 class FSmallBinnedMallocator final : public ISmallBinnedMallocator
 {
 	HLVM_INLINE_VAR HLVM_STATIC_VAR constexpr bool	   bValidate = HLVM_MALLOC_VALIDATION;
@@ -52,7 +52,7 @@ public:
 		mLastFreedBlocks32->FreeBits &= ~(1u << freeIndex);
 		// Setup block head
 		FSmallBinnedBlockHead* BlockHead = R_C(FSmallBinnedBlockHead*, R_C(TBYTE*, mLastFreedBlocks32->P) + freeIndex * (Alignment + sizeof(FSmallBinnedBlockHead)));
-		BlockHead->Pos = S_C(uint8_t, freeIndex);
+		BlockHead->Pos = S_C(TUINT8, freeIndex);
 		BlockHead->Alignment = Alignment;
 		// Return actual pointer address
 		return R_C(TBYTE*, BlockHead) + sizeof(FSmallBinnedBlockHead);
@@ -89,6 +89,10 @@ private:
 		FBlocks32* Next;												  // Point to the Next FBlocks32
 		uint32_t   FreeBits;											  // Use 32 bits to store free bits for each one of 32 blocks
 
+		/**
+		 * Fast bit operation to get highest log2 bit
+		 * https://graphics.stanford.edu/~seander/bithacks.html#IntegerLogIEEE64Float
+		 */
 		uint32_t GetHighestFreeBit() const
 		{
 			if (FreeBits == 0)

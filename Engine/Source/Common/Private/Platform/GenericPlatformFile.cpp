@@ -14,7 +14,7 @@ FGenericPlatformFile* FGenericPlatformFile::sPlatformFileRedirector[EPlatformFil
 
 static FGenericPlatformFile SGenericPlatformFile{};
 
-void FGenericPlatformFile::Init()
+void FGenericPlatformFile::_Init()
 {
 	HLVM_ASSERT(!sPlatformFileRedirector[HLVM_ENUM_V(EPlatformFileType, Unkown)], TXT("Unkown Platform file is already registered"));
 	sPlatformFileRedirector[HLVM_ENUM_V(EPlatformFileType, Unkown)] = &SGenericPlatformFile;
@@ -29,9 +29,9 @@ FGenericPlatformFile* FGenericPlatformFile::Get(EPlatformFileType PlatformFileTy
 			/**
 			 * Init all sub platform file here
 			 */
-			FBoostPlatformFile::Init();
-			FPackedPlatformFile::Init();
-			FGenericPlatformFile::Init();
+			FBoostPlatformFile::_Init();
+			FPackedPlatformFile::_Init();
+			FGenericPlatformFile::_Init();
 		}
 	});
 	return sPlatformFileRedirector[HLVM_ENUM_V_SIZE_T(EPlatformFileType, PlatformFileType)];

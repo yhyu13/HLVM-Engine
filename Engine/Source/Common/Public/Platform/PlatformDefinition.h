@@ -52,6 +52,10 @@
 	#define PLATFORM_DESKTOP 0
 #endif
 
+#ifndef HLVM_PLATFORM_SIMT
+	#define HLVM_PLATFORM_SIMT 2
+#endif
+
 /**
  * Generic platform definitions
  */

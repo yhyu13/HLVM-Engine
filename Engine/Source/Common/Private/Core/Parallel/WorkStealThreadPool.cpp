@@ -3,66 +3,57 @@
  */
 
 #include "Core/Parallel/Async/WorkStealThreadPool.h"
-
-static FWorkStealThreadPool SPool;
+#include "Platform/GenericPlatformThreadUtil.h"
 
 FWorkStealThreadPool* FWorkStealThreadPool::Get()
 {
-	return &SPool;
+	// CAUTION: Since FWorkStealThreadPool calls FGenericPlatformThreadUtil::SetThreadsWithAffinity internally,
+	// FGenericPlatformThreadUtil already depends on has global static singleton,
+	// If SPool is also global static, it could lead to Static Initialization Order Fiasco https://en.cppreference.com/w/cpp/language/siof
+	static FWorkStealThreadPool sPool{};
+	return &sPool;
 }
 
-FWorkStealThreadPool::FWorkStealThreadPool(uint32_t NumThreads)
-	: mCount(NumThreads)
+FWorkStealThreadPool::FWorkStealThreadPool(const FThreadAffinityMode& ThreadConfig)
 {
-	for (uint32_t i = 0; i < NumThreads; ++i)
+	HLVM_ENSURE(ThreadConfig.Valid(), TXT("ThreadConfig not valid {}"), ThreadConfig.ToString());
+
+	// TODO : support other thread affinity mode
+	auto Config2 = S_C(const FThreadAffinityMode2*, ThreadConfig);
+	mCount = Config2->NumThreads;
+
+	// First create queues
+	for (uint32_t i = 0; i < mCount; ++i)
 	{
 		mQueues.emplace_back(new QueueType());
 	}
-	for (uint32_t i = 0; i < NumThreads; ++i)
+	// Then create threads
+	TVector<boost::thread*> Threads;
+	for (uint32_t i = 0; i < mCount; ++i)
 	{
-#if HLVM_THREAD_USE_BOOST
-		HLVM_ENSURE(mThreads.create_thread(
-						[this, index = i] {
-							for (;;)
-							{
-								ProcType task;
-								for (uint32_t n = 0; n < mCount * K; ++n)
-								{
-									if (mQueues[(index + n) % mCount]->PopFront<true>(task))
-									{
-										break;
-									}
-								}
-								if (!task && !mQueues[index]->PopFront<false>(task))
-								{
-									break;
-								}
-								task();
-							}
-						}),
-			TXT("Thread creation failed at {}, NumThreads {}"), i, NumThreads);
-#else
-		mThreads.emplace_back(
-			[this, index = i] {
-				for (;;)
+		auto Func = [this, index = i] {
+			for (;;)
+			{
+				ProcType task;
+				for (uint32_t n = 0; n < mCount * K; ++n)
 				{
-					ProcType task;
-					for (uint32_t n = 0; n < mCount * K; ++n)
-					{
-						if (mQueues[(index + n) % mCount]->PopFront<true>(task))
-						{
-							break;
-						}
-					}
-					if (!task && !mQueues[index]->PopFront<false>(task))
+					if (mQueues[(index + n) % mCount]->PopFront<true>(task))
 					{
 						break;
 					}
-					task();
 				}
-			});
-#endif
+				if (!task && !mQueues[index]->PopFront<false>(task))
+				{
+					break;
+				}
+				task();
+			}
+		};
+		auto Thread = mThreads.create_thread(MoveTemp(Func));
+		HLVM_ENSURE(Thread, TXT("Thread init failed {}"), i);
+		Threads.push_back(Thread);
 	}
+	HLVM_ENSURE(FGenericPlatformThreadUtil::SetThreadsWithAffinity(Threads, ThreadConfig), TXT("Thread affinity set failed with"));
 }
 
 FWorkStealThreadPool::~FWorkStealThreadPool()
@@ -71,12 +62,5 @@ FWorkStealThreadPool::~FWorkStealThreadPool()
 	{
 		queue->SignalStop();
 	}
-#if HLVM_THREAD_USE_BOOST
 	mThreads.join_all();
-#else
-	for (auto& thread : mThreads)
-	{
-		thread.join();
-	}
-#endif
 }

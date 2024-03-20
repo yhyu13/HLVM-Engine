@@ -16,7 +16,7 @@
 class FLinuxGNUPlatformDebuggerUtil final : public FGenericPlatformDebuggerUtil
 {
 protected:
-	virtual bool IsDebuggerPresentInternal() final override
+	virtual bool InternalIsDebuggerPresent() final override
 	{
 		using namespace std::chrono_literals;
 
@@ -48,6 +48,6 @@ protected:
 	}
 };
 
-FGenericPlatformDebuggerUtil* FGenericPlatformDebuggerUtil::s_instance{ new FLinuxGNUPlatformDebuggerUtil() };
+FGenericPlatformDebuggerUtil* FGenericPlatformDebuggerUtil::sInstance{ new FLinuxGNUPlatformDebuggerUtil() };
 
 #endif

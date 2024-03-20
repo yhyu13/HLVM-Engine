@@ -10,7 +10,7 @@
 /**
  * @brief 文件打开模式，和python类似
  */
-enum class EFileMode : uint8_t
+enum class EFileMode : TUINT8
 {
 	R = std::ios::in,
 	W = std::ios::out,
@@ -31,37 +31,37 @@ enum class EFileMode : uint8_t
 
 inline bool operator&(EFileMode a, EFileMode b)
 {
-	return static_cast<uint8_t>(a) & static_cast<uint8_t>(b);
+	return static_cast<TUINT8>(a) & static_cast<TUINT8>(b);
 }
 
-inline uint8_t operator|(EFileMode a, EFileMode b)
+inline TUINT8 operator|(EFileMode a, EFileMode b)
 {
-	return static_cast<uint8_t>(a) | static_cast<uint8_t>(b);
+	return static_cast<TUINT8>(a) | static_cast<TUINT8>(b);
 }
 
 inline bool operator==(EFileMode a, EFileMode b)
 {
-	return static_cast<uint8_t>(a) == static_cast<uint8_t>(b);
+	return static_cast<TUINT8>(a) == static_cast<TUINT8>(b);
 }
 
 inline bool operator!=(EFileMode a, EFileMode b)
 {
-	return static_cast<uint8_t>(a) != static_cast<uint8_t>(b);
+	return static_cast<TUINT8>(a) != static_cast<TUINT8>(b);
 }
 
-enum class EFileMapped : uint8_t
+enum class EFileMapped : TUINT8
 {
 	NoMapped = 0,
 	Mapped = 1,
 };
 
-enum class EFileAsync : uint8_t
+enum class EFileAsync : TUINT8
 {
 	NoAsync = 0,
 	Async = 1,
 };
 
-enum class EFileLock : uint8_t
+enum class EFileLock : TUINT8
 {
 	NoLock = 0,
 	ThreadLock = 1 << 0,
@@ -70,7 +70,7 @@ enum class EFileLock : uint8_t
 };
 inline bool operator&(EFileLock a, EFileLock b)
 {
-	return static_cast<uint8_t>(a) & static_cast<uint8_t>(b);
+	return static_cast<TUINT8>(a) & static_cast<TUINT8>(b);
 }
 
 /**
@@ -93,7 +93,7 @@ HLVM_INLINE_VAR const FFileOptions GReadOnlyFileOptions{
 /**
  * @brief 文件操作状态, report by underlying file system
  */
-enum class EFileOpStatus : uint8_t
+enum class EFileOpStatus : TUINT8
 {
 	Waiting = 0,
 	Success = 1,
@@ -101,7 +101,7 @@ enum class EFileOpStatus : uint8_t
 	Canceled = 3,
 };
 
-enum class EFileOpErrorNo : uint8_t
+enum class EFileOpErrorNo : TUINT8
 {
 	OK = 0,
 	TimeOut = 1,
@@ -155,7 +155,7 @@ struct FFileOpStatus
 	}
 };
 
-enum class EWhence : uint8_t
+enum class EWhence : TUINT8
 {
 	Begin = std::ios::beg,
 	Current = std::ios::cur,
@@ -163,7 +163,7 @@ enum class EWhence : uint8_t
 };
 inline bool operator&(EWhence a, EWhence b)
 {
-	return static_cast<uint8_t>(a) == static_cast<uint8_t>(b);
+	return static_cast<TUINT8>(a) == static_cast<TUINT8>(b);
 }
 
 struct FFileSeekCtx

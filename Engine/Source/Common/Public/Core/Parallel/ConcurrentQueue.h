@@ -12,7 +12,7 @@
 /**
  * Enumerates concurrent queue modes.
  */
-enum class EConcurrentQueueMode : uint8_t
+enum class EConcurrentQueueMode : TUINT8
 {
 	Spsc, // Single Producer Single Consumer
 	Mpsc, // Multiple Producer Single Consumer

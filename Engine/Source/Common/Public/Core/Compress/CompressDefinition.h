@@ -6,7 +6,7 @@
 
 #include "GlobalDefinition.h"
 
-HLVM_ENUM(ECompressType, uint8_t,
+HLVM_ENUM(ECompressType, TUINT8,
 	ZSTD_1,
 	ZSTD_4,
 	No,

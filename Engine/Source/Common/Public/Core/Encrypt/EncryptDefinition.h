@@ -6,7 +6,7 @@
 
 #include "GlobalDefinition.h"
 
-HLVM_ENUM(EEncryptType, uint8_t,
+HLVM_ENUM(EEncryptType, TUINT8,
 	RSA_PKCS8,
 	BASE64,
 	No,

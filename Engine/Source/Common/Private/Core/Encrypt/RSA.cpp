@@ -11,7 +11,7 @@ DELCARE_LOG_CATEGORY(LogRSA)
 
 constexpr size_t SignatureDigestSize = 4096;
 
-HLVM_NODISCARD std::vector<uint8_t> FRSA::Encrypt(const FConstByteBuffer& Buffer)
+HLVM_NODISCARD std::vector<TUINT8> FRSA::Encrypt(const FConstByteBuffer& Buffer)
 {
 	using namespace hlvm_private;
 	HLVM_SCOPED_TIMER(FString::Format(TXT("RSA Encrypt size {}"), Buffer.size()));
@@ -19,7 +19,7 @@ HLVM_NODISCARD std::vector<uint8_t> FRSA::Encrypt(const FConstByteBuffer& Buffer
 	HLVM_ASSERT(bValidBuffer, TXT("Buffer must has content"));
 
 	Botan::PK_Encryptor_EME enc(**公钥, 随机, 算法一);
-	std::vector<uint8_t>	out = enc.encrypt(R_C(const uint8_t*, Buffer.data()), Buffer.size(), 随机);
+	std::vector<TUINT8>	out = enc.encrypt(R_C(const TUINT8*, Buffer.data()), Buffer.size(), 随机);
 	const bool				bValidOut = out.size() > 0;
 	HLVM_ASSERT(bValidOut, TXT("Out must has content"));
 
@@ -28,7 +28,7 @@ HLVM_NODISCARD std::vector<uint8_t> FRSA::Encrypt(const FConstByteBuffer& Buffer
 	return out;
 }
 
-HLVM_NODISCARD Botan::secure_vector<uint8_t> FRSA::Decrypt(const FConstByteBuffer& Buffer)
+HLVM_NODISCARD Botan::secure_vector<TUINT8> FRSA::Decrypt(const FConstByteBuffer& Buffer)
 {
 	using namespace hlvm_private;
 	HLVM_SCOPED_TIMER(FString::Format(TXT("RSA Decrypt size {}"), Buffer.size()));
@@ -36,7 +36,7 @@ HLVM_NODISCARD Botan::secure_vector<uint8_t> FRSA::Decrypt(const FConstByteBuffe
 	HLVM_ASSERT(bValidBuffer, TXT("Buffer must has content"));
 
 	Botan::PK_Decryptor_EME		  dec(**私钥, 随机, 算法一);
-	Botan::secure_vector<uint8_t> out = dec.decrypt(R_C(const uint8_t*, Buffer.data()), Buffer.size());
+	Botan::secure_vector<TUINT8> out = dec.decrypt(R_C(const TUINT8*, Buffer.data()), Buffer.size());
 	const bool					  bValidOut = out.size() > 0;
 	HLVM_ASSERT(bValidOut, TXT("Out must has content"));
 
@@ -45,10 +45,10 @@ HLVM_NODISCARD Botan::secure_vector<uint8_t> FRSA::Decrypt(const FConstByteBuffe
 	return out;
 }
 
-static void digest_buffer(const FConstByteBuffer& Buffer, std::span<uint8_t>& output_buffer)
+static void digest_buffer(const FConstByteBuffer& Buffer, std::span<TUINT8>& output_buffer)
 {
 	using namespace hlvm_private;
-	auto   input_buffer = R_C(const uint8_t*, Buffer.data());
+	auto   input_buffer = R_C(const TUINT8*, Buffer.data());
 	auto   input_len = Buffer.size();
 	size_t per_offset = input_len / SignatureDigestSize + (input_len % SignatureDigestSize == 0 ? 0 : 1);
 
@@ -69,11 +69,11 @@ void FRSA::SignToFile(const FConstByteBuffer& Buffer, const FPath& signature_pat
 	/**
 	 *    1. Digest the digestBuffer
 	 */
-	uint8_t digest[SignatureDigestSize] = { 0 };
+	TUINT8 digest[SignatureDigestSize] = { 0 };
 	auto	digestBuffer = TO_SPAN(digest, SignatureDigestSize);
 	digest_buffer(Buffer, digestBuffer);
 	Botan::PK_Signer	 签名(**私钥, 随机, 算法二);
-	std::vector<uint8_t> signature = 签名.sign_message(digestBuffer, 随机);
+	std::vector<TUINT8> signature = 签名.sign_message(digestBuffer, 随机);
 	const bool			 bValidSig = signature.size() > 0;
 	HLVM_ASSERT(bValidSig, TXT("signature must has content"));
 
@@ -103,7 +103,7 @@ HLVM_NODISCARD bool FRSA::VerifyFileSignature(const FConstByteBuffer& Buffer, co
 	const bool bValidBuffer = Buffer.size() > 0;
 	HLVM_ASSERT(bValidBuffer, TXT("Buffer must has content"));
 
-	uint8_t digest[SignatureDigestSize] = { 0 };
+	TUINT8 digest[SignatureDigestSize] = { 0 };
 	auto	digestBuffer = TO_SPAN(digest, SignatureDigestSize);
 	digest_buffer(Buffer, digestBuffer);
 	{
@@ -121,7 +121,7 @@ HLVM_NODISCARD bool FRSA::VerifyFileSignature(const FConstByteBuffer& Buffer, co
 		/**
 		 *  2. Decode the signature
 		 */
-		Botan::secure_vector<uint8_t> signature = Botan::base64_decode(base64_signature.data(), base64_signature.size(),
+		Botan::secure_vector<TUINT8> signature = Botan::base64_decode(base64_signature.data(), base64_signature.size(),
 			false);
 		const bool					  bValidSig = signature.size() > 0;
 		HLVM_ASSERT(bValidSig, TXT("signature must has content"));

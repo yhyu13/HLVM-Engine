@@ -34,7 +34,7 @@ public:
 	void* Malloc(size_t size);
 	void* MallocSmall(size_t size);
 	void  Free(void* p);
-	void  FreeSmall(void* p, uint8_t size);
+	void  FreeSmall(void* p, TUINT8 size);
 
 private:
 	struct FHeapChain

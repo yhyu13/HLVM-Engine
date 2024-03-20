@@ -4,12 +4,15 @@
 
 #pragma once
 
-HLVM_ENUM(EAsyncMode, uint8_t,
+#include "Core/Parallel/ParallelDefinition.h"
+#include "Core/Log.h"
+
+HLVM_ENUM(EAsyncMode, TUINT8,
 	ThreadPool, // Add to default work steal thread pool
 	Thread		// Startup a new thread
 );
 
-HLVM_ENUM(EThreadPriority, uint8_t,
+HLVM_ENUM(EThreadPriority, TUINT8,
 	Background, // Background priority thread
 	Normal,		// Normal priority thread
 	Prioritized // Prioritized thread
@@ -17,7 +20,7 @@ HLVM_ENUM(EThreadPriority, uint8_t,
 
 // https://man7.org/linux/man-pages/man3/pthread_setaffinity_np.3.html
 // https://eli.thegreenplace.net/2016/c11-threads-affinity-and-hyperthreading/
-HLVM_ENUM(ECoreCapability, uint8_t,
+HLVM_ENUM(ECoreCapability, TUINT8,
 	P1, // Performance 1
 	P2, // Performance 2
 	M1, // Midcore 1
@@ -26,14 +29,14 @@ HLVM_ENUM(ECoreCapability, uint8_t,
 	E2	// Efficient 2
 );
 
-HLVM_ENUM(ECoreType, uint8_t,
+HLVM_ENUM(ECoreType, TUINT8,
 	Physical, // Physical core
 	Logical	  // Logical core
 );
 
 struct FCoreDescription
 {
-	uint8_t			ID;
+	TUINT32			ID;
 	ECoreType		Type{ ECoreType::Logical };
 	ECoreCapability Capability{ ECoreCapability::P1 };
 
@@ -44,18 +47,42 @@ struct FCoreDescription
 			HLVM_ENUM_TCHAR_STR(Type),
 			HLVM_ENUM_TCHAR_STR(Capability));
 	}
+	HLVM_STATIC_FUNC TVector<FCoreDescription> NLogicalCores(TUINT32 N, ECoreCapability Capability = ECoreCapability::P1)
+	{
+		TVector<FCoreDescription> Targets{ N };
+		for (TUINT32 i = 0; i < N; ++i)
+		{
+			Targets[i].ID = (i);
+			Targets[i].Type = ECoreType::Logical;
+			Targets[i].Capability = Capability;
+		}
+		return Targets;
+	}
+	HLVM_STATIC_FUNC TVector<FCoreDescription> NPhysicalCores(TUINT32 N, ECoreCapability Capability = ECoreCapability::P1)
+	{
+		TVector<FCoreDescription> Targets{ N };
+		for (TUINT32 i = 0; i < N; ++i)
+		{
+			Targets[i].ID = (i);
+			Targets[i].Type = ECoreType::Physical;
+			Targets[i].Capability = Capability;
+		}
+		return Targets;
+	}
 };
 
 /**
  * One to One thread affinity mask
- * e.g. each thread is assigned to a corresponding targeted core
+ * i.e. each thread is assigned to a corresponding targeted core
+ * e.g. Number of threads is 4, and 4 cores are targeted, each thread is assigned to a corresponding targeted core
  */
-struct FThreadAffinityMask1
+struct FThreadAffinityMode1
 {
 	EThreadPriority			  Priority;
-	uint8_t					  NumThreads;
+	TUINT32					  NumThreads;
 	TVector<FCoreDescription> TargetedCores;
-	bool					  IsValid() const
+
+	bool IsValid() const
 	{
 		return NumThreads > 0 && NumThreads == TargetedCores.size();
 	}
@@ -71,13 +98,15 @@ struct FThreadAffinityMask1
 /**
  * Many to Many thread affinity mask
  * i.e. each thread can be assigned to any targeted core
+ * e.g. Number of threads is 4, and 4 cores are targeted, each thread can be assigned to among all of the 4 cores on OS's command
  */
-struct FThreadAffinityMask2
+struct FThreadAffinityMode2
 {
 	EThreadPriority			  Priority;
-	uint8_t					  NumThreads;
+	TUINT32					  NumThreads;
 	TVector<FCoreDescription> TargetedCores;
-	bool					  IsValid() const
+
+	bool IsValid() const
 	{
 		return NumThreads > 0 && TargetedCores.size() > 0;
 	}
@@ -92,20 +121,22 @@ struct FThreadAffinityMask2
 
 /**
  * Specific thread ids to Specific thread affinity mask
- * i.e. thread 0, 1 to 0th, 1th p1 cores, 2,3 thread to 2th, 3th m1 cores, etc
+ * i.e. each thread is assigned to a specific group of targeted cores
+ * e.g. Number of threads is 4, and 4 cores are targeted, thread 0, 1 to 0th, 1th p1 cores, thread 2,3 thread to 2th, 3th m1 cores, etc
  */
-struct FThreadAffinityMask3
+struct FThreadAffinityMode3
 {
 	EThreadPriority													Priority;
-	uint8_t															NumThreads;
-	TVector<std::pair<TVector<uint8_t>, TVector<FCoreDescription>>> TargetedCores;
-	bool															IsValid() const
+	TUINT32															NumThreads;
+	TVector<std::pair<TVector<TUINT32>, TVector<FCoreDescription>>> TargetedCores;
+
+	bool IsValid() const
 	{
 		bool bIsValid = NumThreads > 0 && TargetedCores.size() > 0;
-		for (uint8_t i = 0; i < TargetedCores.size(); ++i)
+		for (TUINT32 i = 0; i < TargetedCores.size(); ++i)
 		{
 			bIsValid &= std::all_of(TargetedCores[i].first.begin(), TargetedCores[i].first.end(),
-				[this](uint8_t id) { return id < NumThreads; });
+				[this](TUINT32 id) { return id < NumThreads; });
 			bIsValid &= TargetedCores[i].second.size() > 0;
 		}
 		return bIsValid;
@@ -115,9 +146,9 @@ struct FThreadAffinityMask3
 		return FString::Format(TXT("Thread affinity mask2, {} Priority {} threads, affinity masks\n{}"),
 			HLVM_ENUM_TCHAR_STR(Priority),
 			NumThreads,
-			FString::Join(TargetedCores, [](const std::pair<TVector<uint8_t>, TVector<FCoreDescription>>& pair) {
+			FString::Join(TargetedCores, [](const std::pair<TVector<TUINT32>, TVector<FCoreDescription>>& pair) {
 				return FString::Format(TXT("threads {}, affinity {}"),
-					FString::Join(pair.first, [](const uint8_t& core) { return FString::Format(TXT("{}"), core); }),
+					FString::Join(pair.first, [](const TUINT32& core) { return FString::Format(TXT("{}"), core); }),
 					FString::Join(pair.second, [](const FCoreDescription& core) { return core.ToString(); }));
 			}));
 	}
@@ -126,29 +157,57 @@ struct FThreadAffinityMask3
 /**
  * Thread affinity mask
  */
-class FThreadAffinityMask : public std::variant<FThreadAffinityMask1, FThreadAffinityMask2, FThreadAffinityMask3>
+class FThreadAffinityMode : public std::variant<FThreadAffinityMode1, FThreadAffinityMode2, FThreadAffinityMode3>
 {
 public:
-	FThreadAffinityMask() = delete;
-	explicit FThreadAffinityMask(const FThreadAffinityMask1& Mask1)
-		: std::variant<FThreadAffinityMask1,
-			FThreadAffinityMask2,
-			FThreadAffinityMask3>(Mask1)
+	FThreadAffinityMode() = default;
+	explicit FThreadAffinityMode(const FThreadAffinityMode1& Mask1)
+		: std::variant<FThreadAffinityMode1,
+			FThreadAffinityMode2,
+			FThreadAffinityMode3>(Mask1)
 	{
 	}
-	explicit FThreadAffinityMask(const FThreadAffinityMask2& Mask2)
-		: std::variant<FThreadAffinityMask1,
-			FThreadAffinityMask2, FThreadAffinityMask3>(Mask2)
+	explicit FThreadAffinityMode(const FThreadAffinityMode2& Mask2)
+		: std::variant<FThreadAffinityMode1,
+			FThreadAffinityMode2, FThreadAffinityMode3>(Mask2)
 	{
 	}
-	explicit FThreadAffinityMask(const FThreadAffinityMask3& Mask3)
-		: std::variant<FThreadAffinityMask1,
-			FThreadAffinityMask2,
-			FThreadAffinityMask3>(Mask3)
+	explicit FThreadAffinityMode(const FThreadAffinityMode3& Mask3)
+		: std::variant<FThreadAffinityMode1,
+			FThreadAffinityMode2,
+			FThreadAffinityMode3>(Mask3)
 	{
 	}
 
-	bool IsValid() const
+	/**
+	 * Convert to each alternative implicitly
+	 */
+	operator FThreadAffinityMode1*()
+	{
+		return std::get_if<0>(this);
+	}
+	operator FThreadAffinityMode2*()
+	{
+		return std::get_if<1>(this);
+	}
+	operator FThreadAffinityMode3*()
+	{
+		return std::get_if<2>(this);
+	}
+	operator const FThreadAffinityMode1*() const
+	{
+		return std::get_if<0>(this);
+	}
+	operator const FThreadAffinityMode2*() const
+	{
+		return std::get_if<1>(this);
+	}
+	operator const FThreadAffinityMode3*() const
+	{
+		return std::get_if<2>(this);
+	}
+
+	bool Valid() const
 	{
 		if (const auto* val = std::get_if<0>(this))
 		{

@@ -6,19 +6,21 @@
 
 #include "Core/Parallel/Lock.h"
 #include "Core/Parallel/ConcurrentQueue.h"
+#include "AsyncConfig.h"
 
 #include <boost/thread/thread.hpp>
-
-#ifndef HLVM_THREAD_USE_BOOST
-	#define HLVM_THREAD_USE_BOOST 1
-#endif
 
 class FWorkStealThreadPool
 {
 public:
-	NOCOPYMOVE(FWorkStealThreadPool)
+	HLVM_INLINE_VAR HLVM_STATIC_VAR FThreadAffinityMode2 AllPhysicalCores{
+		.Priority = EThreadPriority::Normal,
+		.NumThreads = S_C(TUINT32, std::thread::hardware_concurrency() / HLVM_PLATFORM_SIMT),
+		.TargetedCores = FCoreDescription::NPhysicalCores(std::thread::hardware_concurrency() / HLVM_PLATFORM_SIMT)
+	};
 
-	explicit FWorkStealThreadPool(uint32_t NumThreads = std::thread::hardware_concurrency() / 2);
+	NOCOPYMOVE(FWorkStealThreadPool)
+	explicit FWorkStealThreadPool(const FThreadAffinityMode& ThreadConfig = FThreadAffinityMode{ AllPhysicalCores });
 	~FWorkStealThreadPool();
 
 	static FWorkStealThreadPool* Get();
@@ -37,7 +39,10 @@ public:
 		return result;
 	}
 
-	uint32_t NumThreads() const { return mCount; }
+	uint32_t NumThreads() const
+	{
+		return mCount;
+	}
 
 private:
 	constexpr inline static int K = { 2 };
@@ -45,11 +50,7 @@ private:
 	using ProcType = std::function<void(void)>;
 	using QueueType = TConcurrentQueue<ProcType, EConcurrentQueueMode::Mpmc, true>;
 	using QueuesType = TVector<std::unique_ptr<QueueType>>;
-#if HLVM_THREAD_USE_BOOST
 	using ThreadsType = boost::thread_group;
-#else
-	using ThreadsType = TVector<std::thread>;
-#endif
 
 	QueuesType				  mQueues;
 	ThreadsType				  mThreads;

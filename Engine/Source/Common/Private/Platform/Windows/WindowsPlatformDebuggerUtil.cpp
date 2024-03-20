@@ -15,7 +15,7 @@
 class FWindowsPlatformDebuggerUtil final : public FGenericPlatformDebuggerUtil
 {
 protected:
-	virtual bool IsDebuggerPresentInternal() final override
+	virtual bool InternalIsDebuggerPresent() final override
 	{
 		static FTimer	   PeriodicTimer{ 1s, true };
 		static int		   underDebugger = 0;
@@ -42,6 +42,6 @@ protected:
 	}
 };
 
-FGenericPlatformDebuggerUtil* FGenericPlatformDebuggerUtil::s_instance{ new FWindowsPlatformDebuggerUtil() };
+FGenericPlatformDebuggerUtil* FGenericPlatformDebuggerUtil::sInstance{ new FWindowsPlatformDebuggerUtil() };
 
 #endif

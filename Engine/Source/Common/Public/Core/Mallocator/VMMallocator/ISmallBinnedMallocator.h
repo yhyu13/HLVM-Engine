@@ -17,14 +17,14 @@
 struct FSmallBinnedBlockHead
 {
 	// Use this FSmallBinnedBlockHead* - Pos * Alignment to get FBlocks32's P pointer location
-	uint8_t Pos;
-	uint8_t Alignment;
+	TUINT8 Pos;
+	TUINT8 Alignment;
 
 	bool Valid() const
 	{
 		return Pos <= 32 && Alignment <= HLVM_SMALL_ALLOC_THRESHOLD && Alignment > 0;
 	}
-	HLVM_STATIC_FUNC uint8_t PotentiallyOwned(void* v)
+	HLVM_STATIC_FUNC TUINT8 PotentiallyOwned(void* v)
 	{
 		FSmallBinnedBlockHead* BlockHead = R_C(FSmallBinnedBlockHead*, R_C(TBYTE*, v) - sizeof(FSmallBinnedBlockHead));
 		if (BlockHead->Valid())
@@ -33,11 +33,11 @@ struct FSmallBinnedBlockHead
 		}
 		return 0;
 	}
-	HLVM_STATIC_FUNC uint8_t GoodSize(size_t _size)
+	HLVM_STATIC_FUNC TUINT8 GoodSize(size_t _size)
 	{
-		uint8_t size = S_C(uint8_t, _size);
+		TUINT8 size = S_C(TUINT8, _size);
 		// Round to next 16 multiplier
-		uint8_t remainder = size % HLVM_SMALL_ALLOC_ALIGNMENT;
+		TUINT8 remainder = size % HLVM_SMALL_ALLOC_ALIGNMENT;
 		if (remainder == 0)
 		{
 			return size;

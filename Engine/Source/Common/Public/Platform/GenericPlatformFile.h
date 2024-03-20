@@ -25,5 +25,5 @@ protected:
 	static FGenericPlatformFile* sPlatformFileRedirector[EPlatformFileType_NUM];
 
 private:
-	static void Init();
+	static void _Init();
 };

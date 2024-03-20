@@ -13,7 +13,7 @@ DEFINE_LOG_CATEGORY(LogBoostPlatformFile)
 
 static FBoostPlatformFile SBoostPlatformFile{};
 
-void FBoostPlatformFile::Init()
+void FBoostPlatformFile::_Init()
 {
 	HLVM_ASSERT(!sPlatformFileRedirector[HLVM_ENUM_V(EPlatformFileType, Local)], TXT("Local Platform file is already registered"));
 	sPlatformFileRedirector[HLVM_ENUM_V(EPlatformFileType, Local)] = FBoostPlatformFile::Get();

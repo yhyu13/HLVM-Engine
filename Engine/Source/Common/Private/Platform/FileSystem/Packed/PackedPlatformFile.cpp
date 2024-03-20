@@ -8,7 +8,7 @@ DELCARE_LOG_CATEGORY(LogPackedPlatformFile)
 
 static FPackedPlatformFile SPackedPlatformFile{};
 
-void FPackedPlatformFile::Init()
+void FPackedPlatformFile::_Init()
 {
 	HLVM_ASSERT(!sPlatformFileRedirector[HLVM_ENUM_V(EPlatformFileType, Packed)], TXT("Packed Platform file is already registered"));
 	sPlatformFileRedirector[HLVM_ENUM_V(EPlatformFileType, Packed)] = FPackedPlatformFile::Get();
