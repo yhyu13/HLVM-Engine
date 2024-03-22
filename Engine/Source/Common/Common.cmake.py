@@ -42,7 +42,7 @@ magic_enum = FindPackage(name='magic_enum',
 Boost = FindPackage(name='Boost',
                     config=False,
                     required=True,
-                    components=['iostreams filesystem system thread date_time regex timer chrono'],
+                    components=['iostreams filesystem system thread fiber date_time'],
                     target_include_dirs=[DomainValueModel(domain=DomainEnum.PUBLIC, values=['${Boost_INCLUDE_DIRS}'])],
                     target_link_dirs=[DomainValueModel(domain=DomainEnum.PUBLIC, values=['${Boost_LIBRARY_DIRS}'])],
                     target_link_libs=[DomainValueModel(domain=DomainEnum.PUBLIC, values=['${Boost_LIBRARIES}'])])

@@ -7,15 +7,16 @@
 #include "Platform/FileSystem/Boost/BoostPlatformFile.h"
 #include "Platform/FileSystem/Packed/PackedPlatformFile.h"
 #include "Core/Parallel/Async/WorkStealThreadPool.h"
+#include "Core/Parallel/Async/WorkStealFiberPool.h"
 
-#include <ylt/struct_pack.hpp>
-#include <ylt/struct_json/json_reader.h>
-#include <ylt/struct_json/json_writer.h>
+// #include <ylt/struct_pack.hpp>
+// #include <ylt/struct_json/json_reader.h>
+// #include <ylt/struct_json/json_writer.h>
 
 DELCARE_LOG_CATEGORY(LogTest)
-DEFINE_LOG_CATEGORY(LogTest)
 
 #define TEST_STACK_ALLOCATOR 0
+#define TEST_FIBER_POOL 0
 
 /*
 	<test method>
@@ -99,7 +100,11 @@ RECORD(packed_test)
 
 		constexpr size_t NumEntries = 8;
 		{
+#if TEST_FIBER_POOL
+			std::vector<boost::fibers::future<void>> jobs;
+#else
 			std::vector<std::future<void>> jobs;
+#endif
 			jobs.reserve(4);
 			FBoostFileHandle fileTokHandle, fileCotHandle, fileJsonlHandle;
 			FFileOptions	 Options{ .eFileMode = EFileMode::WB, .eFileMapped = EFileMapped::Mapped, .eFileLock = EFileLock::InterProcessLock };
@@ -137,15 +142,22 @@ RECORD(packed_test)
 
 				_StartPos += S_C(size_t, Entry_Dev.Entry.Data.Size);
 			}
-			jobs.emplace_back(FWorkStealThreadPool::Get()->EnqueuTask([&]() {
-				for (size_t i = 0; i < PackedData.size(); ++i)
-				{
-					const auto& Entry_Dev = get<0>(PackedData[i]);
-					std::string json = ToJson(Entry_Dev);
-					json += "\n";
-					fileJsonlHandle.Write(json.c_str(), json.size());
-				}
-			}));
+			jobs.emplace_back(
+
+#if TEST_FIBER_POOL
+				FWorkStealFiberPool::Get()->EnqueuTask(
+#else
+				FWorkStealThreadPool::Get()->EnqueuTask(
+#endif
+					[&]() {
+						for (size_t i = 0; i < PackedData.size(); ++i)
+						{
+							const auto& Entry_Dev = get<0>(PackedData[i]);
+							std::string json = ToJson(Entry_Dev);
+							json += "\n";
+							fileJsonlHandle.Write(json.c_str(), json.size());
+						}
+					}));
 
 			FByteVector TokenData;
 			FByteVector CotData;
@@ -202,15 +214,20 @@ RECORD(packed_test)
 		}
 
 		{
-			FWorkStealThreadPool::Get()->EnqueuTask([&]() {
-										   HLVM_LOG(LogTest, info, TXT("Test PackedFileHandle read token file: {}"), *PackedTokFile);
-										   FPackedPlatformFile::Get()->Mount(PackedFileName);
-										   for (size_t i = 0; i < NumEntries; ++i)
-										   {
-											   FPackedEntryHandle entryHandle;
-											   entryHandle.Open(FString::Format(TXT("./test_{}.txt"), i));
-										   }
-									   })
+#if TEST_FIBER_POOL
+			FWorkStealFiberPool::Get()->EnqueuTask(
+#else
+			FWorkStealThreadPool::Get()->EnqueuTask(
+#endif
+										  [&]() {
+											  HLVM_LOG(LogTest, info, TXT("Test PackedFileHandle read token file: {}"), *PackedTokFile);
+											  FPackedPlatformFile::Get()->Mount(PackedFileName);
+											  for (size_t i = 0; i < NumEntries; ++i)
+											  {
+												  FPackedEntryHandle entryHandle;
+												  entryHandle.Open(FString::Format(TXT("./test_{}.txt"), i));
+											  }
+										  })
 				.wait();
 		}
 	}

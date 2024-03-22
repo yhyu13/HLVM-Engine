@@ -61,6 +61,9 @@
  */
 static_assert(1 == sizeof(char), "char is not 1 byte in size");
 static_assert(1 == sizeof(std::byte), "std::byte is not 1 byte in size");
+static_assert(2 == sizeof(uint16_t), "uint16_t is not 2 byte in size");
+static_assert(4 == sizeof(uint32_t), "uint32_t is not 4 byte in size");
+static_assert(8 == sizeof(uint64_t), "uint64_t is not 8 byte in size");
 static_assert(8 == sizeof(uintptr_t), "uintptr_t is not 8 byte in size");
 static_assert(8 == sizeof(intptr_t), "intptr_t is not 8 byte in size");
 static_assert(8 == sizeof(size_t), "size_t is not 8 byte in size");

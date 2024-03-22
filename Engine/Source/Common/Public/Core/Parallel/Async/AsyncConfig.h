@@ -240,3 +240,25 @@ public:
 		return FString{};
 	}
 };
+
+namespace hlvm_private
+{
+	HLVM_INLINE_VAR FThreadAffinityMode2 AllPhysicalCores{
+		.Priority = EThreadPriority::Normal,
+		.NumThreads = S_C(TUINT32, std::thread::hardware_concurrency() / HLVM_PLATFORM_SIMT),
+		.TargetedCores = FCoreDescription::NPhysicalCores(std::thread::hardware_concurrency() / HLVM_PLATFORM_SIMT)
+	};
+	HLVM_INLINE_VAR FThreadAffinityMode2 AllLogicalCores{
+		.Priority = EThreadPriority::Normal,
+		.NumThreads = S_C(TUINT32, std::thread::hardware_concurrency()),
+		.TargetedCores = FCoreDescription::NLogicalCores(std::thread::hardware_concurrency())
+	};
+} // namespace hlvm_private
+
+HLVM_INLINE_VAR FThreadAffinityMode AllPhysicalCores{
+	hlvm_private::AllPhysicalCores
+};
+
+HLVM_INLINE_VAR FThreadAffinityMode AllLogicalCores{
+	hlvm_private::AllLogicalCores
+};

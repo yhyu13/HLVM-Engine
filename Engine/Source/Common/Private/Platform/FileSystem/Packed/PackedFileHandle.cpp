@@ -4,13 +4,13 @@
 
 #include "Platform/FileSystem/Packed/PackedFileHandle.h"
 #include "Platform/FileSystem/Boost/BoostFileHandle.h"
+#include "Core/Parallel/Async/WorkStealFiberPool.h"
 #include "Core/Log.h"
 
 #include <boost/interprocess/mapped_region.hpp>
 #include <magic_enum_all.hpp>
 
 DELCARE_LOG_CATEGORY(LogPackedFileHandle)
-DEFINE_LOG_CATEGORY(LogPackedFileHandle)
 
 #define PFH_SCOPE_LOCK()
 
@@ -119,6 +119,8 @@ IFileHandle::OpRetType FPackedFileHandle::Open(const FPath& FilePath, const FFil
 						PFH_VERBOSE_LOG(TXT("Container file opened {}"), *ContainerFilePath);
 					}
 				});
+			HLVM_SCOPED_VARIABLE(
+				ScopedCotJob, [] {}, [&] { cot_job.join(); });
 
 			// Decompress and read and build all token entries
 			{
@@ -215,7 +217,6 @@ IFileHandle::OpRetType FPackedFileHandle::Open(const FPath& FilePath, const FFil
 					PFH_VERBOSE_LOG(TXT("ContainerFragments elements: {}"), mContainerFragments.size());
 				}
 			}
-			cot_job.join();
 		}
 
 		mOpened = true;

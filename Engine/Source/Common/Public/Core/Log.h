@@ -5,6 +5,7 @@
 #pragma once
 #include "Common.h"
 #include "String.h"
+#include "Core/Parallel/ParallelDefinition.h"
 
 #include <fmt/xchar.h>
 #ifdef SPDLOG_ACTIVE_LEVEL
@@ -49,11 +50,6 @@ struct FLogCatgegory
 
 DELCARE_LOG_CATEGORY(LogAssert)
 DELCARE_LOG_CATEGORY(LogTemp)
-
-/**
- * DEPRECATED: Dummy place holder for defining a log category (since we use inline constexpr, this is deprecated)
- */
-#define DEFINE_LOG_CATEGORY(...)
 
 /**
  * @brief FLogContext is a structure that contains information about a log message,
@@ -128,7 +124,11 @@ public:
 	template <typename... Args>
 	static FString FormatBeforeSink(const FLogContext& Context, const TCHAR* fmt, Args&&... args)
 	{
+#if HLVM_DEBUG_THREAD_UTIL
+		FString Message = FString::Format(TXT("T[{4}] {0}:[{2}:{3}] {1}"), Context.Category->Name, fmt, Context.FileName, Context.Line, *R_C(const uint64_t*, &GCurrentThreadID));
+#else
 		FString Message = FString::Format(TXT("{0}:[{2}:{3}] {1}"), Context.Category->Name, fmt, Context.FileName, Context.Line);
+#endif
 		// check if args num is zero
 		if constexpr (sizeof...(args) == 0)
 		{

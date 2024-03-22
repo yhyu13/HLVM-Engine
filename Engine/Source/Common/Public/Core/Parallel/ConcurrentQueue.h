@@ -152,12 +152,15 @@ public:
 		return mTail->mNextNode->mItem;
 	}
 
+	/**
+	 * @tparam bTryPop No blocking and will return false on empty, otherwise return poped result.
+	 */
 	template <bool bTryPop = false>
 	bool PopFront(T& ret) noexcept
 	{
 		if constexpr (bBlockPopOnEmpty)
 		{
-			while (Empty() && !mbStopFlagByUser)
+			while (Empty() && !bStopFlagByUser)
 			{
 				/**
 				 * If only try pop, we should immediate exit with false on empty queue
@@ -168,10 +171,13 @@ public:
 				}
 				else
 				{
-					std::unique_lock<std::mutex> lock(*mMutex);
-					mCV->wait(lock, [] {
-						return true;
-					});
+					std::this_thread::yield();
+					{
+						std::unique_lock<std::mutex> lock(*mMutex);
+						mCV->wait(lock, [] {
+							return true;
+						});
+					}
 				}
 			}
 		}
@@ -269,14 +275,14 @@ public:
 	void SignalStop() noexcept
 		requires(bBlockPopOnEmpty)
 	{
-		mbStopFlagByUser = true;
+		bStopFlagByUser = true;
 	}
 
 	bool ShouldStopPop() const noexcept
 	{
 		if constexpr (bBlockPopOnEmpty)
 		{
-			return mbStopFlagByUser && Empty();
+			return bStopFlagByUser && Empty();
 		}
 		else
 		{
@@ -333,7 +339,7 @@ private:
 	std::mutex*				 mMutex;
 	std::condition_variable* mCV;
 	/** Whether the queue is quit by user. */
-	BIT_FLAG(mbStopFlagByUser){ false };
+	BIT_FLAG(bStopFlagByUser){ false };
 
 	/** Size of the queue. */
 	std::atomic_uint_fast32_t mCount{ 0 };

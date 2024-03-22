@@ -5,11 +5,11 @@
 #include "Common.h"
 #include "Core/Log.h"
 
-DEFINE_LOG_CATEGORY(LogAssert)
-DEFINE_LOG_CATEGORY(LogTemp)
-DEFINE_LOG_CATEGORY(LogEngine)
-DEFINE_LOG_CATEGORY(LogGame)
-DEFINE_LOG_CATEGORY(LogEditor)
+
+
+
+
+
 
 #if HLVM_SPDLOG_USE_ASYNC
 // Initialize the thread pool for asynchronous logging

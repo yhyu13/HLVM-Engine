@@ -31,7 +31,18 @@ protected:
 					CPU_ZERO(&cpuset);
 					for (const auto& core : Config2->TargetedCores)
 					{
-						CPU_SET(core.ID, &cpuset);
+						if (core.Type == ECoreType::Physical)
+						{
+							CPU_SET(core.ID * HLVM_PLATFORM_SIMT, &cpuset);
+						}
+						else if (core.Type == ECoreType::Logical)
+						{
+							CPU_SET(core.ID, &cpuset);
+						}
+						else
+						{
+							HLVM_ASSERT(false, TXT("Unknown core type"));
+						}
 					}
 					int rc = pthread_setaffinity_np(Thread->native_handle(),
 						sizeof(cpu_set_t), &cpuset);

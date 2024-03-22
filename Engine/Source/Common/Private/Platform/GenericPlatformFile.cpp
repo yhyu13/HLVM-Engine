@@ -8,7 +8,7 @@
 #include "Platform/FileSystem/Packed/PackedPlatformFile.h"
 
 DELCARE_LOG_CATEGORY(LogGenericPlatformFile)
-DEFINE_LOG_CATEGORY(LogGenericPlatformFile)
+
 
 FGenericPlatformFile* FGenericPlatformFile::sPlatformFileRedirector[EPlatformFileType_NUM];
 

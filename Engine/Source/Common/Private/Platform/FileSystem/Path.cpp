@@ -6,7 +6,7 @@
 #include "Platform/GenericPlatformFile.h"
 
 DELCARE_LOG_CATEGORY(LogFPath)
-DEFINE_LOG_CATEGORY(LogFPath)
+
 
 bool FPath::IsDirectory(const FPath& path)
 {

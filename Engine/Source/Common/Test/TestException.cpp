@@ -9,7 +9,7 @@
 #include "Core/Assert.h"
 
 DELCARE_LOG_CATEGORY(LogTest)
-DEFINE_LOG_CATEGORY(LogTest)
+
 
 /*
 	<test method>

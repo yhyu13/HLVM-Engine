@@ -9,7 +9,7 @@
 #include <magic_enum_all.hpp>
 
 DELCARE_LOG_CATEGORY(LogBoostFileHandle)
-DEFINE_LOG_CATEGORY(LogBoostFileHandle)
+
 
 #define BFH_RECRSIVE_LOCK() ATOMIC_LOCK_GUARD(mRecursiveLock)
 

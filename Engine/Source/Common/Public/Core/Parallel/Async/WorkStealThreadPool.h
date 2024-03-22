@@ -4,7 +4,6 @@
 
 #pragma once
 
-#include "Core/Parallel/Lock.h"
 #include "Core/Parallel/ConcurrentQueue.h"
 #include "AsyncConfig.h"
 
@@ -13,30 +12,36 @@
 class FWorkStealThreadPool
 {
 public:
-	HLVM_INLINE_VAR HLVM_STATIC_VAR FThreadAffinityMode2 AllPhysicalCores{
-		.Priority = EThreadPriority::Normal,
-		.NumThreads = S_C(TUINT32, std::thread::hardware_concurrency() / HLVM_PLATFORM_SIMT),
-		.TargetedCores = FCoreDescription::NPhysicalCores(std::thread::hardware_concurrency() / HLVM_PLATFORM_SIMT)
-	};
-
 	NOCOPYMOVE(FWorkStealThreadPool)
-	explicit FWorkStealThreadPool(const FThreadAffinityMode& ThreadConfig = FThreadAffinityMode{ AllPhysicalCores });
+	explicit FWorkStealThreadPool(const FThreadAffinityMode& AffinityMode = AllPhysicalCores);
 	~FWorkStealThreadPool();
 
 	static FWorkStealThreadPool* Get();
 
 	template <typename F, typename... Args>
-	HLVM_NODISCARD auto EnqueuTask(F&& f, Args&&... args) -> std::future<std::invoke_result_t<F, Args...>>
+	HLVM_NODISCARD auto EnqueuTask(F&& f, Args&&... args)
 	{
 		using TaskRetType = std::invoke_result_t<F, Args...>;
 		using TaskType = std::packaged_task<TaskRetType()>;
 
-		const auto index = (mJobIndex.fetch_add(1, std::memory_order_relaxed) % mCount);
 		auto	   task = std::make_shared<TaskType>(std::bind(std::forward<F>(f), std::forward<Args>(args)...));
 		auto	   result = task->get_future();
 		auto	   work = [_task = MoveTemp(task)]() { (*_task)(); };
+		const auto index = (mJobIndex.fetch_add(1, std::memory_order_relaxed) % mCount);
 		mQueues[index]->Push(MoveTemp(work));
-		return result;
+		return MoveTemp(result);
+	}
+
+	template <typename F, typename... Args>
+	void EnqueuDetached(F&& f, Args&&... args)
+	{
+		using TaskRetType = std::invoke_result_t<F, Args...>;
+		using TaskType = std::packaged_task<TaskRetType()>;
+
+		auto	   task = std::make_shared<TaskType>(std::bind(std::forward<F>(f), std::forward<Args>(args)...));
+		auto	   work = [_task = MoveTemp(task)]() { std::thread(*_task).detach(); };
+		const auto index = (mJobIndex.fetch_add(1, std::memory_order_relaxed) % mCount);
+		mQueues[index]->Push(MoveTemp(work));
 	}
 
 	uint32_t NumThreads() const

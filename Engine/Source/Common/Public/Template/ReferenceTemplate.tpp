@@ -7,6 +7,18 @@
 #include <type_traits>
 
 template <typename T>
+struct TConstRemoved
+{
+	using Type = T;
+};
+
+template <typename T>
+struct TConstRemoved<const T&>
+{
+	using Type = T;
+};
+
+template <typename T>
 struct TReferenceRemoved
 {
 	using Type = T;

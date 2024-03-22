@@ -10,7 +10,7 @@
 #include <magic_enum_all.hpp>
 
 DELCARE_LOG_CATEGORY(LogPackedEntryHandle)
-DEFINE_LOG_CATEGORY(LogPackedEntryHandle)
+
 
 #define PEH_SCOPE_LOCK()
 
