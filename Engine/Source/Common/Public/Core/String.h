@@ -29,7 +29,7 @@ public:
 
 	// Move, copy constructor
 	FString(FString&& other) noexcept
-		: std::basic_string<TCHAR>(MoveTemp(other))
+		: std::basic_string<TCHAR>(other)
 	{
 	}
 	FString(const FString& other) noexcept
@@ -38,7 +38,7 @@ public:
 	}
 	FString& operator=(FString&& other) noexcept
 	{
-		std::basic_string<TCHAR>::operator=(MoveTemp(other));
+		std::basic_string<TCHAR>::operator=(other);
 		return *this;
 	}
 	FString& operator=(const FString& other) noexcept
@@ -103,12 +103,12 @@ public:
 	FStdString() = delete;
 	// Move constructor
 	explicit FStdString(std::basic_string<char>&& other) noexcept
-		: std::basic_string<char>(MoveTemp(other))
+		: std::basic_string<char>(other)
 	{
 	}
 	FStdString& operator=(FStdString&& other) noexcept
 	{
-		std::basic_string<char>::operator=(MoveTemp(other));
+		std::basic_string<char>::operator=(other);
 		return *this;
 	}
 

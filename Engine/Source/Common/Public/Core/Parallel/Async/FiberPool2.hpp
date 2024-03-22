@@ -75,12 +75,17 @@ namespace FiberPool
 	class IFiberTask
 	{
 	public:
+		using Func = std::function<void(void)>;
+
 		// how many running fibers there are
-		inline static std::atomic<size_t> no_of_fibers{ 0 };
+		inline static std::atomic_uint_fast32_t no_of_fibers{ 0 };
 
-		IFiberTask(void) = default;
+		IFiberTask() = default;
+		explicit IFiberTask(Func&& func)
+			: m_func{ std::move(func) }
+		{
+		}
 
-		virtual ~IFiberTask(void) = default;
 		IFiberTask(const IFiberTask& rhs) = delete;
 		IFiberTask& operator=(const IFiberTask& rhs) = delete;
 		IFiberTask(IFiberTask&& other) = default;
@@ -89,49 +94,23 @@ namespace FiberPool
 		/**
 		 * Run the task.
 		 */
-		virtual void execute() = 0;
+		void operator()()
+		{
+			no_of_fibers.fetch_add(1, std::memory_order_relaxed);
+			m_func();
+			no_of_fibers.fetch_sub(1, std::memory_order_relaxed);
+		}
+
+	private:
+		Func m_func;
 	};
 
 	template <
 		bool use_work_steal = false,
 		template <typename> typename task_queue_t = boost::fibers::buffered_channel,
-		typename work_task_t = std::tuple<boost::fibers::launch,
-			std::unique_ptr<IFiberTask>>>
+		typename work_task_t = std::tuple<boost::fibers::launch, IFiberTask>>
 	class FiberPool
 	{
-	private:
-		/**
-		 * A wrapper for packaged fiber task
-		 */
-		template <typename Func>
-		class FiberTask : public IFiberTask
-		{
-		public:
-			FiberTask(Func&& func)
-				: m_func{ std::move(func) }
-			{
-			}
-
-			~FiberTask(void) override = default;
-			FiberTask(const FiberTask& rhs) = delete;
-			FiberTask& operator=(const FiberTask& rhs) = delete;
-			FiberTask(FiberTask&& other) = default;
-			FiberTask& operator=(FiberTask&& other) = default;
-
-			/**
-			 * Run the task.
-			 */
-			void execute() override
-			{
-				++no_of_fibers;
-				m_func();
-				--no_of_fibers;
-			}
-
-		private:
-			Func m_func;
-		};
-
 	public:
 		static constexpr bool work_stealing = use_work_steal;
 
@@ -149,8 +128,7 @@ namespace FiberPool
 			{
 				for (std::uint32_t i = 0; i < m_threads_no; ++i)
 				{
-					m_threads.emplace_back(
-						&FiberPool::worker, this);
+					m_threads.create_thread([this] { this->worker(); });
 				}
 			}
 			catch (...)
@@ -167,33 +145,18 @@ namespace FiberPool
 		auto submit(boost::fibers::launch launch_policy,
 			Func&&						  func, Args&&... args)
 		{
-			// capature our task into lambda with all its parameters
-			auto capture = [_func = std::forward<Func>(func),
-							   _args = std::make_tuple(std::forward<Args>(args)...)]() mutable {
-				// run the tesk with the parameters provided
-				// this will be what our fibers execute
-				return std::apply(std::move(_func), std::move(_args));
-			};
+			using TaskRetType = std::invoke_result_t<Func, Args...>;
+			using TaskType = boost::fibers::packaged_task<TaskRetType()>;
+			using task_t = IFiberTask;
 
-			// get return type of our task
-			using task_result_t = std::invoke_result_t<decltype(capture)>;
-
-			// create fiber package_task
-			using packaged_task_t = boost::fibers::packaged_task<task_result_t()>;
-
-			packaged_task_t task{ std::move(capture) };
-
-			using task_t = FiberTask<packaged_task_t>;
-
-			// get future for obtaining future result when
-			// the fiber completes
-			auto result_future = task.get_future();
+			auto task = new TaskType(std::bind(std::forward<Func>(func), std::forward<Args>(args)...));
+			auto result_future = task->get_future();
+			auto work = [task]() { (*task)(); delete task; };
 
 			// finally submit the packaged task into work queue
 			auto status = m_work_queue.push(
-				std::make_tuple(launch_policy,
-					std::make_unique<task_t>(
-						std::move(task))));
+				std::move(std::make_tuple(launch_policy,
+					task_t(std::move(work)))));
 
 			if (status != boost::fibers::channel_op_status::success)
 			{
@@ -213,7 +176,7 @@ namespace FiberPool
 		template <typename Func, typename... Args>
 		auto submit(Func&& func, Args&&... args)
 		{
-			return submit(boost::fibers::launch::post,
+			return submit(boost::fibers::launch::dispatch,
 				std::forward<Func>(func),
 				std::forward<Args>(args)...);
 		}
@@ -233,25 +196,19 @@ namespace FiberPool
 			m_work_queue.close();
 		}
 
-		auto threads_no() const noexcept
+		size_t threads_no() const noexcept
 		{
 			return m_threads.size();
 		}
 
-		auto fibers_no() const noexcept
+		size_t fibers_no() const noexcept
 		{
-			return IFiberTask::no_of_fibers.load();
+			return IFiberTask::no_of_fibers.load(std::memory_order_acquire);
 		}
 
 		~FiberPool()
 		{
-			for (auto& thread : m_threads)
-			{
-				if (thread.joinable())
-				{
-					thread.join();
-				}
-			}
+			m_threads.interrupt_all();
 		}
 
 	private:
@@ -317,11 +274,7 @@ namespace FiberPool
 				// earlier we already got future for the fiber
 				// so we can get the result of our task if we want
 				boost::fibers::fiber(launch_policy,
-					[task = std::move(task_to_run)]() {
-						// execute our task in the newly created
-						// fiber
-						task->execute();
-					})
+					std::move(task_to_run))
 					.detach();
 			}
 		}
@@ -332,7 +285,7 @@ namespace FiberPool
 		// be executing our fibers. Since we use work_shearing scheduling
 		// algorithm, the fibers should be shared evenly
 		// between these threads
-		std::vector<std::thread> m_threads;
+		boost::thread_group m_threads;
 
 		// use buffered_channel (by default) so that we dont block when
 		// there is no  reciver for the fiber. we are only
@@ -345,13 +298,13 @@ namespace FiberPool
 	template <
 		template <typename> typename task_queue_t = boost::fibers::buffered_channel,
 		typename work_task_t = std::tuple<boost::fibers::launch,
-			std::unique_ptr<IFiberTask>>>
+			IFiberTask>>
 	using FiberPoolStealing = FiberPool<true, task_queue_t, work_task_t>;
 
 	template <
 		template <typename> typename task_queue_t = boost::fibers::buffered_channel,
 		typename work_task_t = std::tuple<boost::fibers::launch,
-			std::unique_ptr<IFiberTask>>>
+			IFiberTask>>
 	using FiberPoolSharing = FiberPool<false, task_queue_t, work_task_t>;
 
 } // namespace FiberPool
@@ -364,10 +317,14 @@ namespace FiberPool
 namespace DefaultFiberPool
 {
 
-	inline auto&
+	inline auto
 	get_pool()
 	{
-		static auto default_fp = new FiberPool::FiberPoolSharing<>();
+		/**
+		 * New this static variable to avoid deleting on destruction,
+		 * as boost scheduling context has life time problem with mimalloc allocation (free before destruction)
+		 */
+		static auto default_fp = new FiberPool::FiberPoolSharing<>{};
 		return default_fp;
 	};
 

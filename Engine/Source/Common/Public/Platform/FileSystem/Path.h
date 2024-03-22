@@ -45,7 +45,7 @@ public:
 
 	// Move, copy constructor
 	FPath(FPath&& other) noexcept
-		: boost::filesystem::path(MoveTemp(other)), mHash(MoveTemp(other.mHash)), mFileType(MoveTemp(other.mFileType))
+		: boost::filesystem::path(other), mHash(other.mHash), mFileType(other.mFileType)
 	{
 	}
 	FPath(const FPath& other) noexcept

@@ -244,6 +244,11 @@ RECORD(queue_test)
 #define HLVM_ENABLE_FIBER_POOL 0
 #include "Core/Parallel/Async/WorkStealFiberPool.h"
 
+#if !HLVM_ENABLE_FIBER_POOL
+// #include "Core/Parallel/Async/FiberPool.hpp"
+	#include "Core/Parallel/Async/FiberPool2.hpp"
+#endif
+
 RECORD(pool_test)
 {
 	HLVM_LOG(LogTest, info, TXT("Pool test:"));
@@ -374,10 +379,67 @@ RECORD(pool_test)
 
 		time_lock = RunTestAndCalculateAvg(Test2Func, kNumIterations);
 		HLVM_LOG(LogTest, info, TXT("Pool test #2 Fiber avg took {0:f}, iter {1:d}"), time_lock, kNumIterations);
+#else
+		auto Test2Func = [&](double& Duration) -> bool {
+			auto													Queue = TConcurrentQueue<int, EConcurrentQueueMode::Mpmc, true, true>();
+			FTimer													Timer;
+			std::once_flag											Flag;
+			std::atomic<int>										Counter{ kNumThreads };
+			std::vector<std::optional<boost::fibers::future<void>>> PushThreads;
+			std::vector<std::optional<boost::fibers::future<void>>> PopThreads;
+			auto													Pool = DefaultFiberPool::get_pool();
+			{
+				Queue.Push(1);
+				int val = Queue.PeekFront();
+				HLVM_ENSURE(val == 1, TXT("Queue peek front failed"));
+				HLVM_ENSURE(Queue.PopFront(val), TXT("Queue pop front failed"));
+			}
+			for (int i = 0; i < kNumThreads; ++i)
+			{
+				PushThreads.emplace_back(Pool->submit([&Queue, &Timer, &Flag] {
+					std::call_once(Flag, [&Timer] {
+						Timer.Reset();
+					});
+					for (int j = 0; j < kNumLoops; ++j)
+					{
+						Queue.Push(j);
+					}
+				}));
 
+				PopThreads.emplace_back(Pool->submit([&Queue, &Timer, &Counter, &Duration] {
+					for (int j = 0; !Queue.ShouldStopPop();)
+					{
+						int val;
+						if (Queue.PopFront(val))
+						{
+							++j;
+						}
+					}
+					if (--Counter == 0)
+					{
+						Duration = Timer.Mark();
+					}
+				}));
+			}
+
+			for (auto& t : PushThreads)
+			{
+				t->wait();
+			}
+			Queue.SignalStop();
+			for (auto& t : PopThreads)
+			{
+				t->wait();
+			}
+			HLVM_LOG(LogTest, info, TXT("Pool test #2 took {0:f}, queue size {1:d}"), Duration, Queue.Num());
+			return true;
+		};
+
+		time_lock = RunTestAndCalculateAvg(Test2Func, kNumIterations);
+		HLVM_LOG(LogTest, info, TXT("Pool test #2 Fiber avg took {0:f}, iter {1:d}"), time_lock, kNumIterations);
 #endif
 	}
 
 	double ratio = time_lock / time_concurrent;
-	HLVM_LOG(LogTest, info, TXT("Thread test #1 = {0:.2f}x Pool test #2 Fiber"), ratio);
+	HLVM_LOG(LogTest, info, TXT("Pool Test Thread #1 = {0:.2f}x Pool Test Fiber #2"), ratio);
 };

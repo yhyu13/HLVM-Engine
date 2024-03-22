@@ -41,7 +41,7 @@ public:
 		std::ostringstream os;
 		backward::Printer  p;
 		p.print(st, os);
-		return FStdString(MoveTemp(os.str()));
+		return FStdString(MoveTemp(os.str())); // TODO, consider stack string instead of malloc string
 	}
 
 protected:

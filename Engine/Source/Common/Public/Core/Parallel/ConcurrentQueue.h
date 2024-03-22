@@ -132,13 +132,13 @@ public:
 	void Push(const T& item) noexcept
 		requires(std::is_copy_constructible_v<T>)
 	{
-		PushInternal(new QueueNode(CopyTemp(item)));
+		PushInternal(new QueueNode(item));
 	}
 
 	void Push(T&& item) noexcept
 		requires(std::is_move_constructible_v<T>)
 	{
-		PushInternal(new QueueNode(MoveTemp(item)));
+		PushInternal(new QueueNode(item));
 	}
 
 	/**

@@ -24,9 +24,9 @@ public:
 		using TaskRetType = std::invoke_result_t<F, Args...>;
 		using TaskType = std::packaged_task<TaskRetType()>;
 
-		auto	   task = std::make_shared<TaskType>(std::bind(std::forward<F>(f), std::forward<Args>(args)...));
+		auto	   task = new TaskType(std::bind(std::forward<F>(f), std::forward<Args>(args)...));
 		auto	   result = task->get_future();
-		auto	   work = [_task = MoveTemp(task)]() { (*_task)(); };
+		auto	   work = [task]() { (*task)(); delete task; };
 		const auto index = (mJobIndex.fetch_add(1, std::memory_order_relaxed) % mCount);
 		mQueues[index]->Push(MoveTemp(work));
 		return MoveTemp(result);
@@ -38,10 +38,8 @@ public:
 		using TaskRetType = std::invoke_result_t<F, Args...>;
 		using TaskType = std::packaged_task<TaskRetType()>;
 
-		auto	   task = std::make_shared<TaskType>(std::bind(std::forward<F>(f), std::forward<Args>(args)...));
-		auto	   work = [_task = MoveTemp(task)]() { std::thread(*_task).detach(); };
-		const auto index = (mJobIndex.fetch_add(1, std::memory_order_relaxed) % mCount);
-		mQueues[index]->Push(MoveTemp(work));
+		auto task = TaskType(std::bind(std::forward<F>(f), std::forward<Args>(args)...));
+		std::thread(MoveTemp(task)).detach();
 	}
 
 	uint32_t NumThreads() const

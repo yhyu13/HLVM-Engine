@@ -37,7 +37,13 @@ struct TReferenceRemoved<T&&>
 };
 
 template <typename T>
-inline typename TReferenceRemoved<T>::Type&& MoveTemp(T&& Var)
+HLVM_NODISCARD constexpr T&& FwdTemp(typename TReferenceRemoved<T>::Type& Var) noexcept
+{
+	return static_cast<T&&>(Var);
+}
+
+template <typename T>
+HLVM_NODISCARD constexpr typename TReferenceRemoved<T>::Type&& MoveTemp(T&& Var) noexcept
 {
 	using OutType = typename TReferenceRemoved<T>::Type;
 	static_assert(!std::is_same_v<const OutType&, OutType&>, "Move should not be used on const object");
@@ -45,14 +51,14 @@ inline typename TReferenceRemoved<T>::Type&& MoveTemp(T&& Var)
 }
 
 template <typename T>
-inline typename TReferenceRemoved<T>::Type CopyTemp(T& Var)
+HLVM_NODISCARD constexpr typename TReferenceRemoved<T>::Type CopyTemp(T& Var) noexcept
 {
 	using OutType = typename TReferenceRemoved<T>::Type;
 	return const_cast<const OutType&>(Var);
 }
 
 template <typename T>
-inline typename TReferenceRemoved<T>::Type CopyTemp(const T& Var)
+inline typename TReferenceRemoved<T>::Type CopyTemp(const T& Var) noexcept
 {
 	using OutType = typename TReferenceRemoved<T>::Type;
 	return const_cast<const OutType&>(Var);
