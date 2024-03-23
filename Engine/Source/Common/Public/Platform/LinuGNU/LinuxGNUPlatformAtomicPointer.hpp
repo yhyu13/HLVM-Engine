@@ -38,6 +38,7 @@ public:
 	}
 	~TAtomicPointer() noexcept
 	{
+		Release();
 	}
 	/**
 	 * Release inner pointer without deleting it!

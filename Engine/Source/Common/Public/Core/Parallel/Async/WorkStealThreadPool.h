@@ -13,7 +13,7 @@ class FWorkStealThreadPool
 {
 public:
 	NOCOPYMOVE(FWorkStealThreadPool)
-	explicit FWorkStealThreadPool(const FThreadAffinityMode& AffinityMode = AllPhysicalCores);
+	explicit FWorkStealThreadPool(const FThreadAffinityMode& AffinityMode = BgTwoPhysicalCores);
 	~FWorkStealThreadPool();
 
 	static FWorkStealThreadPool* Get();
@@ -48,8 +48,6 @@ public:
 	}
 
 private:
-	constexpr inline static int K = { 2 };
-
 	using ProcType = std::function<void(void)>;
 	using QueueType = TConcurrentQueue<ProcType, EConcurrentQueueMode::Mpmc, true>;
 	using QueuesType = TVector<std::unique_ptr<QueueType>>;

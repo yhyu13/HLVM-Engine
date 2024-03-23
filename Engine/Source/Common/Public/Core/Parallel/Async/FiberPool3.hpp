@@ -2,16 +2,18 @@
 // http://roar11.com/2016/01/a-platform-independent-thread-pool-using-c14/
 
 #pragma once
+#include "Core/Parallel/ConcurrentQueue.h"
 
 #include <boost/fiber/all.hpp>
+#include <boost/thread.hpp>
 
 namespace FiberPool
 {
 
-	inline size_t
+	inline auto
 	no_of_defualt_threads()
 	{
-		return 2; // std::thread::hardware_concurrency() / HLVM_PLATFORM_SIMT;
+		return std::thread::hardware_concurrency() / HLVM_PLATFORM_SIMT;
 	}
 
 	/**
@@ -21,44 +23,40 @@ namespace FiberPool
 	 * This makes it diffuclt to mock its behaviour in unit tests
 	 * The wrapper solves this (see tests for example mock channel)
 	 */
-	template <typename BaseChannel>
+	template <typename BaseQueue>
 	class TaskQueue
 	{
 	public:
-		using value_type = typename BaseChannel::value_type;
+		using ValueType = typename BaseQueue::ValueType;
 
-		explicit TaskQueue(std::size_t capacity)
-			: m_base_channel{ capacity }
-		{
-		}
-		TaskQueue() = delete;
+		TaskQueue() = default;
 		NOCOPYMOVE(TaskQueue)
 
-		boost::fibers::channel_op_status
-		push(typename BaseChannel::value_type const& value)
+		void
+		push(typename BaseQueue::ValueType const& value)
 		{
-			return m_base_channel.push(value);
+			return m_base_channel.Push(value);
 		}
 
-		boost::fibers::channel_op_status
-		push(typename BaseChannel::value_type&& value)
+		void
+		push(typename BaseQueue::ValueType&& value)
 		{
-			return m_base_channel.push(std::move(value));
+			return m_base_channel.Push(std::move(value));
 		}
 
-		boost::fibers::channel_op_status
-		pop(typename BaseChannel::value_type& value)
+		bool
+		pop(typename BaseQueue::ValueType& value)
 		{
-			return m_base_channel.pop(value);
+			return m_base_channel.template PopFront<false>(value);
 		}
 
 		void close() noexcept
 		{
-			m_base_channel.close();
+			m_base_channel.SignalStop();
 		}
 
 	private:
-		BaseChannel m_base_channel;
+		BaseQueue m_base_channel;
 	};
 
 	/**
@@ -71,12 +69,17 @@ namespace FiberPool
 	public:
 		using Func = std::function<void(void)>;
 
+		// how many running fibers there are
+		inline static std::atomic_uint_fast32_t no_of_fibers{ 0 };
+
 		IFiberTask() = default;
 		explicit IFiberTask(Func&& func)
 			: m_func{ std::move(func) }
 		{
 		}
-		NOCOPY(IFiberTask)
+
+		IFiberTask(const IFiberTask& rhs) = delete;
+		IFiberTask& operator=(const IFiberTask& rhs) = delete;
 		IFiberTask(IFiberTask&& other) = default;
 		IFiberTask& operator=(IFiberTask&& other) = default;
 
@@ -85,7 +88,9 @@ namespace FiberPool
 		 */
 		void operator()()
 		{
+			no_of_fibers.fetch_add(1, std::memory_order_relaxed);
 			m_func();
+			no_of_fibers.fetch_sub(1, std::memory_order_relaxed);
 		}
 
 	private:
@@ -94,23 +99,21 @@ namespace FiberPool
 
 	template <
 		bool use_work_steal = false,
-		template <typename> typename task_queue_t = boost::fibers::buffered_channel,
-		typename work_task_t = std::tuple<boost::fibers::launch, IFiberTask>>
+		typename work_task_t = std::tuple<boost::fibers::launch, IFiberTask>,
+		typename task_queue_t = TConcurrentQueue<work_task_t>>
 	class FiberPool
 	{
 	public:
 		static constexpr bool work_stealing = use_work_steal;
 
 		FiberPool()
-			: FiberPool{ no_of_defualt_threads(),
-				S_C(size_t, pow(2, ceil(log2(no_of_defualt_threads() * 4 + 1)))) } // size need to be 2 powers
+			: FiberPool{ no_of_defualt_threads() }
 		{
 		}
 
 		FiberPool(
-			size_t no_of_threads,
-			size_t work_queue_size) // size need to be 2 powers
-			: m_threads_no{ no_of_threads }, m_work_queue{ work_queue_size }
+			size_t no_of_threads)
+			: m_threads_no{ no_of_threads }
 		{
 			try
 			{
@@ -142,14 +145,9 @@ namespace FiberPool
 			auto work = [task]() { (*task)(); delete task; };
 
 			// finally submit the packaged task into work queue
-			auto status = m_work_queue.push(
+			m_work_queue.push(
 				std::move(std::make_tuple(launch_policy,
 					task_t(std::move(work)))));
-
-			if (status != boost::fibers::channel_op_status::success)
-			{
-				return std::optional<std::decay_t<decltype(result_future)>>{};
-			}
 
 			// return the future to the caller so that
 			// we can get the result when the fiber with our task
@@ -187,6 +185,11 @@ namespace FiberPool
 		size_t threads_no() const noexcept
 		{
 			return m_threads.size();
+		}
+
+		size_t fibers_no() const noexcept
+		{
+			return IFiberTask::no_of_fibers.load(std::memory_order_acquire);
 		}
 
 		~FiberPool()
@@ -236,13 +239,12 @@ namespace FiberPool
 
 			// create a placeholder for packaged task for
 			// to-be-created fiber to execute
-			auto task_tuple = typename decltype(m_work_queue)::value_type{};
+			auto task_tuple = typename decltype(m_work_queue)::ValueType{};
 
 			// fetch a packaged task from the work queue.
 			// if there is nothing, we are just going to wait
 			// here till we get some task
-			while (boost::fibers::channel_op_status::success
-				== m_work_queue.pop(task_tuple))
+			while (m_work_queue.pop(task_tuple))
 			{
 				// creates a fiber from the pacakged task.
 				//
@@ -276,20 +278,18 @@ namespace FiberPool
 		// going to block when the buffered_channel is full.
 		// Otherwise, tasks will be just waiting in the
 		// queue till some fiber picks them up.
-		TaskQueue<task_queue_t<work_task_t>> m_work_queue;
+		TaskQueue<task_queue_t> m_work_queue;
 	};
 
 	template <
-		template <typename> typename task_queue_t = boost::fibers::buffered_channel,
-		typename work_task_t = std::tuple<boost::fibers::launch,
-			IFiberTask>>
-	using FiberPoolStealing = FiberPool<true, task_queue_t, work_task_t>;
+		typename work_task_t = std::tuple<boost::fibers::launch, IFiberTask>,
+		typename task_queue_t = TConcurrentQueue<work_task_t>>
+	using FiberPoolStealing = FiberPool<true, work_task_t, task_queue_t>;
 
 	template <
-		template <typename> typename task_queue_t = boost::fibers::buffered_channel,
-		typename work_task_t = std::tuple<boost::fibers::launch,
-			IFiberTask>>
-	using FiberPoolSharing = FiberPool<false, task_queue_t, work_task_t>;
+		typename work_task_t = std::tuple<boost::fibers::launch, IFiberTask>,
+		typename task_queue_t = TConcurrentQueue<work_task_t>>
+	using FiberPoolSharing = FiberPool<false, work_task_t, task_queue_t>;
 
 } // namespace FiberPool
 

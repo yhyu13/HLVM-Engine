@@ -20,5 +20,5 @@ static_assert(sizeof(std::thread::id) == sizeof(uint64_t), "std::thread::id is n
  * Enable/Disable thread debug utilities
  */
 #ifndef HLVM_DEBUG_THREAD_UTIL
-	#define HLVM_DEBUG_THREAD_UTIL HLVM_BUILD_DEBUG
+	#define HLVM_DEBUG_THREAD_UTIL 0 // HLVM_BUILD_DEBUG
 #endif

@@ -34,6 +34,10 @@ std::function<void()> make_test_wrapper(const FString& name, Func test_function)
 	};
 }
 
+struct AutoRegisterContext
+{
+	bool bEnabled = true;
+};
 /** Macro to record a test function
  * Requirement : (1) use static method in a .cpp test file
  *               (2) function name prefix "test_"
@@ -43,17 +47,44 @@ std::function<void()> make_test_wrapper(const FString& name, Func test_function)
  * };
  * RECORD_TEST_FUNC(hash_test);
  */
-#define RECORD_TEST_FUNC(test_function)                                                                     \
-	namespace AutoRegister_##test_function                                                                  \
+#define RECORD_TEST_FUNC_BODY(test_function)                                                                \
+	struct AutoRegister                                                                                     \
 	{                                                                                                       \
-		struct AutoRegister                                                                                 \
+		AutoRegister()                                                                                      \
 		{                                                                                                   \
-			AutoRegister()                                                                                  \
-			{                                                                                               \
+			if (_AutoRegisterContext.bEnabled)                                                              \
 				recorded_test_functions.push_back(make_test_wrapper(#test_function, test_##test_function)); \
-			}                                                                                               \
-		};                                                                                                  \
-		inline AutoRegister auto_register_##test_function = AutoRegister();                                 \
+		}                                                                                                   \
+	};                                                                                                      \
+	static AutoRegister _AutoRegister
+
+#define RECORD_TEST_FUNC1(test_function, ...)                         \
+	HLVM_STATIC_VAR AutoRegisterContext _AutoRegisterContext{ true }; \
+	RECORD_TEST_FUNC_BODY(test_function);
+
+#define RECORD_TEST_FUNC2(test_function, ...)                                \
+	HLVM_STATIC_VAR AutoRegisterContext _AutoRegisterContext{ __VA_ARGS__ }; \
+	RECORD_TEST_FUNC_BODY(test_function);
+
+#define RECORD_TEST_FUNC(test_function, ...)                                          \
+	namespace record_##test_function                                                  \
+	{                                                                                 \
+		constexpr auto ArgCount = HLVM_GET_ARGS_COUNT(#test_function, ##__VA_ARGS__); \
+		struct RecordTestFunc                                                         \
+		{                                                                             \
+			RecordTestFunc()                                                          \
+			{                                                                         \
+				if constexpr (ArgCount == 1)                                          \
+				{                                                                     \
+					RECORD_TEST_FUNC1(test_function, ##__VA_ARGS__);                  \
+				}                                                                     \
+				if constexpr (ArgCount == 2)                                          \
+				{                                                                     \
+					RECORD_TEST_FUNC2(test_function, ##__VA_ARGS__);                  \
+				}                                                                     \
+			}                                                                         \
+		};                                                                            \
+		static RecordTestFunc _RecordTestFunc;                                        \
 	}
 
 /**
@@ -64,9 +95,9 @@ std::function<void()> make_test_wrapper(const FString& name, Func test_function)
  *    ...
  * }
  */
-#define RECORD(test_function)        \
-	void test_##test_function();     \
-	RECORD_TEST_FUNC(test_function); \
+#define RECORD(test_function, ...)                  \
+	void test_##test_function();                    \
+	RECORD_TEST_FUNC(test_function, ##__VA_ARGS__); \
 	void test_##test_function()
 
 // Implement smoothed average time measurement

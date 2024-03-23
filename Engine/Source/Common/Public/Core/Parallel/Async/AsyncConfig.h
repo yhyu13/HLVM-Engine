@@ -248,6 +248,11 @@ namespace hlvm_private
 		.NumThreads = S_C(TUINT32, std::thread::hardware_concurrency() / HLVM_PLATFORM_SIMT),
 		.TargetedCores = FCoreDescription::NPhysicalCores(std::thread::hardware_concurrency() / HLVM_PLATFORM_SIMT)
 	};
+	HLVM_INLINE_VAR FThreadAffinityMode2 BgTwoPhysicalCores{
+		.Priority = EThreadPriority::Background,
+		.NumThreads = 2u,
+		.TargetedCores = FCoreDescription::NPhysicalCores(2u)
+	};
 	HLVM_INLINE_VAR FThreadAffinityMode2 AllLogicalCores{
 		.Priority = EThreadPriority::Normal,
 		.NumThreads = S_C(TUINT32, std::thread::hardware_concurrency()),
@@ -257,6 +262,10 @@ namespace hlvm_private
 
 HLVM_INLINE_VAR FThreadAffinityMode AllPhysicalCores{
 	hlvm_private::AllPhysicalCores
+};
+
+HLVM_INLINE_VAR FThreadAffinityMode BgTwoPhysicalCores{
+	hlvm_private::BgTwoPhysicalCores
 };
 
 HLVM_INLINE_VAR FThreadAffinityMode AllLogicalCores{

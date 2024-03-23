@@ -22,9 +22,9 @@ FWorkStealFiberPool::FWorkStealFiberPool(const FThreadAffinityMode& AffinityMode
 {
 	#if HLVM_FIBER_POOL_USE_WORKSTEAL
 	// Work steal pool only allow one instance of pool object, warning user if multiple instances are to be constructed
-	if (!sInitialized)
+	if (!sWorkStealInitialized)
 	{
-		sInitialized = true;
+		sWorkStealInitialized = true;
 	}
 	else
 	{
@@ -95,7 +95,7 @@ FWorkStealFiberPool::FWorkStealFiberPool(const FThreadAffinityMode& AffinityMode
 					// In this case we must continue the thread
 					continue;
 				}
-				boost::fibers::fiber(MoveTemp(task)).join();
+				boost::fibers::fiber(boost::fibers::launch::dispatch, MoveTemp(task)).detach();
 			}
 		};
 
@@ -108,7 +108,9 @@ FWorkStealFiberPool::FWorkStealFiberPool(const FThreadAffinityMode& AffinityMode
 
 FWorkStealFiberPool::~FWorkStealFiberPool()
 {
-	sInitialized = false;
+	#if HLVM_FIBER_POOL_USE_WORKSTEAL
+	sWorkStealInitialized = false;
+	#endif
 	mQueue.SignalStop();
 	mThreads.join_all();
 }

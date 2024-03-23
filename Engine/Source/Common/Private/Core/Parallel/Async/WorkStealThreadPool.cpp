@@ -43,7 +43,10 @@ FWorkStealThreadPool::FWorkStealThreadPool(const FThreadAffinityMode& AffinityMo
 			for (;;)
 			{
 				ProcType task;
-				for (uint32_t n = 0; n < mCount * K; ++n)
+				/**
+				 * Try steal work from all threads' queues
+				 */
+				for (uint32_t n = 0; n < mCount; ++n)
 				{
 					auto stolen = (index + n) % mCount;
 					if (mQueues[stolen]->PopFront<true>(task))
@@ -55,6 +58,9 @@ FWorkStealThreadPool::FWorkStealThreadPool(const FThreadAffinityMode& AffinityMo
 						break;
 					}
 				}
+				/**
+				 * If steal fails, wait on current thread's queue
+				 */
 				if (!task)
 				{
 					if (Queue->PopFront<false>(task))

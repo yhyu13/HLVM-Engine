@@ -25,25 +25,27 @@ namespace FiberPool
 	class TaskQueue
 	{
 	public:
-		using value_type = typename BaseChannel::value_type;
+		using ValueType = typename BaseChannel::value_type;
 
+		TaskQueue() = delete;
 		explicit TaskQueue(std::size_t capacity)
 			: m_base_channel{ capacity }
 		{
 		}
-		TaskQueue() = delete;
 		NOCOPYMOVE(TaskQueue)
 
 		boost::fibers::channel_op_status
 		push(typename BaseChannel::value_type const& value)
+			requires(std::is_copy_constructible_v<typename BaseChannel::value_type>)
 		{
-			return m_base_channel.push(value);
+			return m_base_channel.push(CopyTemp(value));
 		}
 
 		boost::fibers::channel_op_status
 		push(typename BaseChannel::value_type&& value)
+			requires(std::is_move_constructible_v<typename BaseChannel::value_type>)
 		{
-			return m_base_channel.push(std::move(value));
+			return m_base_channel.push(MoveTemp(value));
 		}
 
 		boost::fibers::channel_op_status
@@ -61,41 +63,12 @@ namespace FiberPool
 		BaseChannel m_base_channel;
 	};
 
-	/**
-	 * All tasks executed by the FiberPool are
-	 * automatically wrapped to use the
-	 * following interface
-	 */
-	class IFiberTask
-	{
-	public:
-		using Func = std::function<void(void)>;
-
-		IFiberTask() = default;
-		explicit IFiberTask(Func&& func)
-			: m_func{ std::move(func) }
-		{
-		}
-		NOCOPY(IFiberTask)
-		IFiberTask(IFiberTask&& other) = default;
-		IFiberTask& operator=(IFiberTask&& other) = default;
-
-		/**
-		 * Run the task.
-		 */
-		void operator()()
-		{
-			m_func();
-		}
-
-	private:
-		Func m_func;
-	};
+	using FiberTaskType = std::function<void(void)>;
 
 	template <
 		bool use_work_steal = false,
 		template <typename> typename task_queue_t = boost::fibers::buffered_channel,
-		typename work_task_t = std::tuple<boost::fibers::launch, IFiberTask>>
+		typename work_task_t = std::tuple<boost::fibers::launch, FiberTaskType>>
 	class FiberPool
 	{
 	public:
@@ -135,16 +108,15 @@ namespace FiberPool
 		{
 			using TaskRetType = std::invoke_result_t<Func, Args...>;
 			using TaskType = boost::fibers::packaged_task<TaskRetType()>;
-			using task_t = IFiberTask;
 
-			auto task = new TaskType(std::bind(std::forward<Func>(func), std::forward<Args>(args)...));
+			auto task = new TaskType(std::bind(FwdTemp<Func>(func), FwdTemp<Args>(args)...));
 			auto result_future = task->get_future();
 			auto work = [task]() { (*task)(); delete task; };
 
 			// finally submit the packaged task into work queue
 			auto status = m_work_queue.push(
-				std::move(std::make_tuple(launch_policy,
-					task_t(std::move(work)))));
+				MoveTemp(std::make_tuple(launch_policy,
+					MoveTemp(work))));
 
 			if (status != boost::fibers::channel_op_status::success)
 			{
@@ -154,7 +126,7 @@ namespace FiberPool
 			// return the future to the caller so that
 			// we can get the result when the fiber with our task
 			// completes
-			return std::make_optional(std::move(result_future));
+			return std::make_optional(MoveTemp(result_future));
 		}
 
 		/**
@@ -165,8 +137,8 @@ namespace FiberPool
 		auto submit(Func&& func, Args&&... args)
 		{
 			return submit(boost::fibers::launch::dispatch,
-				std::forward<Func>(func),
-				std::forward<Args>(args)...);
+				FwdTemp<Func>(func),
+				FwdTemp<Args>(args)...);
 		}
 
 		/**
@@ -236,7 +208,7 @@ namespace FiberPool
 
 			// create a placeholder for packaged task for
 			// to-be-created fiber to execute
-			auto task_tuple = typename decltype(m_work_queue)::value_type{};
+			auto task_tuple = typename decltype(m_work_queue)::ValueType{};
 
 			// fetch a packaged task from the work queue.
 			// if there is nothing, we are just going to wait
@@ -258,7 +230,7 @@ namespace FiberPool
 				// earlier we already got future for the fiber
 				// so we can get the result of our task if we want
 				boost::fibers::fiber(launch_policy,
-					std::move(task_to_run))
+					MoveTemp(task_to_run))
 					.detach();
 			}
 		}
@@ -282,13 +254,13 @@ namespace FiberPool
 	template <
 		template <typename> typename task_queue_t = boost::fibers::buffered_channel,
 		typename work_task_t = std::tuple<boost::fibers::launch,
-			IFiberTask>>
+			FiberTaskType>>
 	using FiberPoolStealing = FiberPool<true, task_queue_t, work_task_t>;
 
 	template <
 		template <typename> typename task_queue_t = boost::fibers::buffered_channel,
 		typename work_task_t = std::tuple<boost::fibers::launch,
-			IFiberTask>>
+			FiberTaskType>>
 	using FiberPoolSharing = FiberPool<false, task_queue_t, work_task_t>;
 
 } // namespace FiberPool
@@ -319,8 +291,8 @@ namespace DefaultFiberPool
 	{
 		return get_pool()->submit(
 			launch_policy,
-			std::forward<Func>(func),
-			std::forward<Args>(args)...);
+			FwdTemp<Func>(func),
+			FwdTemp<Args>(args)...);
 	}
 
 	template <typename Func, typename... Args>
@@ -328,8 +300,8 @@ namespace DefaultFiberPool
 	submit_job(Func&& func, Args&&... args)
 	{
 		return get_pool()->submit(
-			std::forward<Func>(func),
-			std::forward<Args>(args)...);
+			FwdTemp<Func>(func),
+			FwdTemp<Args>(args)...);
 	}
 
 	inline void

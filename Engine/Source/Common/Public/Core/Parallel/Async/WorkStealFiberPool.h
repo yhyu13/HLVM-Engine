@@ -16,17 +16,23 @@
 	#include "Core/Parallel/ConcurrentQueue.h"
 	#include "AsyncConfig.h"
 
+	/**
+	 * Thread pool does not work on Ubuntu 20.04 clang16 x64
+	 * so turn off by default
+	 */
+	#ifndef HLVM_FIBER_POOL_USE_WORKSTEAL
+		#define HLVM_FIBER_POOL_USE_WORKSTEAL 0
+	#endif
+
+	#include <boost/fiber/fiber.hpp>
 	#include <boost/fiber/future/future.hpp>
 	#include <boost/fiber/future/packaged_task.hpp>
 	#include <boost/fiber/operations.hpp>
 	#include <boost/fiber/algo/shared_work.hpp>
-	#include <boost/fiber/algo/work_stealing.hpp>
-	#include <boost/fiber/fiber.hpp>
-	#include <boost/thread/thread.hpp>
-
-	#ifndef HLVM_FIBER_POOL_USE_WORKSTEAL
-		#define HLVM_FIBER_POOL_USE_WORKSTEAL 1
+	#if HLVM_FIBER_POOL_USE_WORKSTEAL
+		#include <boost/fiber/algo/work_stealing.hpp>
 	#endif
+	#include <boost/thread/thread.hpp>
 
 class FWorkStealFiberPool
 {
@@ -43,9 +49,9 @@ public:
 		using TaskRetType = std::invoke_result_t<F, Args...>;
 		using TaskType = boost::fibers::packaged_task<TaskRetType()>;
 
-		auto task = std::make_shared<TaskType>(std::bind(std::forward<F>(f), std::forward<Args>(args)...));
+		auto task = new TaskType(std::bind(std::forward<F>(f), std::forward<Args>(args)...));
 		auto result = task->get_future();
-		auto work = [_task = MoveTemp(task)]() { (*_task)(); };
+		auto work = [task]() { (*task)(); delete task; };
 		mQueue.Push(MoveTemp(work));
 		return MoveTemp(result);
 	}
@@ -56,8 +62,8 @@ public:
 		using TaskRetType = std::invoke_result_t<F, Args...>;
 		using TaskType = boost::fibers::packaged_task<TaskRetType()>;
 
-		auto task = std::make_shared<TaskType>(std::bind(std::forward<F>(f), std::forward<Args>(args)...));
-		auto work = [_task = MoveTemp(task)]() { (*_task)(); };
+		auto task = new TaskType(std::bind(std::forward<F>(f), std::forward<Args>(args)...));
+		auto work = [task]() { (*task)(); delete task; };
 		mQueue.Push(MoveTemp(work));
 	}
 
@@ -73,7 +79,7 @@ private:
 
 	#if HLVM_FIBER_POOL_USE_WORKSTEAL
 	// Work steal pool only allow one instance of pool object, warning user if multiple instances are to be constructed
-	HLVM_STATIC_VAR HLVM_INLINE_VAR bool sInitialized{ false };
+	HLVM_STATIC_VAR HLVM_INLINE_VAR bool sWorkStealInitialized{ false };
 	#endif
 
 	QueueType	mQueue;

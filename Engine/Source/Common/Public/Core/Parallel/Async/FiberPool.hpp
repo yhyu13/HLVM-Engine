@@ -11,7 +11,7 @@ namespace FiberPool
 	inline auto
 	no_of_defualt_threads()
 	{
-		return std::max(std::thread::hardware_concurrency(), 2u) - 1u;
+		return std::thread::hardware_concurrency() / HLVM_PLATFORM_SIMT;
 	}
 
 	/**
@@ -245,6 +245,7 @@ namespace FiberPool
 
 		~FiberPool()
 		{
+			close_queue();
 			for (auto& thread : m_threads)
 			{
 				if (thread.joinable())

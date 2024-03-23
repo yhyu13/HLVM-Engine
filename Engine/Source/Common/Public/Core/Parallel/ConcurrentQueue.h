@@ -20,7 +20,7 @@ enum class EConcurrentQueueMode : TUINT8
 };
 
 /**
- * Noncopyable lock-free concurrent queue, copy from Unreal Engine's TQueue
+ * Lock-free concurrent queue, inspired by Unreal Engine's TQueue
  */
 template <typename T,
 	EConcurrentQueueMode Mode = EConcurrentQueueMode::Mpmc,
@@ -72,25 +72,11 @@ private:
 	struct QueueNode
 	{
 		QueueNode() = default;
-
-		explicit QueueNode(const T& InItem) noexcept
-			: mItem(InItem)
-		{
-		}
-
 		explicit QueueNode(T&& InItem) noexcept
-			: mItem(InItem)
+			: mItem(FwdTemp<T>(InItem))
 		{
 		}
 #if QUEUE_NODE_USE_ATOMIC_PTR
-		~QueueNode() noexcept
-		{
-			/**
-			 * Call Release manually to avoid delete mNextNode
-			 * which might trigger recursive delete on chained QueueNode* and their mNextNode)
-			 */
-			mNextNode.Release();
-		}
 		TAtomicPointer<QueueNode*> mNextNode;
 #else
 		QueueNode* mNextNode{ nullptr };
@@ -99,12 +85,13 @@ private:
 	};
 
 public:
+	using ValueType = T;
+
 	NOCOPYMOVE(TConcurrentQueue)
 
 	TConcurrentQueue()
 	{
-		auto temp = new QueueNode();
-		mHead = mTail = temp;
+		mHead = mTail = new QueueNode();
 
 		if constexpr (bBlockPopOnEmpty)
 		{
@@ -132,13 +119,13 @@ public:
 	void Push(const T& item) noexcept
 		requires(std::is_copy_constructible_v<T>)
 	{
-		PushInternal(new QueueNode(item));
+		PushInternal(new QueueNode(CopyTemp(item)));
 	}
 
 	void Push(T&& item) noexcept
 		requires(std::is_move_constructible_v<T>)
 	{
-		PushInternal(new QueueNode(item));
+		PushInternal(new QueueNode(MoveTemp(item)));
 	}
 
 	/**
@@ -155,7 +142,7 @@ public:
 	/**
 	 * @tparam bTryPop No blocking and will return false on empty, otherwise return poped result.
 	 */
-	template <bool bTryPop = false>
+	template <bool bTryPop = true>
 	bool PopFront(T& ret) noexcept
 	{
 		if constexpr (bBlockPopOnEmpty)

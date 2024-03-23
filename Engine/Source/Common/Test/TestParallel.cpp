@@ -18,10 +18,10 @@ DELCARE_LOG_CATEGORY(LogTest)
 /*
 	<test method>
 */
-RECORD(lock_test)
+RECORD(lock_test, true)
 {
 	constexpr int kNumThreads = 10;
-	constexpr int kNumIterations = 10;
+	constexpr int kNumIterations = 50;
 	constexpr int kNumLoops = 10000;
 	double		  time_no_lock, time_lock;
 	{
@@ -107,12 +107,12 @@ RECORD(lock_test)
 	HLVM_LOG(LogTest, info, TXT("Atomic ops = {0:.2f}x With lock, lock is {1:.2f}% efficient, ideally, lock should be 95% to 99% efficient"), ratio, efficient);
 };
 
-RECORD(queue_test)
+RECORD(queue_test, true)
 {
 	HLVM_LOG(LogTest, info, TXT("Queue test:"));
 
 	constexpr int kNumThreads = 10;
-	constexpr int kNumIterations = 10;
+	constexpr int kNumIterations = 50;
 	constexpr int kNumLoops = 10000;
 	double		  time_concurrent, time_lock;
 	{
@@ -237,7 +237,7 @@ RECORD(queue_test)
 	}
 
 	double ratio = time_lock / time_concurrent;
-	HLVM_LOG(LogTest, info, TXT("Queue test #1 TConcurrentQueue = {0:.2f}x Queue test #2 boost::lockfree::queue"), ratio);
+	HLVM_LOG(LogTest, info, TXT("Queue test #1 TConcurrentQueue = {0:.2f}x faster than Queue test #2 boost::lockfree::queue"), ratio);
 };
 
 #include "Core/Parallel/Async/WorkStealThreadPool.h"
@@ -245,8 +245,11 @@ RECORD(queue_test)
 #include "Core/Parallel/Async/WorkStealFiberPool.h"
 
 #if !HLVM_ENABLE_FIBER_POOL
-// #include "Core/Parallel/Async/FiberPool.hpp"
-	#include "Core/Parallel/Async/FiberPool2.hpp"
+	#include "Core/Parallel/Async/FiberPool.hpp"
+// #include "Core/Parallel/Async/FiberPool2.hpp"
+// #include "Core/Parallel/Async/FiberPool2_1.hpp"
+// #include "Core/Parallel/Async/FiberPool3.hpp"
+// #include "Core/Parallel/Async/FiberPool4.hpp"
 #endif
 
 RECORD(pool_test)
@@ -254,7 +257,7 @@ RECORD(pool_test)
 	HLVM_LOG(LogTest, info, TXT("Pool test:"));
 
 	constexpr int kNumThreads = 10;
-	constexpr int kNumIterations = 10;
+	constexpr int kNumIterations = 50;
 	constexpr int kNumLoops = 10000;
 	double		  time_concurrent, time_lock = 0;
 	{
@@ -266,7 +269,7 @@ RECORD(pool_test)
 			std::atomic<int>			   Counter{ kNumThreads };
 			std::vector<std::future<void>> PushThreads;
 			std::vector<std::future<void>> PopThreads;
-			FWorkStealThreadPool		   Pool{};
+			FWorkStealThreadPool		   Pool{ BgTwoPhysicalCores };
 
 			{
 				Queue.Push(1);
@@ -329,7 +332,7 @@ RECORD(pool_test)
 			std::atomic<int>						 Counter{ kNumThreads };
 			std::vector<boost::fibers::future<void>> PushThreads;
 			std::vector<boost::fibers::future<void>> PopThreads;
-			FWorkStealFiberPool						 Pool{};
+			FWorkStealFiberPool						 Pool{ BgTwoPhysicalCores };
 			{
 				Queue.Push(1);
 				int val = Queue.PeekFront();
@@ -355,6 +358,11 @@ RECORD(pool_test)
 						if (Queue.PopFront(val))
 						{
 							++j;
+						}
+						else
+						{
+							boost::this_thread::yield();
+							boost::this_fiber::yield();
 						}
 					}
 					if (--Counter == 0)
@@ -387,7 +395,7 @@ RECORD(pool_test)
 			std::atomic<int>										Counter{ kNumThreads };
 			std::vector<std::optional<boost::fibers::future<void>>> PushThreads;
 			std::vector<std::optional<boost::fibers::future<void>>> PopThreads;
-			auto													Pool = DefaultFiberPool::get_pool();
+			auto													Pool = FiberPool::FiberPoolSharing<>{};
 			{
 				Queue.Push(1);
 				int val = Queue.PeekFront();
@@ -396,7 +404,7 @@ RECORD(pool_test)
 			}
 			for (int i = 0; i < kNumThreads; ++i)
 			{
-				PushThreads.emplace_back(Pool->submit([&Queue, &Timer, &Flag] {
+				PushThreads.emplace_back(Pool.submit([&Queue, &Timer, &Flag] {
 					std::call_once(Flag, [&Timer] {
 						Timer.Reset();
 					});
@@ -406,13 +414,18 @@ RECORD(pool_test)
 					}
 				}));
 
-				PopThreads.emplace_back(Pool->submit([&Queue, &Timer, &Counter, &Duration] {
+				PopThreads.emplace_back(Pool.submit([&Queue, &Timer, &Counter, &Duration] {
 					for (int j = 0; !Queue.ShouldStopPop();)
 					{
 						int val;
 						if (Queue.PopFront(val))
 						{
 							++j;
+						}
+						else
+						{
+							boost::this_thread::yield();
+							boost::this_fiber::yield();
 						}
 					}
 					if (--Counter == 0)
@@ -441,5 +454,5 @@ RECORD(pool_test)
 	}
 
 	double ratio = time_lock / time_concurrent;
-	HLVM_LOG(LogTest, info, TXT("Pool Test Thread #1 = {0:.2f}x Pool Test Fiber #2"), ratio);
+	HLVM_LOG(LogTest, info, TXT("Pool Test Thread #1 = {0:.2f}x faster than Pool Test Fiber #2"), ratio);
 };
