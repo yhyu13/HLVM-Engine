@@ -41,7 +41,7 @@ void* FVMArena::Malloc(size_t size)
 	{
 		// Try to allocate from the current managed heaps
 		auto& HeapMallocator = Heap->HeapAllocator;
-		if (HeapMallocator.Managed() && HeapMallocator.GetFreeSizeUpperBound() >= size)
+		if (HeapMallocator.Managed() && HeapMallocator.GetFreeBlockSizeUpperBound() >= size)
 		{
 			auto p = HeapMallocator.Malloc(size);
 			HLVM_CONSTEXPR_ASSERT(bValidate, p != nullptr);
@@ -58,20 +58,20 @@ void* FVMArena::Malloc(size_t size)
 		HLVM_CONSTEXPR_ASSERT(bValidate, Heap->Next == nullptr);
 		Heap->Next = new (MiMallocator->Malloc(sizeof(FHeapChain))) FHeapChain();
 		auto& HeapMallocator = Heap->Next->HeapAllocator;
-		auto  NewSize = size + FHeapMallocator::GetHeaderSize();
-		if (NewSize < mDefaultHeapSize)
+		auto  Capacity = FHeapMallocator::CalculateCapacity(size);
+		if (Capacity < mDefaultHeapSize)
 		{
 			HeapMallocator.Init(MiMallocator, mDefaultHeapSize);
 		}
-		else if (NewSize < mLargeHeapSize)
+		else if (Capacity < mLargeHeapSize)
 		{
 			HeapMallocator.Init(MiMallocator, mLargeHeapSize);
 		}
 		else
 		{
-			HeapMallocator.Init(MiMallocator, NewSize);
+			HeapMallocator.Init(MiMallocator, Capacity);
 		}
-		HLVM_CONSTEXPR_ASSERT(bValidate, HeapMallocator.GetEffectiveSize() > NewSize);
+		HLVM_CONSTEXPR_ASSERT(bValidate, HeapMallocator.GetManagedSize() == 0 || HeapMallocator.GetManagedSize() > Capacity);
 		auto p = HeapMallocator.Malloc(size);
 		HLVM_CONSTEXPR_ASSERT(bValidate, p != nullptr);
 		return p;

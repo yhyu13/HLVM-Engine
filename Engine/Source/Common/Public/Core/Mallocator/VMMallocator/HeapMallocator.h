@@ -9,10 +9,14 @@ class FHeapMallocator
 	HLVM_INLINE_VAR HLVM_STATIC_VAR constexpr bool bValidate = HLVM_MALLOC_VALIDATION;
 
 public:
-	using ManagedSizeType = int32_t;
+	using SizeType = int32_t;
 
 	NOCOPYMOVE(FHeapMallocator)
 	FHeapMallocator() = default;
+	~FHeapMallocator()
+	{
+		Destroy();
+	}
 
 	void Init(FMiMallocator* _MiMallocator, size_t _size)
 	{
@@ -22,13 +26,13 @@ public:
 
 		mHeap = R_C(TBYTE*, MiMallocator->Malloc(N));
 
-		bManaged = N < std::numeric_limits<ManagedSizeType>::max();
+		bManaged = N < std::numeric_limits<SizeType>::max();
 		if (bManaged)
 		{
 			// Init stack and free block head which occupy the whole stack
 			mFreeBlockHead = R_C(FBlock*, mHeap);
 			*mFreeBlockHead = FBlock();
-			mFreeBlockHead->size = (S_C(ManagedSizeType, N) - 2 * FBlock_Size); // Stack size minus head block and tail block
+			mFreeBlockHead->size = (S_C(SizeType, N) - 2 * FBlock_Size); // Stack size minus head block and tail block
 			HLVM_CONSTEXPR_ASSERT(bValidate, mFreeBlockHead->size > 0);
 
 			// Init tail which is trivially free
@@ -60,14 +64,9 @@ public:
 		}
 	}
 
-	~FHeapMallocator()
-	{
-		Destroy();
-	}
-
 	bool Owned(void* p) const
 	{
-		return p >= mLowerBound && p < mTail;
+		return Managed() ? p >= mLowerBound && p < mTail : false;
 	}
 
 	bool Managed() const
@@ -75,7 +74,7 @@ public:
 		return bManaged;
 	}
 
-	size_t GetFreeSizeUpperBound() const
+	size_t GetFreeBlockSizeUpperBound() const
 	{
 		return S_C(size_t, mFreeSizeUpperBound);
 	}
@@ -85,14 +84,14 @@ public:
 		return N;
 	}
 
-	HLVM_STATIC_FUNC size_t GetHeaderSize()
+	HLVM_STATIC_FUNC size_t CalculateCapacity(size_t size)
 	{
-		return 2 * sizeof(FBlock);
+		return size + 2 * FBlock_Size;
 	}
 
-	size_t GetEffectiveSize() const
+	size_t GetManagedSize() const
 	{
-		return GetSize() - GetHeaderSize();
+		return Managed() ? GetSize() - 2 * sizeof(FBlock) : 0;
 	}
 
 	void* Malloc(size_t size);
@@ -105,11 +104,11 @@ private:
 	BIT_FLAG(bManaged){ true };
 
 	PACK(struct FBlock {
-		FBlock*			prevFreeBlock{ nullptr };
-		FBlock*			nextFreeBlock{ nullptr };
-		ManagedSizeType size{ 0 };
-		uint16_t		heapIndex{ 0 };
-		uint16_t		_reserved{ 0xFFFF }; // Reserved 2 bytes to not collide with FSmallBinnedBlockHead
+		FBlock*	 prevFreeBlock{ nullptr };
+		FBlock*	 nextFreeBlock{ nullptr };
+		SizeType size{ 0 };
+		uint16_t heapID{ 0 };
+		uint16_t _reserved{ 0xFFFF }; // Reserved 2 bytes to not collide with FSmallBinnedBlockHead when interpreting block heads
 
 		HLVM_INLINE_FUNC bool
 		GetFree() const
@@ -117,11 +116,11 @@ private:
 			return size >= 0;
 		}
 	});
-	HLVM_STATIC_VAR constexpr ManagedSizeType FBlock_Size = S_C(ManagedSizeType, sizeof(FBlock));
+	HLVM_STATIC_VAR constexpr SizeType FBlock_Size = S_C(SizeType, sizeof(FBlock));
 
-	FBlock*			mFreeBlockHead{ nullptr };
-	FBlock*			mDefragmentHead{ nullptr };
-	FBlock*			mTail{ nullptr };
-	void*			mLowerBound{ nullptr };
-	ManagedSizeType mFreeSizeUpperBound{ 0 };
+	FBlock*	 mFreeBlockHead{ nullptr };
+	FBlock*	 mDefragmentHead{ nullptr };
+	FBlock*	 mTail{ nullptr };
+	void*	 mLowerBound{ nullptr };
+	SizeType mFreeSizeUpperBound{ 0 };
 };

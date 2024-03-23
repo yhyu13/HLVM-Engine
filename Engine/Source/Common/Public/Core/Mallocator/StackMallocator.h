@@ -45,9 +45,6 @@ public:
 
 		// Cache the lower bound memory address for stack pointers
 		mLowerBound = mStack + FBlock_Size;
-
-		// Startoff defragmentation from the start of stack
-		mDefragmentHead = R_C(FBlock*, mStack);
 	}
 	~TStackMallocator() final override
 	{
@@ -107,6 +104,7 @@ private:
 		}
 	});
 	HLVM_STATIC_VAR constexpr SizeType FBlock_Size = S_C(SizeType, sizeof(FBlock));
+	HLVM_STATIC_VAR constexpr SizeType Minimual_Block_Size = 24;
 	static_assert(N - 2 * FBlock_Size > 0);
 
 	void* InternalMalloc(size_t _size) noexcept(bValidate)
@@ -115,62 +113,79 @@ private:
 		HLVM_CONSTEXPR_ASSERT(bValidate, size > 0 && size <= N - 2 * FBlock_Size);
 		HLVM_CONSTEXPR_ASSERT(bValidate, mFreeBlockHead->prevFreeBlock == nullptr);
 		if (mFreeSizeUpperBound < 0 || size <= mFreeSizeUpperBound)
-			HLVM_LIKELY
+		{
+			mFreeSizeUpperBound = -1;
+			FBlock* FreeBlock = mFreeBlockHead;
+			while (FreeBlock->nextFreeBlock != nullptr)
 			{
-				mFreeSizeUpperBound = -1;
-				FBlock* FreeBlock = mFreeBlockHead;
-				while (FreeBlock->nextFreeBlock != nullptr)
+				HLVM_CONSTEXPR_ASSERT(bValidate, FreeBlock->GetFree());
+				if (FreeBlock->size >= size)
 				{
-					HLVM_CONSTEXPR_ASSERT(bValidate, FreeBlock->GetFree());
-					if (FreeBlock->size > size + FBlock_Size)
+					// Reset free size upper bound since allocation success
+					mFreeSizeUpperBound = -1;
+
+					FBlock* NextFreeBlock = FreeBlock->nextFreeBlock;
+					HLVM_CONSTEXPR_ASSERT(bValidate, NextFreeBlock && NextFreeBlock->prevFreeBlock == FreeBlock && (NextFreeBlock == mTail || NextFreeBlock->size > 0));
+					FBlock* PrevFreeBlock = FreeBlock->prevFreeBlock;
+
+					auto NewFreeBlockSize = (FreeBlock->size - FBlock_Size - size);
+					if (NewFreeBlockSize < Minimual_Block_Size)
 					{
-						FBlock* NextFreeBlock = FreeBlock->nextFreeBlock;
-						HLVM_CONSTEXPR_ASSERT(bValidate, NextFreeBlock && NextFreeBlock->prevFreeBlock == FreeBlock && (NextFreeBlock == mTail || NextFreeBlock->size > 0));
-						FBlock* PrevFreeBlock = FreeBlock->prevFreeBlock;
-
-						FBlock* NewFreeBlock = R_C(FBlock*, R_C(TBYTE*, FreeBlock) + FBlock_Size + size);
-						NewFreeBlock->size = (FreeBlock->size - FBlock_Size - size);
-						HLVM_CONSTEXPR_ASSERT(bValidate, NewFreeBlock->size > 0);
-						{
-							NewFreeBlock->nextFreeBlock = NextFreeBlock;
-							NewFreeBlock->prevFreeBlock = PrevFreeBlock;
-							// Otherwise, connect next and prev to new free block
-							NextFreeBlock->prevFreeBlock = NewFreeBlock;
-							if (PrevFreeBlock)
-							{
-								HLVM_CONSTEXPR_ASSERT(bValidate,
-									PrevFreeBlock && PrevFreeBlock->nextFreeBlock == FreeBlock && PrevFreeBlock->size > 0);
-								PrevFreeBlock->nextFreeBlock = NewFreeBlock;
-							}
-							else
-							{
-								// Otherwise, assign head to new free block
-								mFreeBlockHead = NewFreeBlock;
-							}
-						}
-						HLVM_CONSTEXPR_ASSERT(bValidate, mFreeBlockHead->prevFreeBlock == nullptr);
-						HLVM_CONSTEXPR_ASSERT(bValidate, mFreeBlockHead != FreeBlock);
-
+						// New free block is trivial
 						// Mark current free block not free anymore
-						FreeBlock->size = (-size);
-						HLVM_CONSTEXPR_ASSERT(bValidate, FreeBlock->size < 0);
-
-						// Reset free size upper bound since allocation success
-						mFreeSizeUpperBound = -1;
-
-						// Return actual pointer address
-						TBYTE* ptr = R_C(TBYTE*, FreeBlock) + FBlock_Size;
-						return ptr;
+						FreeBlock->size = (-FreeBlock->size);
+						NextFreeBlock->prevFreeBlock = PrevFreeBlock;
+						if (PrevFreeBlock)
+						{
+							HLVM_CONSTEXPR_ASSERT(bValidate,
+								PrevFreeBlock && PrevFreeBlock->nextFreeBlock == FreeBlock && PrevFreeBlock->size > 0);
+							PrevFreeBlock->nextFreeBlock = NextFreeBlock;
+						}
+						else
+						{
+							HLVM_CONSTEXPR_ASSERT(bValidate, mFreeBlockHead == FreeBlock);
+							mFreeBlockHead = NextFreeBlock;
+						}
 					}
 					else
 					{
-						// Try out next free block
-						mFreeSizeUpperBound = std::max(mFreeSizeUpperBound, FreeBlock->size);
-						FreeBlock = FreeBlock->nextFreeBlock;
+						// Otherwise, connect next and prev to new free block
+						FBlock* NewFreeBlock = R_C(FBlock*, R_C(TBYTE*, FreeBlock) + FBlock_Size + size);
+						NewFreeBlock->size = NewFreeBlockSize;
+						// Mark current free block not free anymore and update to malloced size
+						FreeBlock->size = (-size);
+
+						NewFreeBlock->nextFreeBlock = NextFreeBlock;
+						NewFreeBlock->prevFreeBlock = PrevFreeBlock;
+						NextFreeBlock->prevFreeBlock = NewFreeBlock;
+						if (PrevFreeBlock)
+						{
+							HLVM_CONSTEXPR_ASSERT(bValidate,
+								PrevFreeBlock && PrevFreeBlock->nextFreeBlock == FreeBlock && PrevFreeBlock->size > 0);
+							PrevFreeBlock->nextFreeBlock = NewFreeBlock;
+						}
+						else
+						{
+							// Otherwise, assign head to new free block
+							mFreeBlockHead = NewFreeBlock;
+						}
 					}
+					HLVM_CONSTEXPR_ASSERT(bValidate, mFreeBlockHead->prevFreeBlock == nullptr);
+					HLVM_CONSTEXPR_ASSERT(bValidate, mFreeBlockHead != FreeBlock);
+
+					// Return actual pointer address
+					TBYTE* ptr = R_C(TBYTE*, FreeBlock) + FBlock_Size;
+					return ptr;
 				}
-				HLVM_CONSTEXPR_ASSERT(bValidate, FreeBlock == mTail);
+				else
+				{
+					// Try out next free block
+					mFreeSizeUpperBound = std::max(mFreeSizeUpperBound, FreeBlock->size);
+					FreeBlock = FreeBlock->nextFreeBlock;
+				}
 			}
+			HLVM_CONSTEXPR_ASSERT(bValidate, FreeBlock == mTail);
+		}
 		// Running out of free blocks in stack, try heap
 		if constexpr (bAllowOverflowToHeap)
 		{
@@ -214,7 +229,7 @@ private:
 				// Defragmentation next physical block if it is free
 				if constexpr (bDefragment)
 				{
-					FBlock* PrevBlock = R_C(FBlock*, mDefragmentHead);
+					FBlock* PrevBlock = R_C(FBlock*, mStack);
 					FBlock* NextBlock = R_C(FBlock*, R_C(TBYTE*, PrevBlock) + FBlock_Size + std::abs(PrevBlock->size));
 					// While not reach the tail
 					while (NextBlock != mTail)
@@ -265,15 +280,8 @@ private:
 
 										NextBlock = R_C(FBlock*, R_C(TBYTE*, NextBlock) + FBlock_Size + NextBlock->size);
 										HLVM_CONSTEXPR_ASSERT(bValidate, NextBlock == R_C(FBlock*, R_C(TBYTE*, PrevBlock) + FBlock_Size + PrevBlock->size));
-
-										mDefragmentHead = NextBlock;
-										break;
 									}
 							}
-					}
-					if (mDefragmentHead == mTail)
-					{
-						mDefragmentHead = R_C(FBlock*, mStack);
 					}
 				}
 
@@ -336,7 +344,6 @@ private:
 
 	TBYTE	 mStack[N];
 	FBlock*	 mFreeBlockHead{ nullptr };
-	FBlock*	 mDefragmentHead{ nullptr };
 	FBlock*	 mTail{ nullptr };
 	void*	 mLowerBound{ nullptr };
 	SizeType mFreeSizeUpperBound{ -1 };
