@@ -31,10 +31,10 @@ public:
 		size_t				_LargeHeapSize = HLVM_VMA_DEFAULT_HEAP_SIZE * HLVM_VMA_LARGE_HEAP_SIZE_FACTOR);
 	~FVMArena();
 
-	void* Malloc(size_t size);
-	void* MallocSmall(size_t size);
-	void  Free(void* p);
-	void  FreeSmall(void* p, TUINT8 size);
+	void* MallocHeap(size_t size);
+	void* MallocBinned(size_t size);
+	void  FreeHeap(void* p);
+	void  FreeBinned(void* p, TUINT8 size);
 
 private:
 	struct FHeapChain

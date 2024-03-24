@@ -7,6 +7,8 @@
 #ifdef PLATFORM_LINUXGNU
 
 	#include <atomic>
+	#include <stdatomic.h>
+
 /**
  * For linux we use std::atomic
  */
@@ -15,6 +17,7 @@ class TAtomicPointer
 {
 	using AtomicType = std::atomic<T>;
 	using ValueType = T;
+	static_assert(sizeof(ValueType) == sizeof(AtomicType), "TAtomicPointer: ValueType and AtomicType must have the same size!");
 
 public:
 	TAtomicPointer() = default;
@@ -29,11 +32,11 @@ public:
 	}
 	TAtomicPointer(const TAtomicPointer& Other) noexcept
 	{
-		Ptr.store(static_cast<ValueType>(Other), std::memory_order_acquire);
+		Ptr.store(static_cast<ValueType>(Other), std::memory_order_release);
 	}
 	TAtomicPointer& operator=(const TAtomicPointer& Other) noexcept
 	{
-		Ptr.store(static_cast<ValueType>(Other), std::memory_order_acquire);
+		Ptr.store(static_cast<ValueType>(Other), std::memory_order_release);
 		return *this;
 	}
 	~TAtomicPointer() noexcept
@@ -45,12 +48,16 @@ public:
 	 */
 	ValueType Release() noexcept
 	{
-		return Ptr.exchange(nullptr, std::memory_order_relaxed);
+		return Ptr.exchange(nullptr, std::memory_order_acq_rel);
+	}
+	bool IsLockFree() const noexcept
+	{
+		return Ptr.is_always_lock_free;
 	}
 
 	operator ValueType() const noexcept
 	{
-		return Ptr.load(std::memory_order_release);
+		return Ptr.load(std::memory_order_acquire);
 	}
 
 	operator bool() const noexcept
@@ -76,6 +83,11 @@ public:
 	const ValueType operator->() const noexcept
 	{
 		return static_cast<ValueType>(Ptr);
+	}
+
+	friend typename TPointerRemoved<T>::Type& operator*(const TAtomicPointer& self)
+	{
+		return *(static_cast<ValueType>(self));
 	}
 
 	friend FGenericPlatformAtomicPointer;

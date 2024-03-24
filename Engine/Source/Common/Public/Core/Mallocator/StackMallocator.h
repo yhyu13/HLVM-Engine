@@ -95,17 +95,19 @@ public:
 
 private:
 	PACK(struct FBlock {
-		FBlock*				  prevFreeBlock{ nullptr };
-		FBlock*				  nextFreeBlock{ nullptr };
-		SizeType			  size{ 0 };
+		FBlock*	 prevFreeBlock{ nullptr };
+		FBlock*	 nextFreeBlock{ nullptr };
+		SizeType size{ 0 };
+
 		HLVM_INLINE_FUNC bool GetFree() const
 		{
 			return size >= 0;
 		}
 	});
-	HLVM_STATIC_VAR constexpr SizeType FBlock_Size = S_C(SizeType, sizeof(FBlock));
-	HLVM_STATIC_VAR constexpr SizeType Minimual_Block_Size = 24;
+	static_assert(sizeof(FBlock) == 20, "FBlock size must be 20 bytes");
+	HLVM_INLINE_VAR HLVM_STATIC_VAR constexpr SizeType FBlock_Size = S_C(SizeType, sizeof(FBlock));
 	static_assert(N - 2 * FBlock_Size > 0);
+	HLVM_INLINE_VAR HLVM_STATIC_VAR constexpr SizeType Minimual_Block_Size = 24;
 
 	void* InternalMalloc(size_t _size) noexcept(bValidate)
 	{
@@ -114,7 +116,6 @@ private:
 		HLVM_CONSTEXPR_ASSERT(bValidate, mFreeBlockHead->prevFreeBlock == nullptr);
 		if (mFreeSizeUpperBound < 0 || size <= mFreeSizeUpperBound)
 		{
-			mFreeSizeUpperBound = -1;
 			FBlock* FreeBlock = mFreeBlockHead;
 			while (FreeBlock->nextFreeBlock != nullptr)
 			{
@@ -273,7 +274,7 @@ private:
 										HLVM_CONSTEXPR_ASSERT(bValidate, PrevBlock->size > 0 && PrevBlock->size <= N - 2 * FBlock_Size);
 
 										// Update upper bound if necessary
-										if (!(mFreeSizeUpperBound < 0) && mFreeSizeUpperBound < PrevBlock->size)
+										if (mFreeSizeUpperBound >= 0 && mFreeSizeUpperBound < PrevBlock->size)
 										{
 											mFreeSizeUpperBound = PrevBlock->size;
 										}

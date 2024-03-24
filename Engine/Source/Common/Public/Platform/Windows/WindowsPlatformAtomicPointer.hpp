@@ -44,6 +44,10 @@ public:
 	{
 		return (ValueType)InterlockedExchangePointer((void&&)Ptr, nullptr);
 	}
+	bool IsLockFree() const noexcept
+	{
+		return true;
+	}
 
 	operator ValueType() const noexcept
 	{
@@ -73,6 +77,11 @@ public:
 	const ValueType operator->() const noexcept
 	{
 		return (const ValueType)Ptr;
+	}
+
+	friend typename TPointerRemoved<T>::Type& operator*(const TAtomicPointer& self)
+	{
+		return *(static_cast<ValueType>(self));
 	}
 
 	friend FGenericPlatformAtomicPointer;

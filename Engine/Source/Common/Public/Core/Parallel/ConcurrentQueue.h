@@ -92,6 +92,7 @@ public:
 	TConcurrentQueue()
 	{
 		mHead = mTail = new QueueNode();
+		HLVM_ASSERT(mHead.IsLockFree(), TXT("TAtomicPointer is not lock free"));
 
 		if constexpr (bBlockPopOnEmpty)
 		{

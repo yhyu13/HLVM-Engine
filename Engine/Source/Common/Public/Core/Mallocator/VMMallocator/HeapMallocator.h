@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include "Platform/GenericPlatformAtomicPointer.h"
+
 class FHeapMallocator
 {
 	HLVM_INLINE_VAR HLVM_STATIC_VAR constexpr bool bValidate = HLVM_MALLOC_VALIDATION;
@@ -23,7 +25,6 @@ public:
 		MiMallocator = _MiMallocator;
 		N = _size;
 		HLVM_CONSTEXPR_ASSERT(bValidate, (N - 2 * FBlock_Size > 0));
-
 		mHeap = R_C(TBYTE*, MiMallocator->Malloc(N));
 
 		bManaged = N < std::numeric_limits<SizeType>::max();
@@ -34,6 +35,7 @@ public:
 			*mFreeBlockHead = FBlock();
 			mFreeBlockHead->size = (S_C(SizeType, N) - 2 * FBlock_Size); // Stack size minus head block and tail block
 			HLVM_CONSTEXPR_ASSERT(bValidate, mFreeBlockHead->size > 0);
+			mFreeSizeUpperBound = mFreeBlockHead->size;
 
 			// Init tail which is trivially free
 			mTail = R_C(FBlock*, mHeap + N - FBlock_Size);
@@ -45,9 +47,6 @@ public:
 
 			// Cache the lower bound memory address for stack pointers
 			mLowerBound = mHeap + FBlock_Size;
-
-			// Startoff defragmentation from the start of stack
-			mDefragmentHead = R_C(FBlock*, mHeap);
 		}
 	}
 
@@ -66,7 +65,7 @@ public:
 
 	bool Owned(void* p) const
 	{
-		return Managed() ? p >= mLowerBound && p < mTail : false;
+		return Managed() ? p >= mLowerBound && p < mTail : p == mHeap;
 	}
 
 	bool Managed() const
@@ -79,7 +78,7 @@ public:
 		return S_C(size_t, mFreeSizeUpperBound);
 	}
 
-	size_t GetSize() const
+	size_t GetHeapSize() const
 	{
 		return N;
 	}
@@ -89,9 +88,9 @@ public:
 		return size + 2 * FBlock_Size;
 	}
 
-	size_t GetManagedSize() const
+	size_t GetManagedRegsionSize() const
 	{
-		return Managed() ? GetSize() - 2 * sizeof(FBlock) : 0;
+		return Managed() ? GetHeapSize() - 2 * sizeof(FBlock) : 0;
 	}
 
 	void* Malloc(size_t size);
@@ -103,24 +102,24 @@ private:
 	size_t		   N{ 0 };
 	BIT_FLAG(bManaged){ true };
 
-	PACK(struct FBlock {
-		FBlock*	 prevFreeBlock{ nullptr };
-		FBlock*	 nextFreeBlock{ nullptr };
-		SizeType size{ 0 };
-		uint16_t heapID{ 0 };
-		uint16_t _reserved{ 0xFFFF }; // Reserved 2 bytes to not collide with FSmallBinnedBlockHead when interpreting block heads
+	struct FBlock
+	{
+		TAtomicPointer<FBlock*> prevFreeBlock{ nullptr };
+		TAtomicPointer<FBlock*> nextFreeBlock{ nullptr };
+		SizeType				size{ 0 };
+		uint32_t				_reserved{ 0xFFFFFFFF }; // Reserved 2 bytes to not mis-interpreting with FSmallBinnedBlockHead block heads
 
-		HLVM_INLINE_FUNC bool
-		GetFree() const
+		HLVM_INLINE_FUNC bool GetFree() const
 		{
 			return size >= 0;
 		}
-	});
-	HLVM_STATIC_VAR constexpr SizeType FBlock_Size = S_C(SizeType, sizeof(FBlock));
+	};
+	static_assert(sizeof(FBlock) == 24, "FBlock size must be 24 bytes");
+	HLVM_INLINE_VAR HLVM_STATIC_VAR constexpr SizeType FBlock_Size = S_C(SizeType, sizeof(FBlock));
+	HLVM_INLINE_VAR HLVM_STATIC_VAR constexpr SizeType Minimual_Block_Size = 24;
 
-	FBlock*	 mFreeBlockHead{ nullptr };
-	FBlock*	 mDefragmentHead{ nullptr };
-	FBlock*	 mTail{ nullptr };
-	void*	 mLowerBound{ nullptr };
-	SizeType mFreeSizeUpperBound{ 0 };
+	TAtomicPointer<FBlock*> mFreeBlockHead{ nullptr };
+	TAtomicPointer<FBlock*> mTail{ nullptr };
+	void*					mLowerBound{ nullptr };
+	SizeType				mFreeSizeUpperBound{ 0 };
 };

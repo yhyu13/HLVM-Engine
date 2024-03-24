@@ -10,7 +10,7 @@ template <TUINT8 Alignment>
 class FSmallBinnedMallocator final : public ISmallBinnedMallocator
 {
 	HLVM_INLINE_VAR HLVM_STATIC_VAR constexpr bool	   bValidate = HLVM_MALLOC_VALIDATION;
-	HLVM_INLINE_VAR HLVM_STATIC_VAR constexpr uint32_t BlockFreeIndex = 32;
+	HLVM_INLINE_VAR HLVM_STATIC_VAR constexpr uint32_t BlockRunOutFreeIndex = 32;
 
 	static_assert(Alignment > 0);
 
@@ -22,7 +22,7 @@ public:
 		while (mFirstBlocks32)
 		{
 			FBlocks32* Next = mFirstBlocks32->Next;
-			Mallocator->Free(mFirstBlocks32);
+			Mallocator->FreeHeap(mFirstBlocks32);
 			mFirstBlocks32 = Next;
 		}
 	}
@@ -37,7 +37,7 @@ public:
 	void* Malloc() final override
 	{
 		uint32_t freeIndex = mLastFreedBlocks32->GetHighestFreeBit();
-		if (freeIndex == BlockFreeIndex)
+		if (freeIndex == BlockRunOutFreeIndex)
 		{
 			// If no free block , we allocate new block
 			if (!mLastFreedBlocks32->Next)
@@ -62,19 +62,22 @@ public:
 	{
 		FSmallBinnedBlockHead* BlockHead = R_C(FSmallBinnedBlockHead*, R_C(TBYTE*, p) - sizeof(FSmallBinnedBlockHead));
 		HLVM_CONSTEXPR_ASSERT(bValidate, BlockHead->Alignment == Alignment);
-		FBlocks32* Block = R_C(FBlocks32*, R_C(TBYTE*, BlockHead) - BlockHead->Pos * BlockHead->Alignment);
+		FBlocks32* Block = R_C(FBlocks32*, R_C(TBYTE*, BlockHead) - BlockHead->Pos * (BlockHead->Alignment + sizeof(FSmallBinnedBlockHead)));
 		if constexpr (bValidate)
 		{
-			auto Tmep = mFirstBlocks32;
-			while (Tmep != nullptr)
+			/**
+			 * Validate Block is within our owned
+			 */
+			auto Temp = mFirstBlocks32;
+			while (Temp != nullptr)
 			{
-				if (Tmep == Block)
+				if (Temp == Block)
 				{
 					break;
 				}
-				Tmep = Tmep->Next;
+				Temp = Temp->Next;
 			}
-			assert(Tmep != nullptr);
+			assert(Temp != nullptr);
 		}
 		mLastFreedBlocks32 = Block;
 		// Mask free bit
@@ -97,7 +100,11 @@ private:
 		{
 			if (FreeBits == 0)
 			{
-				return BlockFreeIndex;
+				/**
+				 * Since when FreeBits == 0 or ==1, r could be 0 for both cases,
+				 * we need to handle FreeBits == 0 specially
+				 */
+				return BlockRunOutFreeIndex;
 			}
 			uint32_t v = FreeBits;
 			uint32_t r; // result of log2(v) will go here
@@ -131,7 +138,7 @@ private:
 
 	FBlocks32* InternalAllocateBlocks32()
 	{
-		FBlocks32* Temp = R_C(FBlocks32*, Mallocator->Malloc(sizeof(FBlocks32)));
+		FBlocks32* Temp = R_C(FBlocks32*, Mallocator->MallocHeap(sizeof(FBlocks32)));
 		Temp->FreeBits = 0xFFFFFFFF;
 		Temp->Next = nullptr;
 		return Temp;

@@ -84,3 +84,21 @@ inline bool IsPointerOverlap(const void* ptr1, size_t size1, const void* ptr2, s
 		|| (cptr2 <= cptr1 && end_ptr2 > cptr1)
 		|| (cptr2 <= end_ptr1 && end_ptr2 > end_ptr1);
 }
+
+template <typename T>
+struct TPointerRemoved
+{
+	using Type = T;
+};
+
+template <typename T>
+struct TPointerRemoved<T*>
+{
+	using Type = T;
+};
+
+template <typename T>
+struct TPointerRemoved<T**>
+{
+	using Type = T;
+};
