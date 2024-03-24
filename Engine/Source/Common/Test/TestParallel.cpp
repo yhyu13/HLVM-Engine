@@ -242,14 +242,10 @@ RECORD(queue_test, true)
 
 #include "Core/Parallel/Async/WorkStealThreadPool.h"
 #define HLVM_ENABLE_FIBER_POOL 0
-#include "Core/Parallel/Async/WorkStealFiberPool.h"
-
-#if !HLVM_ENABLE_FIBER_POOL
+#if HLVM_ENABLE_FIBER_POOL
+	#include "Core/Parallel/Async/WorkStealFiberPool.h"
+#else
 	#include "Core/Parallel/Async/FiberPool.hpp"
-// #include "Core/Parallel/Async/FiberPool2.hpp"
-// #include "Core/Parallel/Async/FiberPool2_1.hpp"
-// #include "Core/Parallel/Async/FiberPool3.hpp"
-// #include "Core/Parallel/Async/FiberPool4.hpp"
 #endif
 
 RECORD(pool_test)

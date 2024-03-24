@@ -107,7 +107,7 @@ private:
 		TAtomicPointer<FBlock*> prevFreeBlock{ nullptr };
 		TAtomicPointer<FBlock*> nextFreeBlock{ nullptr };
 		SizeType				size{ 0 };
-		uint32_t				_reserved{ 0xFFFFFFFF }; // Reserved 2 bytes to not mis-interpreting with FSmallBinnedBlockHead block heads
+		uint32_t				_{ 0xFFFFFFFF }; // Reserved 2 bytes to not mis-interpreting with FSmallBinnedBlockHead block heads
 
 		HLVM_INLINE_FUNC bool GetFree() const
 		{
