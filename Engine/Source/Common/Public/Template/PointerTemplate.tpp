@@ -102,3 +102,39 @@ struct TPointerRemoved<T**>
 {
 	using Type = T;
 };
+
+template <typename T>
+struct TOffsetPtr32
+{
+	int32_t offset{ 0x7FFFFFFF };
+	TOffsetPtr32() = default;
+	explicit TOffsetPtr32(T* ptr)
+	{
+		*this = ptr;
+	}
+	operator T*()
+	{
+		return (offset != 0x7FFFFFFF) ? R_C(T*, R_C(TBYTE*, this) + offset) : nullptr;
+	}
+	operator const T*() const
+	{
+		return (offset != 0x7FFFFFFF) ? R_C(const T*, R_C(const TBYTE*, this) + offset) : nullptr;
+	}
+	T* operator=(T* lhs)
+	{
+		(lhs != nullptr) ? offset = S_C(int32_t, (R_C(TBYTE*, lhs) - R_C(TBYTE*, this))) : offset = 0x7FFFFFFF;
+		return lhs;
+	}
+	T* operator->()
+	{
+		return S_C(T*, *this);
+	}
+	const T* operator->() const
+	{
+		return S_C(const T*, *this);
+	}
+	bool operator==(T* rhs) const
+	{
+		return S_C(const T*, *this) == rhs;
+	}
+};

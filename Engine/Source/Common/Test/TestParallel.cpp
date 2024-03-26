@@ -30,7 +30,7 @@ RECORD(lock_test, true)
 			std::atomic_int32_t		 i = 0;
 			FTimer					 Timer;
 			std::once_flag			 Flag;
-			std::atomic<int>		 Counter{ kNumThreads };
+			std::atomic_int_fast32_t Counter{ kNumThreads };
 			std::vector<std::thread> threads;
 			for (int j = 0; j < kNumThreads; ++j)
 			{
@@ -70,7 +70,7 @@ RECORD(lock_test, true)
 			std::optional<FRecursiveAtomicFlag> lock = FRecursiveAtomicFlag{};
 			//  std::optional<FAtomicFlag> lock;
 			std::once_flag			 Flag;
-			std::atomic<int>		 Counter{ kNumThreads };
+			std::atomic_int_fast32_t Counter{ kNumThreads };
 			std::vector<std::thread> threads;
 			for (int j = 0; j < kNumThreads; ++j)
 			{
@@ -121,7 +121,7 @@ RECORD(queue_test, true)
 			auto					 Queue = TConcurrentQueue<int, EConcurrentQueueMode::Mpmc, true, true>();
 			FTimer					 Timer;
 			std::once_flag			 Flag;
-			std::atomic<int>		 Counter{ kNumThreads };
+			std::atomic_int_fast32_t Counter{ kNumThreads };
 			std::vector<std::thread> PushThreads;
 			std::vector<std::thread> PopThreads;
 			{
@@ -181,7 +181,7 @@ RECORD(queue_test, true)
 			auto					 Queue = boost::lockfree::queue<int>(kNumLoops * kNumThreads);
 			FTimer					 Timer;
 			std::once_flag			 Flag;
-			std::atomic<int>		 Counter{ kNumThreads };
+			std::atomic_int_fast32_t Counter{ kNumThreads };
 			bool					 bSignalStop = false;
 			std::vector<std::thread> PushThreads;
 			std::vector<std::thread> PopThreads;
@@ -259,40 +259,30 @@ RECORD(pool_test)
 	{
 		HLVM_LOG(LogTest, info, TXT("Pool test #1 Thread"));
 		auto Test1Func = [&](double& Duration) -> bool {
-			auto						   Queue = TConcurrentQueue<int, EConcurrentQueueMode::Mpmc, true, true>();
+			std::atomic_int_fast32_t	   Number = 0;
 			FTimer						   Timer;
 			std::once_flag				   Flag;
-			std::atomic<int>			   Counter{ kNumThreads };
+			std::atomic_int_fast32_t	   Counter{ kNumThreads };
 			std::vector<std::future<void>> PushThreads;
 			std::vector<std::future<void>> PopThreads;
 			FWorkStealThreadPool		   Pool{ BgTwoPhysicalCores };
 
-			{
-				Queue.Push(1);
-				int val = Queue.PeekFront();
-				HLVM_ENSURE(val == 1, TXT("Queue peek front failed"));
-				HLVM_ENSURE(Queue.PopFront(val), TXT("Queue pop front failed"));
-			}
 			for (int i = 0; i < kNumThreads; ++i)
 			{
-				PushThreads.emplace_back(Pool.EnqueuTask([&Queue, &Timer, &Flag] {
+				PushThreads.emplace_back(Pool.EnqueuTask([&Number, &Timer, &Flag] {
 					std::call_once(Flag, [&Timer] {
 						Timer.Reset();
 					});
 					for (int j = 0; j < kNumLoops; ++j)
 					{
-						Queue.Push(j);
+						Number.fetch_add(1, std::memory_order_relaxed);
 					}
 				}));
 
-				PopThreads.emplace_back(Pool.EnqueuTask([&Queue, &Timer, &Counter, &Duration] {
-					for (int j = 0; !Queue.ShouldStopPop();)
+				PopThreads.emplace_back(Pool.EnqueuTask([&Number, &Timer, &Counter, &Duration] {
+					for (int j = 0; j < kNumLoops; ++j)
 					{
-						int val;
-						if (Queue.PopFront(val))
-						{
-							++j;
-						}
+						Number.fetch_sub(1, std::memory_order_relaxed);
 					}
 					if (--Counter == 0)
 					{
@@ -305,12 +295,11 @@ RECORD(pool_test)
 			{
 				t.wait();
 			}
-			Queue.SignalStop();
 			for (auto& t : PopThreads)
 			{
 				t.wait();
 			}
-			HLVM_LOG(LogTest, info, TXT("Pool test #1 took {0:f}, queue size {1:d}"), Duration, Queue.Num());
+			HLVM_LOG(LogTest, info, TXT("Pool test #1 took {0:f}, queue size {1:d}"), Duration, Number.load());
 			return true;
 		};
 
@@ -322,44 +311,30 @@ RECORD(pool_test)
 		HLVM_LOG(LogTest, info, TXT("Pool test #2 Fiber"));
 #if HLVM_ENABLE_FIBER_POOL
 		auto Test2Func = [&](double& Duration) -> bool {
-			auto									 Queue = TConcurrentQueue<int, EConcurrentQueueMode::Mpmc, true, true>();
+			std::atomic_int_fast32_t				 Number = 0;
 			FTimer									 Timer;
 			std::once_flag							 Flag;
-			std::atomic<int>						 Counter{ kNumThreads };
+			std::atomic_int_fast32_t				 Counter{ kNumThreads };
 			std::vector<boost::fibers::future<void>> PushThreads;
 			std::vector<boost::fibers::future<void>> PopThreads;
 			FWorkStealFiberPool						 Pool{ BgTwoPhysicalCores };
-			{
-				Queue.Push(1);
-				int val = Queue.PeekFront();
-				HLVM_ENSURE(val == 1, TXT("Queue peek front failed"));
-				HLVM_ENSURE(Queue.PopFront(val), TXT("Queue pop front failed"));
-			}
+
 			for (int i = 0; i < kNumThreads; ++i)
 			{
-				PushThreads.emplace_back(Pool.EnqueuTask([&Queue, &Timer, &Flag] {
+				PushThreads.emplace_back(Pool.EnqueuTask([&Number, &Timer, &Flag] {
 					std::call_once(Flag, [&Timer] {
 						Timer.Reset();
 					});
 					for (int j = 0; j < kNumLoops; ++j)
 					{
-						Queue.Push(j);
+						Number.fetch_add(1, std::memory_order_relaxed);
 					}
 				}));
 
-				PopThreads.emplace_back(Pool.EnqueuTask([&Queue, &Timer, &Counter, &Duration] {
-					for (int j = 0; !Queue.ShouldStopPop();)
+				PopThreads.emplace_back(Pool.EnqueuTask([&Number, &Timer, &Counter, &Duration] {
+					for (int j = 0; j < kNumLoops; ++j)
 					{
-						int val;
-						if (Queue.PopFront(val))
-						{
-							++j;
-						}
-						else
-						{
-							boost::this_thread::yield();
-							boost::this_fiber::yield();
-						}
+						Number.fetch_sub(1, std::memory_order_relaxed);
 					}
 					if (--Counter == 0)
 					{
@@ -372,12 +347,11 @@ RECORD(pool_test)
 			{
 				t.wait();
 			}
-			Queue.SignalStop();
 			for (auto& t : PopThreads)
 			{
 				t.wait();
 			}
-			HLVM_LOG(LogTest, info, TXT("Pool test #2 took {0:f}, queue size {1:d}"), Duration, Queue.Num());
+			HLVM_LOG(LogTest, info, TXT("Pool test #2 took {0:f}, queue size {1:d}"), Duration, Number.load());
 			return true;
 		};
 
@@ -385,44 +359,29 @@ RECORD(pool_test)
 		HLVM_LOG(LogTest, info, TXT("Pool test #2 Fiber avg took {0:f}, iter {1:d}"), time_lock, kNumIterations);
 #else
 		auto Test2Func = [&](double& Duration) -> bool {
-			auto													Queue = TConcurrentQueue<int, EConcurrentQueueMode::Mpmc, true, true>();
+			std::atomic_int_fast32_t								Number = 0;
 			FTimer													Timer;
 			std::once_flag											Flag;
-			std::atomic<int>										Counter{ kNumThreads };
+			std::atomic_int_fast32_t								Counter{ kNumThreads };
 			std::vector<std::optional<boost::fibers::future<void>>> PushThreads;
 			std::vector<std::optional<boost::fibers::future<void>>> PopThreads;
 			auto													Pool = FiberPool::FiberPoolSharing<>{};
-			{
-				Queue.Push(1);
-				int val = Queue.PeekFront();
-				HLVM_ENSURE(val == 1, TXT("Queue peek front failed"));
-				HLVM_ENSURE(Queue.PopFront(val), TXT("Queue pop front failed"));
-			}
 			for (int i = 0; i < kNumThreads; ++i)
 			{
-				PushThreads.emplace_back(Pool.submit([&Queue, &Timer, &Flag] {
+				PushThreads.emplace_back(Pool.submit([&Number, &Timer, &Flag] {
 					std::call_once(Flag, [&Timer] {
 						Timer.Reset();
 					});
 					for (int j = 0; j < kNumLoops; ++j)
 					{
-						Queue.Push(j);
+						Number.fetch_add(1, std::memory_order_relaxed);
 					}
 				}));
 
-				PopThreads.emplace_back(Pool.submit([&Queue, &Timer, &Counter, &Duration] {
-					for (int j = 0; !Queue.ShouldStopPop();)
+				PopThreads.emplace_back(Pool.submit([&Number, &Timer, &Counter, &Duration] {
+					for (int j = 0; j < kNumLoops; ++j)
 					{
-						int val;
-						if (Queue.PopFront(val))
-						{
-							++j;
-						}
-						else
-						{
-							boost::this_thread::yield();
-							boost::this_fiber::yield();
-						}
+						Number.fetch_sub(1, std::memory_order_relaxed);
 					}
 					if (--Counter == 0)
 					{
@@ -435,12 +394,11 @@ RECORD(pool_test)
 			{
 				t->wait();
 			}
-			Queue.SignalStop();
 			for (auto& t : PopThreads)
 			{
 				t->wait();
 			}
-			HLVM_LOG(LogTest, info, TXT("Pool test #2 took {0:f}, queue size {1:d}"), Duration, Queue.Num());
+			HLVM_LOG(LogTest, info, TXT("Pool test #2 took {0:f}, queue size {1:d}"), Duration, Number.load());
 			return true;
 		};
 

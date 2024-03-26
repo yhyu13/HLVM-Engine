@@ -94,6 +94,7 @@ public:
 	}
 
 private:
+#if 0
 	PACK(struct FBlock {
 		FBlock*	 prevFreeBlock{ nullptr };
 		FBlock*	 nextFreeBlock{ nullptr };
@@ -105,6 +106,53 @@ private:
 		}
 	});
 	static_assert(sizeof(FBlock) == 20, "FBlock size must be 20 bytes");
+#else
+	/**
+	 * Use int32 offset to this pointer to represent another pointer, approximately 1%~3% slower than using raw pointer
+	 */
+	struct FBlock;
+	struct FBlockOffsetPtr
+	{
+		int32_t offset{ 0x7FFFFFFF };
+		operator FBlock*()
+		{
+			return (offset != 0x7FFFFFFF) ? R_C(FBlock*, R_C(TBYTE*, this) + offset) : nullptr;
+		}
+		operator const FBlock*() const
+		{
+			return (offset != 0x7FFFFFFF) ? R_C(const FBlock*, R_C(const TBYTE*, this) + offset) : nullptr;
+		}
+		FBlock* operator=(FBlock* lhs)
+		{
+			(lhs != nullptr) ? offset = S_C(int32_t, (R_C(TBYTE*, lhs) - R_C(TBYTE*, this))) : offset = 0x7FFFFFFF;
+			return lhs;
+		}
+		FBlock* operator->()
+		{
+			return S_C(FBlock*, *this);
+		}
+		const FBlock* operator->() const
+		{
+			return S_C(const FBlock*, *this);
+		}
+		bool operator==(FBlock* rhs) const
+		{
+			return S_C(const FBlock*, *this) == rhs;
+		}
+	};
+
+	PACK(struct FBlock {
+		FBlockOffsetPtr prevFreeBlock{};
+		FBlockOffsetPtr nextFreeBlock{};
+		SizeType		size{ 0 };
+
+		HLVM_INLINE_FUNC bool GetFree() const
+		{
+			return size >= 0;
+		}
+	});
+	static_assert(sizeof(FBlock) == 12, "FBlock size must be 20 bytes");
+#endif
 	HLVM_INLINE_VAR HLVM_STATIC_VAR constexpr SizeType FBlock_Size = S_C(SizeType, sizeof(FBlock));
 	static_assert(N - 2 * FBlock_Size > 0);
 	HLVM_INLINE_VAR HLVM_STATIC_VAR constexpr SizeType Minimual_Block_Size = 24;
@@ -129,7 +177,7 @@ private:
 					HLVM_CONSTEXPR_ASSERT(bValidate, NextFreeBlock && NextFreeBlock->prevFreeBlock == FreeBlock && (NextFreeBlock == mTail || NextFreeBlock->size > 0));
 					FBlock* PrevFreeBlock = FreeBlock->prevFreeBlock;
 
-					auto NewFreeBlockSize = (FreeBlock->size - FBlock_Size - size);
+					SizeType NewFreeBlockSize = (FreeBlock->size - FBlock_Size - size);
 					if (NewFreeBlockSize < Minimual_Block_Size)
 					{
 						// New free block is trivial
@@ -199,9 +247,8 @@ private:
 	}
 
 	void
-	InternalFree(void* _ptr) noexcept(bValidate)
+	InternalFree(void* ptr) noexcept(bValidate)
 	{
-		auto ptr = R_C(TBYTE*, _ptr);
 		if (InStackBound(ptr))
 		{
 			if constexpr (bMonolithic)
@@ -211,7 +258,7 @@ private:
 			else
 			{
 				// Reset new block to free
-				FBlock* FreeBlock = R_C(FBlock*, ptr - FBlock_Size);
+				FBlock* FreeBlock = R_C(FBlock*, R_C(TBYTE*, ptr) - FBlock_Size);
 				HLVM_CONSTEXPR_ASSERT(bValidate, FreeBlock->size < 0);
 				HLVM_CONSTEXPR_ASSERT(bValidate, !FreeBlock->GetFree());
 				HLVM_CONSTEXPR_ASSERT(bValidate, mFreeBlockHead->GetFree());
@@ -288,12 +335,12 @@ private:
 
 				// Swap next block if it is bigger than current free head,
 				// so to keep free head a larger block size for easier allocation next time
-				if (auto NextBlock = mFreeBlockHead->nextFreeBlock;
+				if (FBlock* NextBlock = mFreeBlockHead->nextFreeBlock;
 					NextBlock->size > mFreeBlockHead->size)
 				{
 					// Sanity checks
 					HLVM_CONSTEXPR_ASSERT(bValidate, NextBlock->prevFreeBlock == mFreeBlockHead);
-					auto NextBlockNext = NextBlock->nextFreeBlock;
+					FBlock* NextBlockNext = NextBlock->nextFreeBlock;
 					HLVM_CONSTEXPR_ASSERT(bValidate, NextBlockNext && NextBlockNext != NextBlock && NextBlockNext->prevFreeBlock == NextBlock);
 
 					// Skip next and connect free head with next block's next
@@ -338,7 +385,7 @@ private:
 		}
 	}
 
-	bool InStackBound(const void* ptr) const
+	bool InStackBound(void* ptr) const
 	{
 		return ptr >= mLowerBound && ptr < mTail;
 	}

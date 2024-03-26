@@ -34,19 +34,15 @@ std::function<void()> make_test_wrapper(const FString& name, Func test_function)
 	};
 }
 
+/**
+ * AutoRegisterContext
+ *  bEnabled is used to enable/disable the auto registration of test functions.
+ */
 struct AutoRegisterContext
 {
 	bool bEnabled = true;
 };
-/** Macro to record a test function
- * Requirement : (1) use static method in a .cpp test file
- *               (2) function name prefix "test_"
- * static bool test_hash_test()
- * {
- *     ...
- * };
- * RECORD_TEST_FUNC(hash_test);
- */
+
 #define RECORD_TEST_FUNC_BODY(test_function)                                                                \
 	struct AutoRegister                                                                                     \
 	{                                                                                                       \
@@ -90,7 +86,7 @@ struct AutoRegisterContext
 /**
  * Macro to record a test function (easier version)
  * Example :
- * RECORD(hash_test)
+ * RECORD(hash_test, true)
  * {
  *    ...
  * }
