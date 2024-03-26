@@ -8,12 +8,12 @@
 
 #include "Core/Log.h"
 
-DELCARE_LOG_CATEGORY(LogGenericPlatform)
+DECLARE_LOG_CATEGORY(LogGenericPlatform)
 
 #if defined(PLATFORM_WINDOWS)
-DELCARE_LOG_CATEGORY(LogWindowsPlatform)
+DECLARE_LOG_CATEGORY(LogWindowsPlatform)
 #elif defined(PLATFORM_LINUXGNU)
-DELCARE_LOG_CATEGORY(LogLinuxGNUPlatform)
+DECLARE_LOG_CATEGORY(LogLinuxGNUPlatform)
 #else
 	#error "Not implemented for uknown platform"
 #endif

@@ -7,7 +7,7 @@
 #if HLVM_ENABLE_FIBER_POOL
 	#include "Platform/GenericPlatformThreadUtil.h"
 
-DELCARE_LOG_CATEGORY(LogWorkStealFiberPool);
+DECLARE_LOG_CATEGORY(LogWorkStealFiberPool);
 
 FWorkStealFiberPool* FWorkStealFiberPool::Get()
 {

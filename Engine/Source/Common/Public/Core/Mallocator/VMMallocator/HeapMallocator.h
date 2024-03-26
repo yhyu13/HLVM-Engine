@@ -21,48 +21,12 @@ public:
 		Destroy();
 	}
 
-	void Init(FMiMallocator* _MiMallocator, size_t _size)
-	{
-		MiMallocator = _MiMallocator;
-		N = _size;
-		HLVM_CONSTEXPR_ASSERT(bValidate, (N - 2 * FBlock_Size > 0));
-		mHeap = R_C(TBYTE*, MiMallocator->Malloc(N));
-
-		bManaged = N < std::numeric_limits<SizeType>::max();
-		if (bManaged)
-		{
-			// Init stack and free block head which occupy the whole stack
-			mFreeBlockHead = R_C(FBlock*, mHeap);
-			*mFreeBlockHead = FBlock();
-			mFreeBlockHead->size = (S_C(SizeType, N) - 2 * FBlock_Size); // Stack size minus head block and tail block
-			HLVM_CONSTEXPR_ASSERT(bValidate, mFreeBlockHead->size > 0);
-			mFreeSizeUpperBound = mFreeBlockHead->size;
-
-			// Init tail which is trivially free
-			mTail = R_C(FBlock*, mHeap + N - FBlock_Size);
-			*mTail = FBlock();
-			mTail->prevFreeBlock = mFreeBlockHead;
-
-			// Connect head to tail
-			mFreeBlockHead->nextFreeBlock = mTail;
-
-			// Cache the lower bound memory address for stack pointers
-			mLowerBound = mHeap + FBlock_Size;
-		}
-	}
+	void Init(FVMArena* _VMArena, size_t _size, bool bForceUnManage = false);
 
 	/**
 	 * Sometimes we need destroy w/o deconstruction
 	 */
-	void Destroy()
-	{
-		if (mHeap)
-		{
-			MiMallocator->Free(mHeap);
-			mHeap = nullptr;
-			bManaged = false;
-		}
-	}
+	void Destroy();
 
 	bool Owned(void* p) const
 	{
@@ -98,10 +62,10 @@ public:
 	void  Free(void* p);
 
 private:
-	FMiMallocator* MiMallocator{ nullptr };
-	TBYTE*		   mHeap{ nullptr };
-	size_t		   N{ 0 };
+	FVMArena* VMArena{ nullptr };
+	size_t	  N{ 0 };
 	BIT_FLAG(bManaged){ true };
+	TBYTE* mHeap{ nullptr };
 
 	struct FBlock
 	{

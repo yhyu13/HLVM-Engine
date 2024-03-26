@@ -6,7 +6,7 @@
 #include "Core/Assert.h"
 #include "Utility/ScopedTimer.h"
 
-DELCARE_LOG_CATEGORY(LogZstd)
+DECLARE_LOG_CATEGORY(LogZstd)
 
 HLVM_NODISCARD TVector<std::byte> FZstd::Compress(const FConstByteBuffer& data, int compress_level, bool bShrink)
 {

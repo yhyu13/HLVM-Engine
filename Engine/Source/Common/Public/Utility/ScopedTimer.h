@@ -7,7 +7,7 @@
 #include "Timer.h"
 #include "Core/Log.h"
 
-DELCARE_LOG_CATEGORY(LogScopedTimer)
+DECLARE_LOG_CATEGORY(LogScopedTimer)
 
 class FScopedTimer
 {

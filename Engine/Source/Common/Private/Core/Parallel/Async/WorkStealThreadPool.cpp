@@ -6,7 +6,7 @@
 #include "Platform/GenericPlatformThreadUtil.h"
 #include "Utility/ScopedTimer.h"
 
-DELCARE_LOG_CATEGORY(LogWorkStealThreadPool);
+DECLARE_LOG_CATEGORY(LogWorkStealThreadPool);
 
 FWorkStealThreadPool* FWorkStealThreadPool::Get()
 {

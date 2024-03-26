@@ -14,7 +14,7 @@
 // #include <ylt/struct_json/json_reader.h>
 // #include <ylt/struct_json/json_writer.h>
 
-DELCARE_LOG_CATEGORY(LogTest)
+DECLARE_LOG_CATEGORY(LogTest)
 
 #define TEST_STACK_ALLOCATOR 0
 #define TEST_FIBER_POOL 0

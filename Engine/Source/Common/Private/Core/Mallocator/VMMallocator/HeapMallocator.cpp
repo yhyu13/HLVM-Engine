@@ -4,7 +4,60 @@
 
 #include "Core/Mallocator/VMMallocator/HeapMallocator.h"
 
-DELCARE_LOG_CATEGORY(LogHeapMallocator)
+DECLARE_LOG_CATEGORY(LogHeapMallocator)
+
+void FHeapMallocator::Init(FVMArena* _VMArena, size_t _size, bool bForceUnManage)
+{
+	VMArena = _VMArena;
+	N = _size;
+
+	if (bForceUnManage)
+	{
+		bManaged = false;
+	}
+	else
+	{
+		bManaged = N < std::numeric_limits<SizeType>::max();
+	}
+	if (bManaged)
+	{
+		HLVM_CONSTEXPR_ASSERT(bValidate, (N & (N - 1)) == 0); // Must be power of 2
+		HLVM_CONSTEXPR_ASSERT(bValidate, (N - 2 * FBlock_Size > 0));
+		mHeap = R_C(TBYTE*, VMArena->MallocOS(N, N)); // Aligned Alloc so that we can infer Heap pointer by pointer arithmetic
+
+		// Init stack and free block head which occupy the whole stack
+		mFreeBlockHead = R_C(FBlock*, mHeap);
+		*mFreeBlockHead = FBlock();
+		mFreeBlockHead->size = (S_C(SizeType, N) - 2 * FBlock_Size); // Stack size minus head block and tail block
+		HLVM_CONSTEXPR_ASSERT(bValidate, mFreeBlockHead->size > 0);
+		mFreeSizeUpperBound = mFreeBlockHead->size;
+
+		// Init tail which is trivially free
+		mTail = R_C(FBlock*, mHeap + N - FBlock_Size);
+		*mTail = FBlock();
+		mTail->prevFreeBlock = mFreeBlockHead;
+
+		// Connect head to tail
+		mFreeBlockHead->nextFreeBlock = mTail;
+
+		// Cache the lower bound memory address for stack pointers
+		mLowerBound = mHeap + FBlock_Size;
+	}
+	else
+	{
+		mHeap = R_C(TBYTE*, VMArena->MallocOS(N));
+	}
+}
+
+void FHeapMallocator::Destroy()
+{
+	if (mHeap)
+	{
+		VMArena->FreeOS(mHeap);
+		mHeap = nullptr;
+		bManaged = false;
+	}
+}
 
 void* FHeapMallocator::Malloc(size_t _size)
 {

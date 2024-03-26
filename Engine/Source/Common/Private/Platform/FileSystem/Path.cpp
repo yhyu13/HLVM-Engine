@@ -5,7 +5,7 @@
 #include "Platform/FileSystem/Path.h"
 #include "Platform/GenericPlatformFile.h"
 
-DELCARE_LOG_CATEGORY(LogFPath)
+DECLARE_LOG_CATEGORY(LogFPath)
 
 
 bool FPath::IsDirectory(const FPath& path)

@@ -6,7 +6,7 @@
 #include "Core/Assert.h"
 #include "Core/Log.h"
 
-DELCARE_LOG_CATEGORY(LogPackedFragment)
+DECLARE_LOG_CATEGORY(LogPackedFragment)
 
 /**
  * Suggested Fragment Size (Maybe vary by platform)

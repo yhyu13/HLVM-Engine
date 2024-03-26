@@ -8,7 +8,7 @@
 #include <regex>
 #include <boost/filesystem/directory.hpp>
 
-DELCARE_LOG_CATEGORY(LogBoostPlatformFile)
+DECLARE_LOG_CATEGORY(LogBoostPlatformFile)
 
 
 static FBoostPlatformFile SBoostPlatformFile{};

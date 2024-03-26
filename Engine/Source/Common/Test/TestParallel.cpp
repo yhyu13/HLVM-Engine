@@ -13,7 +13,7 @@
 #include <vector>
 #include <boost/lockfree/queue.hpp>
 
-DELCARE_LOG_CATEGORY(LogTest)
+DECLARE_LOG_CATEGORY(LogTest)
 
 /*
 	<test method>

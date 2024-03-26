@@ -7,7 +7,7 @@
 #include "Platform/FileSystem/Boost/BoostPlatformFile.h"
 #include "Platform/FileSystem/Packed/PackedPlatformFile.h"
 
-DELCARE_LOG_CATEGORY(LogGenericPlatformFile)
+DECLARE_LOG_CATEGORY(LogGenericPlatformFile)
 
 
 FGenericPlatformFile* FGenericPlatformFile::sPlatformFileRedirector[EPlatformFileType_NUM];

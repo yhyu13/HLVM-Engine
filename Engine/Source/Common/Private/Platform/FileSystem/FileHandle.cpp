@@ -9,7 +9,7 @@
 
 #include <magic_enum_all.hpp>
 
-DELCARE_LOG_CATEGORY(LogIFileHandle)
+DECLARE_LOG_CATEGORY(LogIFileHandle)
 
 
 void IFileHandle::HandleException(const OpStatusType& Status_InOut, const TCHAR* Function, const std::exception& Exception)

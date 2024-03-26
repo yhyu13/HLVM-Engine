@@ -10,7 +10,7 @@
 #include <boost/interprocess/mapped_region.hpp>
 #include <magic_enum_all.hpp>
 
-DELCARE_LOG_CATEGORY(LogPackedFileHandle)
+DECLARE_LOG_CATEGORY(LogPackedFileHandle)
 
 #define PFH_SCOPE_LOCK()
 

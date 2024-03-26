@@ -12,7 +12,7 @@
 #include <spdlog/async.h>
 #include <magic_enum_all.hpp>
 
-DELCARE_LOG_CATEGORY(LogTest)
+DECLARE_LOG_CATEGORY(LogTest)
 
 
 /*

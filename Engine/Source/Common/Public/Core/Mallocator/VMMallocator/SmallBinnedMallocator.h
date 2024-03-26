@@ -85,9 +85,8 @@ public:
 	}
 
 private:
-	PACK(struct FBlocks32 {
-		NOCOPYMOVE(FBlocks32)
-
+	struct MS_ALIGN(HLVM_MALLOC_ALIGNMENT) FBlocks32
+	{
 		TBYTE	   P[((Alignment + sizeof(FSmallBinnedBlockHead)) << 5)]; // P should point to some mallocated memory that is 32 * (Alignment + sizeof(FSmallBinnedBlockHead)) bytes in size
 		FBlocks32* Next;												  // Point to the Next FBlocks32
 		uint32_t   FreeBits;											  // Use 32 bits to store free bits for each one of 32 blocks
@@ -134,7 +133,7 @@ private:
 			FSmallBinnedBlockHead* Block = R_C(FSmallBinnedBlockHead*, R_C(TBYTE*, v) - sizeof(FSmallBinnedBlockHead));
 			return ((1u << Block->Pos) | FreeBits) == 0;
 		}
-	});
+	} GCC_ALIGN(HLVM_MALLOC_ALIGNMENT);
 
 	FBlocks32* InternalAllocateBlocks32()
 	{

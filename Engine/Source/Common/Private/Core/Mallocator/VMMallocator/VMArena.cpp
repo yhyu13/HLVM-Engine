@@ -7,10 +7,10 @@
 #include "Core/Assert.h"
 #include "Template/ExpressionTemplate.tpp"
 
-FVMArena::FVMArena(FMiMallocator* _MiMallocator,
-	size_t						  _DefaultHeapSize,
-	size_t						  _LargeHeapSize)
-	: MiMallocator(_MiMallocator), mDefaultHeapSize(_DefaultHeapSize), mLargeHeapSize(_LargeHeapSize)
+DECLARE_LOG_CATEGORY(LogVMArena)
+
+FVMArena::FVMArena(FMiMallocator* _MiMallocator, const FVMArenaInitContext& _InitContext)
+	: MiMallocator(_MiMallocator), mInitCtx(_InitContext)
 {
 	/**
 	 * Intialize small binning allocators (using fancy compile time for-loop)
@@ -23,8 +23,38 @@ FVMArena::FVMArena(FMiMallocator* _MiMallocator,
 	/**
 	 * Initialize heap chain, heaps are where we acquire memory from mimalloc and manage small/large allocations on our own
 	 */
-	mHeapChainHead = new (MiMallocator->Malloc(sizeof(FHeapChain))) FHeapChain();
-	mHeapChainHead->HeapAllocator.Init(MiMallocator, mDefaultHeapSize);
+	HLVM_CONSTEXPR_ASSERT(bValidate, mInitCtx.Valid());
+	auto _Heap = mHeapChainHead;
+	for (size_t i = 0; i < mInitCtx.LargeHeapInitNum; ++i)
+	{
+		auto Heap = new (MiMallocator->Malloc(sizeof(FHeapChain))) FHeapChain();
+		Heap->HeapAllocator.Init(this, mInitCtx.LargeHeapSize);
+		if (!mHeapChainHead)
+		{
+			_Heap = mHeapChainHead = Heap;
+		}
+		else
+		{
+			_Heap->Next = Heap;
+			_Heap = Heap;
+		}
+		HLVM_LOG(LogVMArena, debug, TXT("VMArena: Initialized %d large heaps"), i + 1);
+	}
+	for (size_t i = 0; i < mInitCtx.DefaultHeapInitNum; ++i)
+	{
+		auto Heap = new (MiMallocator->Malloc(sizeof(FHeapChain))) FHeapChain();
+		Heap->HeapAllocator.Init(this, mInitCtx.DefaultHeapSize);
+		if (!mHeapChainHead)
+		{
+			_Heap = mHeapChainHead = Heap;
+		}
+		else
+		{
+			_Heap->Next = Heap;
+			_Heap = Heap;
+		}
+		HLVM_LOG(LogVMArena, debug, TXT("VMArena: Initialized %d default heaps"), i + 1);
+	}
 }
 
 FVMArena::~FVMArena()
@@ -40,13 +70,13 @@ FVMArena::~FVMArena()
 		mHeapChainHead = Next;
 	}
 }
-// TODO
+// TODO : TLS cached free list
 void* FVMArena::MallocHeap(size_t size)
 {
 	HLVM_CONSTEXPR_ASSERT(bValidate, size > HLVM_SMALL_ALLOC_THRESHOLD);
 
 	auto Heap = mHeapChainHead;
-	while (true)
+	while (Heap)
 	{
 		// Try to allocate from the current managed heaps
 		auto& HeapMallocator = Heap->HeapAllocator;
@@ -68,29 +98,20 @@ void* FVMArena::MallocHeap(size_t size)
 	Heap->Next = new (MiMallocator->Malloc(sizeof(FHeapChain))) FHeapChain();
 	auto& HeapMallocator = Heap->Next->HeapAllocator;
 	auto  Capacity = FHeapMallocator::CalculateCapacity(size);
-	if (Capacity < mDefaultHeapSize)
+	if (Capacity <= mInitCtx.DefaultHeapSize)
 	{
-		HeapMallocator.Init(MiMallocator, mDefaultHeapSize);
+		HeapMallocator.Init(this, mInitCtx.DefaultHeapSize);
 	}
-	else if (Capacity < mLargeHeapSize)
+	else if (Capacity <= mInitCtx.LargeHeapSize)
 	{
-		HeapMallocator.Init(MiMallocator, mLargeHeapSize);
+		HeapMallocator.Init(this, mInitCtx.LargeHeapSize);
 	}
 	else
 	{
-		HeapMallocator.Init(MiMallocator, Capacity);
+		HeapMallocator.Init(this, size, true);
 	}
-	HLVM_CONSTEXPR_ASSERT(bValidate, HeapMallocator.GetHeapSize() >= Capacity);
+	HLVM_CONSTEXPR_ASSERT(bValidate, HeapMallocator.GetHeapSize() >= size);
 	auto p = HeapMallocator.Malloc(size);
-	HLVM_CONSTEXPR_ASSERT(bValidate, p != nullptr);
-	return p;
-}
-
-void* FVMArena::MallocBinned(size_t _size)
-{
-	HLVM_CONSTEXPR_ASSERT(bValidate, _size <= HLVM_SMALL_ALLOC_THRESHOLD);
-	TUINT8 size = FSmallBinnedBlockHead::GoodSize(_size);
-	auto   p = mSmallBinnedMallocators[size / HLVM_SMALL_ALLOC_ALIGNMENT]->Malloc();
 	HLVM_CONSTEXPR_ASSERT(bValidate, p != nullptr);
 	return p;
 }
@@ -112,8 +133,27 @@ void FVMArena::FreeHeap(void* p)
 	MiMallocator->Free(p);
 }
 
+void* FVMArena::MallocBinned(size_t _size)
+{
+	HLVM_CONSTEXPR_ASSERT(bValidate, _size <= HLVM_SMALL_ALLOC_THRESHOLD);
+	TUINT8 size = FSmallBinnedBlockHead::GoodSize(_size);
+	auto   p = mSmallBinnedMallocators[size / HLVM_SMALL_ALLOC_ALIGNMENT]->Malloc();
+	HLVM_CONSTEXPR_ASSERT(bValidate, p != nullptr);
+	return p;
+}
+
 void FVMArena::FreeBinned(void* p, TUINT8 size)
 {
 	HLVM_CONSTEXPR_ASSERT(bValidate, size <= HLVM_SMALL_ALLOC_THRESHOLD);
 	mSmallBinnedMallocators[size / HLVM_SMALL_ALLOC_ALIGNMENT]->Free(p);
+}
+
+void* FVMArena::MallocOS(size_t size, size_t alignment)
+{
+	return MiMallocator->MallocAligned(size, alignment);
+}
+
+void FVMArena::FreeOS(void* p)
+{
+	MiMallocator->Free(p);
 }

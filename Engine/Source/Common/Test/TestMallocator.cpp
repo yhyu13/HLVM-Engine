@@ -8,7 +8,7 @@
 #include "Core/Container/ContainerDefinition.h"
 #include "Core/Parallel/ConcurrentQueue.h"
 
-DELCARE_LOG_CATEGORY(LogTest)
+DECLARE_LOG_CATEGORY(LogTest)
 
 RECORD(mallocator_test)
 {

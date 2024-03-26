@@ -43,13 +43,13 @@ struct FLogCatgegory
 };
 
 // Macro for declare a log category
-#define DELCARE_LOG_CATEGORY(category) \
+#define DECLARE_LOG_CATEGORY(category) \
 	HLVM_INLINE_VAR constexpr FLogCatgegory category = FLogCatgegory(TXT(#category));
 #define DELCARE_LOG_CATEGORY2(category, _level) \
 	HLVM_INLINE_VAR constexpr FLogCatgegory category = FLogCatgegory(TXT(#category), spdlog::level::_level);
 
-DELCARE_LOG_CATEGORY(LogAssert)
-DELCARE_LOG_CATEGORY(LogTemp)
+DECLARE_LOG_CATEGORY(LogAssert)
+DECLARE_LOG_CATEGORY(LogTemp)
 
 /**
  * @brief FLogContext is a structure that contains information about a log message,

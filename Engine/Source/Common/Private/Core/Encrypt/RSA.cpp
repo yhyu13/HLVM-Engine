@@ -7,7 +7,7 @@
 #include "Utility/ScopedTimer.h"
 #include "Platform/FileSystem/Boost/BoostFileHandle.h"
 
-DELCARE_LOG_CATEGORY(LogRSA)
+DECLARE_LOG_CATEGORY(LogRSA)
 
 constexpr size_t SignatureDigestSize = 4096;
 

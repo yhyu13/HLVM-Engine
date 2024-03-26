@@ -9,7 +9,7 @@
 #include <boost/interprocess/mapped_region.hpp>
 #include <magic_enum_all.hpp>
 
-DELCARE_LOG_CATEGORY(LogPackedEntryHandle)
+DECLARE_LOG_CATEGORY(LogPackedEntryHandle)
 
 
 #define PEH_SCOPE_LOCK()

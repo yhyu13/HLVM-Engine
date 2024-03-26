@@ -4,7 +4,7 @@
 
 #include "Platform/FileSystem/Packed/PackedPlatformFile.h"
 
-DELCARE_LOG_CATEGORY(LogPackedPlatformFile)
+DECLARE_LOG_CATEGORY(LogPackedPlatformFile)
 
 static FPackedPlatformFile SPackedPlatformFile{};
 

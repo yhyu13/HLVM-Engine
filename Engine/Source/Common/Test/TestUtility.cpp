@@ -11,7 +11,7 @@
 #include <boost/chrono.hpp>
 #include <boost/thread/thread.hpp>
 
-DELCARE_LOG_CATEGORY(LogTest)
+DECLARE_LOG_CATEGORY(LogTest)
 
 
 /*

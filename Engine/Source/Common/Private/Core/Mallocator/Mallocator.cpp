@@ -33,7 +33,7 @@
 	#define CALLOC(...)
 #endif
 
-DELCARE_LOG_CATEGORY(LogMiMallocator)
+DECLARE_LOG_CATEGORY(LogMiMallocator)
 
 void InitMallocator()
 {

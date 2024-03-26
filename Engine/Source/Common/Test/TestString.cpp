@@ -7,7 +7,7 @@
 #include "Core/Log.h"
 #include "Platform/GenericPlatformDebuggerUtil.h"
 
-DELCARE_LOG_CATEGORY(LogTest)
+DECLARE_LOG_CATEGORY(LogTest)
 
 
 /*

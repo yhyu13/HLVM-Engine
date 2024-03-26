@@ -8,7 +8,7 @@
 #include "Core/Log.h"
 #include "Core/Assert.h"
 
-DELCARE_LOG_CATEGORY(LogTest)
+DECLARE_LOG_CATEGORY(LogTest)
 
 
 /*
