@@ -107,11 +107,6 @@ template <typename T>
 struct TOffsetPtr32
 {
 	int32_t offset{ 0x7FFFFFFF };
-	TOffsetPtr32() = default;
-	explicit TOffsetPtr32(T* ptr)
-	{
-		*this = ptr;
-	}
 	operator T*()
 	{
 		return (offset != 0x7FFFFFFF) ? R_C(T*, R_C(TBYTE*, this) + offset) : nullptr;
@@ -136,5 +131,9 @@ struct TOffsetPtr32
 	bool operator==(T* rhs) const
 	{
 		return S_C(const T*, *this) == rhs;
+	}
+	bool operator!=(T* rhs) const
+	{
+		return S_C(const T*, *this) != rhs;
 	}
 };

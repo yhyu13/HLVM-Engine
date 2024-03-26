@@ -62,7 +62,7 @@ struct TMallocator
 		}
 		else
 		{
-			p = std::malloc(realSize);
+			p = new TBYTE[realSize];
 		}
 		if (!p)
 			HLVM_UNLIKELY
@@ -88,7 +88,7 @@ struct TMallocator
 		}
 		else
 		{
-			std::free(p);
+			delete[] R_C(TBYTE*, p);
 		}
 #if HVLM_MALLOCATOR_DEATIL_TRACE
 		size_t _allocSize = hlvm_private::GPMRAllocatedSize.fetch_sub(realSize, std::memory_order_relaxed);

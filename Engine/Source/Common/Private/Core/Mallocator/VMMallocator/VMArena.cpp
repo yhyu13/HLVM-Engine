@@ -63,7 +63,7 @@ void* FVMArena::MallocHeap(size_t size)
 		Heap = Heap->Next;
 	}
 
-	// Allocate new heap space for this allocation since we don't have a rgith heap
+	// Allocate new heap space for this allocation since we don't have an available heap
 	HLVM_CONSTEXPR_ASSERT(bValidate, Heap->Next == nullptr);
 	Heap->Next = new (MiMallocator->Malloc(sizeof(FHeapChain))) FHeapChain();
 	auto& HeapMallocator = Heap->Next->HeapAllocator;

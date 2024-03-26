@@ -132,7 +132,7 @@ private:
 		bool CheckFree(void* v) const
 		{
 			FSmallBinnedBlockHead* Block = R_C(FSmallBinnedBlockHead*, R_C(TBYTE*, v) - sizeof(FSmallBinnedBlockHead));
-			return (1u << Block->Pos | FreeBits) == 0;
+			return ((1u << Block->Pos) | FreeBits) == 0;
 		}
 	});
 

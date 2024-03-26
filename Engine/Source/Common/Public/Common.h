@@ -13,8 +13,3 @@
 #include "Core/Parallel/ParallelDefinition.h"
 
 #include "Template/GlobalTemplate.tpp"
-
-/**
- * Class
- */
-#include "Core/Mallocator/PMR.h"

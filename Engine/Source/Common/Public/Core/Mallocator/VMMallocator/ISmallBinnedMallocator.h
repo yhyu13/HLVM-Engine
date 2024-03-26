@@ -22,7 +22,7 @@ struct FSmallBinnedBlockHead
 
 	bool Valid() const
 	{
-		return Pos <= 32 && Alignment <= HLVM_SMALL_ALLOC_THRESHOLD && Alignment > 0;
+		return Pos < 32 && Alignment <= HLVM_SMALL_ALLOC_THRESHOLD && Alignment > 0;
 	}
 	HLVM_STATIC_FUNC TUINT8 PotentiallyOwned(void* v)
 	{
@@ -36,16 +36,9 @@ struct FSmallBinnedBlockHead
 	HLVM_STATIC_FUNC TUINT8 GoodSize(size_t _size)
 	{
 		TUINT8 size = S_C(TUINT8, _size);
-		// Round to next 16 multiplier
+		// Round to next HLVM_SMALL_ALLOC_ALIGNMENT multiplier
 		TUINT8 remainder = size % HLVM_SMALL_ALLOC_ALIGNMENT;
-		if (remainder == 0)
-		{
-			return size;
-		}
-		else
-		{
-			return size + (HLVM_SMALL_ALLOC_ALIGNMENT - remainder);
-		}
+		return (remainder == 0) ? size : size + (HLVM_SMALL_ALLOC_ALIGNMENT - remainder);
 	}
 };
 static_assert(sizeof(FSmallBinnedBlockHead) == 2);

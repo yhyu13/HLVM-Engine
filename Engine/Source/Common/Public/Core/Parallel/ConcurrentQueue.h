@@ -24,7 +24,6 @@ enum class EConcurrentQueueMode : TUINT8
  */
 template <typename T,
 	EConcurrentQueueMode Mode = EConcurrentQueueMode::Mpmc,
-	bool				 bBlockPopOnEmpty = true, // Applying block on pop when empty actually makes the queue performance 1.25 faster on the TestParallel benchmark
 	bool				 bCountSize = false>
 class TConcurrentQueue
 {
@@ -93,22 +92,10 @@ public:
 	{
 		mHead = mTail = new QueueNode();
 		HLVM_ASSERT(mHead.IsLockFree(), TXT("TAtomicPointer is not lock free"));
-
-		if constexpr (bBlockPopOnEmpty)
-		{
-			mMutex = new std::mutex();
-			mCV = new std::condition_variable();
-		}
 	}
 
 	~TConcurrentQueue() noexcept
 	{
-		if constexpr (bBlockPopOnEmpty)
-		{
-			delete mMutex;
-			delete mCV;
-		}
-
 		while (QueueNode* temp = mTail)
 		{
 			mTail = mTail->mNextNode;
@@ -146,26 +133,23 @@ public:
 	template <bool bTryPop = true>
 	bool PopFront(T& ret) noexcept
 	{
-		if constexpr (bBlockPopOnEmpty)
+		while (Empty() && !bStopFlagByUser)
 		{
-			while (Empty() && !bStopFlagByUser)
+			/**
+			 * If only try pop, we should immediate exit with false on empty queue
+			 */
+			if constexpr (bTryPop)
 			{
-				/**
-				 * If only try pop, we should immediate exit with false on empty queue
-				 */
-				if constexpr (bTryPop)
+				return false;
+			}
+			else
+			{
+				std::this_thread::yield();
 				{
-					return false;
-				}
-				else
-				{
-					std::this_thread::yield();
-					{
-						std::unique_lock<std::mutex> lock(*mMutex);
-						mCV->wait(lock, [] {
-							return true;
-						});
-					}
+					std::unique_lock<std::mutex> lock(mMutex);
+					mCV.wait(lock, [] {
+						return true;
+					});
 				}
 			}
 		}
@@ -261,21 +245,13 @@ public:
 	 * so that poping will not be blocked until queue is popped to empty
 	 */
 	void SignalStop() noexcept
-		requires(bBlockPopOnEmpty)
 	{
 		bStopFlagByUser = true;
 	}
 
 	bool ShouldStopPop() const noexcept
 	{
-		if constexpr (bBlockPopOnEmpty)
-		{
-			return bStopFlagByUser && Empty();
-		}
-		else
-		{
-			return Empty();
-		}
+		return bStopFlagByUser && Empty();
 	}
 
 private:
@@ -311,10 +287,7 @@ private:
 			mCount.fetch_add(1, std::memory_order_relaxed);
 		}
 
-		if constexpr (bBlockPopOnEmpty)
-		{
-			mCV->notify_one(); // Notify the poping thread
-		}
+		mCV.notify_one(); // Notify the poping thread
 	}
 
 private:
@@ -324,8 +297,8 @@ private:
 	TAtomicPointer<QueueNode*> mTail;
 
 	/** mMutex for blocking pop. */
-	std::mutex*				 mMutex;
-	std::condition_variable* mCV;
+	std::mutex				mMutex;
+	std::condition_variable mCV;
 	/** Whether the queue is quit by user. */
 	BIT_FLAG(bStopFlagByUser){ false };
 

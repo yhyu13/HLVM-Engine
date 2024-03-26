@@ -4,6 +4,7 @@
 
 #include "Test.h"
 
+#include "Core/Mallocator/PMR.h"
 #include "Platform/FileSystem/Boost/BoostPlatformFile.h"
 #include "Platform/FileSystem/Packed/PackedPlatformFile.h"
 #include "Core/Parallel/Async/WorkStealThreadPool.h"

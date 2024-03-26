@@ -6,6 +6,7 @@
 #include "Core/String.h"
 #include "Core/Assert.h"
 #include "Utility/Timer.h"
+#include "Core/Mallocator/IMallocator.h"
 
 #include <iostream>
 #include <vector>

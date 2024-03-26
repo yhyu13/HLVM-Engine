@@ -5,6 +5,7 @@
 #pragma once
 
 #include "Platform/GenericPlatformAtomicPointer.h"
+#include "Core/Mallocator/MiMallocator.h"
 
 class FHeapMallocator
 {
@@ -104,22 +105,24 @@ private:
 
 	struct FBlock
 	{
-		TAtomicPointer<FBlock*> prevFreeBlock{ nullptr };
-		TAtomicPointer<FBlock*> nextFreeBlock{ nullptr };
-		SizeType				size{ 0 };
-		uint32_t				_{ 0xFFFFFFFF }; // Reserved 2 bytes to not mis-interpreting with FSmallBinnedBlockHead block heads
+		TOffsetPtr32<FBlock> prevFreeBlock{};
+		TOffsetPtr32<FBlock> nextFreeBlock{};
+		SizeType			 size{ 0 };
+		uint16_t			 offset{ 0 };
+		uint16_t			 _{ 0xFFFF }; // Reserved 2 bytes to not mis-interpreting with FSmallBinnedBlockHead block heads
 
 		HLVM_INLINE_FUNC bool GetFree() const
 		{
 			return size >= 0;
 		}
 	};
-	static_assert(sizeof(FBlock) == 24, "FBlock size must be 24 bytes");
+	static_assert(sizeof(FBlock) == 16, "FBlock size must be 16 bytes");
+
 	HLVM_INLINE_VAR HLVM_STATIC_VAR constexpr SizeType FBlock_Size = S_C(SizeType, sizeof(FBlock));
 	HLVM_INLINE_VAR HLVM_STATIC_VAR constexpr SizeType Minimual_Block_Size = 24;
 
-	TAtomicPointer<FBlock*> mFreeBlockHead{ nullptr };
-	TAtomicPointer<FBlock*> mTail{ nullptr };
-	void*					mLowerBound{ nullptr };
-	SizeType				mFreeSizeUpperBound{ 0 };
+	FBlock*	 mFreeBlockHead{ nullptr };
+	FBlock*	 mTail{ nullptr };
+	void*	 mLowerBound{ nullptr };
+	SizeType mFreeSizeUpperBound{ 0 };
 };

@@ -118,7 +118,7 @@ RECORD(queue_test, true)
 	{
 		HLVM_LOG(LogTest, info, TXT("Queue test #1 TConcurrentQueue"));
 		auto Test1Func = [&](double& Duration) -> bool {
-			auto					 Queue = TConcurrentQueue<int, EConcurrentQueueMode::Mpmc, true, true>();
+			auto					 Queue = TConcurrentQueue<int, EConcurrentQueueMode::Mpmc, true>();
 			FTimer					 Timer;
 			std::once_flag			 Flag;
 			std::atomic_int_fast32_t Counter{ kNumThreads };
