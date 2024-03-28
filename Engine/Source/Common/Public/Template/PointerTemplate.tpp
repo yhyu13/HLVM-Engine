@@ -115,6 +115,12 @@ struct TOffsetPtr32
 	{
 		return (offset != 0x7FFFFFFF) ? R_C(const T*, R_C(const TBYTE*, this) + offset) : nullptr;
 	}
+	const T* operator=(const TOffsetPtr32& _rhs)
+	{
+		const T* rhs = _rhs;
+		(rhs != nullptr) ? offset = S_C(int32_t, (R_C(const TBYTE*, rhs) - R_C(TBYTE*, this))) : offset = 0x7FFFFFFF;
+		return rhs;
+	}
 	T* operator=(T* lhs)
 	{
 		(lhs != nullptr) ? offset = S_C(int32_t, (R_C(TBYTE*, lhs) - R_C(TBYTE*, this))) : offset = 0x7FFFFFFF;

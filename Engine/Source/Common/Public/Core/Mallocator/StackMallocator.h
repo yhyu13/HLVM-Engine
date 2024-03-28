@@ -18,6 +18,7 @@ template <int32_t N = HLVM_STACK_MALLOCATOR_DEFAULT_SIZE,
 	bool		  bMonolithic = false,
 	bool		  bDefragment = true,
 	bool		  bAllowOverflowToHeap = true,
+	bool		  bUseHeapForAlignedAlloc = true,
 	bool		  bValidate = HLVM_MALLOC_VALIDATION>
 class TStackMallocator final : public IMallocator
 {
@@ -68,13 +69,27 @@ public:
 	{
 		return InternalMalloc(size);
 	}
-	HLVM_INLINE_FUNC virtual void* MallocAligned(size_t size, size_t) noexcept(false) final override
+	HLVM_INLINE_FUNC virtual void* MallocAligned(size_t size, size_t align) noexcept(false) final override
 	{
-		return InternalMalloc(size);
+		if constexpr (bUseHeapForAlignedAlloc)
+		{
+			return GMiMallocatorTLS.MallocAligned(size, align);
+		}
+		else
+		{
+			return InternalMalloc(size);
+		}
 	}
-	HLVM_INLINE_FUNC virtual void* MallocAligned2(size_t size, size_t) noexcept final override
+	HLVM_INLINE_FUNC virtual void* MallocAligned2(size_t size, size_t align) noexcept final override
 	{
-		return InternalMalloc(size);
+		if constexpr (bUseHeapForAlignedAlloc)
+		{
+			return GMiMallocatorTLS.MallocAligned2(size, align);
+		}
+		else
+		{
+			return InternalMalloc(size);
+		}
 	}
 	HLVM_INLINE_FUNC virtual void Free(void* ptr) noexcept final override
 	{
@@ -84,13 +99,27 @@ public:
 	{
 		InternalFree(ptr);
 	}
-	HLVM_INLINE_FUNC virtual void FreeAligned(void* ptr, size_t) noexcept final override
+	HLVM_INLINE_FUNC virtual void FreeAligned(void* ptr, size_t align) noexcept final override
 	{
-		InternalFree(ptr);
+		if constexpr (bUseHeapForAlignedAlloc)
+		{
+			return GMiMallocatorTLS.FreeAligned(ptr, align);
+		}
+		else
+		{
+			InternalFree(ptr);
+		}
 	}
-	HLVM_INLINE_FUNC virtual void FreeSizeAligned(void* ptr, size_t, size_t) noexcept final override
+	HLVM_INLINE_FUNC virtual void FreeSizeAligned(void* ptr, size_t size, size_t align) noexcept final override
 	{
-		InternalFree(ptr);
+		if constexpr (bUseHeapForAlignedAlloc)
+		{
+			return GMiMallocatorTLS.FreeSizeAligned(ptr, size, align);
+		}
+		else
+		{
+			InternalFree(ptr);
+		}
 	}
 
 private:
@@ -122,10 +151,16 @@ private:
 		{
 			return (offset != 0x7FFFFFFF) ? R_C(const FBlock*, R_C(const TBYTE*, this) + offset) : nullptr;
 		}
-		FBlock* operator=(FBlock* lhs)
+		const FBlock* operator=(const FBlockOffsetPtr& _rhs)
 		{
-			(lhs != nullptr) ? offset = S_C(int32_t, (R_C(TBYTE*, lhs) - R_C(TBYTE*, this))) : offset = 0x7FFFFFFF;
-			return lhs;
+			const FBlock* rhs = _rhs;
+			(rhs != nullptr) ? offset = S_C(int32_t, (R_C(const TBYTE*, rhs) - R_C(TBYTE*, this))) : offset = 0x7FFFFFFF;
+			return rhs;
+		}
+		FBlock* operator=(FBlock* rhs)
+		{
+			(rhs != nullptr) ? offset = S_C(int32_t, (R_C(TBYTE*, rhs) - R_C(TBYTE*, this))) : offset = 0x7FFFFFFF;
+			return rhs;
 		}
 		FBlock* operator->()
 		{
@@ -160,7 +195,7 @@ private:
 #endif
 	HLVM_INLINE_VAR HLVM_STATIC_VAR constexpr SizeType FBlock_Size = S_C(SizeType, sizeof(FBlock));
 	static_assert(N - 2 * FBlock_Size > 0);
-	HLVM_INLINE_VAR HLVM_STATIC_VAR constexpr SizeType Minimual_Block_Size = 24;
+	HLVM_INLINE_VAR HLVM_STATIC_VAR constexpr SizeType Minimal_Block_Size = 24;
 
 	void* InternalMalloc(size_t _size) noexcept(bValidate)
 	{
@@ -183,7 +218,7 @@ private:
 					FBlock* PrevFreeBlock = FreeBlock->prevFreeBlock;
 
 					SizeType NewFreeBlockSize = (FreeBlock->size - FBlock_Size - size);
-					if (NewFreeBlockSize < Minimual_Block_Size)
+					if (NewFreeBlockSize < Minimal_Block_Size)
 					{
 						// New free block is trivial
 						// Mark current free block not free anymore
@@ -242,6 +277,7 @@ private:
 				}
 			}
 			HLVM_CONSTEXPR_ASSERT(bValidate, FreeBlock == mTail);
+			HLVM_CONSTEXPR_ASSERT(bValidate, mFreeSizeUpperBound >= 0);
 		}
 		// Running out of free blocks in stack, try heap
 		if constexpr (bAllowOverflowToHeap)
@@ -293,9 +329,6 @@ private:
 						HLVM_CONSTEXPR_ASSERT(bValidate, CurrBlock->size != 0 && NextBlock->size != 0);
 						if (CurrBlock->size < 0 || NextBlock->size < 0)
 						{
-							// If not both blocks are free, continue
-							CurrBlock = NextBlock;
-							NextBlock = R_C(FBlock*, R_C(TBYTE*, CurrBlock) + FBlock_Size + std::abs(CurrBlock->size));
 							break;
 						}
 						else
@@ -324,32 +357,73 @@ private:
 								mFreeSizeUpperBound = CurrBlock->size;
 							}
 
+							// Iterate to next block
 							NextBlock = R_C(FBlock*, R_C(TBYTE*, NextBlock) + FBlock_Size + NextBlock->size);
 							HLVM_CONSTEXPR_ASSERT(bValidate, NextBlock == R_C(FBlock*, R_C(TBYTE*, CurrBlock) + FBlock_Size + CurrBlock->size));
 						}
 					}
 				}
 
-				// Swap next block if it is bigger than current free head,
-				// so to keep free head a larger block size for easier allocation next time
-				if (FBlock* NextBlock = mFreeBlockHead->nextFreeBlock;
-					NextBlock->size > mFreeBlockHead->size)
 				{
-					// Sanity checks
-					HLVM_CONSTEXPR_ASSERT(bValidate, NextBlock->prevFreeBlock == mFreeBlockHead);
-					FBlock* NextBlockNext = NextBlock->nextFreeBlock;
-					HLVM_CONSTEXPR_ASSERT(bValidate, NextBlockNext && NextBlockNext != NextBlock && NextBlockNext->prevFreeBlock == NextBlock);
+					// Swap next block if it is bigger than current free head,
+					// so to keep free head a larger block size for easier allocation next time
+#if 1 // Fast path
+					if (FBlock* NextBlock = mFreeBlockHead->nextFreeBlock;
+						NextBlock->size > mFreeBlockHead->size)
+					{
+						// Sanity checks
+						HLVM_CONSTEXPR_ASSERT(bValidate, NextBlock->prevFreeBlock == mFreeBlockHead);
+						FBlock* NextBlockNext = NextBlock->nextFreeBlock;
+						HLVM_CONSTEXPR_ASSERT(bValidate, NextBlockNext && NextBlockNext != NextBlock && NextBlockNext->prevFreeBlock == NextBlock);
+						// Skip next and connect free head with next block's next
+						HLVM_CONSTEXPR_ASSERT(bValidate, NextBlockNext != mFreeBlockHead);
+						mFreeBlockHead->nextFreeBlock = NextBlockNext;
+						NextBlockNext->prevFreeBlock = mFreeBlockHead;
+						// Swap next block with free head
+						NextBlock->prevFreeBlock = nullptr;
+						NextBlock->nextFreeBlock = mFreeBlockHead;
+						mFreeBlockHead->prevFreeBlock = NextBlock;
+						mFreeBlockHead = NextBlock;
+					}
+#else
+					FBlock* CurrBlock = mFreeBlockHead;
+					FBlock* NextBlock = CurrBlock->nextFreeBlock;
+					bool	bFirst = true;
+					while (NextBlock->size > CurrBlock->size)
+					{
+						// Sanity checks
+						HLVM_CONSTEXPR_ASSERT(bValidate, NextBlock->prevFreeBlock == CurrBlock);
+						FBlock* NextBlockNext = NextBlock->nextFreeBlock;
+						HLVM_CONSTEXPR_ASSERT(bValidate, NextBlockNext && NextBlockNext != NextBlock && NextBlockNext->prevFreeBlock == NextBlock);
 
-					// Skip next and connect free head with next block's next
-					HLVM_CONSTEXPR_ASSERT(bValidate, NextBlockNext != mFreeBlockHead);
-					mFreeBlockHead->nextFreeBlock = NextBlockNext;
-					NextBlockNext->prevFreeBlock = mFreeBlockHead;
+						// Skip next and connect current with next block's next
+						HLVM_CONSTEXPR_ASSERT(bValidate, NextBlockNext != CurrBlock);
+						CurrBlock->nextFreeBlock = NextBlockNext;
+						NextBlockNext->prevFreeBlock = CurrBlock;
 
-					// Swap next block with free head
-					NextBlock->prevFreeBlock = nullptr;
-					NextBlock->nextFreeBlock = mFreeBlockHead;
-					mFreeBlockHead->prevFreeBlock = NextBlock;
-					mFreeBlockHead = NextBlock;
+						// Skip current and connect current block's prev with next
+						FBlock* CurrPrevBlock = CurrBlock->prevFreeBlock;
+						NextBlock->prevFreeBlock = CurrPrevBlock;
+						if (CurrPrevBlock)
+						{
+							CurrPrevBlock->nextFreeBlock = NextBlock;
+						}
+
+						// Swap next block with free head
+						NextBlock->nextFreeBlock = CurrBlock;
+						CurrBlock->prevFreeBlock = NextBlock;
+
+						// Only update mFreeBlockHead once!
+						if (bFirst)
+						{
+							bFirst = false;
+							mFreeBlockHead = NextBlock;
+						}
+
+						// Iterate to next block
+						NextBlock = NextBlockNext;
+					}
+#endif
 				}
 
 				/**

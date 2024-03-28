@@ -255,7 +255,7 @@ RECORD(pool_test)
 	constexpr int kNumThreads = 10;
 	constexpr int kNumIterations = 50;
 	constexpr int kNumLoops = 10000;
-	double		  time_concurrent, time_lock = 0;
+	double		  time_1, time_2, time_3 = 0;
 	{
 		HLVM_LOG(LogTest, info, TXT("Pool test #1 Thread"));
 		auto Test1Func = [&](double& Duration) -> bool {
@@ -303,8 +303,8 @@ RECORD(pool_test)
 			return true;
 		};
 
-		time_concurrent = RunTestAndCalculateAvg(Test1Func, kNumIterations);
-		HLVM_LOG(LogTest, info, TXT("Pool test #1 ThreadPool avg took {0:f}, iter {1:d}"), time_concurrent, kNumIterations);
+		time_1 = RunTestAndCalculateAvg(Test1Func, kNumIterations);
+		HLVM_LOG(LogTest, info, TXT("Pool test #1 ThreadPool avg took {0:f}, iter {1:d}"), time_1, kNumIterations);
 	}
 
 	{
@@ -355,8 +355,8 @@ RECORD(pool_test)
 			return true;
 		};
 
-		time_lock = RunTestAndCalculateAvg(Test2Func, kNumIterations);
-		HLVM_LOG(LogTest, info, TXT("Pool test #2 Fiber avg took {0:f}, iter {1:d}"), time_lock, kNumIterations);
+		time_2 = RunTestAndCalculateAvg(Test2Func, kNumIterations);
+		HLVM_LOG(LogTest, info, TXT("Pool test #2 Fiber avg took {0:f}, iter {1:d}"), time_2, kNumIterations);
 #else
 		auto Test2Func = [&](double& Duration) -> bool {
 			std::atomic_int_fast32_t								Number = 0;
@@ -402,11 +402,62 @@ RECORD(pool_test)
 			return true;
 		};
 
-		time_lock = RunTestAndCalculateAvg(Test2Func, kNumIterations);
-		HLVM_LOG(LogTest, info, TXT("Pool test #2 Fiber avg took {0:f}, iter {1:d}"), time_lock, kNumIterations);
+		time_2 = RunTestAndCalculateAvg(Test2Func, kNumIterations);
+		HLVM_LOG(LogTest, info, TXT("Pool test #2 Fiber avg took {0:f}, iter {1:d}"), time_2, kNumIterations);
 #endif
 	}
 
-	double ratio = time_lock / time_concurrent;
-	HLVM_LOG(LogTest, info, TXT("Pool Test Thread #1 = {0:.2f}x faster than Pool Test Fiber #2"), ratio);
+	HLVM_LOG(LogTest, info, TXT("Pool Test Thread #1 = {0:.2f}x faster than Pool Test Fiber #2"), time_2 / time_1);
+
+	{
+		HLVM_LOG(LogTest, info, TXT("Pool test #3 Async"));
+		auto Test3Func = [&](double& Duration) -> bool {
+			std::atomic_int_fast32_t	   Number = 0;
+			FTimer						   Timer;
+			std::once_flag				   Flag;
+			std::atomic_int_fast32_t	   Counter{ kNumThreads };
+			std::vector<std::future<void>> PushThreads;
+			std::vector<std::future<void>> PopThreads;
+
+			for (int i = 0; i < kNumThreads; ++i)
+			{
+				PushThreads.emplace_back(std::async(std::launch::async, [&Number, &Timer, &Flag] {
+					std::call_once(Flag, [&Timer] {
+						Timer.Reset();
+					});
+					for (int j = 0; j < kNumLoops; ++j)
+					{
+						Number.fetch_add(1, std::memory_order_relaxed);
+					}
+				}));
+
+				PopThreads.emplace_back(std::async(std::launch::async, [&Number, &Timer, &Counter, &Duration] {
+					for (int j = 0; j < kNumLoops; ++j)
+					{
+						Number.fetch_sub(1, std::memory_order_relaxed);
+					}
+					if (--Counter == 0)
+					{
+						Duration = Timer.Mark();
+					}
+				}));
+			}
+
+			for (auto& t : PushThreads)
+			{
+				t.wait();
+			}
+			for (auto& t : PopThreads)
+			{
+				t.wait();
+			}
+			HLVM_LOG(LogTest, info, TXT("Pool test #3 took {0:f}, queue size {1:d}"), Duration, Number.load());
+			return true;
+		};
+
+		time_3 = RunTestAndCalculateAvg(Test3Func, kNumIterations);
+		HLVM_LOG(LogTest, info, TXT("Pool test #3 ThreadPool avg took {0:f}, iter {1:d}"), time_3, kNumIterations);
+	}
+
+	HLVM_LOG(LogTest, info, TXT("Pool Test Thread #1 = {0:.2f}x faster than Pool Test Aync #3"), time_3 / time_1);
 };

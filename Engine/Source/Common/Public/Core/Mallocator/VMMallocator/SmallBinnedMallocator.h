@@ -30,12 +30,16 @@ public:
 	void Init(FVMArena* _Mallocator) final override
 	{
 		Mallocator = _Mallocator;
-		mFirstBlocks32 = InternalAllocateBlocks32();
-		mLastFreedBlocks32 = mFirstBlocks32;
 	}
 
 	void* Malloc() final override
 	{
+		if (!mFirstBlocks32)
+		{
+			mFirstBlocks32 = InternalAllocateBlocks32();
+			mLastFreedBlocks32 = mFirstBlocks32;
+		}
+
 		uint32_t freeIndex = mLastFreedBlocks32->GetHighestFreeBit();
 		if (freeIndex == BlockRunOutFreeIndex)
 		{

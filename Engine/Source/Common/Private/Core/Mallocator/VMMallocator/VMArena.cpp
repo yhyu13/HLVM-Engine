@@ -13,14 +13,6 @@ FVMArena::FVMArena(FMiMallocator* _MiMallocator, const FVMArenaInitContext& _Ini
 	: MiMallocator(_MiMallocator), mInitCtx(_InitContext)
 {
 	/**
-	 * Intialize small binning allocators (using fancy compile time for-loop)
-	 */
-	ct_for<0, HLVM_SMALL_ALLOC_THRESHOLD / HLVM_SMALL_ALLOC_ALIGNMENT, 1, TUINT8>([&](auto i) {
-		using BinnedMallocatorType = FSmallBinnedMallocator<(i.value + 1) * HLVM_SMALL_ALLOC_ALIGNMENT>;
-		mSmallBinnedMallocators[i] = new (MiMallocator->Malloc(sizeof(BinnedMallocatorType))) BinnedMallocatorType();
-		mSmallBinnedMallocators[i]->Init(this);
-	});
-	/**
 	 * Initialize heap chain, heaps are where we acquire memory from mimalloc and manage small/large allocations on our own
 	 */
 	HLVM_CONSTEXPR_ASSERT(bValidate, mInitCtx.Valid());
@@ -55,10 +47,30 @@ FVMArena::FVMArena(FMiMallocator* _MiMallocator, const FVMArenaInitContext& _Ini
 		}
 		HLVM_LOG(LogVMArena, debug, TXT("VMArena: Initialized %d default heaps"), i + 1);
 	}
+
+	/**
+	 * Intialize small binning allocators (using fancy compile time for-loop)
+	 */
+	ct_for<0, HLVM_SMALL_ALLOC_THRESHOLD / HLVM_SMALL_ALLOC_ALIGNMENT, 1, TUINT8>([&](auto i) {
+		using BinnedMallocatorType = FSmallBinnedMallocator<(i.value + 1) * HLVM_SMALL_ALLOC_ALIGNMENT>;
+		mSmallBinnedMallocators[i] = new (MiMallocator->Malloc(sizeof(BinnedMallocatorType))) BinnedMallocatorType();
+		mSmallBinnedMallocators[i]->Init(this);
+	});
 }
 
 FVMArena::~FVMArena()
 {
+	/**
+	 * Free all small binned allocators
+	 */
+	for (size_t i = 0; i < HLVM_SMALL_ALLOC_THRESHOLD / HLVM_SMALL_ALLOC_ALIGNMENT; ++i)
+	{
+		if (mSmallBinnedMallocators[i])
+		{
+			mSmallBinnedMallocators[i]->~ISmallBinnedMallocator();
+			MiMallocator->Free(mSmallBinnedMallocators[i]);
+		}
+	}
 	/**
 	 * Free all heaps
 	 */

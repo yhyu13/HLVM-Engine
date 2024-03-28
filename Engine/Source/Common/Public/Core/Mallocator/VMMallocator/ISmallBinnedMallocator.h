@@ -5,14 +5,7 @@
 #pragma once
 
 #include "Core/Mallocator/IMallocator.h"
-
-#ifndef HLVM_SMALL_ALLOC_THRESHOLD
-	#define HLVM_SMALL_ALLOC_THRESHOLD 240 // Must be smaller than 256
-#endif
-
-#ifndef HLVM_SMALL_ALLOC_ALIGNMENT
-	#define HLVM_SMALL_ALLOC_ALIGNMENT 16 // Every binned allocator manage a multiplier of alignment
-#endif
+#include "VMMallocatorDefinition.h"
 
 struct FSmallBinnedBlockHead
 {

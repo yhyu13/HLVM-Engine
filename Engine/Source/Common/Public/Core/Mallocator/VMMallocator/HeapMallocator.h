@@ -6,7 +6,9 @@
 
 #include "Platform/GenericPlatformAtomicPointer.h"
 #include "Core/Mallocator/MiMallocator.h"
+#include "VMMallocatorDefinition.h"
 
+class FVMArena;
 class FHeapMallocator
 {
 	HLVM_INLINE_VAR HLVM_STATIC_VAR constexpr bool bValidate = HLVM_MALLOC_VALIDATION;
@@ -83,7 +85,7 @@ private:
 	static_assert(sizeof(FBlock) == 16, "FBlock size must be 16 bytes");
 
 	HLVM_INLINE_VAR HLVM_STATIC_VAR constexpr SizeType FBlock_Size = S_C(SizeType, sizeof(FBlock));
-	HLVM_INLINE_VAR HLVM_STATIC_VAR constexpr SizeType Minimual_Block_Size = 24;
+	HLVM_INLINE_VAR HLVM_STATIC_VAR constexpr SizeType Minimal_Block_Size = HLVM_SMALL_ALLOC_THRESHOLD;
 
 	FBlock*	 mFreeBlockHead{ nullptr };
 	FBlock*	 mTail{ nullptr };
