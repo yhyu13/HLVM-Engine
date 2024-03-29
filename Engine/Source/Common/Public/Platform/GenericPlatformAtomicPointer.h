@@ -41,5 +41,5 @@ public:
 		typename TAtomicPointer<T>::ValueType desired) noexcept;
 };
 
-#include "LinuGNU/LinuxGNUPlatformAtomicPointer.hpp"
-#include "Windows/WindowsPlatformAtomicPointer.hpp"
+#include "LinuGNU/LinuxGNUPlatformAtomicPointer.tpp"
+#include "Windows/WindowsPlatformAtomicPointer.tpp"

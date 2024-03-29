@@ -6,6 +6,7 @@
 #include "Core/Log.h"
 #include "Platform/GenericPlatformDebuggerUtil.h"
 #include "Template/PrintTemplate.tpp"
+#include "Template/AlignTemplate.tpp"
 
 /**
  * Override new and delete operator
@@ -202,6 +203,7 @@ void operator delete[](void* p, const std::nothrow_t&) noexcept
 mi_decl_new(n) void* operator new(std::size_t n) noexcept(false)
 {
 	// hlvm_printf("new %s\n", n);
+	n = AlignUp(n, HLVM_MALLOC_ALIGNMENT);
 	HLVM_MIMALLOC_USE()
 	{
 		void* p = S_C(FMiMallocator*, GMallocatorTLS)->Malloc(n);
@@ -221,6 +223,7 @@ mi_decl_new(n) void* operator new(std::size_t n) noexcept(false)
 mi_decl_new(n) void* operator new[](std::size_t n) noexcept(false)
 {
 	// hlvm_printf("new[] %s\n", n);
+	n = AlignUp(n, HLVM_MALLOC_ALIGNMENT);
 	HLVM_MIMALLOC_USE()
 	{
 		void* p = S_C(FMiMallocator*, GMallocatorTLS)->Malloc(n);
@@ -241,6 +244,7 @@ mi_decl_new(n) void* operator new[](std::size_t n) noexcept(false)
 mi_decl_new_nothrow(n) void* operator new(std::size_t n, const std::nothrow_t&) noexcept
 {
 	// hlvm_printf("new %s\n", n);
+	n = AlignUp(n, HLVM_MALLOC_ALIGNMENT);
 	HLVM_MIMALLOC_USE()
 	{
 		void* p = S_C(FMiMallocator*, GMallocatorTLS)->Malloc2(n);
@@ -260,6 +264,7 @@ mi_decl_new_nothrow(n) void* operator new(std::size_t n, const std::nothrow_t&) 
 mi_decl_new_nothrow(n) void* operator new[](std::size_t n, const std::nothrow_t&) noexcept
 {
 	// hlvm_printf("new[] %s\n", n);
+	n = AlignUp(n, HLVM_MALLOC_ALIGNMENT);
 	HLVM_MIMALLOC_USE()
 	{
 		void* p = S_C(FMiMallocator*, GMallocatorTLS)->Malloc2(n);
@@ -311,33 +316,33 @@ void operator delete[](void* p, std::size_t n) noexcept
 		#if (__cplusplus > 201402L || defined(__cpp_aligned_new))
 void operator delete(void* p, std::align_val_t al) noexcept
 {
-	size_t n = static_cast<size_t>(al);
+	size_t align = static_cast<size_t>(al);
 	HLVM_MIMALLOC_OWNED(p)
 	{
-		S_C(FMiMallocator*, GMallocatorTLS)->FreeAligned(p, n);
+		S_C(FMiMallocator*, GMallocatorTLS)->FreeAligned(p, align);
 		return;
 	}
 	HLVM_STACK_OWNED(p)
 	{
-		GMallocatorTLS->FreeAligned(p, n);
+		GMallocatorTLS->FreeAligned(p, align);
 		return;
 	}
-	GMiMallocatorTLS.FreeAligned(p, n);
+	GMiMallocatorTLS.FreeAligned(p, align);
 }
 void operator delete[](void* p, std::align_val_t al) noexcept
 {
-	size_t n = static_cast<size_t>(al);
+	size_t align = static_cast<size_t>(al);
 	HLVM_MIMALLOC_OWNED(p)
 	{
-		S_C(FMiMallocator*, GMallocatorTLS)->FreeAligned(p, n);
+		S_C(FMiMallocator*, GMallocatorTLS)->FreeAligned(p, align);
 		return;
 	}
 	HLVM_STACK_OWNED(p)
 	{
-		GMallocatorTLS->FreeAligned(p, n);
+		GMallocatorTLS->FreeAligned(p, align);
 		return;
 	}
-	GMiMallocatorTLS.FreeAligned(p, n);
+	GMiMallocatorTLS.FreeAligned(p, align);
 }
 void operator delete(void* p, std::size_t n, std::align_val_t al) noexcept
 {
@@ -371,38 +376,39 @@ void operator delete[](void* p, std::size_t n, std::align_val_t al) noexcept
 };
 void operator delete(void* p, std::align_val_t al, const std::nothrow_t&) noexcept
 {
-	size_t n = static_cast<size_t>(al);
+	size_t align = static_cast<size_t>(al);
 	HLVM_MIMALLOC_OWNED(p)
 	{
-		S_C(FMiMallocator*, GMallocatorTLS)->FreeAligned(p, n);
+		S_C(FMiMallocator*, GMallocatorTLS)->FreeAligned(p, align);
 		return;
 	}
 	HLVM_STACK_OWNED(p)
 	{
-		GMallocatorTLS->FreeAligned(p, n);
+		GMallocatorTLS->FreeAligned(p, align);
 		return;
 	}
-	GMiMallocatorTLS.FreeAligned(p, n);
+	GMiMallocatorTLS.FreeAligned(p, align);
 }
 void operator delete[](void* p, std::align_val_t al, const std::nothrow_t&) noexcept
 {
-	size_t n = static_cast<size_t>(al);
+	size_t align = static_cast<size_t>(al);
 	HLVM_MIMALLOC_OWNED(p)
 	{
-		S_C(FMiMallocator*, GMallocatorTLS)->FreeAligned(p, n);
+		S_C(FMiMallocator*, GMallocatorTLS)->FreeAligned(p, align);
 		return;
 	}
 	HLVM_STACK_OWNED(p)
 	{
-		GMallocatorTLS->FreeAligned(p, n);
+		GMallocatorTLS->FreeAligned(p, align);
 		return;
 	}
-	GMiMallocatorTLS.FreeAligned(p, n);
+	GMiMallocatorTLS.FreeAligned(p, align);
 }
 
 void* operator new(std::size_t n, std::align_val_t al) noexcept(false)
 {
 	size_t align = static_cast<size_t>(al);
+	n = AlignUp(n, align);
 	HLVM_MIMALLOC_USE()
 	{
 		void* p = S_C(FMiMallocator*, GMallocatorTLS)->MallocAligned(n, align);
@@ -422,6 +428,7 @@ void* operator new(std::size_t n, std::align_val_t al) noexcept(false)
 void* operator new[](std::size_t n, std::align_val_t al) noexcept(false)
 {
 	size_t align = static_cast<size_t>(al);
+	n = AlignUp(n, align);
 	HLVM_MIMALLOC_USE()
 	{
 		void* p = S_C(FMiMallocator*, GMallocatorTLS)->MallocAligned(n, align);
@@ -441,6 +448,7 @@ void* operator new[](std::size_t n, std::align_val_t al) noexcept(false)
 void* operator new(std::size_t n, std::align_val_t al, const std::nothrow_t&) noexcept
 {
 	size_t align = static_cast<size_t>(al);
+	n = AlignUp(n, align);
 	HLVM_MIMALLOC_USE()
 	{
 		void* p = S_C(FMiMallocator*, GMallocatorTLS)->MallocAligned2(n, align);
@@ -460,6 +468,7 @@ void* operator new(std::size_t n, std::align_val_t al, const std::nothrow_t&) no
 void* operator new[](std::size_t n, std::align_val_t al, const std::nothrow_t&) noexcept
 {
 	size_t align = static_cast<size_t>(al);
+	n = AlignUp(n, align);
 	HLVM_MIMALLOC_USE()
 	{
 		void* p = S_C(FMiMallocator*, GMallocatorTLS)->MallocAligned2(n, align);

@@ -19,13 +19,13 @@ class FMiMallocator final : public IMallocator
 {
 public:
 	NOCOPYMOVE(FMiMallocator)
-	FMiMallocator(const FMiMallocatorContext& _Ctx = FMiMallocatorContext())
+	FMiMallocator(const FMiMallocatorContext& _Ctx = FMiMallocatorContext()) noexcept
 		: mCtx(_Ctx)
 	{
 		Type = EMallocator::Mimalloc;
 		mHeap = (mCtx.bNewHeap ? mi_heap_new() : mi_heap_get_default());
 	}
-	~FMiMallocator() final override
+	~FMiMallocator() noexcept final override
 	{
 		if (mCtx.bNewHeap)
 		{
@@ -45,19 +45,19 @@ public:
 		}
 	}
 	virtual bool				   Owened(void* ptr) noexcept final override;
-	HLVM_INLINE_FUNC virtual void* Malloc(size_t size) noexcept(false) final override
+	HLVM_INLINE_FUNC virtual void* Malloc(std::size_t size) noexcept(false) final override
 	{
 		return mi_heap_malloc(mHeap, size);
 	}
-	HLVM_INLINE_FUNC virtual void* Malloc2(size_t size) noexcept final override
+	HLVM_INLINE_FUNC virtual void* Malloc2(std::size_t size) noexcept final override
 	{
 		return mi_heap_malloc(mHeap, size);
 	}
-	HLVM_INLINE_FUNC virtual void* MallocAligned(size_t size, size_t alignment) noexcept(false) final override
+	HLVM_INLINE_FUNC virtual void* MallocAligned(std::size_t size, std::size_t alignment) noexcept(false) final override
 	{
 		return mi_heap_malloc_aligned(mHeap, size, alignment);
 	}
-	HLVM_INLINE_FUNC virtual void* MallocAligned2(size_t size, size_t alignment) noexcept final override
+	HLVM_INLINE_FUNC virtual void* MallocAligned2(std::size_t size, std::size_t alignment) noexcept final override
 	{
 		return mi_heap_malloc_aligned(mHeap, size, alignment);
 	}
@@ -65,15 +65,15 @@ public:
 	{
 		mi_free(ptr);
 	}
-	HLVM_INLINE_FUNC virtual void FreeSize(void* ptr, size_t size) noexcept final override
+	HLVM_INLINE_FUNC virtual void FreeSize(void* ptr, std::size_t size) noexcept final override
 	{
 		mi_free_size(ptr, size);
 	}
-	HLVM_INLINE_FUNC virtual void FreeAligned(void* ptr, size_t alignment) noexcept final override
+	HLVM_INLINE_FUNC virtual void FreeAligned(void* ptr, std::size_t alignment) noexcept final override
 	{
 		mi_free_aligned(ptr, alignment);
 	}
-	HLVM_INLINE_FUNC virtual void FreeSizeAligned(void* ptr, size_t size, size_t alignment) noexcept final override
+	HLVM_INLINE_FUNC virtual void FreeSizeAligned(void* ptr, std::size_t size, std::size_t alignment) noexcept final override
 	{
 		mi_free_size_aligned(ptr, size, alignment);
 	}

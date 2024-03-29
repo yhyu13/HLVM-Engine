@@ -140,7 +140,7 @@ IFileHandle::OpRetType FPackedFileHandle::Open(const FPath& FilePath, const FFil
 					.Size(fileSize);
 				// Read token file in 1 shot
 				PFH_HANDLE_ENSURE(fileSize > 0, TXT("Packed token file size invalid {}"), fileSize);
-				TVector<std::byte> TokenData{ fileSize };
+				TVector<TBYTE> TokenData{ fileSize };
 				fileHandle.Read(TokenData.data(), TokenData.size(), { .Offset = 0, .Whence = EWhence::Begin });
 
 #if HLVM_PACKED_FILE_WITH_SIGNATURE
@@ -155,14 +155,14 @@ IFileHandle::OpRetType FPackedFileHandle::Open(const FPath& FilePath, const FFil
 #else
 					const auto& Decrypted = TokenData;
 #endif
-					const auto Decompressed = FZstd::Decompress({ R_C(const std::byte*, Decrypted.data()), Decrypted.size() });
+					const auto Decompressed = FZstd::Decompress({ R_C(const TBYTE*, Decrypted.data()), Decrypted.size() });
 
 					/**
 					 * Deserialize token entry from file buffer
 					 */
-					const std::byte* lineStart = Decompressed.data();
-					const std::byte* lineEnd = lineStart + FPackedTokenEntry_SerializedSize;
-					const std::byte* tokenDataEnd = lineStart + Decompressed.size();
+					const TBYTE* lineStart = Decompressed.data();
+					const TBYTE* lineEnd = lineStart + FPackedTokenEntry_SerializedSize;
+					const TBYTE* tokenDataEnd = lineStart + Decompressed.size();
 
 					size_t Num = 0;
 					auto   ExtractTokenEntry = [&](FPackedTokenEntry& Entry) {

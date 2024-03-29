@@ -12,7 +12,7 @@
 
 struct FMD5Digest
 {
-	std::byte digest[16];
+	TBYTE digest[16];
 
 	FMD5Digest() = default;
 	explicit FMD5Digest(boost::uuids::detail::md5::digest_type&& data);
@@ -28,7 +28,7 @@ public:
 
 struct FSHA1Digest
 {
-	std::byte digest[20];
+	TBYTE digest[20];
 
 	FSHA1Digest() = default;
 	explicit FSHA1Digest(boost::uuids::detail::sha1::digest_type&& data);

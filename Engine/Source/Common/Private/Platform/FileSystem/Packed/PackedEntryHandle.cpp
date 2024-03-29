@@ -11,7 +11,6 @@
 
 DECLARE_LOG_CATEGORY(LogPackedEntryHandle)
 
-
 #define PEH_SCOPE_LOCK()
 
 #define PEH_HANDLE_EXCPETIONS() HandleException(Status_InOut, TO_TCHAR_STR(__FUNCTION__), Exception)
@@ -72,7 +71,7 @@ IFileHandle::OpRetType FPackedEntryHandle::Open(const FPath& FilePath, const FFi
 			auto RawBuffer = Fragment->GetSubRegion(*Data);
 
 			// Decryption
-			TVector<std::byte> DecryptedBuffer;
+			TVector<TBYTE> DecryptedBuffer;
 			switch (Data->EncryptType)
 			{
 				case EEncryptType::RSA_PKCS8:
@@ -124,7 +123,7 @@ IFileHandle::OpRetType FPackedEntryHandle::Open(const FPath& FilePath, const FFi
 		}
 		mOpened = true;
 		Status_InOut->eFileOpStatus = EFileOpStatus::Success;
-		PEH_VERBOSE_LOG(TXT("Open success with mode {}"), HLVM_ENUM_TCHAR_STR(mFileOptions.eFileMode));
+		PEH_VERBOSE_LOG(TXT("Open success with content size {}"), mContentBuffer.size());
 	}
 	catch (std::exception& Exception)
 	{

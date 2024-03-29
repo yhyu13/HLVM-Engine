@@ -167,7 +167,7 @@ RECORD(packed_test)
 				const auto& Entry_Dev = get<0>(PackedData[i]);
 				const auto& ContentBuffer = get<1>(PackedData[i]);
 				{
-					std::byte	buffer[FPackedTokenEntry_SerializedSize];
+					TBYTE		buffer[FPackedTokenEntry_SerializedSize];
 					FByteBuffer buffer_span = buffer;
 					bool		bSuccess = SerializeTo(Entry_Dev.Entry, buffer_span);
 					HLVM_ENSURE(bSuccess, TXT("SerializeTo failed"));

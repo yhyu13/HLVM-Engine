@@ -23,7 +23,7 @@ namespace hlvm_private
 /*
 	Reference https://en.cppreference.com/w/cpp/named_req/Allocator
 */
-template <class T>
+template <class T, bool bForceAlignedAlloc = false>
 struct TMallocator
 {
 	HLVM_INLINE_VAR HLVM_STATIC_VAR FString sTypeName{ typeid(T).name() };
@@ -58,7 +58,14 @@ struct TMallocator
 		if (Mallocator)
 		{
 			// Using static_cast instead of reinterpret_cast because malloc might return nullptr or NULL
-			p = Mallocator->Malloc(realSize);
+			if constexpr (bForceAlignedAlloc)
+			{
+				p = Mallocator->MallocAligned(realSize, alignof(T));
+			}
+			else
+			{
+				p = Mallocator->Malloc(realSize);
+			}
 		}
 		else
 		{
@@ -84,7 +91,14 @@ struct TMallocator
 		size_t realSize = n * sizeof(T);
 		if (Mallocator)
 		{
-			Mallocator->FreeSize(p, realSize);
+			if constexpr (bForceAlignedAlloc)
+			{
+				Mallocator->FreeSizeAligned(p, realSize, alignof(T));
+			}
+			else
+			{
+				Mallocator->FreeSize(p, realSize);
+			}
 		}
 		else
 		{

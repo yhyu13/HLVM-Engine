@@ -21,7 +21,8 @@ void FPackedContainerFragment::Open()
 		/**
 		 * Move construct our Region of interest
 		 */
-		Region = MoveTemp(mapped_region(*FileMapping, read_only, S_C(offset_t, FragmentStartPos), FragmentSize, nullptr, default_map_options));
+		// CAUTION : If throwing is xsi errors on Linux system, switch back mode to read_only instead of read_private
+		Region = MoveTemp(mapped_region(*FileMapping, read_private, S_C(offset_t, FragmentStartPos), FragmentSize, nullptr, default_map_options));
 	}
 }
 
@@ -44,5 +45,5 @@ HLVM_NODISCARD FConstByteBuffer FPackedContainerFragment::GetSubRegion(const FPa
 	size_t	   Offset = Data.StartPos - FragmentStartPos;
 	const bool bValid = Region.get_size() > 0;
 	HLVM_ASSERT(bValid && Data.StartPos >= FragmentStartPos && Offset + Data.Size <= FragmentSize, TXT("Offset out of bounds"));
-	return FConstByteBuffer(R_C(const std::byte*, Region.get_address()) + Offset, Data.Size);
+	return FConstByteBuffer(R_C(const TBYTE*, Region.get_address()) + Offset, Data.Size);
 }

@@ -5,31 +5,34 @@
 #pragma once
 #include <iostream>
 
-/**
- * Templated printf that require now memory allocation, format only accept %% or %s for simplicity
- */
-template <typename T>
-const char* hlvm_printf_inner(const char* format, T value)
+namespace hlvm_private
 {
-	std::cout << value;
-	return format;
-}
+	/**
+	 * Templated printf that require now memory allocation, format only accept %% or %s for simplicity
+	 */
+	template <typename T, typename U>
+	const char* StreamPrintfInner(T* ostream, const char* format, U value)
+	{
+		*ostream << value;
+		return format;
+	}
+
+	/**
+	 * Templated printf that require now memory allocation, format only accept %% or %s for simplicity
+	 */
+	template <typename T, typename U, typename... Args>
+	const char* StreamPrintfInner(T* ostream, const char* format, U first, Args... args)
+	{
+		*ostream << first;
+		return StreamPrintf(ostream, format, args...);
+	}
+} // namespace hlvm_private
 
 /**
  * Templated printf that require now memory allocation, format only accept %% or %s for simplicity
  */
 template <typename T, typename... Args>
-const char* hlvm_printf_inner(const char* format, T first, Args... args)
-{
-	std::cout << first;
-	return hlvm_printf(format, args...);
-}
-
-/**
- * Templated printf that require now memory allocation, format only accept %% or %s for simplicity
- */
-template <typename... Args>
-const char* hlvm_printf(const char* format, Args... args)
+const char* StreamPrintf(T* ostream, const char* format, Args... args)
 {
 	const char* current = format;
 	while (*current)
@@ -40,12 +43,12 @@ const char* hlvm_printf(const char* format, Args... args)
 			++current;
 			if (*current == '%')
 			{
-				std::cout << '%';
+				*ostream << '%';
 			}
 			else if (*current == 's')
 			{
 				++current;
-				current = hlvm_printf_inner(current, args...);
+				current = hlvm_private::StreamPrintfInner(ostream, current, args...);
 				// If still has printable content, we continue. Else we stop
 				if (*current)
 				{
@@ -61,7 +64,7 @@ const char* hlvm_printf(const char* format, Args... args)
 		}
 		else
 		{
-			std::cout << *current;
+			*ostream << *current;
 		}
 		++current;
 	}

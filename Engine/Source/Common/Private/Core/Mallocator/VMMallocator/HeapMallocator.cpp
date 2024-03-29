@@ -92,20 +92,21 @@ void* FHeapMallocator::Malloc(size_t _size)
 					FBlock* PrevFreeBlock = FreeBlock->prevFreeBlock;
 
 					SizeType NewFreeBlockSize = (FreeBlock->size - FBlock_Size - size);
-					if (NewFreeBlockSize < Minimal_Block_Size)
+					if (NewFreeBlockSize <= Minimal_Block_Size)
 					{
 						// New free block is trivial
 						// Mark current free block not free anymore
 						FreeBlock->size = (-FreeBlock->size);
 						NextFreeBlock->prevFreeBlock = PrevFreeBlock;
-						if (PrevFreeBlock)
+						//						if (PrevFreeBlock)
+						//						{
+						//							HLVM_CONSTEXPR_ASSERT(bValidate,
+						//								PrevFreeBlock && PrevFreeBlock->nextFreeBlock == FreeBlock && PrevFreeBlock->size > 0);
+						//							PrevFreeBlock->nextFreeBlock = NextFreeBlock;
+						//						}
+						//						else
 						{
-							HLVM_CONSTEXPR_ASSERT(bValidate,
-								PrevFreeBlock && PrevFreeBlock->nextFreeBlock == FreeBlock && PrevFreeBlock->size > 0);
-							PrevFreeBlock->nextFreeBlock = NextFreeBlock;
-						}
-						else
-						{
+							HLVM_CONSTEXPR_ASSERT(bValidate, PrevFreeBlock == nullptr);
 							HLVM_CONSTEXPR_ASSERT(bValidate, mFreeBlockHead == FreeBlock);
 							mFreeBlockHead = NextFreeBlock;
 						}
@@ -123,14 +124,16 @@ void* FHeapMallocator::Malloc(size_t _size)
 						NewFreeBlock->nextFreeBlock = NextFreeBlock;
 						NewFreeBlock->prevFreeBlock = PrevFreeBlock;
 						NextFreeBlock->prevFreeBlock = NewFreeBlock;
-						if (PrevFreeBlock)
+						//						if (PrevFreeBlock)
+						//						{
+						//							HLVM_CONSTEXPR_ASSERT(bValidate,
+						//								PrevFreeBlock && PrevFreeBlock->nextFreeBlock == FreeBlock && PrevFreeBlock->size > 0);
+						//							PrevFreeBlock->nextFreeBlock = NewFreeBlock;
+						//						}
+						//						else
 						{
-							HLVM_CONSTEXPR_ASSERT(bValidate,
-								PrevFreeBlock && PrevFreeBlock->nextFreeBlock == FreeBlock && PrevFreeBlock->size > 0);
-							PrevFreeBlock->nextFreeBlock = NewFreeBlock;
-						}
-						else
-						{
+							HLVM_CONSTEXPR_ASSERT(bValidate, PrevFreeBlock == nullptr);
+							HLVM_CONSTEXPR_ASSERT(bValidate, mFreeBlockHead == FreeBlock);
 							// Otherwise, assign head to new free block
 							mFreeBlockHead = NewFreeBlock;
 						}

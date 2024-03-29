@@ -26,7 +26,7 @@ public:
 	using SizeType = int32_t;
 
 	NOCOPYMOVE(TStackMallocator)
-	TStackMallocator()
+	TStackMallocator() noexcept
 	{
 		Type = EMallocator::Stack;
 
@@ -47,7 +47,7 @@ public:
 		// Cache the lower bound memory address for stack pointers
 		mLowerBound = mStack + FBlock_Size;
 	}
-	~TStackMallocator() final override
+	~TStackMallocator() noexcept final override
 	{
 	}
 	HLVM_INLINE_FUNC virtual bool Owened(void* ptr) noexcept final override
@@ -61,15 +61,15 @@ public:
 			return false;
 		}
 	}
-	HLVM_INLINE_FUNC virtual void* Malloc(size_t size) noexcept(false) final override
+	HLVM_INLINE_FUNC virtual void* Malloc(std::size_t size) noexcept(false) final override
 	{
 		return InternalMalloc(size);
 	}
-	HLVM_INLINE_FUNC virtual void* Malloc2(size_t size) noexcept final override
+	HLVM_INLINE_FUNC virtual void* Malloc2(std::size_t size) noexcept final override
 	{
 		return InternalMalloc(size);
 	}
-	HLVM_INLINE_FUNC virtual void* MallocAligned(size_t size, size_t align) noexcept(false) final override
+	HLVM_INLINE_FUNC virtual void* MallocAligned(std::size_t size, std::size_t align) noexcept(false) final override
 	{
 		if constexpr (bUseHeapForAlignedAlloc)
 		{
@@ -80,7 +80,7 @@ public:
 			return InternalMalloc(size);
 		}
 	}
-	HLVM_INLINE_FUNC virtual void* MallocAligned2(size_t size, size_t align) noexcept final override
+	HLVM_INLINE_FUNC virtual void* MallocAligned2(std::size_t size, std::size_t align) noexcept final override
 	{
 		if constexpr (bUseHeapForAlignedAlloc)
 		{
@@ -95,11 +95,11 @@ public:
 	{
 		InternalFree(ptr);
 	}
-	HLVM_INLINE_FUNC virtual void FreeSize(void* ptr, size_t) noexcept final override
+	HLVM_INLINE_FUNC virtual void FreeSize(void* ptr, std::size_t) noexcept final override
 	{
 		InternalFree(ptr);
 	}
-	HLVM_INLINE_FUNC virtual void FreeAligned(void* ptr, size_t align) noexcept final override
+	HLVM_INLINE_FUNC virtual void FreeAligned(void* ptr, std::size_t align) noexcept final override
 	{
 		if constexpr (bUseHeapForAlignedAlloc)
 		{
@@ -110,7 +110,7 @@ public:
 			InternalFree(ptr);
 		}
 	}
-	HLVM_INLINE_FUNC virtual void FreeSizeAligned(void* ptr, size_t size, size_t align) noexcept final override
+	HLVM_INLINE_FUNC virtual void FreeSizeAligned(void* ptr, std::size_t size, std::size_t align) noexcept final override
 	{
 		if constexpr (bUseHeapForAlignedAlloc)
 		{
@@ -197,7 +197,7 @@ private:
 	static_assert(N - 2 * FBlock_Size > 0);
 	HLVM_INLINE_VAR HLVM_STATIC_VAR constexpr SizeType Minimal_Block_Size = 24;
 
-	void* InternalMalloc(size_t _size) noexcept(bValidate)
+	void* InternalMalloc(std::size_t _size) noexcept(bValidate)
 	{
 		SizeType size = S_C(SizeType, _size);
 		HLVM_CONSTEXPR_ASSERT(bValidate, size > 0 && size <= N - 2 * FBlock_Size);
@@ -218,7 +218,7 @@ private:
 					FBlock* PrevFreeBlock = FreeBlock->prevFreeBlock;
 
 					SizeType NewFreeBlockSize = (FreeBlock->size - FBlock_Size - size);
-					if (NewFreeBlockSize < Minimal_Block_Size)
+					if (NewFreeBlockSize <= Minimal_Block_Size)
 					{
 						// New free block is trivial
 						// Mark current free block not free anymore
@@ -255,6 +255,7 @@ private:
 						}
 						else
 						{
+							HLVM_CONSTEXPR_ASSERT(bValidate, mFreeBlockHead == FreeBlock);
 							// Otherwise, assign head to new free block
 							mFreeBlockHead = NewFreeBlock;
 						}

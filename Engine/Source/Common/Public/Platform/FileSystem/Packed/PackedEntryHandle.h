@@ -48,6 +48,6 @@ public:
 	HLVM_MAYBEUNUSED HLVM_NODISCARD virtual std::shared_ptr<IFFileStat> Stat(const FPath& FilePath) final override;
 
 private:
-	TVector<std::byte>	  mContentBuffer;
+	TVector<TBYTE>		  mContentBuffer;
 	FPackedEntryQuickFind mQuickFind;
 };

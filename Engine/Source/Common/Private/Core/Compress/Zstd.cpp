@@ -8,7 +8,7 @@
 
 DECLARE_LOG_CATEGORY(LogZstd)
 
-HLVM_NODISCARD TVector<std::byte> FZstd::Compress(const FConstByteBuffer& data, int compress_level, bool bShrink)
+HLVM_NODISCARD TVector<TBYTE> FZstd::Compress(const FConstByteBuffer& data, int compress_level, bool bShrink)
 {
 	HLVM_SCOPED_TIMER(FString::Format(TXT("Zstd compress size {} level {}"), data.size(), compress_level));
 
@@ -16,7 +16,7 @@ HLVM_NODISCARD TVector<std::byte> FZstd::Compress(const FConstByteBuffer& data, 
 	HLVM_ENSURE(ZSTD_isError(est_compress_size) == 0, TXT("ZSTD_compressBound = {}, ErrMsg: {}"),
 		est_compress_size, TO_TCHAR_STR(ZSTD_getErrorName(est_compress_size)));
 
-	TVector<std::byte> comp_buffer;
+	TVector<TBYTE> comp_buffer;
 	comp_buffer.resize(est_compress_size);
 	auto compress_size = ZSTD_compress(comp_buffer.data(), est_compress_size, data.data(), data.size(), compress_level);
 	comp_buffer.resize(compress_size);
@@ -32,7 +32,7 @@ HLVM_NODISCARD TVector<std::byte> FZstd::Compress(const FConstByteBuffer& data, 
 	return comp_buffer;
 }
 
-HLVM_NODISCARD TVector<std::byte> FZstd::Decompress(const FConstByteBuffer& data, bool bShrink)
+HLVM_NODISCARD TVector<TBYTE> FZstd::Decompress(const FConstByteBuffer& data, bool bShrink)
 {
 	HLVM_SCOPED_TIMER(FString::Format(TXT("Zstd decompress size {}"), data.size()));
 
@@ -42,7 +42,7 @@ HLVM_NODISCARD TVector<std::byte> FZstd::Decompress(const FConstByteBuffer& data
 	HLVM_ENSURE(est_decomp_size != ZSTD_CONTENTSIZE_ERROR, TXT("ZSTD_getFrameContentSize = {}, ErrMsg: {}"),
 		ZSTD_CONTENTSIZE_ERROR, TXT("an error occurred"));
 
-	TVector<std::byte> decomp_buffer;
+	TVector<TBYTE> decomp_buffer;
 	decomp_buffer.resize(est_decomp_size);
 	size_t const decomp_size = ZSTD_decompress(decomp_buffer.data(), est_decomp_size, data.data(), data.size());
 	decomp_buffer.resize(decomp_size);

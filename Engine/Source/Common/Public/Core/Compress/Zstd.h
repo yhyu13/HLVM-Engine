@@ -13,6 +13,6 @@
 class FZstd
 {
 public:
-	HLVM_NODISCARD HLVM_STATIC_FUNC TVector<std::byte> Compress(const FConstByteBuffer& data, int compress_level = 1, bool bShrink = HLVM_CONTAINER_SHRINK);
-	HLVM_NODISCARD HLVM_STATIC_FUNC TVector<std::byte> Decompress(const FConstByteBuffer& data, bool bShrink = HLVM_CONTAINER_SHRINK);
+	HLVM_NODISCARD HLVM_STATIC_FUNC TVector<TBYTE> Compress(const FConstByteBuffer& data, int compress_level = 1, bool bShrink = HLVM_CONTAINER_SHRINK);
+	HLVM_NODISCARD HLVM_STATIC_FUNC TVector<TBYTE> Decompress(const FConstByteBuffer& data, bool bShrink = HLVM_CONTAINER_SHRINK);
 };
