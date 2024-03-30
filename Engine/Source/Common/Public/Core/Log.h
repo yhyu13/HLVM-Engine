@@ -124,8 +124,8 @@ public:
 	template <typename... Args>
 	static FString FormatBeforeSink(const FLogContext& Context, const TCHAR* fmt, Args&&... args)
 	{
-#if HLVM_DEBUG_THREAD_UTIL
-		FString Message = FString::Format(TXT("T[{4}] {0}:[{2}:{3}] {1}"), Context.Category->Name, fmt, Context.FileName, Context.Line, *R_C(const uint64_t*, &GCurrentThreadID));
+#if 1
+		FString Message = FString::Format(TXT("T[{4:#x}] {0}:[{2}:{3}] {1}"), Context.Category->Name, fmt, Context.FileName, Context.Line, *R_C(const uint64_t*, &GCurrentThreadID));
 #else
 		FString Message = FString::Format(TXT("{0}:[{2}:{3}] {1}"), Context.Category->Name, fmt, Context.FileName, Context.Line);
 #endif

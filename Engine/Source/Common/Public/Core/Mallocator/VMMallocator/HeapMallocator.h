@@ -4,8 +4,6 @@
 
 #pragma once
 
-#include "Platform/GenericPlatformAtomicPointer.h"
-#include "Core/Mallocator/MiMallocator.h"
 #include "VMMallocatorDefinition.h"
 
 class FVMArena;
@@ -23,7 +21,7 @@ public:
 		Destroy();
 	}
 
-	void Init(FVMArena* _VMArena, size_t _size, bool bForceUnManage = false);
+	void Init(FVMArena* _VMArena, size_t _size, bool bForceUnManaged = false);
 
 	/**
 	 * Sometimes we need destroy w/o deconstruction
@@ -55,7 +53,7 @@ public:
 		return size + 2 * FBlock_Size;
 	}
 
-	size_t GetManagedRegsionSize() const
+	size_t GetManagedSize() const
 	{
 		return Managed() ? GetHeapSize() - 2 * sizeof(FBlock) : 0;
 	}
@@ -67,25 +65,23 @@ private:
 	FVMArena* VMArena{ nullptr };
 	size_t	  N{ 0 };
 	BIT_FLAG(bManaged){ true };
-	TBYTE* mHeap{ nullptr };
+	TBYTE* mHeap{ nullptr }; // TODO Allocate pointer to HeapAllocator in the beginning of Heap so that we can get the size of Heap
 
-	struct FBlock
-	{
+	PACK(struct FBlock {
 		TOffsetPtr32<FBlock> prevFreeBlock{};
 		TOffsetPtr32<FBlock> nextFreeBlock{};
 		SizeType			 size{ 0 };
-		uint16_t			 offset{ 0 };
 		uint16_t			 _{ 0xFFFF }; // Reserved 2 bytes to not mis-interpreting with FSmallBinnedBlockHead block heads
 
 		HLVM_INLINE_FUNC bool GetFree() const
 		{
 			return size >= 0;
 		}
-	};
-	static_assert(sizeof(FBlock) == 16, "FBlock size must be 16 bytes");
+	});
+	static_assert(sizeof(FBlock) == 14, "FBlock size must be 14 bytes");
 
 	HLVM_INLINE_VAR HLVM_STATIC_VAR constexpr SizeType FBlock_Size = S_C(SizeType, sizeof(FBlock));
-	HLVM_INLINE_VAR HLVM_STATIC_VAR constexpr SizeType Minimal_Block_Size = HLVM_SMALL_ALLOC_THRESHOLD;
+	HLVM_INLINE_VAR HLVM_STATIC_VAR constexpr SizeType Minimal_Block_Size = HLVM_VMA_SMALL_ALLOC_THRESHOLD;
 
 	FBlock*	 mFreeBlockHead{ nullptr };
 	FBlock*	 mTail{ nullptr };

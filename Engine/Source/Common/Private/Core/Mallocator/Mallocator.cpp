@@ -2,11 +2,13 @@
  * Copyright (c) 2024. MIT License. All rights reserved.
  */
 
+#include "Core/Mallocator/MiMallocator.h"
+#include "Core/Mallocator/StdMallocator.h"
 #include "Core/Mallocator/StackMallocator.h"
 #include "Core/Log.h"
 #include "Platform/GenericPlatformDebuggerUtil.h"
 #include "Template/PrintTemplate.tpp"
-#include "Template/AlignTemplate.tpp"
+#include "Template/AlignmentTemplate.tpp"
 
 /**
  * Override new and delete operator
@@ -38,14 +40,14 @@ DECLARE_LOG_CATEGORY(LogMiMallocator)
 
 void InitMallocator()
 {
-#if !HLVM_BUILD_RELEASE
+#if !HLVM_BUILD_RELEASE && HLVM_MALLOC_USE_MIMALLOC_OVER_STD
 	mi_option_enable(mi_option_t::mi_option_show_errors);
 	mi_option_enable(mi_option_t::mi_option_show_stats);
 	mi_option_enable(mi_option_t::mi_option_verbose);
 #endif
 }
 
-bool FMiMallocator::Owened(void* ptr) noexcept
+bool FMiMallocator::Owned(void* ptr) noexcept
 {
 	try
 	{
@@ -54,7 +56,7 @@ bool FMiMallocator::Owened(void* ptr) noexcept
 	catch (std::exception& e)
 	{
 		const FStdString& Stack = FGenericPlatformDebuggerUtil::GetStackTrace();
-		HLVM_LOG(LogMiMallocator, err, TXT("Owened exception : {} at\n{}"), TO_TCHAR_STR(e.what()), *Stack);
+		HLVM_LOG(LogMiMallocator, err, TXT("Owned exception : {} at\n{}"), TO_TCHAR_STR(e.what()), *Stack);
 		return false;
 	}
 }
@@ -78,33 +80,40 @@ void					  SwapMallocator(IMallocator* Mallocator)
 
 // Guide to override global new and delete : https://microsoft.github.io/mimalloc/using.html
 // MIMALLOC_SHOW_STATS=1 ./Engine/Source/Common/Test/Test3rdParty
+// <mimalloc-new-delete.h> is used as references to see what mimalloc has done in terms of overriding
 // #include <mimalloc-new-delete.h>
 
-	#define HLVM_MIMALLOC_USE()                            \
-		if (GMallocatorTLS->Type == EMallocator::Mimalloc) \
-		HLVM_LIKELY
+	#if HLVM_MALLOC_USE_MIMALLOC_OVER_STD
+		#define HLVM_MIMALLOC_USE() \
+			if (GMallocatorTLS->Type == EMallocator::Mimalloc)
+	#else
+		#define HLVM_MIMALLOC_USE() \
+			if (false)
+	#endif
 
 	#if HLVM_MALLOC_USE_GENERAL_PURPOSE_STACK_ALLOCATOR
-		#define HLVM_STACK_USE()                            \
-			if (GMallocatorTLS->Type == EMallocator::Stack) \
-			HLVM_LIKELY
+		#define HLVM_STACK_USE() \
+			if (GMallocatorTLS->Type == EMallocator::Stack)
 	#else
 		#define HLVM_STACK_USE() \
 			if (false)
 	#endif
 
-	/**
-	 * Mimalloc checks thread local allocated pointer as well as non thread local allocated pointer.
-	 * So just let mimalloc does its job on freeing w/o checking owner ship
-	 */
-	#define HLVM_MIMALLOC_OWNED(p)                         \
-		if (GMallocatorTLS->Type == EMallocator::Mimalloc) \
-		HLVM_LIKELY
+/**
+ * Mimalloc checks thread local allocated pointer as well as non thread local allocated pointer.
+ * So just let mimalloc does its job on freeing w/o checking owner ship
+ */
+	#if HLVM_MALLOC_USE_MIMALLOC_OVER_STD
+		#define HLVM_MIMALLOC_OWNED(p) \
+			if (GMallocatorTLS->Type == EMallocator::Mimalloc)
+	#else
+		#define HLVM_MIMALLOC_OWNED() \
+			if (false)
+	#endif
 
 	#if HLVM_MALLOC_USE_GENERAL_PURPOSE_STACK_ALLOCATOR
-		#define HLVM_STACK_OWNED(p)                         \
-			if (GMallocatorTLS->Type == EMallocator::Stack) \
-			HLVM_LIKELY
+		#define HLVM_STACK_OWNED(p) \
+			if (GMallocatorTLS->Type == EMallocator::Stack && GMallocatorTLS->Owned(p))
 	#else
 		#define HLVM_STACK_OWNED(p) \
 			if (false)

@@ -80,7 +80,7 @@ https://zhuanlan.zhihu.com/p/677704467
      - describes the file structure (e.g. offset, size, compression, etc)
      - Store `size_t` hash instead of string path (smaller token file size but not able to search and parse file paths in runtime)
      - debug json file that describes the token file content in human-readable format
-   - Container file [link](Engine/Source/Common/Public/Platform/FileSystem/Packed/PackedFragment.h)
+   - Container file [link](Engine/Source/Common/Public/Platform/FileSystem/Packed/PackedContainerFragment.h)
      - tightly packs the data files for memory mapping
      - Runtime fragment that loads a minimal 4MB of mapped file region per fragment
      - Proxy that load actual content using token entry and container fragment

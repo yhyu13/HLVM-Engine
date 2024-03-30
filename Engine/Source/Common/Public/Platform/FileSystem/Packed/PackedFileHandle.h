@@ -6,7 +6,7 @@
 
 #include "PackedDefinition.h"
 #include "PackedToken.h"
-#include "PackedFragment.h"
+#include "PackedContainerFragment.h"
 #include "Platform/FileSystem/FileHandle.h"
 #include "Core/Compress/Zstd.h"
 #include "Core/Encrypt/RSA.h"

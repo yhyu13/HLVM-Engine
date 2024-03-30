@@ -5,12 +5,12 @@
 #pragma once
 
 #ifndef HLVM_ENABLE_FIBER_POOL
+	/**
+	 * Fiber pool segfaults on Ubuntu20.04 x64 with Mimalloc for no apparent reasons, so disable it
+	 */
 	#define HLVM_ENABLE_FIBER_POOL 0
 #endif
 
-/**
- * Fiber pool segfaults for no apparent reasons, so disable it
- */
 #if HLVM_ENABLE_FIBER_POOL
 
 	#include "Core/Parallel/ConcurrentQueue.h"

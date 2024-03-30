@@ -2,7 +2,7 @@
  * Copyright (c) 2024. MIT License. All rights reserved.
  */
 
-#include "Platform/FileSystem/Packed/PackedFragment.h"
+#include "Platform/FileSystem/Packed/PackedContainerFragment.h"
 #include "Core/Assert.h"
 #include "Core/Log.h"
 

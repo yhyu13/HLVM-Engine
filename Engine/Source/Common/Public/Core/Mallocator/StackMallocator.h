@@ -4,7 +4,11 @@
 
 #pragma once
 
-#include "MiMallocator.h"
+#if HLVM_MALLOC_USE_MIMALLOC_OVER_STD
+	#include "MiMallocator.h"
+#else
+	#include "StdMallocator.h"
+#endif
 #include "Core/Assert.h"
 
 #ifndef HLVM_STACK_MALLOCATOR_DEFAULT_SIZE
@@ -43,14 +47,11 @@ public:
 
 		// Connect head to tail
 		mFreeBlockHead->nextFreeBlock = mTail;
-
-		// Cache the lower bound memory address for stack pointers
-		mLowerBound = mStack + FBlock_Size;
 	}
 	~TStackMallocator() noexcept final override
 	{
 	}
-	HLVM_INLINE_FUNC virtual bool Owened(void* ptr) noexcept final override
+	HLVM_INLINE_FUNC virtual bool Owned(void* ptr) noexcept final override
 	{
 		if (InStackBound(ptr))
 		{
@@ -71,9 +72,14 @@ public:
 	}
 	HLVM_INLINE_FUNC virtual void* MallocAligned(std::size_t size, std::size_t align) noexcept(false) final override
 	{
+		// TODO : Maybe consider implement aligned address looking up for stack allocator
 		if constexpr (bUseHeapForAlignedAlloc)
 		{
+#if HLVM_MALLOC_USE_MIMALLOC_OVER_STD
 			return GMiMallocatorTLS.MallocAligned(size, align);
+#else
+			return GStdMallocator.MallocAligned(size, align);
+#endif
 		}
 		else
 		{
@@ -84,7 +90,11 @@ public:
 	{
 		if constexpr (bUseHeapForAlignedAlloc)
 		{
+#if HLVM_MALLOC_USE_MIMALLOC_OVER_STD
 			return GMiMallocatorTLS.MallocAligned2(size, align);
+#else
+			return GStdMallocator.MallocAligned2(size, align);
+#endif
 		}
 		else
 		{
@@ -103,7 +113,11 @@ public:
 	{
 		if constexpr (bUseHeapForAlignedAlloc)
 		{
+#if HLVM_MALLOC_USE_MIMALLOC_OVER_STD
 			return GMiMallocatorTLS.FreeAligned(ptr, align);
+#else
+			return GStdMallocator.FreeAligned(ptr, align);
+#endif
 		}
 		else
 		{
@@ -114,7 +128,11 @@ public:
 	{
 		if constexpr (bUseHeapForAlignedAlloc)
 		{
+#if HLVM_MALLOC_USE_MIMALLOC_OVER_STD
 			return GMiMallocatorTLS.FreeSizeAligned(ptr, size, align);
+#else
+			return GStdMallocator.FreeSizeAligned(ptr, size, align);
+#endif
 		}
 		else
 		{
@@ -191,7 +209,7 @@ private:
 			return size >= 0;
 		}
 	};
-	static_assert(sizeof(FBlock) == 12, "FBlock size must be 20 bytes");
+	static_assert(sizeof(FBlock) == 12, "FBlock size must be 12 bytes");
 #endif
 	HLVM_INLINE_VAR HLVM_STATIC_VAR constexpr SizeType FBlock_Size = S_C(SizeType, sizeof(FBlock));
 	static_assert(N - 2 * FBlock_Size > 0);
@@ -283,7 +301,11 @@ private:
 		// Running out of free blocks in stack, try heap
 		if constexpr (bAllowOverflowToHeap)
 		{
+#if HLVM_MALLOC_USE_MIMALLOC_OVER_STD
 			return GMiMallocatorTLS.Malloc(_size);
+#else
+			return GStdMallocator.Malloc(_size);
+#endif
 		}
 		else
 		{
@@ -453,19 +475,30 @@ private:
 		}
 		else
 		{
-			GMiMallocatorTLS.Free(ptr);
+			if constexpr (bAllowOverflowToHeap)
+			{
+#if HLVM_MALLOC_USE_MIMALLOC_OVER_STD
+				GMiMallocatorTLS.Free(ptr);
+#else
+				GStdMallocator.Free(ptr);
+#endif
+			}
+			else
+			{
+				// TODO : Use stack string assert
+				assert(false);
+			}
 		}
 	}
 
 	bool InStackBound(void* ptr) const
 	{
-		return ptr >= mLowerBound && ptr < mTail;
+		return ptr >= mStack + FBlock_Size && ptr < mTail;
 	}
 
 	TBYTE	 mStack[N];
 	FBlock*	 mFreeBlockHead{ nullptr };
 	FBlock*	 mTail{ nullptr };
-	void*	 mLowerBound{ nullptr };
 	SizeType mFreeSizeUpperBound{ -1 };
 };
 

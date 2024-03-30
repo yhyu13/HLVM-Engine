@@ -4,15 +4,16 @@
 
 #include "Core/Mallocator/VMMallocator/HeapMallocator.h"
 #include "Core/Mallocator/VMMallocator/VMArena.h"
+#include "Core/Log.h"
 
 DECLARE_LOG_CATEGORY(LogHeapMallocator)
 
-void FHeapMallocator::Init(FVMArena* _VMArena, size_t _size, bool bForceUnManage)
+void FHeapMallocator::Init(FVMArena* _VMArena, size_t _size, bool bForceUnManaged)
 {
 	VMArena = _VMArena;
 	N = _size;
 
-	if (bForceUnManage)
+	if (bForceUnManaged)
 	{
 		bManaged = false;
 	}
@@ -23,13 +24,13 @@ void FHeapMallocator::Init(FVMArena* _VMArena, size_t _size, bool bForceUnManage
 	if (bManaged)
 	{
 		HLVM_CONSTEXPR_ASSERT(bValidate, (N & (N - 1)) == 0); // Must be power of 2
-		HLVM_CONSTEXPR_ASSERT(bValidate, (N - 2 * FBlock_Size > 0));
-		mHeap = R_C(TBYTE*, VMArena->MallocOS(N, N)); // Aligned Alloc so that we can infer Heap pointer by pointer arithmetic
+		HLVM_CONSTEXPR_ASSERT(bValidate, (GetManagedSize() > 0));
+		mHeap = R_C(TBYTE*, VMArena->MallocOSPage(N, N));
 
 		// Init stack and free block head which occupy the whole stack
 		mFreeBlockHead = R_C(FBlock*, mHeap);
 		*mFreeBlockHead = FBlock();
-		mFreeBlockHead->size = (S_C(SizeType, N) - 2 * FBlock_Size); // Stack size minus head block and tail block
+		mFreeBlockHead->size = S_C(SizeType, GetManagedSize()); // Stack size minus head block and tail block
 		HLVM_CONSTEXPR_ASSERT(bValidate, mFreeBlockHead->size > 0);
 		mFreeSizeUpperBound = mFreeBlockHead->size;
 
@@ -46,7 +47,7 @@ void FHeapMallocator::Init(FVMArena* _VMArena, size_t _size, bool bForceUnManage
 	}
 	else
 	{
-		mHeap = R_C(TBYTE*, VMArena->MallocOS(N));
+		mHeap = R_C(TBYTE*, VMArena->MallocLowLevel(N));
 	}
 }
 
@@ -54,7 +55,7 @@ void FHeapMallocator::Destroy()
 {
 	if (mHeap)
 	{
-		VMArena->FreeOS(mHeap);
+		VMArena->FreeLowLevel(mHeap);
 		mHeap = nullptr;
 		bManaged = false;
 	}
@@ -71,7 +72,7 @@ void* FHeapMallocator::Malloc(size_t _size)
 	{
 		void*	 RetPtr{ nullptr };
 		SizeType size = S_C(SizeType, _size);
-		HLVM_CONSTEXPR_ASSERT(bValidate, size > 0 && S_C(size_t, size) <= N - 2 * FBlock_Size);
+		HLVM_CONSTEXPR_ASSERT(bValidate, size > 0 && S_C(size_t, size) <= GetManagedSize());
 		HLVM_CONSTEXPR_ASSERT(bValidate, mFreeBlockHead->prevFreeBlock == nullptr);
 		/**
 		 * Unlike StackAllocator, where we stop looping when there is a fit free block,
@@ -181,7 +182,7 @@ void FHeapMallocator::Free(void* p)
 
 		// Set free block to free again
 		FreeBlock->size = (-FreeBlock->size);
-		HLVM_CONSTEXPR_ASSERT(bValidate, FreeBlock->size > 0 && S_C(size_t, FreeBlock->size) <= N - 2 * FBlock_Size);
+		HLVM_CONSTEXPR_ASSERT(bValidate, FreeBlock->size > 0 && S_C(size_t, FreeBlock->size) <= GetManagedSize());
 
 		// Exchange new free block with free head
 		FreeBlock->prevFreeBlock = nullptr;
@@ -220,7 +221,7 @@ void FHeapMallocator::Free(void* p)
 
 					// Defragment CurrBlock and move on to next block once more
 					CurrBlock->size += NextBlock->size + FBlock_Size;
-					HLVM_CONSTEXPR_ASSERT(bValidate, CurrBlock->size > 0 && S_C(size_t, CurrBlock->size) <= N - 2 * FBlock_Size);
+					HLVM_CONSTEXPR_ASSERT(bValidate, CurrBlock->size > 0 && S_C(size_t, CurrBlock->size) <= GetManagedSize());
 
 					// Update upper bound if necessary
 					if (mFreeSizeUpperBound < CurrBlock->size)

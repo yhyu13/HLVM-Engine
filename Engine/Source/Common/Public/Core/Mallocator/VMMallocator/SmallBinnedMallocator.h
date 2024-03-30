@@ -34,12 +34,14 @@ public:
 
 	void* Malloc() final override
 	{
+		// Allocate first block
 		if (!mFirstBlocks32)
 		{
 			mFirstBlocks32 = InternalAllocateBlocks32();
 			mLastFreedBlocks32 = mFirstBlocks32;
 		}
 
+		// Get free index
 		uint32_t freeIndex = mLastFreedBlocks32->GetHighestFreeBit();
 		if (freeIndex == BlockRunOutFreeIndex)
 		{
@@ -52,6 +54,7 @@ public:
 			freeIndex = 31;
 			HLVM_CONSTEXPR_ASSERT(bValidate, mLastFreedBlocks32->GetHighestFreeBit() == 31);
 		}
+
 		// Mask allocated index
 		mLastFreedBlocks32->FreeBits &= ~(1u << freeIndex);
 		// Setup block head
@@ -85,7 +88,7 @@ public:
 		}
 		mLastFreedBlocks32 = Block;
 		// Mask free bit
-		mLastFreedBlocks32->FreeBits |= 1u << BlockHead->Pos;
+		mLastFreedBlocks32->FreeBits |= (1u << BlockHead->Pos);
 	}
 
 private:

@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include "MiMallocator.h"
+#include "StdMallocator.h"
 #include "StackMallocator.h"
 #include "Core/Log.h"
 
@@ -26,7 +28,9 @@ namespace hlvm_private
 template <class T, bool bForceAlignedAlloc = false>
 struct TMallocator
 {
+#if HVLM_MALLOCATOR_DEATIL_TRACE
 	HLVM_INLINE_VAR HLVM_STATIC_VAR FString sTypeName{ typeid(T).name() };
+#endif
 
 	using value_type = T;
 	using size_type = std::size_t;
@@ -124,6 +128,88 @@ inline bool operator==(const TMallocator<W>&, const TMallocator<U>&)
 
 template <class W, class U>
 inline bool operator!=(const TMallocator<W>&, const TMallocator<U>&)
+{
+	return false;
+}
+
+template <class T, bool bForceAlignedAlloc = false>
+struct TStdMallocator
+{
+#if HVLM_MALLOCATOR_DEATIL_TRACE
+	HLVM_INLINE_VAR HLVM_STATIC_VAR FString sTypeName{ typeid(T).name() };
+#endif
+
+	using value_type = T;
+	using size_type = std::size_t;
+	using difference_type = std::ptrdiff_t;
+
+	using propagate_on_container_move_assignment = std::true_type;
+	using is_always_equal = std::true_type;
+
+	TStdMallocator() noexcept = default;
+	TStdMallocator(const TStdMallocator&) noexcept = default;
+
+	template <class U>
+	TStdMallocator(const TStdMallocator<U>&) noexcept
+	{
+	}
+
+	HLVM_NODISCARD T* allocate(std::size_t n)
+	{
+		void*  p = nullptr;
+		size_t realSize = n * sizeof(T);
+		// Using static_cast instead of reinterpret_cast because malloc might return nullptr or NULL
+		if constexpr (bForceAlignedAlloc)
+		{
+			p = GStdMallocator.MallocAligned(realSize, alignof(T));
+		}
+		else
+		{
+			p = GStdMallocator.Malloc(realSize);
+		}
+		if (!p)
+			HLVM_UNLIKELY
+			{
+				throw std::bad_alloc();
+			}
+#if HVLM_MALLOCATOR_DEATIL_TRACE
+		size_t _allocSize = hlvm_private::GPMRAllocatedSize.fetch_add(realSize, std::memory_order_relaxed);
+		_allocSize += realSize;
+		HLVM_LOG(LogPMR, trace, TXT("Malloc {} {} {} {:p} {}"),
+			*sTypeName, n, sizeof(T), p, _allocSize);
+#endif
+		return R_C(T*, p);
+	}
+
+	void deallocate(T* _p, std::size_t n) noexcept
+	{
+		void*  p = R_C(void*, _p);
+		size_t realSize = n * sizeof(T);
+		if constexpr (bForceAlignedAlloc)
+		{
+			GStdMallocator.FreeSizeAligned(p, realSize, alignof(T));
+		}
+		else
+		{
+			GStdMallocator.FreeSize(p, realSize);
+		}
+#if HVLM_MALLOCATOR_DEATIL_TRACE
+		size_t _allocSize = hlvm_private::GPMRAllocatedSize.fetch_sub(realSize, std::memory_order_relaxed);
+		_allocSize -= realSize;
+		HLVM_LOG(LogPMR, trace, TXT("Free {} {} {} {:p} {}"),
+			*sTypeName, n, sizeof(T), p, _allocSize);
+#endif
+	}
+};
+
+template <class W, class U>
+inline bool operator==(const TStdMallocator<W>&, const TStdMallocator<U>&)
+{
+	return true;
+}
+
+template <class W, class U>
+inline bool operator!=(const TStdMallocator<W>&, const TStdMallocator<U>&)
 {
 	return false;
 }

@@ -44,7 +44,7 @@ public:
 			mi_heap_collect(mHeap, false);
 		}
 	}
-	virtual bool				   Owened(void* ptr) noexcept final override;
+	virtual bool				   Owned(void* ptr) noexcept final override;
 	HLVM_INLINE_FUNC virtual void* Malloc(std::size_t size) noexcept(false) final override
 	{
 		return mi_heap_malloc(mHeap, size);

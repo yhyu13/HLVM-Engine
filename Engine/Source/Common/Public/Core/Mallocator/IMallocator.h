@@ -10,9 +10,9 @@
 #include <cstddef>
 
 HLVM_ENUM(EMallocator, TUINT8,
+	Std,
 	Mimalloc,
 	Stack,
-	VirtualMemory,
 	Unkown);
 
 /**
@@ -25,7 +25,7 @@ public:
 	NOCOPYMOVE(IMallocator)
 	IMallocator() noexcept = default;
 	virtual ~IMallocator() noexcept = default;
-	HLVM_INLINE_FUNC virtual bool  Owened(void* ptr) noexcept = 0;
+	HLVM_INLINE_FUNC virtual bool  Owned(void* ptr) noexcept = 0;
 	HLVM_INLINE_FUNC virtual void* Malloc(std::size_t size) noexcept(false) = 0;
 	HLVM_INLINE_FUNC virtual void* Malloc2(std::size_t size) noexcept = 0;
 	HLVM_INLINE_FUNC virtual void* MallocAligned(std::size_t size, std::size_t alignment) noexcept(false) = 0;

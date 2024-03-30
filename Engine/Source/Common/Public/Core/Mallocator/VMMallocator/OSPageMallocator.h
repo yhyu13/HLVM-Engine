@@ -1,0 +1,181 @@
+/**
+ * Copyright (c) 2024. MIT License. All rights reserved.
+ */
+
+#pragma once
+
+#include "Core/Mallocator/StdMallocator.h"
+#include "Core/Mallocator/StackMallocator.h"
+
+class FOSPageMallocator
+{
+	HLVM_INLINE_VAR HLVM_STATIC_VAR constexpr bool bValidate = HLVM_MALLOC_VALIDATION;
+
+public:
+	NOCOPYMOVE(FOSPageMallocator)
+
+	FOSPageMallocator() noexcept
+	{
+		mSmallAllocatorHead = new (GStdMallocator.MallocAligned(sizeof(FSmallAllocator), sizeof(FSmallAllocator))) FSmallAllocator();
+		mLargeHeapChainHead = R_C(FLargeHeapChain*, GStdMallocator.Malloc(sizeof(FLargeHeapChain)));
+	}
+
+	~FOSPageMallocator() noexcept
+	{
+		auto Small = mSmallAllocatorHead;
+		while (Small)
+		{
+			Small->~FSmallAllocator();
+			GStdMallocator.FreeAligned(Small, sizeof(FSmallAllocator));
+			Small = Small->Next;
+		}
+
+		auto Large = mLargeHeapChainHead;
+		while (Large)
+		{
+			auto Next = Large->Next;
+			GStdMallocator.FreeAligned(Large->Heap, sizeof(FLargeHeap));
+			GStdMallocator.Free(Large);
+			Large = Next;
+		}
+	}
+
+	bool Owned(void* ptr) const noexcept
+	{
+		auto Large = mLargeHeapChainHead;
+		while (Large)
+		{
+			if (Large->Heap->Owned(ptr))
+			{
+				return true;
+			}
+			Large = Large->Next;
+		}
+
+		auto Small = mSmallAllocatorHead;
+		while (Small)
+		{
+			if (Small->StackMallocator.Owned(ptr))
+			{
+				return true;
+			}
+			Small = Small->Next;
+		}
+		return false;
+	}
+
+	/**
+	 *  Allocate memory from small heap with very limit size (<4K), if fail, return nullptr
+	 */
+	void* MallocSmall(size_t size)
+	{
+		void* p = nullptr;
+		auto  Small = mSmallAllocatorHead;
+		while (!p && Small)
+		{
+			p = Small->StackMallocator.Malloc(size);
+			if (!p)
+			{
+				if (!Small->Next)
+				{
+					/**
+					 *  Allocate new small heap
+					 */
+					Small->Next = R_C(FSmallAllocator*, GStdMallocator.MallocAligned(sizeof(FSmallAllocator), sizeof(FSmallAllocator)));
+					Small = Small->Next;
+					p = Small->StackMallocator.Malloc(size);
+					HLVM_CONSTEXPR_ASSERT(bValidate, p != nullptr);
+					return p;
+				}
+				else
+				{
+					Small = Small->Next;
+				}
+			}
+		}
+		HLVM_CONSTEXPR_ASSERT(bValidate, p != nullptr);
+		return p;
+	}
+
+	void FreeSmall(void* ptr)
+	{
+		auto Small = mSmallAllocatorHead;
+		while (Small)
+		{
+			if (Small->StackMallocator.Owned(ptr))
+			{
+				Small->StackMallocator.Free(ptr);
+				return;
+			}
+			Small = Small->Next;
+		}
+	}
+
+	void* MallocLargeHeap()
+	{
+		void* p = nullptr;
+		auto  Large = mLargeHeapChainHead;
+		while (!p && Large)
+		{
+			if (!Large->Heap)
+			{
+				p = Large->Heap = R_C(FLargeHeap*, GStdMallocator.MallocAligned(sizeof(FLargeHeap), sizeof(FLargeHeap)));
+				HLVM_CONSTEXPR_ASSERT(bValidate, p != nullptr);
+			}
+			else
+			{
+				if (!Large->Next)
+				{
+					Large->Next = R_C(FLargeHeapChain*, GStdMallocator.Malloc(sizeof(FLargeHeapChain)));
+				}
+				Large = Large->Next;
+			}
+		}
+		HLVM_CONSTEXPR_ASSERT(bValidate, p != nullptr);
+		return p;
+	}
+
+	void FreeLargeHeap(void* ptr)
+	{
+		bool bFound = false;
+		auto Large = mLargeHeapChainHead;
+		while (!bFound && Large)
+		{
+			if (Large->Heap == ptr)
+			{
+				GStdMallocator.FreeAligned(ptr, sizeof(FLargeHeap));
+				Large->Heap = nullptr;
+				bFound = true;
+			}
+			Large = Large->Next;
+		}
+		HLVM_CONSTEXPR_ASSERT(bValidate, bFound);
+	}
+
+private:
+	struct FSmallAllocator
+	{
+		TStackMallocator<HLVM_VMA_SMALL_HEAP_SIZE - 48, false, true, false, false> StackMallocator;
+		FSmallAllocator*														   Next{};
+	};
+	static_assert(sizeof(FSmallAllocator) == HLVM_VMA_SMALL_HEAP_SIZE, "SmallHeap size must be HLVM_VMA_SMALL_HEAP_SIZE");
+	FSmallAllocator* mSmallAllocatorHead{ nullptr };
+
+	struct FLargeHeap
+	{
+		TBYTE Data[HLVM_VMA_LARGE_HEAP_SIZE];
+
+		bool Owned(void* ptr) const
+		{
+			return ptr >= Data && ptr < Data + sizeof(Data);
+		}
+	};
+	static_assert(sizeof(FLargeHeap) == HLVM_VMA_LARGE_HEAP_SIZE, "FLargeHeap size must be HLVM_VMA_LARGE_HEAP_SIZE");
+
+	struct FLargeHeapChain
+	{
+		FLargeHeap*		 Heap{ nullptr };
+		FLargeHeapChain* Next{ nullptr };
+	};
+	FLargeHeapChain* mLargeHeapChainHead{ nullptr };
+};

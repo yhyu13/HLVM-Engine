@@ -104,8 +104,7 @@ struct TPointerRemoved<T**>
 };
 
 template <typename T>
-struct TOffsetPtr32
-{
+PACK(struct TOffsetPtr32 {
 	int32_t offset{ 0x7FFFFFFF };
 	operator T*()
 	{
@@ -142,4 +141,4 @@ struct TOffsetPtr32
 	{
 		return S_C(const T*, *this) != rhs;
 	}
-};
+});

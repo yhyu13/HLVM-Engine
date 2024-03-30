@@ -11,3 +11,8 @@
 #ifndef HLVM_MALLOC_ALIGNMENT
 	#define HLVM_MALLOC_ALIGNMENT 8
 #endif
+
+// TODO : Finish macro switch between mimallocatorTLS and stdMallocator
+#ifndef HLVM_MALLOC_USE_MIMALLOC_OVER_STD
+	#define HLVM_MALLOC_USE_MIMALLOC_OVER_STD 1
+#endif
