@@ -3,7 +3,7 @@
  */
 
 #include "Platform/FileSystem/Packed/PackedFileHandle.h"
-#include "Platform/FileSystem/Boost/BoostFileHandle.h"
+#include "Platform/FileSystem/Boost/BoostMapFileHandle.h"
 #include "Core/Parallel/Async/WorkStealFiberPool.h"
 #include "Core/Log.h"
 
@@ -134,7 +134,7 @@ IFileHandle::OpRetType FPackedFileHandle::Open(const FPath& FilePath, const FFil
 				mTokenFileLock = MoveTemp(sharable_lock<file_lock>(_Lock));
 
 				// Open token file
-				FBoostFileHandle fileHandle;
+				FBoostMapFileHandle fileHandle;
 				size_t			 fileSize = 0;
 				fileHandle.Open(TokenFilePath, mFileOptions)
 					.Size(fileSize);

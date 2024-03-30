@@ -4,7 +4,9 @@
 
 #pragma once
 
-#include "BoostFileHandle.h"
+#include "BoostFileStat.h"
+#include "BoostStreamFileHandle.h"
+#include "BoostMapFileHandle.h"
 #include "Platform/GenericPlatformFile.h"
 
 class FBoostPlatformFile final : public FGenericPlatformFile
@@ -24,5 +26,5 @@ public:
 	virtual TSmallVector32<FPath> Glob(const FPath& root_dir, const FString& regex, bool recursive = false) final override;
 
 private:
-	FBoostFileHandle mFileHandle; // Dummy file handle just to get file stat
+	FBoostMapFileHandle mFileHandle; // Dummy file handle just to get file stat
 };

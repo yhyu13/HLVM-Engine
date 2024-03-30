@@ -5,7 +5,7 @@
 #include "Core/Encrypt/RSA.h"
 #include "Core/Assert.h"
 #include "Utility/ScopedTimer.h"
-#include "Platform/FileSystem/Boost/BoostFileHandle.h"
+#include "Platform/FileSystem/Boost/BoostMapFileHandle.h"
 
 DECLARE_LOG_CATEGORY(LogRSA)
 
@@ -81,7 +81,7 @@ void FRSA::SignToFile(const FConstByteBuffer& Buffer, const FPath& signature_pat
 	 *   2. Encode the signature
 	 */
 	auto			 base64 = Botan::base64_encode(signature);
-	FBoostFileHandle fileHandle;
+	FBoostMapFileHandle fileHandle;
 	FFileOptions	 Options{ .eFileMode = EFileMode::W, .eFileMapped = EFileMapped::Mapped, .eFileLock = EFileLock::FullLock };
 	fileHandle.Open(signature_path, Options)
 		.Write(base64.data(), base64.size());
@@ -89,7 +89,7 @@ void FRSA::SignToFile(const FConstByteBuffer& Buffer, const FPath& signature_pat
 
 void FRSA::SignToFile(const FPath& FilePath, const FPath& signature_path)
 {
-	FBoostFileHandle fileHandle;
+	FBoostMapFileHandle fileHandle;
 	FFileOptions	 Options{ .eFileMode = EFileMode::RB, .eFileMapped = EFileMapped::Mapped, .eFileLock = EFileLock::FullLock };
 	fileHandle.Open(FilePath, Options);
 	auto Buffer = fileHandle.GetMappedBufferReadOnly();
@@ -110,7 +110,7 @@ HLVM_NODISCARD bool FRSA::VerifyFileSignature(const FConstByteBuffer& Buffer, co
 		/**
 		 *  1. Read the signature
 		 */
-		FBoostFileHandle  signatureHandle;
+		FBoostMapFileHandle  signatureHandle;
 		FFileOptions	  sigOptions{ .eFileMode = EFileMode::R, .eFileMapped = EFileMapped::Mapped, .eFileLock = EFileLock::FullLock };
 		std::vector<char> base64_signature;
 		size_t			  sigSize;
@@ -133,7 +133,7 @@ HLVM_NODISCARD bool FRSA::VerifyFileSignature(const FConstByteBuffer& Buffer, co
 
 HLVM_NODISCARD bool FRSA::VerifyFileSignature(const FPath& FilePath, const FPath& signature_path)
 {
-	FBoostFileHandle fileHandle;
+	FBoostMapFileHandle fileHandle;
 	FFileOptions	 Options{ .eFileMode = EFileMode::RB, .eFileMapped = EFileMapped::Mapped, .eFileLock = EFileLock::FullLock };
 	fileHandle.Open(FilePath, Options);
 	auto Buffer = fileHandle.GetMappedBufferReadOnly();

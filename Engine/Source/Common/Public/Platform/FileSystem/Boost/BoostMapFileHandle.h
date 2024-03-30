@@ -9,23 +9,6 @@
 
 #include <boost/iostreams/device/mapped_file.hpp>
 #include <boost/interprocess/sync/file_lock.hpp>
-#include <fstream>
-
-class FBoostFileStat final : public IFFileStat
-{
-public:
-	NOCOPYMOVE(FBoostFileStat)
-	FBoostFileStat() = delete;
-	explicit FBoostFileStat(const FPath& Path);
-
-	virtual bool IsDirectory() const final override;
-	virtual bool Exists() const final override;
-	virtual bool IsFile() const final override;
-	virtual bool IsLink() const final override;
-
-private:
-	boost::filesystem::file_status fs;
-};
 
 /**
  * boost file system  https://theboostcpplibraries.com/boost.filesystem-files-and-directories
@@ -33,11 +16,11 @@ private:
  * boost mapped file https://beta.boost.org/doc/libs/1_83_0/libs/iostreams/doc/classes/mapped_file.html
  * boost std:fbuf init file before mapping https://stackoverflow.com/questions/70480239/boost-mmaping-a-file-into-memory-for-readswrites
  */
-class FBoostFileHandle final : public IFileHandle
+class FBoostMapFileHandle final : public IFileHandle
 {
 public:
-	FBoostFileHandle() = default;
-	~FBoostFileHandle() final override;
+	FBoostMapFileHandle() = default;
+	~FBoostMapFileHandle() final override;
 
 	virtual OpRetType Open(const FPath& FilePath, const FFileOptions& Options = GReadOnlyFileOptions) final override;
 	virtual OpRetType Close() final override;
@@ -57,14 +40,13 @@ public:
 	HLVM_NODISCARD FConstByteBuffer GetMappedBufferReadOnly() const;
 
 private:
-	void		MappedFileLazyInit();
+	void		MappedFileInit();
 	const void* MappedFileCurPos_R(int64_t Offset = 0) const;
 	void*		MappedFileCurPos_W(int64_t Offset = 0);
 
 private:
-	boost::iostreams::mapped_file*				mMappedFile{ nullptr };
+	boost::iostreams::mapped_file				mMappedFile;
 	int64_t										mMappedSeekPos{ 0 };
-	std::fstream*								mFStream{ nullptr };
 	mutable boost::interprocess::file_lock*		mFileLock{ nullptr };
 	mutable std::optional<FRecursiveAtomicFlag> mRecursiveLock;
 	BIT_FLAG(mMappedLazyInit){ false };

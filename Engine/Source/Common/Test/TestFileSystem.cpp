@@ -39,9 +39,9 @@ static void test_boostfile_test()
 
 	HLVM_LOG(LogTest, info, TXT("Test BoostFileHandle"));
 	{
-		FBoostFileHandle fileHandle;
-		FFileOptions	 Options{ .eFileMode = EFileMode::RW, .eFileMapped = EFileMapped::NoMapped, .eFileLock = EFileLock::FullLock };
-		TCharArrayStr<4> Buffer;
+		FBoostStreamFileHandle fileHandle;
+		FFileOptions		   Options{ .eFileMode = EFileMode::RW, .eFileMapped = EFileMapped::NoMapped, .eFileLock = EFileLock::FullLock };
+		TCharArrayStr<4>	   Buffer;
 		fileHandle.Open(TXT("./test.txt"), Options)
 			.Write("test", 4, { .bEraseSeekPos = true })
 			.Read(Buffer.data(), Buffer.Capacity, { .bEraseSeekPos = true })
@@ -51,12 +51,9 @@ static void test_boostfile_test()
 		HLVM_LOG(LogTest, info, TXT("Test BoostFileHandle nomap result: {}"), Buffer.c_str());
 	}
 	{
-		/**
-		 * Mapped file cannot be create by file open, so only read write
-		 */
-		FBoostFileHandle fileHandle;
-		FFileOptions	 Options{ .eFileMode = EFileMode::RW, .eFileMapped = EFileMapped::Mapped, .eFileLock = EFileLock::FullLock };
-		TCharArrayStr<4> Buffer;
+		FBoostMapFileHandle fileHandle;
+		FFileOptions		Options{ .eFileMode = EFileMode::RW, .eFileMapped = EFileMapped::Mapped, .eFileLock = EFileLock::FullLock };
+		TCharArrayStr<4>	Buffer;
 		fileHandle.Open(TXT("./test_mapped.txt"), Options)
 			.Write("test", 4, { .bEraseSeekPos = true })
 			.Read(Buffer.data(), Buffer.Capacity, { .bEraseSeekPos = true })
@@ -107,8 +104,8 @@ RECORD(packed_test)
 			std::vector<std::future<void>> jobs;
 #endif
 			jobs.reserve(4);
-			FBoostFileHandle fileTokHandle, fileCotHandle, fileJsonlHandle;
-			FFileOptions	 Options{ .eFileMode = EFileMode::WB, .eFileMapped = EFileMapped::Mapped, .eFileLock = EFileLock::InterProcessLock };
+			FBoostMapFileHandle fileTokHandle, fileCotHandle, fileJsonlHandle;
+			FFileOptions		Options{ .eFileMode = EFileMode::WB, .eFileMapped = EFileMapped::Mapped, .eFileLock = EFileLock::InterProcessLock };
 			HLVM_SCOPED_VARIABLE(
 				ScopedFileHandle, [&]() -> void {
                     fileTokHandle.Open(PackedTokFile, Options);

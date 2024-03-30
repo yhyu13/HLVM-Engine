@@ -51,14 +51,16 @@ inline bool operator!=(EFileMode a, EFileMode b)
 
 enum class EFileMapped : TUINT8
 {
-	NoMapped = 0,
-	Mapped = 1,
+	Default = 0,
+	NoMapped = 1,
+	Mapped = 2,
 };
 
 enum class EFileAsync : TUINT8
 {
-	NoAsync = 0,
-	Async = 1,
+	Default = 0,
+	NoAsync = 1,
+	Async = 2,
 };
 
 enum class EFileLock : TUINT8
@@ -79,14 +81,14 @@ inline bool operator&(EFileLock a, EFileLock b)
 struct FFileOptions
 {
 	EFileMode	eFileMode{ EFileMode::R };
-	EFileMapped eFileMapped{ EFileMapped::Mapped };
-	EFileAsync	eFileAsync{ EFileAsync::NoAsync };
+	EFileMapped eFileMapped{ EFileMapped::Default };
+	EFileAsync	eFileAsync{ EFileAsync::Default };
 	EFileLock	eFileLock{ EFileLock::NoLock };
 };
 HLVM_INLINE_VAR const FFileOptions GReadOnlyFileOptions{
 	.eFileMode = EFileMode::R,
-	.eFileMapped = EFileMapped::Mapped,
-	.eFileAsync = EFileAsync::NoAsync,
+	.eFileMapped = EFileMapped::Default,
+	.eFileAsync = EFileAsync::Default,
 	.eFileLock = EFileLock::NoLock,
 };
 
@@ -220,7 +222,7 @@ public:
 	/**
 	 * These methods can be static methods, but since we require inheritance, they have to be member virtual methods
 	 */
-	virtual OpRetType								  Truncate(size_t Size) = 0;
+	virtual OpRetType								   Truncate(size_t Size) = 0;
 	HLVM_NODISCARD virtual std::shared_ptr<IFFileStat> Stat(const FPath& FilePath) = 0;
 
 public:

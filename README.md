@@ -35,7 +35,7 @@ https://zhuanlan.zhihu.com/p/677704467
  - Platform-specific code for Linux and Windows
    - Platform specific Compare Swap Exchange [link](Engine/Source/Common/Public/Platform/GenericPlatformAtomicPointer.h)
    - Platform specific debugging utilities [link](Engine/Source/Common/Public/Platform/GenericPlatformDebuggerUtil.h)
- - File system handling with Boost [link](Engine/Source/Common/Public/Platform/FileSystem/Boost/BoostFileHandle.h)
+ - File system handling with Boost [link](Engine/Source/Common/Public/Platform/FileSystem/Boost/BoostMapFileHandle.h)
    - Use `Boost` for local file mapping
    - Use `fstream` for file reading and writing
    - Support `std` compatible file modes
