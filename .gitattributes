@@ -1,1 +1,1 @@
-Binary/GNULinux-x64/ filter=lfs diff=lfs merge=lfs -text
+Binary/GNULinux-x64/* filter=lfs diff=lfs merge=lfs -text
