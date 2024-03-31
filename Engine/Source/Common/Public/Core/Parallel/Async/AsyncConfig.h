@@ -7,11 +7,6 @@
 #include "Core/Parallel/ParallelDefinition.h"
 #include "Core/Log.h"
 
-HLVM_ENUM(EAsyncMode, TUINT8,
-	ThreadPool, // Add to default work steal thread pool
-	Thread		// Startup a new thread
-);
-
 HLVM_ENUM(EThreadPriority, TUINT8,
 	Background, // Background priority thread
 	Normal,		// Normal priority thread

@@ -32,16 +32,6 @@ public:
 		return MoveTemp(result);
 	}
 
-	template <typename F, typename... Args>
-	void EnqueuDetached(F&& f, Args&&... args)
-	{
-		using TaskRetType = std::invoke_result_t<F, Args...>;
-		using TaskType = std::packaged_task<TaskRetType()>;
-
-		auto task = TaskType(std::bind(std::forward<F>(f), std::forward<Args>(args)...));
-		std::thread(MoveTemp(task)).detach();
-	}
-
 	uint32_t NumThreads() const
 	{
 		return mCount;

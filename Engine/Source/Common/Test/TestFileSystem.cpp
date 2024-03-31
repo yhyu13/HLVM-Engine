@@ -7,8 +7,7 @@
 #include "Core/Mallocator/PMR.h"
 #include "Platform/FileSystem/Boost/BoostPlatformFile.h"
 #include "Platform/FileSystem/Packed/PackedPlatformFile.h"
-#include "Core/Parallel/Async/WorkStealThreadPool.h"
-#include "Core/Parallel/Async/WorkStealFiberPool.h"
+#include "Core/Parallel/Async/Async.h"
 
 // #include <ylt/struct_pack.hpp>
 // #include <ylt/struct_json/json_reader.h>
@@ -145,7 +144,7 @@ RECORD(packed_test)
 #if TEST_FIBER_POOL
 				FWorkStealFiberPool::Get()->EnqueuTask(
 #else
-				FWorkStealThreadPool::Get()->EnqueuTask(
+				FAsync::Launch(EAsyncMode::Thread,
 #endif
 					[&]() {
 						for (size_t i = 0; i < PackedData.size(); ++i)
@@ -215,7 +214,7 @@ RECORD(packed_test)
 #if TEST_FIBER_POOL
 			FWorkStealFiberPool::Get()->EnqueuTask(
 #else
-			FWorkStealThreadPool::Get()->EnqueuTask(
+			FAsync::Launch(EAsyncMode::Thread,
 #endif
 										  [&]() {
 											  HLVM_LOG(LogTest, info, TXT("Test PackedFileHandle read token file: {}"), *PackedTokFile);

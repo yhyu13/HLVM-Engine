@@ -6,6 +6,7 @@
 #include "FileSystemDefinition.h"
 #include "Template/PointerTemplate.tpp"
 #include "Path.h"
+#include "Core/Assert.h"
 
 /**
  * @brief 文件打开模式，和python类似
@@ -219,11 +220,40 @@ public:
 	virtual OpRetType Tell(int64_t& Offset) = 0;
 	virtual OpRetType Size(size_t& Size) = 0;
 
-	/**
-	 * These methods can be static methods, but since we require inheritance, they have to be member virtual methods
-	 */
 	virtual OpRetType								   Truncate(size_t Size) = 0;
 	HLVM_NODISCARD virtual std::shared_ptr<IFFileStat> Stat(const FPath& FilePath) = 0;
+
+	/**
+	 * Generic methods
+	 */
+	HLVM_NODISCARD virtual bool IsOpen() const final
+	{
+		return mOpened;
+	}
+
+	HLVM_NODISCARD virtual FPath GetPath() const final
+	{
+		return mFilePath;
+	}
+
+	HLVM_NODISCARD virtual FFileOptions GetOption() const final
+	{
+		return mFileOptions;
+	}
+
+	HLVM_NODISCARD virtual TVector<TBYTE> GetFileContent(IFileHandle* fileHandle) final
+	{
+		TVector<TBYTE> TokenData{};
+		size_t		   fileSize = 0;
+		HLVM_ENSURE(fileHandle->IsOpen(), TXT("file {} is not opened yet"), *fileHandle->GetPath());
+		fileHandle->Size(fileSize);
+		if (fileSize > 0)
+		{
+			TokenData.resize(fileSize);
+			fileHandle->Read(TokenData.data(), TokenData.size(), { .Offset = 0, .Whence = EWhence::Begin });
+		}
+		return TokenData;
+	}
 
 public:
 	operator bool() const noexcept
