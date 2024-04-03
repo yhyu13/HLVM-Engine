@@ -72,16 +72,19 @@ public:
 			}
 		}
 
-		std::this_thread::yield();
+		if constexpr (!bTryPop)
 		{
-			std::unique_lock<std::mutex> lock(mMutex);
-			mCV.wait(lock, [] {
-				return true;
-			});
-		}
-		if (!bTryPop && !ShouldStopPop())
-		{
-			goto TRY_POP;
+			std::this_thread::yield();
+			{
+				std::unique_lock<std::mutex> lock(mMutex);
+				mCV.wait(lock, [] {
+					return true;
+				});
+			}
+			if (!ShouldStopPop())
+			{
+				goto TRY_POP;
+			}
 		}
 		return false;
 	}

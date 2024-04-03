@@ -36,7 +36,10 @@ public:
 	}
 	TAtomicPointer& operator=(const TAtomicPointer& Other) noexcept
 	{
-		Ptr.store(static_cast<ValueType>(Other), std::memory_order_release);
+		if (this != &Other)
+		{
+			Ptr.store(static_cast<ValueType>(Other), std::memory_order_release);
+		}
 		return *this;
 	}
 	~TAtomicPointer() noexcept

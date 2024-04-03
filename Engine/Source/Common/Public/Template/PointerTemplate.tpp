@@ -103,6 +103,9 @@ struct TPointerRemoved<T**>
 	using Type = T;
 };
 
+/**
+ * Use int32 offset to this pointer to represent another pointer, approximately 1%~3% slower than using raw pointer
+ */
 template <typename T>
 PACK(struct TOffsetPtr32 {
 	int32_t offset{ 0x7FFFFFFF };
@@ -117,7 +120,10 @@ PACK(struct TOffsetPtr32 {
 	const T* operator=(const TOffsetPtr32& _rhs)
 	{
 		const T* rhs = _rhs;
-		(rhs != nullptr) ? offset = S_C(int32_t, (R_C(const TBYTE*, rhs) - R_C(TBYTE*, this))) : offset = 0x7FFFFFFF;
+		if (this != &_rhs)
+		{
+			(rhs != nullptr) ? offset = S_C(int32_t, (R_C(const TBYTE*, rhs) - R_C(TBYTE*, this))) : offset = 0x7FFFFFFF;
+		}
 		return rhs;
 	}
 	T* operator=(T* lhs)

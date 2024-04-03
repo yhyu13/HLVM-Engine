@@ -154,55 +154,11 @@ private:
 	});
 	static_assert(sizeof(FBlock) == 20, "FBlock size must be 20 bytes");
 #else
-	/**
-	 * Use int32 offset to this pointer to represent another pointer, approximately 1%~3% slower than using raw pointer
-	 */
-	struct FBlock;
-	struct FBlockOffsetPtr
-	{
-		int32_t offset{ 0x7FFFFFFF };
-		operator FBlock*()
-		{
-			return (offset != 0x7FFFFFFF) ? R_C(FBlock*, R_C(TBYTE*, this) + offset) : nullptr;
-		}
-		operator const FBlock*() const
-		{
-			return (offset != 0x7FFFFFFF) ? R_C(const FBlock*, R_C(const TBYTE*, this) + offset) : nullptr;
-		}
-		const FBlock* operator=(const FBlockOffsetPtr& _rhs)
-		{
-			const FBlock* rhs = _rhs;
-			(rhs != nullptr) ? offset = S_C(int32_t, (R_C(const TBYTE*, rhs) - R_C(TBYTE*, this))) : offset = 0x7FFFFFFF;
-			return rhs;
-		}
-		FBlock* operator=(FBlock* rhs)
-		{
-			(rhs != nullptr) ? offset = S_C(int32_t, (R_C(TBYTE*, rhs) - R_C(TBYTE*, this))) : offset = 0x7FFFFFFF;
-			return rhs;
-		}
-		FBlock* operator->()
-		{
-			return S_C(FBlock*, *this);
-		}
-		const FBlock* operator->() const
-		{
-			return S_C(const FBlock*, *this);
-		}
-		bool operator==(FBlock* rhs) const
-		{
-			return S_C(const FBlock*, *this) == rhs;
-		}
-		bool operator!=(FBlock* rhs) const
-		{
-			return S_C(const FBlock*, *this) != rhs;
-		}
-	};
-
 	struct FBlock
 	{
-		FBlockOffsetPtr prevFreeBlock{};
-		FBlockOffsetPtr nextFreeBlock{};
-		SizeType		size{ 0 };
+		TOffsetPtr32<FBlock> prevFreeBlock{};
+		TOffsetPtr32<FBlock> nextFreeBlock{};
+		SizeType			 size{ 0 };
 
 		HLVM_INLINE_FUNC bool GetFree() const
 		{
@@ -486,7 +442,7 @@ private:
 			else
 			{
 				// TODO : Use stack string assert
-				assert(false);
+				HLVM_ENSURE(false, TXT("Stack allocator overflowed!"));
 			}
 		}
 	}

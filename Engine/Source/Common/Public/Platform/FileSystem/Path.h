@@ -54,16 +54,22 @@ public:
 	}
 	FPath& operator=(FPath&& other) noexcept
 	{
-		boost::filesystem::path::operator=(MoveTemp(other));
-		mHash = MoveTemp(other.mHash);
-		mFileType = MoveTemp(other.mFileType);
+		if (this != &other)
+		{
+			boost::filesystem::path::operator=(MoveTemp(other));
+			mHash = MoveTemp(other.mHash);
+			mFileType = MoveTemp(other.mFileType);
+		}
 		return *this;
 	}
 	FPath& operator=(const FPath& other) noexcept
 	{
-		boost::filesystem::path::operator=(other);
-		mHash = other.mHash;
-		mFileType = other.mFileType;
+		if (this != &other)
+		{
+			boost::filesystem::path::operator=(other);
+			mHash = other.mHash;
+			mFileType = other.mFileType;
+		}
 		return *this;
 	}
 

@@ -1,0 +1,62 @@
+/**
+ * Copyright (c) 2024. MIT License. All rights reserved.
+ */
+
+#pragma once
+
+// A base class for reference counting which supports non-copyable inherited classes.
+struct FBaseRefCountable
+{
+public:
+	FBaseRefCountable() = default;
+	FBaseRefCountable(const FBaseRefCountable&)
+	{
+		// Trivial,
+		// copy construct would not copy the value of counter as it is a brand new object
+	}
+	FBaseRefCountable(FBaseRefCountable&& Other)
+	{
+		mCounter.store(Other.mCounter.load(std::memory_order_relaxed), std::memory_order_relaxed);
+	}
+	FBaseRefCountable& operator=(const FBaseRefCountable&)
+	{
+		// Trivial,
+		// copy construct would not copy the value of counter as it is a brand new object
+		return *this;
+	}
+	FBaseRefCountable& operator=(FBaseRefCountable&& Other)
+	{
+		mCounter.store(Other.mCounter.load(std::memory_order_relaxed), std::memory_order_relaxed);
+		return *this;
+	}
+
+	HLVM_INLINE_FUNC void IncrementRef() const noexcept
+	{
+		mCounter.fetch_add(1, std::memory_order_relaxed);
+	}
+
+	HLVM_INLINE_FUNC bool DecrementRef() const noexcept
+	{
+		return mCounter.fetch_sub(1, std::memory_order_relaxed) > 1;
+	}
+
+	HLVM_INLINE_FUNC size_t NumRef() const noexcept
+	{
+		return mCounter.load(std::memory_order_relaxed);
+	}
+
+private:
+	mutable std::atomic_uint_fast32_t mCounter{ 0 };
+};
+
+// Concept for reference countable classes
+template <typename T>
+concept ReferenceCountable = requires(T&& t) {
+	{
+		t.IncrementRef()
+	};
+} && requires(T&& t) {
+	{
+		t.DecrementRef()
+	} -> std::convertible_to<bool>;
+};

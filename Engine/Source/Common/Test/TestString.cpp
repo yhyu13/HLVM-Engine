@@ -12,7 +12,7 @@ DECLARE_LOG_CATEGORY(LogTest)
 /*
 	<test method>
 */
-static void test_string_test()
+RECORD(test_string, true)
 {
 	HLVM_LOG(LogTest, trace, TXT("Test performance impact on different order of formatting!"));
 	{
@@ -118,5 +118,24 @@ static void test_string_test()
 			}
 		}
 	}
-};
-RECORD_TEST_FUNC(string_test);
+}
+
+#include "Core/Name.h"
+
+RECORD(test_name, true)
+{
+	HLVM_LOG(LogTest, trace, TXT("Test FName!"));
+	FName name("test");
+	{
+		HLVM_LOG(LogTest, info, TXT("name: {0}, ref {1}"), *name.ToString(), name.NumRef());
+		for (int i = 0; i < 1000000; ++i)
+		{
+			FName name2 = name;
+			if (i % 100000 == 0)
+			{
+				HLVM_LOG(LogTest, info, TXT("name: {0}, ref {1}"), *name.ToString(), name.NumRef());
+			}
+		}
+		HLVM_LOG(LogTest, info, TXT("name: {0}, ref {1}"), *name.ToString(), name.NumRef());
+	}
+}

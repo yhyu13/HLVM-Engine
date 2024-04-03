@@ -38,12 +38,18 @@ public:
 	}
 	FString& operator=(FString&& other) noexcept
 	{
-		std::basic_string<TCHAR>::operator=(other);
+		if (this != &other)
+		{
+			std::basic_string<TCHAR>::operator=(MoveTemp(other));
+		}
 		return *this;
 	}
 	FString& operator=(const FString& other) noexcept
 	{
-		std::basic_string<TCHAR>::operator=(other);
+		if (this != &other)
+		{
+			std::basic_string<TCHAR>::operator=(other);
+		}
 		return *this;
 	}
 

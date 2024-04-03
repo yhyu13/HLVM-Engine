@@ -231,7 +231,7 @@ public:
 					}
 					else
 					{
-						assert(false);
+						HLVM_ASSERT(false, TXT("Type {} must be move or copy constructible"), TO_TCHAR_STR(typeid(T).name()));
 					}
 
 					// Step3 delete old tail

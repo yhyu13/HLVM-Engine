@@ -151,7 +151,7 @@ void FVMArena::FreeHeap(void* p)
 		Heap = Heap->Next;
 	}
 	// TODO, should use stack string assert
-	assert(false);
+	HLVM_ENSURE(false, TXT("FVMArena::FreeHeap : Failed to free heap allocation"));
 }
 
 void* FVMArena::MallocBinned(size_t _size)

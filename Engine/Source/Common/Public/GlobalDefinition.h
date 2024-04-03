@@ -79,7 +79,13 @@
 #define C_C(type, value) const_cast<type>((value))
 #define R_C(type, value) reinterpret_cast<type>((value))
 
-#define HLVM_NOT_IMPLEMENTED() assert(false)
+#define HLVM_NOT_IMPLEMENTED() \
+	do                         \
+	{                          \
+		int* _ = nullptr;      \
+		*_ = 0;                \
+	}                          \
+	while (0)
 
 #define HLVM_DELETE(ptr)    \
 	do                      \

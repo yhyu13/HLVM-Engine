@@ -5,4 +5,81 @@
 #pragma once
 #include "String.h"
 
-#include <StringPool.h>
+#include "Core/Object/RefObject.h"
+// #include <StringPool.h>
+
+class FName
+{
+	struct FNameInternal : public FBaseRefCountable
+	{
+		FNameInternal() = default;
+		explicit FNameInternal(const FString& Other)
+			: Name(CopyTemp(Other))
+		{
+		}
+		explicit FNameInternal(FString&& Other)
+			: Name(MoveTemp(Other))
+		{
+		}
+
+		FString Name;
+	};
+
+public:
+	FName() = default;
+	~FName() = default;
+
+	FName(const FString& str)
+		: mInternal(MoveTemp(FNameInternal{ CopyTemp(str) }))
+	{
+	}
+	FName(FString&& str)
+		: mInternal(MoveTemp(FNameInternal{ MoveTemp(str) }))
+	{
+	}
+	FName(const FName& other) noexcept
+		: mInternal(CopyTemp(other.mInternal))
+	{
+	}
+	FName(FName&& other) noexcept
+		: mInternal(MoveTemp(other.mInternal))
+	{
+	}
+	FName& operator=(const FName& Other) noexcept
+	{
+		if (this != &Other)
+		{
+			mInternal = CopyTemp(Other.mInternal);
+		}
+		return *this;
+	}
+	FName& operator=(FName&& Other) noexcept
+	{
+		if (this != &Other)
+		{
+			mInternal = MoveTemp(Other.mInternal);
+		}
+		return *this;
+	}
+
+	FString ToString() const
+	{
+		if (mInternal.Valid())
+		{
+			return mInternal->Name;
+		}
+		return FString{};
+	}
+
+	size_t NumRef() const
+	{
+		if (mInternal.Valid())
+		{
+			return mInternal->NumRef();
+		}
+		return 0;
+	}
+
+private:
+	TRefObject<FNameInternal> mInternal;
+};

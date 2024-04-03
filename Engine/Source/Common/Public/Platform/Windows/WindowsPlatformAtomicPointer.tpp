@@ -31,7 +31,10 @@ public:
 	}
 	TAtomicPointer& operator=(const TAtomicPointer& Other) noexcept
 	{
-		Ptr = (ValueType)Other;
+		if (this != &Other)
+		{
+			Ptr = (ValueType)Other;
+		}
 		return *this;
 	}
 	~TAtomicPointer() noexcept
