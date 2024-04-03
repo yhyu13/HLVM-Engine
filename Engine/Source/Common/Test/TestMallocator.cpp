@@ -26,7 +26,7 @@ RECORD(mallocator_test)
 			delete[] p2;
 		}
 		{
-			boost::container::vector<int, TMallocator<int>> vec{ TMallocator<int>(&MiMallocator) };
+			TVector<int, TMallocator<int>> vec{ TMallocator<int>(&MiMallocator) };
 			vec.reserve(1000);
 			for (size_t i = 0; i < 1000; i++)
 			{
@@ -49,7 +49,7 @@ RECORD(mallocator_test)
 			delete[] p2;
 		}
 		{
-			boost::container::vector<int, TMallocator<int>> vec{ TMallocator<int>(&StackMallocator) };
+			TVector<int, TMallocator<int>> vec{ TMallocator<int>(&StackMallocator) };
 			vec.reserve(1000);
 			for (size_t i = 0; i < 1000; i++)
 			{

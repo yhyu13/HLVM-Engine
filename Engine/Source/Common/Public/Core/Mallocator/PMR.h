@@ -39,6 +39,12 @@ struct TMallocator
 	using propagate_on_container_move_assignment = std::true_type;
 	using is_always_equal = std::true_type;
 
+	template <class U>
+	struct rebind
+	{
+		using other = TMallocator<U, bForceAlignedAlloc>;
+	};
+
 	TMallocator() noexcept = default;
 	TMallocator(const TMallocator&) noexcept = default;
 
@@ -145,6 +151,12 @@ struct TStdMallocator
 
 	using propagate_on_container_move_assignment = std::true_type;
 	using is_always_equal = std::true_type;
+
+	template <class U>
+	struct rebind
+	{
+		using other = TStdMallocator<U>;
+	};
 
 	TStdMallocator() noexcept = default;
 	TStdMallocator(const TStdMallocator&) noexcept = default;

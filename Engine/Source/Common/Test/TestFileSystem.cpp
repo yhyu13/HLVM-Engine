@@ -142,7 +142,7 @@ RECORD(packed_test)
 			jobs.emplace_back(
 
 #if TEST_FIBER_POOL
-				FWorkStealFiberPool::Get()->EnqueuTask(
+				FWorkStealFiberPool::Get()->EnqueueTask(
 #else
 				FAsync::Launch(EAsyncMode::Thread,
 #endif
@@ -212,7 +212,7 @@ RECORD(packed_test)
 
 		{
 #if TEST_FIBER_POOL
-			FWorkStealFiberPool::Get()->EnqueuTask(
+			FWorkStealFiberPool::Get()->EnqueueTask(
 #else
 			FAsync::Launch(EAsyncMode::Thread,
 #endif

@@ -58,7 +58,7 @@
 
 #define TOKENPASTE(x, y) x##y
 #define TOKENPASTE2(x, y) TOKENPASTE(x, y)
-#define PADDING(size) TBYTE TOKENPASTE2(padding_, __LINE__)[size]
+#define PADDING(size) TBYTE TOKENPASTE2(__padding_, __LINE__)[size]
 
 #define BIT_FLAG(x) bool x : 1
 
@@ -71,7 +71,7 @@
 	HLVM_INLINE_VAR constexpr size_t enum_class##_NUM = static_cast<size_t>(enum_class::HLVM_NUM)
 
 #define HLVM_ENUM_V(enum_class, enum_value) static_cast<std::underlying_type_t<enum_class>>(enum_class::enum_value)
-#define HLVM_ENUM_V_SIZE_T(enum_class, enum_value) static_cast<size_t>((enum_value))
+#define HLVM_ENUM_SIZE_T(enum_value) static_cast<size_t>((enum_value))
 
 #define S_C(type, value) static_cast<type>((value))
 #define SP_C(type, value) static_pointer_cast<type>((value))
@@ -110,6 +110,8 @@ static_assert(sizeof(TCHAR) == sizeof(char), "TCHAR is not char in size");
 static_assert(sizeof(TBYTE) == sizeof(char), "TBYTE is not char in size");
 #define TUINT8 std::uint8_t
 static_assert(sizeof(TUINT8) == sizeof(char), "TUINT8 is not char in size");
+#define TUINT16 std::uint16_t
+static_assert(sizeof(TUINT16) == 2 * sizeof(char), "uint16_t is not char in size");
 #define TUINT32 std::uint32_t
 static_assert(sizeof(TUINT32) == 4 * sizeof(char), "uint32_t is not char in size");
 

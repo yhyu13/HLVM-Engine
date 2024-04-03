@@ -29,14 +29,14 @@ using TSmallVector = boost::container::small_vector<T, N>;
 template <typename T>
 using TSmallVector32 = boost::container::small_vector<T, 32>;
 
-template <typename T>
-using TVector = boost::container::vector<T>;
+template <typename T, typename Allocator = void>
+using TVector = boost::container::vector<T, Allocator>;
 
 template <typename Key, typename Value>
 using TMap = phmap::flat_hash_map<Key, Value>;
 
-template <typename Key, typename Value>
-using TStableMap = phmap::node_hash_map<Key, Value>;
+template <typename Key, typename Value, typename Allocator = std::allocator<std::pair<Key, Value>>>
+using TStableMap = phmap::node_hash_map<Key, Value, std::hash<Key>, std::equal_to<Key>, Allocator>;
 
 #define HLVM_MAP_FIND(map, key)        \
 	if (auto iter = (map).find((key)); \

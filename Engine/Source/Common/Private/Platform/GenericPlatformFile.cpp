@@ -9,7 +9,6 @@
 
 DECLARE_LOG_CATEGORY(LogGenericPlatformFile)
 
-
 FGenericPlatformFile* FGenericPlatformFile::sPlatformFileRedirector[EPlatformFileType_NUM];
 
 static FGenericPlatformFile SGenericPlatformFile{};
@@ -34,7 +33,7 @@ FGenericPlatformFile* FGenericPlatformFile::Get(EPlatformFileType PlatformFileTy
 			FGenericPlatformFile::_Init();
 		}
 	});
-	return sPlatformFileRedirector[HLVM_ENUM_V_SIZE_T(EPlatformFileType, PlatformFileType)];
+	return sPlatformFileRedirector[HLVM_ENUM_SIZE_T(PlatformFileType)];
 }
 
 bool FGenericPlatformFile::IsDirectory(const FPath& path)

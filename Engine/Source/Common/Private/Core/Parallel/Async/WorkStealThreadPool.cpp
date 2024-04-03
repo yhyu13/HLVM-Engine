@@ -26,12 +26,16 @@ FWorkStealThreadPool::FWorkStealThreadPool(const FThreadAffinityMode& AffinityMo
 	mCount = Config2->NumThreads;
 
 	// First create queues
+	mQueues.reserve(mCount);
 	for (uint32_t i = 0; i < mCount; ++i)
 	{
 		mQueues.emplace_back(new QueueType());
 	}
+	mQueues.resize(mCount);
+
 	// Then create threads
-	TVector<boost::thread*> Threads;
+	TVector<boost::thread*> Threads{};
+	Threads.reserve(mCount);
 	for (uint32_t i = 0; i < mCount; ++i)
 	{
 		auto Func = [this, index = i] {
@@ -97,8 +101,10 @@ FWorkStealThreadPool::FWorkStealThreadPool(const FThreadAffinityMode& AffinityMo
 
 		auto Thread = mThreads.create_thread(MoveTemp(Func));
 		HLVM_ENSURE(Thread, TXT("Thread init failed {}"), i);
-		Threads.push_back(Thread);
+		Threads.emplace_back(Thread);
 	}
+	Threads.resize(mCount);
+
 	HLVM_ENSURE(FGenericPlatformThreadUtil::SetThreadsWithAffinity(Threads, AffinityMode), TXT("Thread affinity set failed with"));
 }
 

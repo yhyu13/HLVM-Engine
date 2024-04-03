@@ -39,7 +39,6 @@
 			{                                                                        \
 				break;                                                               \
 			}                                                                        \
-			ATOMIC_THREAD_FENCE();                                                   \
 			ASSERT_DEADLOCK_TIMER();                                                 \
 			THREAD_YIELD();                                                          \
 		}                                                                            \
@@ -109,25 +108,30 @@ void FAtomicFlag::Unlock() const noexcept
 
 void FRecursiveAtomicFlag::Lock() const noexcept(!HLVM_DEADLOCK_TIMER)
 {
+	// Test if the same thread already is held
 	if (mOwner == GCurrentThreadID)
 	{
 		mCount.fetch_add(1, std::memory_order_relaxed);
 		return;
 	}
 
+	// Lock the flag
 	LOCK_BODY(&mFlag);
 
+	// Set the owner
 	mOwner = GCurrentThreadID;
 	mCount = 1;
 }
 
 void FRecursiveAtomicFlag::Unlock() const noexcept
 {
+	// Decrement the counter, early return when not 0
 	if (mCount.fetch_sub(1, std::memory_order_relaxed) > 1)
 	{
 		return;
 	}
 
+	// Last held unlock, release owner
 	mOwner = std::thread::id();
 	UNLOCK_BODY(&mFlag);
 }
@@ -135,6 +139,8 @@ void FRecursiveAtomicFlag::Unlock() const noexcept
 void FRWRivalLock::Lock(int group) const noexcept(!HLVM_DEADLOCK_TIMER)
 {
 	Group* desiredGroupPtr = C_C(Group*, &mGroups[group]);
+
+	// Test if the same group already is held
 	if (mCurrentGroupPtr == desiredGroupPtr)
 	{
 		// If already held by the same rival group, try to add to program counter
@@ -148,6 +154,7 @@ void FRWRivalLock::Lock(int group) const noexcept(!HLVM_DEADLOCK_TIMER)
 		mProgramCounter.fetch_sub(1, std::memory_order_relaxed);
 	}
 
+	// Try to compete for the lock
 	INIT_DEADLOCK_TIMER();
 	Group* _expected = nullptr;
 	while (!FGenericPlatformAtomicPointer::AtomicCompareExchange(&mCurrentGroupPtr, &_expected, desiredGroupPtr))
@@ -165,11 +172,14 @@ void FRWRivalLock::Lock(int group) const noexcept(!HLVM_DEADLOCK_TIMER)
 		ASSERT_DEADLOCK_TIMER();
 		THREAD_YIELD();
 	}
+
+	// Add to program counter
 	mProgramCounter.fetch_add(1, std::memory_order_relaxed);
 }
 
 void FRWRivalLock::Unlock() const noexcept
 {
+	// If mProgramCounter == 0, it means that the lock is not held by any rival group, so we can reset mCurrentGroupPtr to nullptr
 	if (mProgramCounter.fetch_sub(1, std::memory_order_relaxed) == 1)
 	{
 		mCurrentGroupPtr = nullptr;

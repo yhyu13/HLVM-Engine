@@ -8,7 +8,12 @@
 #include "Platform/GenericPlatformAtomicPointer.h"
 
 #ifndef HLVM_ATOMIC_LOCK_ENABLE_PADDING
-	#define HLVM_ATOMIC_LOCK_ENABLE_PADDING 0
+	#define HLVM_ATOMIC_LOCK_ENABLE_PADDING 1
+#endif
+
+#if HLVM_ATOMIC_LOCK_ENABLE_PADDING
+	#pragma clang diagnostic push
+	#pragma clang diagnostic ignored "-Wunused-private-field"
 #endif
 
 #if !HLVM_BUILD_RELEASE
@@ -121,7 +126,7 @@ class FAtomicFlagNC
 public:
 	NOCOPYMOVE(FAtomicFlagNC)
 
-#define LOCK_GUARD_()                          \
+#define LOCK_GUARD_NC()                        \
 	FAtomicLockGuard __lock_guard_nc(nc_flag); \
 	ATOMIC_THREAD_FENCE()
 
@@ -236,7 +241,7 @@ protected:
 
 private:
 #if HLVM_ATOMIC_LOCK_ENABLE_PADDING
-	PADDING(HLVM_CACHE_LINE_SIZE - sizeof(std::atomic_flag));
+	PADDING(HLVM_CACHE_LINE_SIZE - sizeof(std::atomic_flag) - sizeof(std::thread::id) - sizeof(std::atomic_uint_fast32_t));
 #endif
 };
 
@@ -299,4 +304,7 @@ private:
 	RivialLockGuardCond<FRWRivalLock> __lock_rival_cond(lock, group, ##__VA_ARGS__); \
 	ATOMIC_THREAD_FENCE()
 
+#if HLVM_ATOMIC_LOCK_ENABLE_PADDING
+	#pragma clang diagnostic pop
+#endif
 #undef HLVM_ATOMIC_LOCK_ENABLE_PADDING

@@ -4,8 +4,7 @@
 
 #pragma once
 
-#include "Core/Parallel/ConcurrentQueue.h"
-#include "AsyncConfig.h"
+#include "TaskQueue.h"
 
 #include <boost/thread/thread.hpp>
 
@@ -19,7 +18,13 @@ public:
 	static FWorkStealThreadPool* Get();
 
 	template <typename F, typename... Args>
-	HLVM_NODISCARD auto EnqueuTask(F&& f, Args&&... args)
+	HLVM_NODISCARD auto EnqueueTask(F&& f, Args&&... args)
+	{
+		return EnqueueTask(ETaskPriority::Default, FwdTemp<F>(f), FwdTemp<Args>(args)...);
+	}
+
+	template <typename F, typename... Args>
+	HLVM_NODISCARD auto EnqueueTask(ETaskPriority Priority, F&& f, Args&&... args)
 	{
 		using TaskRetType = std::invoke_result_t<F, Args...>;
 		using TaskType = std::packaged_task<TaskRetType()>;
@@ -28,7 +33,7 @@ public:
 		auto	   result = task->get_future();
 		auto	   work = [task]() { (*task)(); delete task; };
 		const auto index = (mJobIndex.fetch_add(1, std::memory_order_relaxed) % mCount);
-		mQueues[index]->Push(MoveTemp(work));
+		mQueues[index]->Push(Priority, MoveTemp(work));
 		return MoveTemp(result);
 	}
 
@@ -39,7 +44,7 @@ public:
 
 private:
 	using ProcType = std::function<void(void)>;
-	using QueueType = TConcurrentQueue<ProcType, EConcurrentQueueMode::Mpmc, true>;
+	using QueueType = TTaskQueue<ProcType>;
 	using QueuesType = TVector<std::unique_ptr<QueueType>>;
 	using ThreadsType = boost::thread_group;
 

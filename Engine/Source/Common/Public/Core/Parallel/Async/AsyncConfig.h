@@ -7,6 +7,13 @@
 #include "Core/Parallel/ParallelDefinition.h"
 #include "Core/Log.h"
 
+HLVM_ENUM(ETaskPriority, TUINT8,
+	Normal, // Normal priority task
+	Default = Normal,
+	High,	// High priority task
+	Highest // Low priority task
+);
+
 HLVM_ENUM(EThreadPriority, TUINT8,
 	Background, // Background priority thread
 	Normal,		// Normal priority thread

@@ -4,7 +4,9 @@
 
 #pragma once
 
-#include "Core/Mallocator/MallocatorDefinition.h"
+#include "Core/Mallocator/PMR.h"
+#include "Core/Parallel/Lock.h"
+#include "Core/Container/ContainerDefinition.h"
 #include "ISmallBinnedMallocator.h"
 #include "HeapMallocator.h"
 #include "OSPageMallocator.h"
@@ -48,6 +50,18 @@ public:
 
 	void* MallocLowLevel(size_t size);
 	void  FreeLowLevel(void* p);
+
+private:
+	struct FVMArenaShared
+	{
+		// Use RW lock to protect shared data
+		FRWRivalLock RWLock{};
+
+		// Shared lookup table for Threaded free list (which all uses std allocator underneath)
+		using Tid = std::thread::id;
+		using TLSList = TVector<void*, TStdMallocator<void*>>*;
+		TStableMap<Tid, TLSList, TStdMallocator<std::pair<Tid, TLSList>>> ThreadFreeListMap;
+	};
 
 private:
 	struct FHeapChain

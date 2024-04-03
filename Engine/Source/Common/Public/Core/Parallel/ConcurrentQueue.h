@@ -104,16 +104,44 @@ public:
 		}
 	}
 
-	void Push(const T& item) noexcept
+	/**
+	 * ConcurrentQueue Push always success, so there is no different between TryPush or not
+	 */
+	template <bool bTryPush = false>
+	bool Push(const T& item) noexcept
 		requires(std::is_copy_constructible_v<T>)
 	{
-		PushInternal(new QueueNode(CopyTemp(item)));
+		if (bStopFlagByUser)
+			HLVM_UNLIKELY
+			{
+				return false;
+			}
+		else
+			HLVM_LIKELY
+			{
+				PushInternal(new QueueNode(CopyTemp(item)));
+				return true;
+			}
 	}
 
-	void Push(T&& item) noexcept
+	/**
+	 * ConcurrentQueue Push always success, so there is no different between TryPush or not
+	 */
+	template <bool bTryPush = false>
+	bool Push(T&& item) noexcept
 		requires(std::is_move_constructible_v<T>)
 	{
-		PushInternal(new QueueNode(MoveTemp(item)));
+		if (bStopFlagByUser)
+			HLVM_UNLIKELY
+			{
+				return false;
+			}
+		else
+			HLVM_LIKELY
+			{
+				PushInternal(new QueueNode(MoveTemp(item)));
+				return true;
+			}
 	}
 
 	/**
@@ -121,7 +149,7 @@ public:
 	 * Also make sure that the queue is not empty before calling this function.
 	 * @return T&
 	 */
-	T& PeekFront() const noexcept
+	T& PeekFront() noexcept
 	{
 		HLVM_ASSERT(mTail->mNextNode, TXT("Queue Tail is null"));
 		return mTail->mNextNode->mItem;
@@ -167,13 +195,13 @@ public:
 				{
 					ret = MoveTemp(PopedNode->mItem);
 				}
-				else if (std::is_copy_constructible_v<T>)
+				else if constexpr (std::is_copy_constructible_v<T>)
 				{
 					ret = CopyTemp(PopedNode->mItem);
 				}
 				else
 				{
-					assert(false);
+					HLVM_ASSERT(false, TXT("Type {} must be move or copy constructible"), TO_TCHAR_STR(typeid(T).name()));
 				}
 
 				// Step3 delete old tail
@@ -237,7 +265,7 @@ public:
 	size_t Num() const noexcept
 		requires(bCountSize)
 	{
-		return static_cast<size_t>(mCount.load(std::memory_order_relaxed));
+		return mCount.load(std::memory_order_relaxed);
 	}
 
 	/**
@@ -249,6 +277,9 @@ public:
 		bStopFlagByUser = true;
 	}
 
+	/**
+	 * Use should stop poping instead of Empty in the poping whle loop condition
+	 */
 	bool ShouldStopPop() const noexcept
 	{
 		return bStopFlagByUser && Empty();

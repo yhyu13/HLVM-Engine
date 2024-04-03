@@ -23,7 +23,7 @@ public:
 	{
 		if (mode == EAsyncMode::ThreadPool)
 		{
-			return FWorkStealThreadPool::Get()->EnqueuTask(FwdTemp<F>(f), FwdTemp<Args>(args)...);
+			return FWorkStealThreadPool::Get()->EnqueueTask(FwdTemp<F>(f), FwdTemp<Args>(args)...);
 		}
 		else // Thread
 		{

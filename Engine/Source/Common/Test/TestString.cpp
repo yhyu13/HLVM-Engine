@@ -9,7 +9,6 @@
 
 DECLARE_LOG_CATEGORY(LogTest)
 
-
 /*
 	<test method>
 */
@@ -27,7 +26,6 @@ static void test_string_test()
 		double		  time_order_big_first, time_order_small_first;
 		{
 			auto TestFunc = [&](double& Duration) -> bool {
-				std::atomic_int32_t		 i = 0;
 				FTimer					 Timer;
 				std::once_flag			 Flag;
 				std::atomic<int>		 Counter{ kNumThreads };
@@ -64,7 +62,6 @@ static void test_string_test()
 
 		{
 			auto TestFunc = [&](double& Duration) -> bool {
-				std::atomic_int32_t		 i = 0;
 				FTimer					 Timer;
 				std::once_flag			 Flag;
 				std::atomic<int>		 Counter{ kNumThreads };

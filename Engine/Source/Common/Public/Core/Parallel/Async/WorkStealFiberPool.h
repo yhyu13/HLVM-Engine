@@ -44,7 +44,7 @@ public:
 	static FWorkStealFiberPool* Get();
 
 	template <typename F, typename... Args>
-	HLVM_NODISCARD auto EnqueuTask(F&& f, Args&&... args)
+	HLVM_NODISCARD auto EnqueueTask(F&& f, Args&&... args)
 	{
 		using TaskRetType = std::invoke_result_t<F, Args...>;
 		using TaskType = boost::fibers::packaged_task<TaskRetType()>;

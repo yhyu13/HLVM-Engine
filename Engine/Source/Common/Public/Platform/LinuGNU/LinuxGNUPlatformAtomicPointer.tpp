@@ -23,11 +23,11 @@ public:
 	TAtomicPointer() = default;
 	explicit TAtomicPointer(ValueType Other) noexcept
 	{
-		Ptr.store(Other, std::memory_order_acquire);
+		Ptr.store(Other, std::memory_order_release);
 	}
 	TAtomicPointer& operator=(ValueType Other) noexcept
 	{
-		Ptr.store(Other, std::memory_order_acquire);
+		Ptr.store(Other, std::memory_order_release);
 		return *this;
 	}
 	TAtomicPointer(const TAtomicPointer& Other) noexcept
