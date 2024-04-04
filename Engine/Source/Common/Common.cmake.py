@@ -14,8 +14,9 @@ vcpkg_cxt = VcpkgContenxt(vcpkg_root_path='../Dependency/vcpkg',
                                                             "zstd",
                                                             "botan",
                                                             "rapidjson",
-                                                            VcpkgPackage(name="opentelemetry-cpp",
-                                                                         features=["otlp-grpc"], default_features=True),
+                                                            # VcpkgPackage(name="opentelemetry-cpp",
+                                                            #              features=[], default_features=False),
+                                                            # "catch2"
                                                         ],
                                                         builtin_baseline='53bef8994c541b6561884a8395ea35715ece75db'))
 
@@ -69,25 +70,34 @@ rapidjson = FindPackage(name='RapidJSON',
                             DomainValueModel(domain=DomainEnum.PUBLIC, values=['rapidjson'])])
 
 # Find the opentelemtry package with the specified options
-opentelemetry = FindPackage(name='opentelemetry-cpp',
-                            config=True,
-                            required=True,
-                            target_include_dirs=[DomainValueModel(domain=DomainEnum.PUBLIC,
-                                                                  values=['${OPENTELEMETRY_CPP_INCLUDE_DIRS}'])],
-                            target_link_libs=[
-                                DomainValueModel(domain=DomainEnum.PUBLIC, values=['${OPENTELEMETRY_CPP_LIBRARIES}'])])
-protobuf = FindPackage(name='protobuf',
-                       config=False,
-                       required=True)
-grpc = FindPackage(name='gRPC',
-                   config=False,
-                   required=True)
-curl = FindPackage(name='CURL',
-                   config=False,
-                   required=True)
-nlohmann_json = FindPackage(name='nlohmann_json',
-                            config=False,
-                            required=True)
+# opentelemetry = FindPackage(name='opentelemetry-cpp',
+#                             config=True,
+#                             required=True,
+#                             target_include_dirs=[DomainValueModel(domain=DomainEnum.PUBLIC,
+#                                                                   values=['${OPENTELEMETRY_CPP_INCLUDE_DIRS}'])],
+#                             target_link_libs=[
+#                                 DomainValueModel(domain=DomainEnum.PUBLIC, values=['${OPENTELEMETRY_CPP_LIBRARIES}'])])
+# protobuf = FindPackage(name='protobuf',
+#                        config=False,
+#                        required=True)
+# grpc = FindPackage(name='gRPC',
+#                    config=False,
+#                    required=True)
+# curl = FindPackage(name='CURL',
+#                    config=False,
+#                    required=True)
+# nlohmann_json = FindPackage(name='nlohmann_json',
+#                             config=False,
+#                             required=True)
+
+# # Find the catch2 package with the specified options
+#  Linking time is too slowwww, just copy some key ideas e.g. stable seed, section, benchmarking macro)
+# catch2 = FindPackage(name='Catch2',
+#                         config=True,
+#                         required=True,
+#                         target_link_libs=[
+#                             DomainValueModel(domain=DomainEnum.PUBLIC, values=['Catch2::Catch2',
+#                                                                                'Catch2::Catch2WithMain'])])
 
 # Fetch the Yalantinglibs package from GitHub with the specified options
 yalantinlibs = FetchContent(name='yalantinglibs',
@@ -126,15 +136,6 @@ ctre = FetchContent(name='ctre',
                                                        values=['ctre::ctre'])]
                     )
 
-string_pool = FetchContent(name='StringPool',
-                           git_repo_url='https://github.com/yhyu13/StringPool.git',
-                           git_tag='4dd2bc2d02322578e1efc387674059b75b5cce87',
-                           target_include_dirs=[
-                               DomainValueModel(domain=DomainEnum.PUBLIC,
-                                                values=['${StringPool_SOURCE_DIR}'])],
-                           )
-
-
 # Create a CommonModule object with the specified options
 class CommonModule(BaseModule):
     def __init__(self):
@@ -148,7 +149,6 @@ class CommonModule(BaseModule):
                                          backward,
                                          parallel_hashmap,
                                          ctre,
-                                         string_pool,
                                          ],
                          find_packages=[spdlog,
                                         mimalloc,
@@ -157,11 +157,12 @@ class CommonModule(BaseModule):
                                         botan3,
                                         zstd,
                                         rapidjson,
-                                        opentelemetry,
-                                        protobuf,
-                                        grpc,
-                                        curl,
-                                        nlohmann_json,
+                                        # opentelemetry,
+                                        # protobuf,
+                                        # grpc,
+                                        # curl,
+                                        # nlohmann_json,
+                                        # catch2
                                         ]
                          )
         self.target_interface.add_compile_options(domain=DomainEnum.PUBLIC, values=[
