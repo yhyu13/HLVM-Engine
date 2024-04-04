@@ -8,10 +8,17 @@
 #include "Template/ExpressionTemplate.tpp"
 #include "Platform/PlatformDefinition.h"
 
+#include "Core/Mallocator/IMallocator.h"
+#include "Template/FunctionTemplate.tpp"
+
 namespace hlvm_private
 {
-	HLVM_NORETURN HLVM_NOINLINE_FUNC void hlvm_internal_assert(const TCHAR* Expression, FString&& Message, const TCHAR* File, int Line);
-}
+	HLVM_EXTERN_VAR IMallocator* AssertStackMallocator;
+	HLVM_EXTERN_FUNC void		 InitAssertStackMallocator();
+
+	HLVM_NORETURN HLVM_NOINLINE_FUNC void
+	hlvm_internal_assert(const TCHAR* Expression, FString&& Message, const TCHAR* File, int Line);
+} // namespace hlvm_private
 
 #ifndef HLVM_ASSERT_EVEN_IN_RELEASE
 	#define HLVM_ASSERT_EVEN_IN_RELEASE 0
@@ -31,7 +38,11 @@ namespace hlvm_private
 		do                                                                                                             \
 		{                                                                                                              \
 			if (static_cast<bool>((x)) == false)                                                                       \
+			{                                                                                                          \
+				hlvm_private::InitAssertStackMallocator();                                                             \
+				SwapMallocator(hlvm_private::AssertStackMallocator);                                                   \
 				hlvm_private::hlvm_internal_assert(STRTIFY(x), FString::Format(__VA_ARGS__), TXT(__FILE__), __LINE__); \
+			}                                                                                                          \
 		}                                                                                                              \
 		while (0)
 #else
@@ -64,6 +75,10 @@ namespace hlvm_private
 	do                                                                                                             \
 	{                                                                                                              \
 		if (static_cast<bool>((x)) == false)                                                                       \
+		{                                                                                                          \
+			hlvm_private::InitAssertStackMallocator();                                                             \
+			SwapMallocator(hlvm_private::AssertStackMallocator);                                                   \
 			hlvm_private::hlvm_internal_assert(STRTIFY(x), FString::Format(__VA_ARGS__), TXT(__FILE__), __LINE__); \
+		}                                                                                                          \
 	}                                                                                                              \
 	while (0)

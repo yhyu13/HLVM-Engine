@@ -18,30 +18,66 @@
 
 #define THREAD_PAUSE() _mm_pause()				 // pause for ~75 clocks on intel 11th-i7 11700
 #define THREAD_YIELD() std::this_thread::yield() // pause for ~400 clocks on intel 11th-i7 11700
-#define SPIN_COUNT 8							 // ~=1.5 * 400 / 75
+#define PAUSE_SPIN_COUNT 32						 //
+
+// Inspired from boost spinlock_ttas.hpp, use thread sleep and contention spin
+// to further reduce cpu stall and improve lock efficiency
+// based on informations from:
+// https://software.intel.com/en-us/articles/benefitting-power-and-performance-sleep-loops
+// https://software.intel.com/en-us/articles/long-duration-spin-wait-loops-on-hyper-threading-technology-enabled-intel-processors
+static constexpr std::chrono::microseconds us0{ 0 };
+#define THREAD_SLEEP0() std::this_thread::sleep_for(us0) // pause for 1000 clocks claimed by boost?
+#define SLEEP_SPIN_COUNT 32								 //
+#define CONTENTION_SPIN_COUNT 16						 //
 
 #if 1
 	/**
 	 * Balance spin lock with pause instruction and thread yield
 	 * to lower the meaningless power consumptions of CPU during busy waiting
 	 */
-	#define LOCK_BODY(lock)                                                          \
-		INIT_DEADLOCK_TIMER();                                                       \
-		while ((lock)->test_and_set(std::memory_order_acq_rel))                      \
-		{                                                                            \
-			int spin_count = SPIN_COUNT;                                             \
-			do                                                                       \
-			{                                                                        \
-				THREAD_PAUSE();                                                      \
-			}                                                                        \
-			while ((lock)->test_and_set(std::memory_order_acq_rel) && --spin_count); \
-			if (spin_count > 0)                                                      \
-			{                                                                        \
-				break;                                                               \
-			}                                                                        \
-			ASSERT_DEADLOCK_TIMER();                                                 \
-			THREAD_YIELD();                                                          \
-		}                                                                            \
+	#define LOCK_BODY(lock)                                                      \
+		INIT_DEADLOCK_TIMER();                                                   \
+		for (;;)                                                                 \
+		{                                                                        \
+			while ((lock)->test(std::memory_order_relaxed))                      \
+			{                                                                    \
+				uint_fast8_t spin_count = PAUSE_SPIN_COUNT;                      \
+				do                                                               \
+				{                                                                \
+					THREAD_PAUSE();                                              \
+				}                                                                \
+				while ((lock)->test(std::memory_order_relaxed) && --spin_count); \
+				if (spin_count > 0)                                              \
+				{                                                                \
+					break;                                                       \
+				}                                                                \
+				spin_count = SLEEP_SPIN_COUNT;                                   \
+				do                                                               \
+				{                                                                \
+					THREAD_SLEEP0();                                             \
+				}                                                                \
+				while ((lock)->test(std::memory_order_relaxed) && --spin_count); \
+				if (spin_count > 0)                                              \
+				{                                                                \
+					break;                                                       \
+				}                                                                \
+				ASSERT_DEADLOCK_TIMER();                                         \
+				THREAD_YIELD();                                                  \
+			}                                                                    \
+			if ((lock)->test_and_set(std::memory_order_acq_rel))                 \
+			{                                                                    \
+				uint_fast8_t spin_count = CONTENTION_SPIN_COUNT;                 \
+				do                                                               \
+				{                                                                \
+					THREAD_PAUSE();                                              \
+				}                                                                \
+				while (--spin_count);                                            \
+			}                                                                    \
+			else                                                                 \
+			{                                                                    \
+				break;                                                           \
+			}                                                                    \
+		}                                                                        \
 		ATOMIC_THREAD_FENCE()
 #else
 	#define LOCK_BODY(lock)                                     \
@@ -159,13 +195,23 @@ void FRWRivalLock::Lock(int group) const noexcept(!HLVM_DEADLOCK_TIMER)
 	Group* _expected = nullptr;
 	while (!FGenericPlatformAtomicPointer::AtomicCompareExchange(&mCurrentGroupPtr, &_expected, desiredGroupPtr))
 	{
-		int spin_count = SPIN_COUNT;
+		uint_fast8_t spin_count = PAUSE_SPIN_COUNT;
 		do
 		{
 			THREAD_PAUSE();
 		}
 		while (!FGenericPlatformAtomicPointer::AtomicCompareExchange(&mCurrentGroupPtr, &_expected, desiredGroupPtr) && --spin_count);
 		if (spin_count)
+		{
+			break;
+		}
+		spin_count = SLEEP_SPIN_COUNT;
+		do
+		{
+			THREAD_SLEEP0();
+		}
+		while (!FGenericPlatformAtomicPointer::AtomicCompareExchange(&mCurrentGroupPtr, &_expected, desiredGroupPtr) && --spin_count);
+		if (spin_count > 0)
 		{
 			break;
 		}

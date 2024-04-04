@@ -11,6 +11,9 @@
 #include <thread>
 #include <vector>
 
+#include <boost/fiber/detail/spinlock.hpp>
+#include <boost/fiber/detail/spinlock_ttas.hpp>
+
 DECLARE_LOG_CATEGORY(LogTest)
 
 /*
@@ -64,9 +67,10 @@ RECORD(lock_test, true)
 		auto TestFunc = [&](double& Duration) -> bool {
 			int	   i = 0;
 			FTimer Timer;
-			// std::optional<FAtomicFlag> lock = FAtomicFlag{};
-			std::optional<FRecursiveAtomicFlag> lock = FRecursiveAtomicFlag{};
-			//  std::optional<FAtomicFlag> lock;
+			//  std::optional<FAtomicFlag> lock; // test empty lock
+			// std::optional<FAtomicFlag> lock = FAtomicFlag{}; // test non empty lock
+			// std::optional<FRecursiveAtomicFlag> lock = FRecursiveAtomicFlag{}; // test recursive lock
+			auto					 lock = FAtomicFlag();
 			std::once_flag			 Flag;
 			std::atomic_int_fast32_t Counter{ kNumThreads };
 			std::vector<std::thread> threads;
@@ -100,9 +104,59 @@ RECORD(lock_test, true)
 		time_lock = RunTestAndCalculateAvg(TestFunc, kNumIterations);
 		HLVM_LOG(LogTest, info, TXT("With lock avg took {0:f}"), time_lock);
 	}
-	double ratio = time_lock / time_no_lock;
-	double efficient = kNumThreads / ratio * 100;
-	HLVM_LOG(LogTest, info, TXT("Atomic ops = {0:.2f}x With lock, lock is {1:.2f}% efficient, ideally, lock should be 95% to 99% efficient"), ratio, efficient);
+	{
+		double ratio = time_lock / time_no_lock;
+		double efficient = kNumThreads / ratio * 100;
+		HLVM_LOG(LogTest, info,
+			TXT("Atomic ops = {0:.2f}x With lock, lock is {1:.2f}% efficient, ideally, lock should be 95% to 99% efficient"),
+			ratio, efficient);
+	}
+	{
+		HLVM_LOG(LogTest, info, TXT("With lock : Create 10 threads and adds to i"));
+		auto TestFunc = [&](double& Duration) -> bool {
+			int						 i = 0;
+			FTimer					 Timer;
+			auto					 lock = boost::fibers::detail::spinlock_ttas{};
+			std::once_flag			 Flag;
+			std::atomic_int_fast32_t Counter{ kNumThreads };
+			std::vector<std::thread> threads;
+			for (int j = 0; j < kNumThreads; ++j)
+			{
+				threads.emplace_back([&i, &Timer, &Flag, &Counter, &Duration, &lock] {
+					std::call_once(Flag, [&Timer] {
+						Timer.Reset();
+					});
+					for (int k = 0; k < kNumLoops; ++k)
+					{
+						boost::fibers::detail::spinlock_lock lk{ lock };
+						i++;
+					}
+					if (--Counter == 0)
+					{
+						Duration = Timer.Mark();
+					}
+				});
+			}
+
+			for (std::thread& t : threads)
+			{
+				t.join();
+			}
+
+			HLVM_LOG(LogTest, info, TXT("i = {0:d}, took {1:f}"), i, Duration);
+			return true;
+		};
+
+		time_lock = RunTestAndCalculateAvg(TestFunc, kNumIterations);
+		HLVM_LOG(LogTest, info, TXT("With boost spin lock avg took {0:f}"), time_lock);
+	}
+	{
+		double ratio = time_lock / time_no_lock;
+		double efficient = kNumThreads / ratio * 100;
+		HLVM_LOG(LogTest, info,
+			TXT("Atomic ops = {0:.2f}x With boost lock, boost lock is {1:.2f}% efficient, ideally, lock should be 95% to 99% efficient"),
+			ratio, efficient);
+	}
 };
 
 #include "Core/Parallel/ConcurrentQueue.h"

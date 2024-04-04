@@ -4,12 +4,14 @@
 
 #pragma once
 
+#include "MallocatorDefinition.h"
 #if HLVM_MALLOC_USE_MIMALLOC_OVER_STD
 	#include "MiMallocator.h"
 #else
 	#include "StdMallocator.h"
 #endif
 #include "Core/Assert.h"
+#include "Template/PointerTemplate.tpp"
 
 #ifndef HLVM_STACK_MALLOCATOR_DEFAULT_SIZE
 	#define HLVM_STACK_MALLOCATOR_DEFAULT_SIZE 64 * 1024
@@ -31,6 +33,7 @@ public:
 
 	NOCOPYMOVE(TStackMallocator)
 	TStackMallocator() noexcept
+		: mFreeSizeUpperBound(-1)
 	{
 		Type = EMallocator::Stack;
 
@@ -51,6 +54,29 @@ public:
 	~TStackMallocator() noexcept final override
 	{
 	}
+
+	/**
+	 * Reset the allocator, useful when you want to reuse the allocator and ignore all previously allocated memory
+	 * Used in Assert Stack Allocation in Assert.cpp
+	 */
+	void Reset() noexcept
+	{
+		// Init free size upper bound
+		mFreeSizeUpperBound = -1;
+
+		// Init stack and free block head which occupy the whole stack
+		mFreeBlockHead = R_C(FBlock*, mStack);
+		*mFreeBlockHead = FBlock();
+		mFreeBlockHead->size = (N - 2 * FBlock_Size); // Stack size minus head block and tail block
+		HLVM_CONSTEXPR_ASSERT(bValidate, mFreeBlockHead->size > 0);
+
+		// Init tail which is trivially free
+		mTail = R_C(FBlock*, mStack + N - FBlock_Size);
+
+		// Connect head to tail
+		mFreeBlockHead->nextFreeBlock = mTail;
+	}
+
 	HLVM_INLINE_FUNC virtual bool Owned(void* ptr) noexcept final override
 	{
 		if (InStackBound(ptr))
@@ -453,9 +479,9 @@ private:
 	}
 
 	TBYTE	 mStack[N];
-	FBlock*	 mFreeBlockHead{ nullptr };
-	FBlock*	 mTail{ nullptr };
-	SizeType mFreeSizeUpperBound{ -1 };
+	FBlock*	 mFreeBlockHead;
+	FBlock*	 mTail;
+	SizeType mFreeSizeUpperBound;
 };
 
 /**
