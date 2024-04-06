@@ -13,11 +13,11 @@
 
 namespace hlvm_private
 {
-	HLVM_EXTERN_VAR IMallocator* AssertStackMallocator;
-	HLVM_EXTERN_FUNC void		 InitAssertStackMallocator();
+	HLVM_EXTERN_VAR IMallocator* assert_stack_mallocator;
+	HLVM_EXTERN_FUNC void		 init_assert_stack_mallocator();
 
 	HLVM_NORETURN HLVM_NOINLINE_FUNC void
-	hlvm_internal_assert(const TCHAR* Expression, FString&& Message, const TCHAR* File, int Line);
+	hlvm_internal_assert(const TCHAR* Expression, const FString* Message, const TCHAR* File, int Line);
 } // namespace hlvm_private
 
 #ifndef HLVM_ASSERT_EVEN_IN_RELEASE
@@ -34,16 +34,16 @@ namespace hlvm_private
  * 条件大多数情况下就是简单的表达式，如：x == 100，x > 100，x < 100。发布环境下，判断条件被省略，可以避免不必要的计算。
  */
 #if !HLVM_BUILD_RELEASE || HLVM_ASSERT_EVEN_IN_RELEASE
-	#define HLVM_ASSERT(x, ...)                                                                                        \
-		do                                                                                                             \
-		{                                                                                                              \
-			if (static_cast<bool>((x)) == false)                                                                       \
-			{                                                                                                          \
-				hlvm_private::InitAssertStackMallocator();                                                             \
-				SwapMallocator(hlvm_private::AssertStackMallocator);                                                   \
-				hlvm_private::hlvm_internal_assert(STRTIFY(x), FString::Format(__VA_ARGS__), TXT(__FILE__), __LINE__); \
-			}                                                                                                          \
-		}                                                                                                              \
+	#define HLVM_ASSERT(x, ...)                                                                                                       \
+		do                                                                                                                            \
+		{                                                                                                                             \
+			if (static_cast<bool>((x)) == false)                                                                                      \
+			{                                                                                                                         \
+				hlvm_private::init_assert_stack_mallocator();                                                                         \
+				SwapMallocator(hlvm_private::assert_stack_mallocator);                                                                \
+				hlvm_private::hlvm_internal_assert(STRTIFY(x), new FString{ FString::Format(__VA_ARGS__) }, TXT(__FILE__), __LINE__); \
+			}                                                                                                                         \
+		}                                                                                                                             \
 		while (0)
 #else
 	#if HLVM_ASSERT_ALWAYS_EVLUATE_EXPERSION
@@ -71,14 +71,14 @@ namespace hlvm_private
  * 确保：开发与发布模式下，判断语句返回值是否为真，否则抛出异常
  * 语句大多数是函数执行结果，如：x() == 100，x() > 100，x() < 100。如果x()不计算会影响到程序的正确性，则不能用断言
  */
-#define HLVM_ENSURE(x, ...)                                                                                        \
-	do                                                                                                             \
-	{                                                                                                              \
-		if (static_cast<bool>((x)) == false)                                                                       \
-		{                                                                                                          \
-			hlvm_private::InitAssertStackMallocator();                                                             \
-			SwapMallocator(hlvm_private::AssertStackMallocator);                                                   \
-			hlvm_private::hlvm_internal_assert(STRTIFY(x), FString::Format(__VA_ARGS__), TXT(__FILE__), __LINE__); \
-		}                                                                                                          \
-	}                                                                                                              \
+#define HLVM_ENSURE(x, ...)                                                                                                       \
+	do                                                                                                                            \
+	{                                                                                                                             \
+		if (static_cast<bool>((x)) == false)                                                                                      \
+		{                                                                                                                         \
+			hlvm_private::init_assert_stack_mallocator();                                                                         \
+			SwapMallocator(hlvm_private::assert_stack_mallocator);                                                                \
+			hlvm_private::hlvm_internal_assert(STRTIFY(x), new FString{ FString::Format(__VA_ARGS__) }, TXT(__FILE__), __LINE__); \
+		}                                                                                                                         \
+	}                                                                                                                             \
 	while (0)

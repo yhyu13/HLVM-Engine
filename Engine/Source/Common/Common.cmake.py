@@ -10,13 +10,16 @@ vcpkg_cxt = VcpkgContenxt(vcpkg_root_path='../Dependency/vcpkg',
                                                                          default_features=False),
                                                             "magic-enum",
                                                             "boost",
-                                                            "elfutils",
+                                                            "libbacktrace",  # used by boost stack trace on linux
+                                                            # "elfutils",  # used for backward
                                                             "zstd",
                                                             "botan",
                                                             "rapidjson",
                                                             # VcpkgPackage(name="opentelemetry-cpp",
                                                             #              features=[], default_features=False),
                                                             # "catch2"
+                                                            "gperftools",
+                                                            "minitrace"
                                                         ],
                                                         builtin_baseline='53bef8994c541b6561884a8395ea35715ece75db'))
 
@@ -37,16 +40,17 @@ magic_enum = FindPackage(name='magic_enum',
                          config=True,
                          required=True,
                          target_link_libs=[
-                             DomainValueModel(domain=DomainEnum.PUBLIC, values=['yalantinglibs::yalantinglibs'])])
+                             DomainValueModel(domain=DomainEnum.PUBLIC, values=['magic_enum::magic_enum'])])
 
 # Find the Boost package with the specified options
 Boost = FindPackage(name='Boost',
                     config=False,
                     required=True,
-                    components=['iostreams filesystem system thread fiber date_time'],
+                    components=['iostreams filesystem system thread fiber date_time program_options'],
                     target_include_dirs=[DomainValueModel(domain=DomainEnum.PUBLIC, values=['${Boost_INCLUDE_DIRS}'])],
                     target_link_dirs=[DomainValueModel(domain=DomainEnum.PUBLIC, values=['${Boost_LIBRARY_DIRS}'])],
-                    target_link_libs=[DomainValueModel(domain=DomainEnum.PUBLIC, values=['${Boost_LIBRARIES}'])])
+                    target_link_libs=[DomainValueModel(domain=DomainEnum.PUBLIC, values=['${Boost_LIBRARIES}',
+                                                                                         'backtrace'])])
 
 # Find the Botan3 package with the specified options
 botan3 = FindPackage(name='Botan',
@@ -99,6 +103,22 @@ rapidjson = FindPackage(name='RapidJSON',
 #                             DomainValueModel(domain=DomainEnum.PUBLIC, values=['Catch2::Catch2',
 #                                                                                'Catch2::Catch2WithMain'])])
 
+# Find the gperftools package with the specified options
+gperftools = FindPackage(name='gperftools',
+                         config=False,
+                         required=True,
+                         target_link_libs=[
+                             DomainValueModel(domain=DomainEnum.PUBLIC, values=['gperftools::profiler'])])
+
+# Find the minitrace package with the specified options
+minitrace = FindPackage(name='minitrace',
+                        config=True,
+                        required=True,
+                        target_link_libs=[
+                            DomainValueModel(domain=DomainEnum.PUBLIC, values=['minitrace::minitrace'])])
+
+##########################################################
+
 # Fetch the Yalantinglibs package from GitHub with the specified options
 yalantinlibs = FetchContent(name='yalantinglibs',
                             git_repo_url='https://github.com/yhyu13/yalantinglibs.git',
@@ -111,13 +131,13 @@ yalantinlibs = FetchContent(name='yalantinglibs',
                                 DomainValueModel(domain=DomainEnum.PUBLIC, values=['yalantinglibs::yalantinglibs'])]
                             )
 
-# Fetch the Backward package from GitHub with the specified options
-backward = FetchContent(name='backward',
-                        git_repo_url='https://github.com/yhyu13/backward-cpp.git',
-                        git_tag='51f0700452cf71c57d43c2d028277b24cde32502',
-                        target_link_libs=[DomainValueModel(domain=DomainEnum.PUBLIC,
-                                                           values=['Backward::Interface', '${CMAKE_DL_LIBS}'])]
-                        )
+# # Fetch the Backward package from GitHub with the specified options
+# backward = FetchContent(name='backward',
+#                         git_repo_url='https://github.com/yhyu13/backward-cpp.git',
+#                         git_tag='51f0700452cf71c57d43c2d028277b24cde32502',
+#                         target_link_libs=[DomainValueModel(domain=DomainEnum.PUBLIC,
+#                                                            values=['Backward::Interface', '${CMAKE_DL_LIBS}'])]
+#                         )
 
 # Fetch the parallel-hashmap package from GitHub with the specified options
 parallel_hashmap = FetchContent(name='parallel-hashmap',
@@ -136,6 +156,16 @@ ctre = FetchContent(name='ctre',
                                                        values=['ctre::ctre'])]
                     )
 
+
+# # Find the cpptrace package with the specified options
+# # cpptrace's fancy stack trace used too much memory (~16MB compare to <64K used by backwardcpp), so we would not use it
+# cpptrace = FetchContent(name='cpptrace',
+#                         git_repo_url='https://github.com/yhyu13/cpptrace.git',
+#                         git_tag='ce353dc3abde5286bcff799206686934f0150bf2',
+#                         target_link_libs=[DomainValueModel(domain=DomainEnum.PUBLIC,
+#                                                            values=['cpptrace::cpptrace'])])
+
+
 # Create a CommonModule object with the specified options
 class CommonModule(BaseModule):
     def __init__(self):
@@ -146,14 +176,16 @@ class CommonModule(BaseModule):
                                                                                  ]),
                                                   unity_build=True),
                          fetch_packages=[yalantinlibs,
-                                         backward,
+                                         # backward,
                                          parallel_hashmap,
                                          ctre,
+                                         # cpptrace
                                          ],
                          find_packages=[spdlog,
                                         mimalloc,
                                         magic_enum,
                                         Boost,
+                                        # libdwarf,
                                         botan3,
                                         zstd,
                                         rapidjson,
@@ -184,7 +216,9 @@ class TestCommonModule(BaseModule):
         super().__init__(module=ModuleTargetModel(target=os.path.basename(cpp_path).split('.')[0],
                                                   type=ModuleEnum.EXECUTABLE_AND_TEST,
                                                   source_files=[ToCMakePath(cpp_path)],
-                                                  unity_build=False)
+                                                  unity_build=False),
+                         fetch_packages=[],
+                         find_packages=[gperftools]
                          )
         self.target_interface.add_pch_files(domain=DomainEnum.REUSE_FROM,
                                             values=['Common'])

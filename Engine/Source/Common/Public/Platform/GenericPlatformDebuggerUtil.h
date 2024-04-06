@@ -7,8 +7,6 @@
 #include "GenericPlatform.h"
 #include "Core/String.h"
 
-#include <backward.hpp>
-
 #ifndef HLVM_ALLOW_DEBUGGER_EVEN_IN_RELEASE
 	#define HLVM_ALLOW_DEBUGGER_EVEN_IN_RELEASE 0
 #endif
@@ -23,7 +21,7 @@ public:
 	/**
 	 * Generic Platform method that check if any debugger is attached, might be slow depdending on implementation
 	 */
-	inline static bool IsDebuggerPresent()
+	HLVM_INLINE_FUNC static bool IsDebuggerPresent()
 	{
 		return sInstance->InternalIsDebuggerPresent();
 	}
@@ -31,18 +29,10 @@ public:
 	/**
 	 * Generic Platform method that get the stack trace string
 	 * @param skip number of frame to skip, counting from bottom
+	 * @param max_depth  max number of frame to get
 	 * @return FStdString of the stack trace
 	 */
-	inline static FStdString GetStackTrace(size_t skip = 0)
-	{
-		backward::StackTrace st;
-		st.load_here(32);
-		st.skip_n_firsts(1 + skip); // Skip the first frame of backward to get our frame
-		std::ostringstream os;
-		backward::Printer  p;
-		p.print(st, os);
-		return FStdString(MoveTemp(os.str())); // TODO, consider stack string instead of malloc string
-	}
+	HLVM_NOINLINE_FUNC static FStdString GetStackTrace(size_t skip = 0, size_t max_depth = 10);
 
 protected:
 	virtual bool InternalIsDebuggerPresent() = 0;

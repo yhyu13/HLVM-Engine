@@ -13,3 +13,5 @@
 #include "Core/Parallel/ParallelDefinition.h"
 
 #include "Template/GlobalTemplate.tpp"
+
+#include "Global.h"

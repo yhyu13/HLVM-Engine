@@ -169,19 +169,6 @@ RECORD(magic_enum_test)
 	}
 };
 
-#include <backward.hpp>
-
-RECORD(backward_test)
-{
-	using namespace backward;
-	{
-		StackTrace st;
-		st.load_here(32);
-		Printer p;
-		p.print(st);
-	}
-};
-
 /**
  * phmap has alot of unconventional warnings, pretty bad code though
  */
@@ -420,16 +407,19 @@ RECORD(test_zstd)
 
 RECORD(test_rapidjson)
 {
+	HLVM_LOG(LogTest, trace, TXT("Test FName!"));
 	using namespace std;
 	using namespace rapidjson;
-	const char json[] = R"({ "hello" : "world\nand you?" })";
-	Document   document;
-	document.Parse(json);
+	{
+		const char json[] = R"({ "hello" : "world\nand you?" })";
+		Document   document;
+		document.Parse(json);
 
-	assert(document.HasMember("hello"));
-	const Value& hello = document["hello"];
-	assert(hello.IsString());
-	cout << "Hello: " << hello.GetString() << endl;
+		assert(document.HasMember("hello"));
+		const Value& hello = document["hello"];
+		assert(hello.IsString());
+		cout << "Hello: " << hello.GetString() << endl;
+	}
 }
 
 //// opentelemetry
@@ -516,3 +506,64 @@ RECORD(test_rapidjson)
 //
 //	CleanupTracer();
 // }
+
+// #include <backward.hpp>
+//
+// RECORD(backward_test, true)
+//{
+//	using namespace backward;
+//	{
+//		StackTrace st;
+//		st.load_here(32);
+//		Printer p;
+//		p.print(st);
+//	}
+//	{
+//		StackTrace st;
+//		st.load_here(32);
+//		TraceResolver tr;
+//		tr.load_stacktrace(st);
+//		for (size_t i = 0; i < st.size(); ++i)
+//		{
+//			ResolvedTrace trace = tr.resolve(st[i]);
+//			std::cout << "#" << i
+//					  << "file " << trace.source.filename
+//					  << ":" << trace.source.line
+//					  << ":" << trace.source.col
+//					  << " " << trace.object_function
+//					  << std::endl;
+//		}
+//	}
+// };
+
+// #include <cpptrace/cpptrace.hpp>
+//
+// RECORD(cpptrace_test)
+//{
+//	HLVM_LOG(LogTest, info, TXT("Test cpptrace!"));
+//	{
+//		FTimer timer{ true };
+//		cpptrace::generate_raw_trace().resolve().print();
+//		HLVM_LOG(LogTest, warn, TXT("cpptrace raw resolve print cost {}!"), timer.Mark());
+//	}
+//	{
+//		FTimer timer{ true };
+//		cpptrace::generate_trace().print();
+//		HLVM_LOG(LogTest, warn, TXT("cpptrace print cost {}!"), timer.Mark());
+//	}
+//	{
+//		FTimer timer{ true };
+//		cpptrace::generate_trace().print_with_snippets();
+//		HLVM_LOG(LogTest, warn, TXT("cpptrace print_with_snippets cost {}!"), timer.Mark());
+//	}
+// };
+
+#include <boost/stacktrace.hpp>
+
+RECORD(boost_stacktrace_test)
+{
+	HLVM_LOG(LogTest, info, TXT("Test boost_stacktrace!"));
+	{
+		std::cout << boost::stacktrace::stacktrace();
+	}
+}

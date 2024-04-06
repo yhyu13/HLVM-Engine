@@ -9,32 +9,39 @@
 
 namespace hlvm_private
 {
-	HLVM_STATIC_VAR TStackMallocator<64 * 1024, false, true, false, false, false> StackMallocator;
-	IMallocator*																  AssertStackMallocator = &StackMallocator;
+	/**
+	 * Assert stack mallocator, adjust reserved memory size to your needs
+	 */
+	HLVM_STATIC_VAR auto stack_mallocator = TStackMallocator<64 * 1024, false, true, false, false, false>{};
+	IMallocator*		 assert_stack_mallocator = &stack_mallocator;
 
-	void InitAssertStackMallocator()
+	void init_assert_stack_mallocator()
 	{
 		// Reset stack mallocator each time init is called to wap out any previous allocations
 		// This is totally valid since allocation last time on assertion is already handled and gone obsolete
-		StackMallocator.Reset();
+		stack_mallocator.Reset();
 	}
 
-	HLVM_NORETURN HLVM_NOINLINE_FUNC void hlvm_internal_assert(const TCHAR* Expression, FString&& Message, const TCHAR* File, int Line)
+	HLVM_NORETURN HLVM_NOINLINE_FUNC void hlvm_internal_assert(const TCHAR* Expression, const FString* Message, const TCHAR* File, int Line)
 	{
 		// Sanity check that we are using stack mallocator
-		assert(GMallocatorTLS == AssertStackMallocator);
+		assert(GMallocatorTLS == assert_stack_mallocator);
+
 #if HLVM_BUILD_DEBUG
-		// In Debug mode we skip first 3 frames to get proper stack trace
-		constexpr size_t SkipStackNum = 3;
+		// In Debug mode we skip 1 frames to get proper stack trace
+		constexpr size_t SkipStackNum = 1;
 #else
-		// In RelWithDebInfo mode we skip first frame to get proper stack trace
+		// In RelWithDebInfo mode we skip 1 frame to get proper stack trace
 		constexpr size_t SkipStackNum = 1;
 #endif
-		// Deliberate new here to avoid free on destrcutor as destructors are called
-		// where stack mallocator is already swapped out by the end of this frame
-		FStdString* Stack = new FStdString{ FGenericPlatformDebuggerUtil::GetStackTrace(SkipStackNum) }; // Explicitly call stack trace here to get proper stack trace
-		FString*	msg = new FString{ FString::Format(TXT("{1} with '{2}' at {3}:{4}\n{0}"), **Stack, Expression, *Message, File,
-			   Line) };
+		// Deliberate *new* here to avoid free on destrcution
+		auto Stack = new FStdString{ FGenericPlatformDebuggerUtil::GetStackTrace(SkipStackNum) }; // Explicitly call stack trace here to get proper stack trace
+		auto msg = new FString{ FString::Format(TXT("{1} with '{2}' at {3}:{4}\n{0}"), **Stack, Expression, **Message, File,
+			Line) };
+
+		// Free memory in order to leave more space before logging
+		delete Stack;
+		delete Message;
 
 		// Log message
 		HLVM_LOG(LogAssert, critical, **msg);
@@ -44,8 +51,7 @@ namespace hlvm_private
 
 		// Swap back to original GMallocator
 		SwapMallocator();
-
 		// Use original GMallocator to copy stack allocated msg back to heap
-		throw std::runtime_error(std::string(msg->ToCharStr()));
+		throw std::runtime_error(TO_CHAR_STR(Expression));
 	}
 } // namespace hlvm_private

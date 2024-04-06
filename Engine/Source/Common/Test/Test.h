@@ -2,6 +2,8 @@
  * Copyright (c) 2024. MIT License. All rights reserved.
  */
 
+#pragma once
+
 #include "Core/Log.h"
 #include "Core/String.h"
 #include "Core/Assert.h"
@@ -13,7 +15,10 @@
 #include <functional>
 #include <chrono>
 
-inline std::vector<std::function<void()>> recorded_test_functions{};
+namespace hlvm_private
+{
+	HLVM_INLINE_VAR std::vector<std::function<void()>> recorded_test_functions{};
+}
 
 // Helper function to create a lambda that runs the test and prints the info
 template <typename Func>
@@ -44,15 +49,15 @@ struct AutoRegisterContext
 	bool bEnabled = true;
 };
 
-#define RECORD_TEST_FUNC_BODY(test_function)                                                                \
-	struct AutoRegister                                                                                     \
-	{                                                                                                       \
-		AutoRegister()                                                                                      \
-		{                                                                                                   \
-			if (_AutoRegisterContext.bEnabled)                                                              \
-				recorded_test_functions.push_back(make_test_wrapper(#test_function, test_##test_function)); \
-		}                                                                                                   \
-	};                                                                                                      \
+#define RECORD_TEST_FUNC_BODY(test_function)                                                                              \
+	struct AutoRegister                                                                                                   \
+	{                                                                                                                     \
+		AutoRegister()                                                                                                    \
+		{                                                                                                                 \
+			if (_AutoRegisterContext.bEnabled)                                                                            \
+				hlvm_private::recorded_test_functions.push_back(make_test_wrapper(#test_function, test_##test_function)); \
+		}                                                                                                                 \
+	};                                                                                                                    \
 	static AutoRegister _AutoRegister
 
 #define RECORD_TEST_FUNC1(test_function, ...)                         \
@@ -124,8 +129,71 @@ inline double RunTestAndCalculateAvg(const TestFuncType& func, int num_iteration
 	return avg / (num_iterations - 2);
 }
 
-int main()
+#include <boost/program_options.hpp>
+
+#if HLVM_ALLOW_GPERF
+	#include <gperftools/profiler.h>
+#endif
+
+int main(int ac, char* av[])
 {
+	{
+		GExecutableName = TO_TCHAR_STR(av[0]);
+	}
+
+	using namespace std;
+	using namespace boost;
+	namespace po = boost::program_options;
+
+	try
+	{
+		po::variables_map		vm;
+		po::options_description desc("Allowed options");
+		desc.add_options()("help", "produce help message")("verbose,v", po::value<int>()->implicit_value(-1),
+			"enable verbosity override to specify level")("gperf",
+			po::value<int>()->implicit_value(0), "enable gerpftools profiling by cpu sample (linux only!)");
+
+		po::store(po::command_line_parser(ac, av).options(desc).run(), vm);
+		po::notify(vm);
+
+		/**
+		 * Print help
+		 */
+		if (vm.count("help"))
+		{
+			cout << "Usage: options_description [options]\n";
+			cout << desc;
+			return 0;
+		}
+		/**
+		 * Change verbosity
+		 */
+		if (vm.count("verbose"))
+		{
+			GVerbosity = vm["verbose"].as<int>();
+			cout << "options: Verbosity override enabled.  Level is " << GVerbosity
+				 << "\n";
+		}
+		/**
+		 * Enable gperf
+		 */
+		if constexpr (HLVM_ALLOW_GPERF)
+		{
+			if (vm.count("gperf") && vm["gperf"].as<int>() == 1)
+			{
+				GGperfEnabled = true;
+				cout << "options: gperf enabled"
+					 << "\n";
+			}
+		}
+	}
+	catch (std::exception& e)
+	{
+		cout << "options encountered exception:\n"
+			 << e.what() << "\n";
+		return 1;
+	}
+
 	{
 		InitMallocator();
 	}
@@ -134,10 +202,34 @@ int main()
 		FLogRedirector::Get()->AddDevice(LogDevice);
 	}
 
-	// Run all registered test functions
-	for (auto& test_function : recorded_test_functions)
 	{
-		test_function();
+		HLVM_SCOPED_VARIABLE(
+			Scoped,
+			[&] {
+				if constexpr (HLVM_ALLOW_GPERF)
+				{
+					if (GGperfEnabled)
+					{
+						ProfilerStart(FString::Format(TXT("{}_{}"), GExecutableName, TXT("gperf.prof")));
+					}
+				}
+			},
+			[&] {
+				if constexpr (HLVM_ALLOW_GPERF)
+				{
+					if (GGperfEnabled)
+					{
+						ProfilerStop();
+					}
+				}
+			});
+
+		// Run all registered test functions
+		for (auto& test_function : hlvm_private::recorded_test_functions)
+		{
+			test_function();
+		}
 	}
+
 	return 0;
 }
