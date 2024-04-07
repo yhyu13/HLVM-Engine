@@ -8,7 +8,8 @@ ROOT_DIR=$(pwd)
 conda env create -f ./env.yaml
 conda init && conda activate hlvm
 
-# Setup
+# Setup git repo
+git lfs pull
 git submodule update --init --recursive
 
 # vcpkg

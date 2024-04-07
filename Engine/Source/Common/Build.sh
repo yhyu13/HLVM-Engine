@@ -19,8 +19,8 @@ for config in "${buildConfigs[@]}"; do
     CMAKE_BUILD_DIR=${ROOT_DIR}/Build/${CMAKE_BUILD_TYPE}
 
     # Gen cmake build directory
+    #-Wno-dev \
     ${CMAKE_BIN} \
-      -Wno-dev \
       -G Ninja \
       -S ${CMAKE_SRC_DIR} \
       -B ${CMAKE_BUILD_DIR} \
