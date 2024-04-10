@@ -21,18 +21,10 @@ public:
 	/**
 	 * Generic Platform method that check if any debugger is attached, might be slow depdending on implementation
 	 */
-	HLVM_INLINE_FUNC static bool IsDebuggerPresent()
+	HLVM_INLINE_FUNC HLVM_STATIC_FUNC bool IsDebuggerPresent()
 	{
 		return sInstance->InternalIsDebuggerPresent();
 	}
-
-	/**
-	 * Generic Platform method that get the stack trace string
-	 * @param skip number of frame to skip, counting from bottom
-	 * @param max_depth  max number of frame to get
-	 * @return FStdString of the stack trace
-	 */
-	HLVM_NOINLINE_FUNC static FStdString GetStackTrace(size_t skip = 0, size_t max_depth = 10);
 
 protected:
 	virtual bool InternalIsDebuggerPresent() = 0;

@@ -4,7 +4,7 @@
 
 #include "Core/Assert.h"
 #include "Core/Log.h"
-#include "Platform/GenericPlatformDebuggerUtil.h"
+#include "Platform/GenericPlatformStackTrace.h"
 #include "Core/Mallocator/StackMallocator.h"
 
 namespace hlvm_private
@@ -26,31 +26,40 @@ namespace hlvm_private
 	{
 		// Sanity check that we are using stack mallocator
 		assert(GMallocatorTLS == assert_stack_mallocator);
-
+		{
 #if HLVM_BUILD_DEBUG
-		// In Debug mode we skip 1 frames to get proper stack trace
-		constexpr size_t SkipStackNum = 1;
+			// In Debug mode we skip 1 frames to get proper stack trace
+			constexpr size_t SkipStackNum = 1;
+			constexpr size_t MaxStackDepth = 10;
 #else
-		// In RelWithDebInfo mode we skip 1 frame to get proper stack trace
-		constexpr size_t SkipStackNum = 1;
+			// In RelWithDebInfo mode we skip 1 frame to get proper stack trace
+			constexpr size_t SkipStackNum = 1;
+			constexpr size_t MaxStackDepth = 10;
 #endif
-		// Deliberate *new* here to avoid free on destrcution
-		auto Stack = new FStdString{ FGenericPlatformDebuggerUtil::GetStackTrace(SkipStackNum) }; // Explicitly call stack trace here to get proper stack trace
-		auto msg = new FString{ FString::Format(TXT("{1} with '{2}' at {3}:{4}\n{0}"), **Stack, Expression, **Message, File,
-			Line) };
+			// Deliberate use *new* here manually control lifetime
+			auto Stack = new FStdString{ FGenericPlatformStackTrace::GetStackTrace(
+				SkipStackNum, MaxStackDepth) }; // Explicitly call stack trace here to get proper stack trace
+			auto LogMsg = new FString{
+				FString::Format(TXT("{1} with '{2}' at {3}:{4}\n{0}"), **Stack, Expression, **Message, File,
+					Line)
+			};
 
-		// Free memory in order to leave more space before logging
-		delete Stack;
-		delete Message;
+			// Free memory in order to leave more space before logging
+			delete Stack;
+			delete Message;
 
-		// Log message
-		HLVM_LOG(LogAssert, critical, **msg);
+			// Log message
+			HLVM_LOG(LogAssert, critical, **LogMsg);
+
+			delete LogMsg;
+
+			// Swap back to original GMallocator
+			SwapMallocator();
+		}
 
 		// Try to debug break if debugger attached for easier debugging
 		HLVM_TRY_DEBUG_BREAK();
 
-		// Swap back to original GMallocator
-		SwapMallocator();
 		// Use original GMallocator to copy stack allocated msg back to heap
 		throw std::runtime_error(TO_CHAR_STR(Expression));
 	}

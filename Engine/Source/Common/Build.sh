@@ -20,7 +20,10 @@ for config in "${buildConfigs[@]}"; do
 
     # Gen cmake build directory
     #-Wno-dev \
+    #      -Wdev \
     ${CMAKE_BIN} \
+      -Wno-dev \
+      --debug-output \
       -G Ninja \
       -S ${CMAKE_SRC_DIR} \
       -B ${CMAKE_BUILD_DIR} \
@@ -29,9 +32,10 @@ for config in "${buildConfigs[@]}"; do
     # 进入目标目录
     cd "${CMAKE_BUILD_DIR}" || exit 1
 
+    cbuild_param="-j 32 --verbose"
     ctest_param="-j 4 --output-on-failure --stop-on-failure"
     # 构建项目
-    ((${CMAKE_BIN} --build . && ${CTEST_BIN} . ${ctest_param}) || exit 1) | tee "${ROOT_DIR}/build_${config}.log"
+    ((${CMAKE_BIN} --build . ${cbuild_param} && ${CTEST_BIN} . ${ctest_param}) || exit 1) | tee "${ROOT_DIR}/build_${config}.log"
 done
 
 echo "Finished building all targets"

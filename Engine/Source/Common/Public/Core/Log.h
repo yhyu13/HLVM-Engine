@@ -144,18 +144,18 @@ public:
 	template <typename... Args>
 	void Pump(const FLogContext& Context, const TCHAR* fmt, Args&&... args)
 	{
-		FString Message;
+		FString ReusedMessage;
 		for (auto& Device : LogDevices)
 		{
 			// Send to all devices
 			if (Device->AllowSink(Context))
 			{
 				// If the message is empty, format it first, and reuse it
-				if (Message.empty())
+				if (ReusedMessage.empty())
 				{
-					Message = MoveTemp(FormatBeforeSink(Context, fmt, std::forward<Args>(args)...));
+					ReusedMessage = MoveTemp(FormatBeforeSink(Context, fmt, std::forward<Args>(args)...));
 				}
-				Device->Sink(Context, Message);
+				Device->Sink(Context, ReusedMessage);
 			}
 		}
 	}
@@ -164,6 +164,13 @@ public:
 	void AddDevice(const std::shared_ptr<FLogDevice>& Device)
 	{
 		LogDevices.push_front(Device);
+	}
+
+	template <typename T>
+	void AddDevice()
+	{
+		std::shared_ptr<FLogDevice> Device = SP_C(FLogDevice, std::make_shared<T>());
+		LogDevices.push_front(MoveTemp(Device));
 	}
 
 	ContainerType AllDevices() const

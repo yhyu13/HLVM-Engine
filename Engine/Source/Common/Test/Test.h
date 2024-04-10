@@ -194,14 +194,15 @@ int main(int ac, char* av[])
 		return 1;
 	}
 
+	// Initialize mallocator
 	{
 		InitMallocator();
 	}
+	// Initialize log redirector
 	{
-		auto LogDevice = std::make_shared<FSpdlogConsoleDevice>();
-		FLogRedirector::Get()->AddDevice(LogDevice);
+		FLogRedirector::Get()->AddDevice<FSpdlogConsoleDevice>();
 	}
-
+	// Run tests
 	{
 		HLVM_SCOPED_VARIABLE(
 			Scoped,

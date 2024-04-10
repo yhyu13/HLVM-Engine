@@ -3,7 +3,7 @@ from PyCMake.cmakecpp import *
 # Create a VcpkgContext object with the specified path for vcpkg root and version
 vcpkg_cxt = VcpkgContenxt(vcpkg_root_path='../Dependency/vcpkg',
                           vcpkg_config=VcpkgConfigModel(name='Common',
-                                                        version='0.1.0',
+                                                        version='0.2.0',
                                                         dependencies=[
                                                             "spdlog",
                                                             VcpkgPackage(name="mimalloc", features=["asm", "secure"],
@@ -18,8 +18,9 @@ vcpkg_cxt = VcpkgContenxt(vcpkg_root_path='../Dependency/vcpkg',
                                                             # VcpkgPackage(name="opentelemetry-cpp",
                                                             #              features=[], default_features=False),
                                                             # "catch2"
-                                                            "gperftools",
-                                                            "minitrace"
+                                                            "gperftools", # linux cpu sampling
+                                                            "minitrace", # chrome format tracing
+                                                            "tracy", # general tracing
                                                         ],
                                                         builtin_baseline='53bef8994c541b6561884a8395ea35715ece75db'))
 
@@ -104,11 +105,12 @@ rapidjson = FindPackage(name='RapidJSON',
 #                                                                                'Catch2::Catch2WithMain'])])
 
 # Find the gperftools package with the specified options
-gperftools = FindPackage(name='gperftools',
+gperftools = FindPackage(name='Gperftools',
                          config=False,
                          required=True,
+                         components=['profiler'],
                          target_link_libs=[
-                             DomainValueModel(domain=DomainEnum.PUBLIC, values=['gperftools::profiler'])])
+                             DomainValueModel(domain=DomainEnum.PUBLIC, values=['${GPERFTOOLS_LIBRARIES}'])])
 
 # Find the minitrace package with the specified options
 minitrace = FindPackage(name='minitrace',
@@ -116,6 +118,13 @@ minitrace = FindPackage(name='minitrace',
                         required=True,
                         target_link_libs=[
                             DomainValueModel(domain=DomainEnum.PUBLIC, values=['minitrace::minitrace'])])
+
+# Find the minitrace package with the specified options
+tracy = FindPackage(name='Tracy',
+                        config=True,
+                        required=True,
+                        target_link_libs=[
+                            DomainValueModel(domain=DomainEnum.PUBLIC, values=['Tracy::TracyClient'])])
 
 ##########################################################
 
@@ -185,7 +194,6 @@ class CommonModule(BaseModule):
                                         mimalloc,
                                         magic_enum,
                                         Boost,
-                                        # libdwarf,
                                         botan3,
                                         zstd,
                                         rapidjson,
@@ -195,6 +203,9 @@ class CommonModule(BaseModule):
                                         # curl,
                                         # nlohmann_json,
                                         # catch2
+                                        gperftools,
+                                        minitrace,
+                                        tracy,
                                         ]
                          )
         self.target_interface.add_compile_options(domain=DomainEnum.PUBLIC, values=[
@@ -218,7 +229,7 @@ class TestCommonModule(BaseModule):
                                                   source_files=[ToCMakePath(cpp_path)],
                                                   unity_build=False),
                          fetch_packages=[],
-                         find_packages=[gperftools]
+                         find_packages=[]
                          )
         self.target_interface.add_pch_files(domain=DomainEnum.REUSE_FROM,
                                             values=['Common'])

@@ -2,7 +2,7 @@
  * Copyright (c) 2024. MIT License. All rights reserved.
  */
 
-#include "Platform/GenericPlatformDebuggerUtil.h"
+#include "Platform/GenericPlatformStackTrace.h"
 
 #ifndef HLVM_USE_BACKWARD_FOR_STACK_TRACE
 	#define HLVM_USE_BACKWARD_FOR_STACK_TRACE 0
@@ -15,7 +15,7 @@
 #if HLVM_USE_BACKWARD_FOR_STACK_TRACE
 	#include <backward.hpp>
 
-FStdString FGenericPlatformDebuggerUtil::GetStackTrace(size_t skip)
+FStdString FGenericPlatformStackTrace::GetStackTrace(size_t skip)
 {
 	backward::StackTrace st;
 	st.load_here(10);
@@ -30,7 +30,7 @@ FStdString FGenericPlatformDebuggerUtil::GetStackTrace(size_t skip)
 
 //	#include <cpptrace/cpptrace.hpp>
 //
-// FStdString FGenericPlatformDebuggerUtil::GetStackTrace(size_t skip)
+// FStdString FGenericPlatformStackTrace::GetStackTrace(size_t skip)
 //{
 //	std::ostringstream oss;
 // Skip the first frame of backward to get our frame
@@ -42,7 +42,7 @@ FStdString FGenericPlatformDebuggerUtil::GetStackTrace(size_t skip)
 #else
 	#include <boost/stacktrace.hpp>
 
-FStdString FGenericPlatformDebuggerUtil::GetStackTrace(size_t skip, size_t max_depth)
+FStdString FGenericPlatformStackTrace::GetStackTrace(size_t skip, size_t max_depth)
 {
 	std::ostringstream os;
 	// Skip the first frame of backward to get our frame

@@ -6,7 +6,7 @@
 #include "Core/Mallocator/StdMallocator.h"
 #include "Core/Mallocator/StackMallocator.h"
 #include "Core/Log.h"
-#include "Platform/GenericPlatformDebuggerUtil.h"
+#include "Platform/GenericPlatformStackTrace.h"
 #include "Template/PrintTemplate.tpp"
 #include "Template/AlignmentTemplate.tpp"
 
@@ -55,7 +55,7 @@ bool FMiMallocator::Owned(void* ptr) noexcept
 	}
 	catch (std::exception& e)
 	{
-		const FStdString& Stack = FGenericPlatformDebuggerUtil::GetStackTrace();
+		const FStdString& Stack = FGenericPlatformStackTrace::GetStackTrace();
 		HLVM_LOG(LogMiMallocator, err, TXT("Owned exception : {} at\n{}"), TO_TCHAR_STR(e.what()), *Stack);
 		return false;
 	}

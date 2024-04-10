@@ -28,8 +28,14 @@ if(NOT DEFINED GPERFTOOLS_FOUND)
             CMAKE_SYSTEM_NAME MATCHES "BlueGeneP") AND
     (CMAKE_SIZEOF_VOID_P EQUAL 8))
 
-        # HLVM : we had elfutil instead of libunwind for linux, so disable checks here
-#        # Libunwind is required by profiler on this platform
+        # HLVM : we had libunwind already installed on Ubuntu 20.04,
+        # check by `ldconfig -p | grep libunwind` in terminal, you should see things like below
+#        libunwind.so.8 (libc6,x86-64) => /lib/x86_64-linux-gnu/libunwind.so.8
+#libunwind-x86_64.so.8 (libc6,x86-64) => /lib/x86_64-linux-gnu/libunwind-x86_64.so.8
+#libunwind-ptrace.so.0 (libc6,x86-64) => /lib/x86_64-linux-gnu/libunwind-ptrace.so.0
+#libunwind-coredump.so.0 (libc6,x86-64) => /lib/x86_64-linux-gnu/libunwind-coredump.so.0
+
+        # Libunwind is required by profiler on this platform
 #        if(Gperftools_FIND_REQUIRED_profiler OR Gperftools_FIND_REQUIRED_tcmalloc_and_profiler)
 #            find_package(Libunwind 0.99 REQUIRED)
 #        else()

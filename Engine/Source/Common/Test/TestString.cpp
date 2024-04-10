@@ -5,7 +5,7 @@
 #include "Test.h"
 
 #include "Core/Log.h"
-#include "Platform/GenericPlatformDebuggerUtil.h"
+#include "Platform/GenericPlatformStackTrace.h"
 
 DECLARE_LOG_CATEGORY(LogTest)
 
@@ -16,7 +16,7 @@ RECORD(test_string, true)
 {
 	HLVM_LOG(LogTest, trace, TXT("Test performance impact on different order of formatting!"));
 	{
-		const FStdString& StackTrace = FGenericPlatformDebuggerUtil::GetStackTrace();
+		const FStdString& StackTrace = FGenericPlatformStackTrace::GetStackTrace();
 		auto			  Message = FString::Format(TXT("Ensure failed: {0}, with '{1}'"), TXT("1!=1"),
 						 FString::Format(TXT("1!=1")));
 
