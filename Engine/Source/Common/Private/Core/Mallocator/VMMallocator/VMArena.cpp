@@ -186,5 +186,6 @@ void* FVMArena::MallocLowLevel(size_t size)
 
 void FVMArena::FreeLowLevel(void* p)
 {
-	GStdMallocator.Free(p);
+	HLVM_ENSURE(GStdMallocator.Free(p) == EFreeRetType::Success,
+		TXT("FreeLowLevel failed {}"), R_C(void*, p));
 }

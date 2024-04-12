@@ -9,6 +9,7 @@
 #include "Core/Assert.h"
 #include "Utility/Timer.h"
 #include "Core/Mallocator/IMallocator.h"
+#include "Platform/GenericPlatformCrashDump.h"
 
 #include <iostream>
 #include <vector>
@@ -137,8 +138,12 @@ inline double RunTestAndCalculateAvg(const TestFuncType& func, int num_iteration
 
 int main(int ac, char* av[])
 {
+	FrameMarkNamed("main");
 	{
 		GExecutableName = TO_TCHAR_STR(av[0]);
+	}
+	{
+		FGenericPlatformCrashDump::Init();
 	}
 
 	using namespace std;

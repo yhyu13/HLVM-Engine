@@ -12,6 +12,8 @@ DECLARE_LOG_CATEGORY(LogTest)
 
 RECORD(mallocator_test)
 {
+	ZoneScopedN("mallocator_test");
+
 	{
 		FMiMallocator MiMallocator{ { .bNewHeap = true } };
 		HLVM_SCOPED_VARIABLE(

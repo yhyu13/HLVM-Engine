@@ -18,9 +18,9 @@ vcpkg_cxt = VcpkgContenxt(vcpkg_root_path='../Dependency/vcpkg',
                                                             # VcpkgPackage(name="opentelemetry-cpp",
                                                             #              features=[], default_features=False),
                                                             # "catch2"
-                                                            "gperftools", # linux cpu sampling
-                                                            "minitrace", # chrome format tracing
-                                                            "tracy", # general tracing
+                                                            "gperftools",  # linux cpu sampling
+                                                            "minitrace",  # chrome format tracing
+                                                            # "tracy",  # general tracing
                                                         ],
                                                         builtin_baseline='53bef8994c541b6561884a8395ea35715ece75db'))
 
@@ -28,19 +28,20 @@ vcpkg_cxt = VcpkgContenxt(vcpkg_root_path='../Dependency/vcpkg',
 spdlog = FindPackage(name='spdlog',
                      config=True,
                      required=True,
-                     target_link_libs=[DomainValueModel(domain=DomainEnum.PUBLIC, values=['spdlog::spdlog'])])
+                     dependant_target_link_libs=[DomainValueModel(domain=DomainEnum.PUBLIC, values=['spdlog::spdlog'])])
 
 # Find the mimalloc package with the specified options
 mimalloc = FindPackage(name='mimalloc',
                        config=True,
                        required=True,
-                       target_link_libs=[DomainValueModel(domain=DomainEnum.PUBLIC, values=['mimalloc-static'])])
+                       dependant_target_link_libs=[
+                           DomainValueModel(domain=DomainEnum.PUBLIC, values=['mimalloc-static'])])
 
 # Find the magic_enum package with the specified options
 magic_enum = FindPackage(name='magic_enum',
                          config=True,
                          required=True,
-                         target_link_libs=[
+                         dependant_target_link_libs=[
                              DomainValueModel(domain=DomainEnum.PUBLIC, values=['magic_enum::magic_enum'])])
 
 # Find the Boost package with the specified options
@@ -48,39 +49,41 @@ Boost = FindPackage(name='Boost',
                     config=False,
                     required=True,
                     components=['iostreams filesystem system thread fiber date_time program_options'],
-                    target_include_dirs=[DomainValueModel(domain=DomainEnum.PUBLIC, values=['${Boost_INCLUDE_DIRS}'])],
-                    target_link_dirs=[DomainValueModel(domain=DomainEnum.PUBLIC, values=['${Boost_LIBRARY_DIRS}'])],
-                    target_link_libs=[DomainValueModel(domain=DomainEnum.PUBLIC, values=['${Boost_LIBRARIES}',
-                                                                                         'backtrace'])])
+                    dependant_target_include_dirs=[
+                        DomainValueModel(domain=DomainEnum.PUBLIC, values=['${Boost_INCLUDE_DIRS}'])],
+                    dependant_target_link_dirs=[
+                        DomainValueModel(domain=DomainEnum.PUBLIC, values=['${Boost_LIBRARY_DIRS}'])],
+                    dependant_target_link_libs=[DomainValueModel(domain=DomainEnum.PUBLIC, values=['${Boost_LIBRARIES}',
+                                                                                                   'backtrace'])])
 
 # Find the Botan3 package with the specified options
 botan3 = FindPackage(name='Botan',
                      config=False,
                      required=True,
-                     target_link_libs=[
+                     dependant_target_link_libs=[
                          DomainValueModel(domain=DomainEnum.PUBLIC, values=['Botan::Botan'])])
 
 # Find the zstd package with the specified options
 zstd = FindPackage(name='zstd',
                    config=True,
                    required=True,
-                   target_link_libs=[
+                   dependant_target_link_libs=[
                        DomainValueModel(domain=DomainEnum.PUBLIC, values=['zstd::libzstd_static'])])
 
 # Find the rapidjson package with the specified options
 rapidjson = FindPackage(name='RapidJSON',
                         config=True,
                         required=True,
-                        target_link_libs=[
+                        dependant_target_link_libs=[
                             DomainValueModel(domain=DomainEnum.PUBLIC, values=['rapidjson'])])
 
 # Find the opentelemtry package with the specified options
 # opentelemetry = FindPackage(name='opentelemetry-cpp',
 #                             config=True,
 #                             required=True,
-#                             target_include_dirs=[DomainValueModel(domain=DomainEnum.PUBLIC,
+#                             dependant_target_include_dirs=[DomainValueModel(domain=DomainEnum.PUBLIC,
 #                                                                   values=['${OPENTELEMETRY_CPP_INCLUDE_DIRS}'])],
-#                             target_link_libs=[
+#                             dependant_target_link_libs=[
 #                                 DomainValueModel(domain=DomainEnum.PUBLIC, values=['${OPENTELEMETRY_CPP_LIBRARIES}'])])
 # protobuf = FindPackage(name='protobuf',
 #                        config=False,
@@ -100,7 +103,7 @@ rapidjson = FindPackage(name='RapidJSON',
 # catch2 = FindPackage(name='Catch2',
 #                         config=True,
 #                         required=True,
-#                         target_link_libs=[
+#                         dependant_target_link_libs=[
 #                             DomainValueModel(domain=DomainEnum.PUBLIC, values=['Catch2::Catch2',
 #                                                                                'Catch2::Catch2WithMain'])])
 
@@ -109,22 +112,30 @@ gperftools = FindPackage(name='Gperftools',
                          config=False,
                          required=True,
                          components=['profiler'],
-                         target_link_libs=[
+                         dependant_target_link_libs=[
                              DomainValueModel(domain=DomainEnum.PUBLIC, values=['${GPERFTOOLS_LIBRARIES}'])])
 
 # Find the minitrace package with the specified options
 minitrace = FindPackage(name='minitrace',
                         config=True,
                         required=True,
-                        target_link_libs=[
+                        dependant_target_link_libs=[
                             DomainValueModel(domain=DomainEnum.PUBLIC, values=['minitrace::minitrace'])])
 
-# Find the minitrace package with the specified options
-tracy = FindPackage(name='Tracy',
-                        config=True,
-                        required=True,
-                        target_link_libs=[
-                            DomainValueModel(domain=DomainEnum.PUBLIC, values=['Tracy::TracyClient'])])
+# # Find the minitrace package with the specified options
+# tracy = FindPackage(name='Tracy',
+#                     config=True,
+#                     required=True,
+#                     target_compile_options=[TargetDomainValueModel(target='Tracy::TracyClient',
+#                                                       domain=DomainEnum.INTERFACE,
+#                                                       values=['-DTRACY_ENABLE=ON',
+#                                                               '-DTRACY_ON_DEMAND=ON',
+#                                                               '-DTRACY_ONLY_LOCALHOST=ON',
+#                                                               '-DTRACY_NO_FRAME_IMAGE=ON',
+#                                                               '-DTRACY_ONLY_IPV4=ON',
+#                                                               '-DTRACY_NO_CALLSTACK=ON'])],
+#                     dependant_target_link_libs=[
+#                         DomainValueModel(domain=DomainEnum.PUBLIC, values=['Tracy::TracyClient'])])
 
 ##########################################################
 
@@ -132,11 +143,12 @@ tracy = FindPackage(name='Tracy',
 yalantinlibs = FetchContent(name='yalantinglibs',
                             git_repo_url='https://github.com/yhyu13/yalantinglibs.git',
                             git_tag='abf6016a8f7841d29303ef68f118ea85b69a1051',
-                            compile_options=[DomainValueModel(domain=DomainEnum.INTERFACE,
-                                                              values=['-DYLT_ENABLE_PMR=ON',
-                                                                      '-DIGUANA_ENABLE_PMR=ON',
-                                                                      '-DENABLE_STRUCT_PACK_OPTIMIZE=ON'])],
-                            target_link_libs=[
+                            target_compile_options=[TargetDomainValueModel(target='yalantinglibs',
+                                                                           domain=DomainEnum.INTERFACE,
+                                                                           values=['-DYLT_ENABLE_PMR=ON',
+                                                                                   '-DIGUANA_ENABLE_PMR=ON',
+                                                                                   '-DENABLE_STRUCT_PACK_OPTIMIZE=ON'])],
+                            dependant_target_link_libs=[
                                 DomainValueModel(domain=DomainEnum.PUBLIC, values=['yalantinglibs::yalantinglibs'])]
                             )
 
@@ -144,7 +156,7 @@ yalantinlibs = FetchContent(name='yalantinglibs',
 # backward = FetchContent(name='backward',
 #                         git_repo_url='https://github.com/yhyu13/backward-cpp.git',
 #                         git_tag='51f0700452cf71c57d43c2d028277b24cde32502',
-#                         target_link_libs=[DomainValueModel(domain=DomainEnum.PUBLIC,
+#                         dependant_target_link_libs=[DomainValueModel(domain=DomainEnum.PUBLIC,
 #                                                            values=['Backward::Interface', '${CMAKE_DL_LIBS}'])]
 #                         )
 
@@ -152,7 +164,7 @@ yalantinlibs = FetchContent(name='yalantinglibs',
 parallel_hashmap = FetchContent(name='parallel-hashmap',
                                 git_repo_url='https://github.com/yhyu13/parallel-hashmap.git',
                                 git_tag='67c24619e4f5ab2097b74cc397732c17a25d6944',
-                                target_include_dirs=[
+                                dependant_target_include_dirs=[
                                     DomainValueModel(domain=DomainEnum.PUBLIC,
                                                      values=['${parallel-hashmap_SOURCE_DIR}'])],
                                 )
@@ -161,18 +173,32 @@ parallel_hashmap = FetchContent(name='parallel-hashmap',
 ctre = FetchContent(name='ctre',
                     git_repo_url='https://github.com/yhyu13/compile-time-regular-expressions.git',
                     git_tag='9725886582a928491a086bba1c07909b2e583157',
-                    target_link_libs=[DomainValueModel(domain=DomainEnum.PUBLIC,
-                                                       values=['ctre::ctre'])]
+                    dependant_target_link_libs=[DomainValueModel(domain=DomainEnum.PUBLIC,
+                                                                 values=['ctre::ctre'])]
                     )
-
 
 # # Find the cpptrace package with the specified options
 # # cpptrace's fancy stack trace used too much memory (~16MB compare to <64K used by backwardcpp), so we would not use it
 # cpptrace = FetchContent(name='cpptrace',
 #                         git_repo_url='https://github.com/yhyu13/cpptrace.git',
 #                         git_tag='ce353dc3abde5286bcff799206686934f0150bf2',
-#                         target_link_libs=[DomainValueModel(domain=DomainEnum.PUBLIC,
+#                         dependant_target_link_libs=[DomainValueModel(domain=DomainEnum.PUBLIC,
 #                                                            values=['cpptrace::cpptrace'])])
+
+# Find the minitrace package with the specified options
+tracy = FetchContent(name='Tracy',
+                     git_repo_url='https://github.com/yhyu13/tracy.git',
+                     git_tag='b5b985d1d09e2c757338a51f8a82115626bf81ab',
+                     target_compile_options=[TargetDomainValueModel(target='TracyClient', domain=DomainEnum.INTERFACE,
+                                                                    values=['-DTRACY_ON_DEMAND=OFF',
+                                                                            '-DTRACY_ONLY_LOCALHOST=ON',
+                                                                            '-DTRACY_NO_FRAME_IMAGE=ON',
+                                                                            '-DTRACY_ONLY_IPV4=ON',
+                                                                            '-DTRACY_NO_CALLSTACK=OFF',
+                                                                            '-DTRACY_USE_RPMALLOC=ON'])],
+                     dependant_target_link_libs=[
+                         DomainValueModel(domain=DomainEnum.PUBLIC, values=['Tracy::TracyClient'])]
+                     )
 
 
 # Create a CommonModule object with the specified options
@@ -189,6 +215,7 @@ class CommonModule(BaseModule):
                                          parallel_hashmap,
                                          ctre,
                                          # cpptrace
+                                         tracy,
                                          ],
                          find_packages=[spdlog,
                                         mimalloc,
@@ -205,7 +232,6 @@ class CommonModule(BaseModule):
                                         # catch2
                                         gperftools,
                                         minitrace,
-                                        tracy,
                                         ]
                          )
         self.target_interface.add_compile_options(domain=DomainEnum.PUBLIC, values=[

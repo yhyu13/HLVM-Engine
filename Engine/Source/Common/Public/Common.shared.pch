@@ -23,6 +23,7 @@
 #include <string>
 #include <sstream>
 #include <vector>
+#include <span>
 #include <set>
 #include <map>
 #include <queue>
@@ -42,35 +43,6 @@
 
 #include <math.h>
 #include <filesystem>
-
-/**
- * 3rd party includes
- */
-#include <ylt/struct_pack.hpp>
-#include <ylt/struct_json/json_reader.h>
-#include <ylt/struct_json/json_writer.h>
-#include <spdlog/spdlog.h>
-#include <spdlog/async.h>
-#include <magic_enum_all.hpp>
-#include <ctre.hpp>
-
-/**
- * phmap has alot of unconventional warnings, pretty bad code though
- */
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wcomma"
-#pragma clang diagnostic ignored "-Wold-style-cast"
-#pragma clang diagnostic ignored "-Wsign-conversion"
-#pragma clang diagnostic ignored "-Wmissing-noreturn"
-#include <parallel_hashmap/phmap.h>
-#pragma clang diagnostic pop
-
-#define BOOST_STACKTRACE_USE_BACKTRACE
-/**
- * Boost include
- */
-#include <boost/stacktrace.hpp>
-#include <boost/filesystem.hpp>
 
 /**
  * Common lib

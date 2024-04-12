@@ -51,7 +51,7 @@ public:
 		// Connect head to tail
 		mFreeBlockHead->nextFreeBlock = mTail;
 	}
-	~TStackMallocator() noexcept final override
+	virtual ~TStackMallocator() noexcept final override
 	{
 	}
 
@@ -59,7 +59,7 @@ public:
 	 * Reset the allocator, useful when you want to reuse the allocator and ignore all previously allocated memory
 	 * Used in Assert Stack Allocation in Assert.cpp
 	 */
-	void Reset() noexcept
+	HLVM_INLINE_FUNC void Reset() noexcept
 	{
 		// Init free size upper bound
 		mFreeSizeUpperBound = -1;
@@ -77,7 +77,7 @@ public:
 		mFreeBlockHead->nextFreeBlock = mTail;
 	}
 
-	HLVM_INLINE_FUNC virtual bool Owned(void* ptr) noexcept final override
+	HLVM_NODISCARD HLVM_INLINE_FUNC virtual bool Owned(void* ptr) noexcept final override
 	{
 		if (InStackBound(ptr))
 		{
@@ -88,17 +88,16 @@ public:
 			return false;
 		}
 	}
-	HLVM_INLINE_FUNC virtual void* Malloc(std::size_t size) noexcept(false) final override
+	HLVM_NODISCARD HLVM_INLINE_FUNC virtual void* Malloc(std::size_t size) noexcept(false) final override
 	{
 		return InternalMalloc(size);
 	}
-	HLVM_INLINE_FUNC virtual void* Malloc2(std::size_t size) noexcept final override
+	HLVM_NODISCARD HLVM_INLINE_FUNC virtual void* Malloc2(std::size_t size) noexcept final override
 	{
 		return InternalMalloc(size);
 	}
-	HLVM_INLINE_FUNC virtual void* MallocAligned(std::size_t size, std::size_t align) noexcept(false) final override
+	HLVM_NODISCARD HLVM_INLINE_FUNC virtual void* MallocAligned(std::size_t size, std::size_t align) noexcept(false) final override
 	{
-		// TODO : Maybe consider implement aligned address looking up for stack allocator
 		if constexpr (bUseHeapForAlignedAlloc)
 		{
 #if HLVM_MALLOC_USE_MIMALLOC_OVER_STD
@@ -112,7 +111,7 @@ public:
 			return InternalMalloc(size);
 		}
 	}
-	HLVM_INLINE_FUNC virtual void* MallocAligned2(std::size_t size, std::size_t align) noexcept final override
+	HLVM_NODISCARD HLVM_INLINE_FUNC virtual void* MallocAligned2(std::size_t size, std::size_t align) noexcept final override
 	{
 		if constexpr (bUseHeapForAlignedAlloc)
 		{
@@ -127,15 +126,15 @@ public:
 			return InternalMalloc(size);
 		}
 	}
-	HLVM_INLINE_FUNC virtual void Free(void* ptr) noexcept final override
+	HLVM_NODISCARD HLVM_INLINE_FUNC virtual EFreeRetType Free(void* ptr) noexcept final override
 	{
-		InternalFree(ptr);
+		return InternalFree(ptr);
 	}
-	HLVM_INLINE_FUNC virtual void FreeSize(void* ptr, std::size_t) noexcept final override
+	HLVM_NODISCARD HLVM_INLINE_FUNC virtual EFreeRetType FreeSize(void* ptr, std::size_t) noexcept final override
 	{
-		InternalFree(ptr);
+		return InternalFree(ptr);
 	}
-	HLVM_INLINE_FUNC virtual void FreeAligned(void* ptr, std::size_t align) noexcept final override
+	HLVM_NODISCARD HLVM_INLINE_FUNC virtual EFreeRetType FreeAligned(void* ptr, std::size_t align) noexcept final override
 	{
 		if constexpr (bUseHeapForAlignedAlloc)
 		{
@@ -147,10 +146,10 @@ public:
 		}
 		else
 		{
-			InternalFree(ptr);
+			return InternalFree(ptr);
 		}
 	}
-	HLVM_INLINE_FUNC virtual void FreeSizeAligned(void* ptr, std::size_t size, std::size_t align) noexcept final override
+	HLVM_NODISCARD HLVM_INLINE_FUNC virtual EFreeRetType FreeSizeAligned(void* ptr, std::size_t size, std::size_t align) noexcept final override
 	{
 		if constexpr (bUseHeapForAlignedAlloc)
 		{
@@ -162,7 +161,7 @@ public:
 		}
 		else
 		{
-			InternalFree(ptr);
+			return InternalFree(ptr);
 		}
 	}
 
@@ -197,6 +196,7 @@ private:
 	static_assert(N - 2 * FBlock_Size > 0);
 	HLVM_INLINE_VAR HLVM_STATIC_VAR constexpr SizeType Minimal_Block_Size = 24;
 
+	// TODO : Maybe consider implement aligned address looking up for stack allocator
 	void* InternalMalloc(std::size_t _size) noexcept(bValidate)
 	{
 		SizeType size = S_C(SizeType, _size);
@@ -295,14 +295,13 @@ private:
 		}
 	}
 
-	void
-	InternalFree(void* ptr) noexcept(bValidate)
+	EFreeRetType InternalFree(void* ptr) noexcept(bValidate)
 	{
 		if (InStackBound(ptr))
 		{
 			if constexpr (bMonolithic)
 			{
-				return;
+				return EFreeRetType::Success;
 			}
 			else
 			{
@@ -372,7 +371,8 @@ private:
 				{
 					// Swap next block if it is bigger than current free head,
 					// so to keep free head a larger block size for easier allocation next time
-#if 1 // Fast path
+#if 1
+					// Fast path
 					if (FBlock* NextBlock = mFreeBlockHead->nextFreeBlock;
 						NextBlock->size > mFreeBlockHead->size)
 					{
@@ -391,6 +391,7 @@ private:
 						mFreeBlockHead = NextBlock;
 					}
 #else
+					// Slow path, swap free block until it is no longer smaller than next block
 					FBlock* CurrBlock = mFreeBlockHead;
 					FBlock* NextBlock = CurrBlock->nextFreeBlock;
 					bool	bFirst = true;
@@ -453,6 +454,7 @@ private:
 					}
 					assert(FreeBlock == mTail);
 				}
+				return EFreeRetType::Success;
 			}
 		}
 		else
@@ -460,17 +462,13 @@ private:
 			if constexpr (bAllowOverflowToHeap)
 			{
 #if HLVM_MALLOC_USE_MIMALLOC_OVER_STD
-				GMiMallocatorTLS.Free(ptr);
+				return GMiMallocatorTLS.Free(ptr);
 #else
-				GStdMallocator.Free(ptr);
+				return GStdMallocator.Free(ptr);
 #endif
 			}
-			else
-			{
-				// TODO : Use stack string assert
-				HLVM_ENSURE(false, TXT("Stack allocator overflowed!"));
-			}
 		}
+		return EFreeRetType::NotOwned;
 	}
 
 	bool InStackBound(void* ptr) const
@@ -485,8 +483,7 @@ private:
 };
 
 /**
- * Default Stack allocator is no monolithic,
- * So we create a monolithic variant
+ * We create a monolithic specialization of stack allocator
  */
 template <int32_t N = HLVM_STACK_MALLOCATOR_DEFAULT_SIZE>
 using TStackMonolithicAllocator = TStackMallocator<N, true>;

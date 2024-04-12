@@ -32,12 +32,17 @@ for config in "${buildConfigs[@]}"; do
     # 进入目标目录
     cd "${CMAKE_BIN_DIR}" || exit 1
 
+    TEST_LOG="${ROOT_DIR}/test_${config}.log"
+    echo "Start testing " | tee "${TEST_LOG}"
     for binary in ./Test*; do
-        echo "Testing ${binary}"
-        # 测试项目
-        (${binary} --gperf=1 || exit 1)
-        # 查看性能
-        (${GPERF_BIN}/pprof --text ${binary} ${binary}_gperf.prof || exit 1)
+        if test -x ${binary}; then
+          echo "Testing ${binary}" | tee -a "${TEST_LOG}"
+          rm ${binary}_gperf.prof
+          # 测试项目
+          (${binary} --gperf=1 || exit 1)
+          # 查看性能
+          (${GPERF_BIN}/pprof --text ${binary} ${binary}_gperf.prof || exit 1) | tee -a "${TEST_LOG}"
+        fi
     done
 done
 

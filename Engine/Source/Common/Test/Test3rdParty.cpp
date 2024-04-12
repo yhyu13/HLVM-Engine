@@ -12,6 +12,8 @@
 #include <spdlog/async.h>
 #include <magic_enum_all.hpp>
 
+#include <tracy/Tracy.hpp>
+
 DECLARE_LOG_CATEGORY(LogTest)
 
 /*
@@ -19,6 +21,8 @@ DECLARE_LOG_CATEGORY(LogTest)
 */
 RECORD(spdlog_test)
 {
+	ZoneScopedN("spdlog_test");
+
 	spdlog::init_thread_pool(8192, 1);
 	spdlog::set_pattern("%^[%Y-%m-%d %H:%M:%S.%e] %l: %v%$");
 
@@ -61,6 +65,8 @@ REFLECTION(json_person, name, age);
 
 RECORD(yalantinlibs_test)
 {
+	ZoneScopedN("Yalantin_test");
+
 	HLVM_LOG(LogTest, info, TXT("Yalantin test"));
 	{
 		// Yalantin example
@@ -127,6 +133,8 @@ RECORD(yalantinlibs_test)
 
 RECORD(magic_enum_test)
 {
+	ZoneScopedN("magic_enum_test");
+
 	enum class Color : int
 	{
 		NONE = -1,
@@ -182,6 +190,8 @@ RECORD(magic_enum_test)
 
 RECORD(phmap_test)
 {
+	ZoneScopedN("phmap_test");
+
 	HLVM_LOG(LogTest, info, TXT("phmap test"));
 	{
 		phmap::flat_hash_map<std::string, int> map;
@@ -263,6 +273,8 @@ constexpr auto match_assignment(std::string_view sv) noexcept
 
 RECORD(test_ctre)
 {
+	ZoneScopedN("test_ctre");
+
 	HLVM_ENSURE(match("h.h.cpp"), TXT("Failed"));
 	HLVM_ENSURE(match_functionCall("a()"), TXT("Failed"));
 	HLVM_ENSURE(!match_functionCall("(a)"), TXT("Failed"));
@@ -282,6 +294,8 @@ RECORD(test_ctre)
 
 RECORD(test_botan)
 {
+	ZoneScopedN("test_botan");
+
 	std::string plaintext(
 		"Your great-grandfather gave this watch to your granddad for good luck. "
 		"Unfortunately, Dane's luck wasn't as good as his old man's.");
@@ -367,6 +381,8 @@ RECORD(test_botan)
 
 RECORD(test_zstd)
 {
+	ZoneScopedN("test_zstd");
+
 	std::string		  input = "This is a test string to compress.";
 	std::vector<char> compressed(ZSTD_compressBound(input.size()));
 	size_t			  compressedSize = ZSTD_compress(compressed.data(), compressed.size(), input.data(), input.size(), 1);
@@ -407,6 +423,8 @@ RECORD(test_zstd)
 
 RECORD(test_rapidjson)
 {
+	ZoneScopedN("test_rapidjson");
+
 	HLVM_LOG(LogTest, trace, TXT("Test FName!"));
 	using namespace std;
 	using namespace rapidjson;
@@ -562,6 +580,8 @@ RECORD(test_rapidjson)
 
 RECORD(boost_stacktrace_test)
 {
+	ZoneScopedN("boost_stacktrace_test");
+
 	HLVM_LOG(LogTest, info, TXT("Test boost_stacktrace!"));
 	{
 		std::cout << boost::stacktrace::stacktrace();

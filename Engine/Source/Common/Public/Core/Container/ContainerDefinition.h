@@ -6,6 +6,7 @@
 
 #include "GlobalDefinition.h"
 
+#include <span>
 #include <boost/container/vector.hpp>
 #include <boost/container/small_vector.hpp>
 #include <boost/algorithm/string/join.hpp>

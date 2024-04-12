@@ -103,11 +103,13 @@ struct TMallocator
 		{
 			if constexpr (bForceAlignedAlloc)
 			{
-				Mallocator->FreeSizeAligned(p, realSize, alignof(T));
+				HLVM_ENSURE(Mallocator->FreeSizeAligned(p, realSize, alignof(T)) == EFreeRetType::Success,
+					TXT("aligned deallocate failed {}"), p);
 			}
 			else
 			{
-				Mallocator->FreeSize(p, realSize);
+				HLVM_ENSURE(Mallocator->FreeSize(p, realSize) == EFreeRetType::Success,
+					TXT("deallocate failed {}"), p);
 			}
 		}
 		else
@@ -199,11 +201,13 @@ struct TStdMallocator
 		size_t realSize = n * sizeof(T);
 		if constexpr (bForceAlignedAlloc)
 		{
-			GStdMallocator.FreeSizeAligned(p, realSize, alignof(T));
+			HLVM_ENSURE(GStdMallocator.FreeSizeAligned(p, realSize, alignof(T)) == EFreeRetType::Success,
+				TXT("deallocate failed {}"), p);
 		}
 		else
 		{
-			GStdMallocator.FreeSize(p, realSize);
+			HLVM_ENSURE(GStdMallocator.FreeSize(p, realSize) == EFreeRetType::Success,
+				TXT("deallocate failed {}"), p);
 		}
 #if HVLM_MALLOCATOR_DEATIL_TRACE
 		size_t _allocSize = hlvm_private::GPMRAllocatedSize.fetch_sub(realSize, std::memory_order_relaxed);

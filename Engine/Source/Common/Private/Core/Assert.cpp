@@ -5,6 +5,7 @@
 #include "Core/Assert.h"
 #include "Core/Log.h"
 #include "Platform/GenericPlatformStackTrace.h"
+#include "Platform/GenericPlatformDebuggerUtil.h"
 #include "Core/Mallocator/StackMallocator.h"
 
 namespace hlvm_private

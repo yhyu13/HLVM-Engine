@@ -20,6 +20,14 @@
 	#error "HLVM_BUILD_RELEASE + HLVM_BUILD_DEBUG + HLVM_BUILD_DEVELOPMENT != 1"
 #endif
 
+/**
+ * If HLVM_SHIPPING is defined, then the code will be compiled in a way that
+ * is optimized for shipping. e.g. disable profiling and other developer only features
+ */
+#ifndef HLVM_SHIPPING
+	#define HLVM_SHIPPING 0
+#endif
+
 #define HLVM_INLINE_FUNC inline
 #define HLVM_STATIC_FUNC static
 #define HLVM_EXTERN_FUNC extern
@@ -60,7 +68,7 @@
 #define TOKENPASTE2(x, y) TOKENPASTE(x, y)
 #define PADDING(size) TBYTE TOKENPASTE2(__padding_, __LINE__)[size]
 
-#define BIT_FLAG(x) bool x : 1
+#define BIT_FLAG(x) bool x // bool x : 1 // May not be reliable for all compilers, So disable
 
 #define HLVM_ENUM(enum_class, type, ...) \
 	enum class enum_class : type         \
@@ -76,6 +84,7 @@
 #define S_C(type, value) static_cast<type>((value))
 #define SP_C(type, value) static_pointer_cast<type>((value))
 #define D_C(type, value) dynamic_cast<type>((value))
+#define DP_C(type, value) dynamic_pointer_cast<type>((value))
 #define C_C(type, value) const_cast<type>((value))
 #define R_C(type, value) reinterpret_cast<type>((value))
 

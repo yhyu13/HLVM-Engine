@@ -15,19 +15,19 @@ public:
 	{
 		Type = EMallocator::Std;
 	}
-	~FStdMallocator() noexcept final override
+	virtual ~FStdMallocator() noexcept final override
 	{
 	}
-	virtual bool Owned(void*) noexcept final override
+	HLVM_NODISCARD HLVM_INLINE_FUNC virtual bool Owned(void*) noexcept final override
 	{
-		// Trivial, so set to false
-		return false;
+		// Trivial, so set to true
+		return true;
 	}
-	HLVM_INLINE_FUNC virtual void* Malloc(std::size_t size) noexcept(false) final override
+	HLVM_NODISCARD HLVM_INLINE_FUNC virtual void* Malloc(std::size_t size) noexcept(false) final override
 	{
 		return std::malloc(size);
 	}
-	HLVM_INLINE_FUNC virtual void* Malloc2(std::size_t size) noexcept final override
+	HLVM_NODISCARD HLVM_INLINE_FUNC virtual void* Malloc2(std::size_t size) noexcept final override
 	{
 		try
 		{
@@ -38,11 +38,11 @@ public:
 			return nullptr;
 		}
 	}
-	HLVM_INLINE_FUNC virtual void* MallocAligned(std::size_t size, std::size_t alignment) noexcept(false) final override
+	HLVM_NODISCARD HLVM_INLINE_FUNC virtual void* MallocAligned(std::size_t size, std::size_t alignment) noexcept(false) final override
 	{
 		return std::aligned_alloc(size, alignment);
 	}
-	HLVM_INLINE_FUNC virtual void* MallocAligned2(std::size_t size, std::size_t alignment) noexcept final override
+	HLVM_NODISCARD HLVM_INLINE_FUNC virtual void* MallocAligned2(std::size_t size, std::size_t alignment) noexcept final override
 	{
 		try
 		{
@@ -53,21 +53,25 @@ public:
 			return nullptr;
 		}
 	}
-	HLVM_INLINE_FUNC virtual void Free(void* ptr) noexcept final override
+	HLVM_NODISCARD HLVM_INLINE_FUNC virtual EFreeRetType Free(void* ptr) noexcept final override
 	{
 		std::free(ptr);
+		return EFreeRetType::Success;
 	}
-	HLVM_INLINE_FUNC virtual void FreeSize(void* ptr, std::size_t) noexcept final override
+	HLVM_NODISCARD HLVM_INLINE_FUNC virtual EFreeRetType FreeSize(void* ptr, std::size_t) noexcept final override
 	{
 		std::free(ptr);
+		return EFreeRetType::Success;
 	}
-	HLVM_INLINE_FUNC virtual void FreeAligned(void* ptr, std::size_t) noexcept final override
+	HLVM_NODISCARD HLVM_INLINE_FUNC virtual EFreeRetType FreeAligned(void* ptr, std::size_t) noexcept final override
 	{
 		std::free(ptr);
+		return EFreeRetType::Success;
 	}
-	HLVM_INLINE_FUNC virtual void FreeSizeAligned(void* ptr, std::size_t, std::size_t) noexcept final override
+	HLVM_INLINE_FUNC virtual EFreeRetType FreeSizeAligned(void* ptr, std::size_t, std::size_t) noexcept final override
 	{
 		std::free(ptr);
+		return EFreeRetType::Success;
 	}
 };
 HLVM_INLINE_VAR FStdMallocator GStdMallocator{};

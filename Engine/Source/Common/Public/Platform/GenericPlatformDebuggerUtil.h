@@ -7,10 +7,6 @@
 #include "GenericPlatform.h"
 #include "Core/String.h"
 
-#ifndef HLVM_ALLOW_DEBUGGER_EVEN_IN_RELEASE
-	#define HLVM_ALLOW_DEBUGGER_EVEN_IN_RELEASE 0
-#endif
-
 class FGenericPlatformDebuggerUtil
 {
 public:

@@ -55,8 +55,7 @@ bool FMiMallocator::Owned(void* ptr) noexcept
 	}
 	catch (std::exception& e)
 	{
-		const FStdString& Stack = FGenericPlatformStackTrace::GetStackTrace();
-		HLVM_LOG(LogMiMallocator, err, TXT("Owned exception : {} at\n{}"), TO_TCHAR_STR(e.what()), *Stack);
+		HLVM_ENSURE(false, TO_TCHAR_STR(e.what()));
 		return false;
 	}
 }
@@ -64,7 +63,9 @@ bool FMiMallocator::Owned(void* ptr) noexcept
 // TODO : throw std::bad_alloc(); on nullptr malloc
 #if HLVM_MALLOC_OVERRIDE
 HLVM_TLS_VAR IMallocator* GMallocatorTLS = &GMiMallocatorTLS;
-void					  SwapMallocator(IMallocator* Mallocator)
+HLVM_TLS_VAR IMallocator* GFallBacllMallocatorTLS = &GMiMallocatorTLS;
+
+void SwapMallocator(IMallocator* Mallocator)
 {
 	if (hlvm_private::GMallocatorTLSSwap == nullptr)
 	{
@@ -149,144 +150,88 @@ void					  SwapMallocator(IMallocator* Mallocator)
 
 void operator delete(void* p) noexcept
 {
-	// hlvm_printf("delete %s\n", R_C(uintptr_t, p));
-	HLVM_MIMALLOC_OWNED(p)
+	// StreamPrintf(&std::cout, "delete %s\n", R_C(uintptr_t, p));
+	if (GMallocatorTLS->Free(p) != EFreeRetType::Success)
 	{
-		S_C(FMiMallocator*, GMallocatorTLS)->Free(p);
-		return;
+		HLVM_ENSURE(GFallBacllMallocatorTLS->Free(p), TXT("delete failed {}"), p);
 	}
-	HLVM_STACK_OWNED(p)
-	{
-		GMallocatorTLS->Free(p);
-		return;
-	}
-	GMiMallocatorTLS.Free(p);
 };
 void operator delete[](void* p) noexcept
 {
-	// hlvm_printf("delete[] %s\n", R_C(uintptr_t, p));
-	HLVM_MIMALLOC_OWNED(p)
+	// StreamPrintf(&std::cout, "delete[] %s\n", R_C(uintptr_t, p));
+	if (GMallocatorTLS->Free(p) != EFreeRetType::Success)
 	{
-		S_C(FMiMallocator*, GMallocatorTLS)->Free(p);
-		return;
+		HLVM_ENSURE(GFallBacllMallocatorTLS->Free(p), TXT("delete failed {}"), p);
 	}
-	HLVM_STACK_OWNED(p)
-	{
-		GMallocatorTLS->Free(p);
-		return;
-	}
-	GMiMallocatorTLS.Free(p);
 };
 
 void operator delete(void* p, const std::nothrow_t&) noexcept
 {
-	// hlvm_printf("delete %s\n", R_C(uintptr_t, p));
-	HLVM_MIMALLOC_OWNED(p)
+	// StreamPrintf(&std::cout, "delete %s\n", R_C(uintptr_t, p));
+	if (GMallocatorTLS->Free(p) != EFreeRetType::Success)
 	{
-		S_C(FMiMallocator*, GMallocatorTLS)->Free(p);
-		return;
+		HLVM_ENSURE(GFallBacllMallocatorTLS->Free(p), TXT("delete failed {}"), p);
 	}
-	HLVM_STACK_OWNED(p)
-	{
-		GMallocatorTLS->Free(p);
-		return;
-	}
-	GMiMallocatorTLS.Free(p);
 }
 void operator delete[](void* p, const std::nothrow_t&) noexcept
 {
-	// hlvm_printf("delete[] %s\n", R_C(uintptr_t, p));
-	HLVM_MIMALLOC_OWNED(p)
+	// StreamPrintf(&std::cout, "delete[] %s\n", R_C(uintptr_t, p));
+	if (GMallocatorTLS->Free(p) != EFreeRetType::Success)
 	{
-		S_C(FMiMallocator*, GMallocatorTLS)->Free(p);
-		return;
+		HLVM_ENSURE(GFallBacllMallocatorTLS->Free(p), TXT("delete failed {}"), p);
 	}
-	HLVM_STACK_OWNED(p)
-	{
-		GMallocatorTLS->Free(p);
-		return;
-	}
-	GMiMallocatorTLS.Free(p);
 }
 
 mi_decl_new(n) void* operator new(std::size_t n) noexcept(false)
 {
-	// hlvm_printf("new %s\n", n);
+	// StreamPrintf(&std::cout, "new %s\n", n);
 	n = AlignUp(n, HLVM_MALLOC_ALIGNMENT);
-	HLVM_MIMALLOC_USE()
+	void* p = GMallocatorTLS->Malloc(n);
+	if (!p)
 	{
-		void* p = S_C(FMiMallocator*, GMallocatorTLS)->Malloc(n);
-		CALLOC(p, n);
-		return p;
+		p = GFallBacllMallocatorTLS->Malloc(n);
 	}
-	HLVM_STACK_USE()
-	{
-		void* p = GMallocatorTLS->Malloc(n);
-		CALLOC(p, n);
-		return p;
-	}
-	void* p = GMiMallocatorTLS.Malloc(n);
+	HLVM_ENSURE(p, TXT("new failed {}"), n);
 	CALLOC(p, n);
 	return p;
 }
 mi_decl_new(n) void* operator new[](std::size_t n) noexcept(false)
 {
-	// hlvm_printf("new[] %s\n", n);
+	// StreamPrintf(&std::cout, "new[] %s\n", n);
 	n = AlignUp(n, HLVM_MALLOC_ALIGNMENT);
-	HLVM_MIMALLOC_USE()
+	void* p = GMallocatorTLS->Malloc(n);
+	if (!p)
 	{
-		void* p = S_C(FMiMallocator*, GMallocatorTLS)->Malloc(n);
-		CALLOC(p, n);
-		return p;
+		p = GFallBacllMallocatorTLS->Malloc(n);
 	}
-	HLVM_STACK_USE()
-	{
-		void* p = GMallocatorTLS->Malloc(n);
-		CALLOC(p, n);
-		return p;
-	}
-	void* p = GMiMallocatorTLS.Malloc(n);
+	HLVM_ENSURE(p, TXT("new failed {}"), n);
 	CALLOC(p, n);
 	return p;
 }
 
 mi_decl_new_nothrow(n) void* operator new(std::size_t n, const std::nothrow_t&) noexcept
 {
-	// hlvm_printf("new %s\n", n);
+	// StreamPrintf(&std::cout, "new %s\n", n);
 	n = AlignUp(n, HLVM_MALLOC_ALIGNMENT);
-	HLVM_MIMALLOC_USE()
+	void* p = GMallocatorTLS->Malloc(n);
+	if (!p)
 	{
-		void* p = S_C(FMiMallocator*, GMallocatorTLS)->Malloc2(n);
-		CALLOC(p, n);
-		return p;
+		p = GFallBacllMallocatorTLS->Malloc(n);
 	}
-	HLVM_STACK_USE()
-	{
-		void* p = GMallocatorTLS->Malloc2(n);
-		CALLOC(p, n);
-		return p;
-	}
-	void* p = GMiMallocatorTLS.Malloc2(n);
+	HLVM_ENSURE(p, TXT("new failed {}"), n);
 	CALLOC(p, n);
 	return p;
 }
 mi_decl_new_nothrow(n) void* operator new[](std::size_t n, const std::nothrow_t&) noexcept
 {
-	// hlvm_printf("new[] %s\n", n);
+	// StreamPrintf(&std::cout, "new[] %s\n", n);
 	n = AlignUp(n, HLVM_MALLOC_ALIGNMENT);
-	HLVM_MIMALLOC_USE()
+	void* p = GMallocatorTLS->Malloc2(n);
+	if (!p)
 	{
-		void* p = S_C(FMiMallocator*, GMallocatorTLS)->Malloc2(n);
-		CALLOC(p, n);
-		return p;
+		p = GFallBacllMallocatorTLS->Malloc2(n);
 	}
-	HLVM_STACK_USE()
-	{
-		void* p = GMallocatorTLS->Malloc2(n);
-		CALLOC(p, n);
-		return p;
-	}
-	void* p = GMiMallocatorTLS.Malloc2(n);
+	HLVM_ENSURE(p, TXT("new failed {}"), n);
 	CALLOC(p, n);
 	return p;
 }
@@ -294,31 +239,17 @@ mi_decl_new_nothrow(n) void* operator new[](std::size_t n, const std::nothrow_t&
 		#if (__cplusplus >= 201402L || _MSC_VER >= 1916)
 void operator delete(void* p, std::size_t n) noexcept
 {
-	HLVM_MIMALLOC_OWNED(p)
+	if (GMallocatorTLS->FreeSize(p, n) != EFreeRetType::Success)
 	{
-		S_C(FMiMallocator*, GMallocatorTLS)->FreeSize(p, n);
-		return;
+		HLVM_ENSURE(GFallBacllMallocatorTLS->FreeSize(p, n), TXT("delete failed {}"), p);
 	}
-	HLVM_STACK_OWNED(p)
-	{
-		GMallocatorTLS->FreeSize(p, n);
-		return;
-	}
-	GMiMallocatorTLS.FreeSize(p, n);
 };
 void operator delete[](void* p, std::size_t n) noexcept
 {
-	HLVM_MIMALLOC_OWNED(p)
+	if (GMallocatorTLS->FreeSize(p, n) != EFreeRetType::Success)
 	{
-		S_C(FMiMallocator*, GMallocatorTLS)->FreeSize(p, n);
-		return;
+		HLVM_ENSURE(GFallBacllMallocatorTLS->FreeSize(p, n), TXT("delete failed {}"), p);
 	}
-	HLVM_STACK_OWNED(p)
-	{
-		GMallocatorTLS->FreeSize(p, n);
-		return;
-	}
-	GMiMallocatorTLS.FreeSize(p, n);
 };
 		#endif
 
@@ -326,111 +257,62 @@ void operator delete[](void* p, std::size_t n) noexcept
 void operator delete(void* p, std::align_val_t al) noexcept
 {
 	size_t align = static_cast<size_t>(al);
-	HLVM_MIMALLOC_OWNED(p)
+	if (GMallocatorTLS->FreeAligned(p, align) != EFreeRetType::Success)
 	{
-		S_C(FMiMallocator*, GMallocatorTLS)->FreeAligned(p, align);
-		return;
+		HLVM_ENSURE(GFallBacllMallocatorTLS->FreeAligned(p, align), TXT("delete failed {}"), p);
 	}
-	HLVM_STACK_OWNED(p)
-	{
-		GMallocatorTLS->FreeAligned(p, align);
-		return;
-	}
-	GMiMallocatorTLS.FreeAligned(p, align);
 }
 void operator delete[](void* p, std::align_val_t al) noexcept
 {
 	size_t align = static_cast<size_t>(al);
-	HLVM_MIMALLOC_OWNED(p)
+	if (GMallocatorTLS->FreeAligned(p, align) != EFreeRetType::Success)
 	{
-		S_C(FMiMallocator*, GMallocatorTLS)->FreeAligned(p, align);
-		return;
+		HLVM_ENSURE(GFallBacllMallocatorTLS->FreeAligned(p, align), TXT("delete failed {}"), p);
 	}
-	HLVM_STACK_OWNED(p)
-	{
-		GMallocatorTLS->FreeAligned(p, align);
-		return;
-	}
-	GMiMallocatorTLS.FreeAligned(p, align);
 }
 void operator delete(void* p, std::size_t n, std::align_val_t al) noexcept
 {
 	size_t align = static_cast<size_t>(al);
-	HLVM_MIMALLOC_OWNED(p)
+	if (GMallocatorTLS->FreeSizeAligned(p, n, align) != EFreeRetType::Success)
 	{
-		S_C(FMiMallocator*, GMallocatorTLS)->FreeSizeAligned(p, n, align);
-		return;
+		HLVM_ENSURE(GFallBacllMallocatorTLS->FreeSizeAligned(p, n, align), TXT("delete failed {}"), p);
 	}
-	HLVM_STACK_OWNED(p)
-	{
-		GMallocatorTLS->FreeSizeAligned(p, n, align);
-		return;
-	}
-	GMiMallocatorTLS.FreeSizeAligned(p, n, align);
 };
 void operator delete[](void* p, std::size_t n, std::align_val_t al) noexcept
 {
 	size_t align = static_cast<size_t>(al);
-	HLVM_MIMALLOC_OWNED(p)
+	if (GMallocatorTLS->FreeSizeAligned(p, n, align) != EFreeRetType::Success)
 	{
-		S_C(FMiMallocator*, GMallocatorTLS)->FreeSizeAligned(p, n, align);
-		return;
+		HLVM_ENSURE(GFallBacllMallocatorTLS->FreeSizeAligned(p, n, align), TXT("delete failed {}"), p);
 	}
-	HLVM_STACK_OWNED(p)
-	{
-		GMallocatorTLS->FreeSizeAligned(p, n, align);
-		return;
-	}
-	GMiMallocatorTLS.FreeSizeAligned(p, n, align);
 };
 void operator delete(void* p, std::align_val_t al, const std::nothrow_t&) noexcept
 {
 	size_t align = static_cast<size_t>(al);
-	HLVM_MIMALLOC_OWNED(p)
+	if (GMallocatorTLS->FreeAligned(p, align) != EFreeRetType::Success)
 	{
-		S_C(FMiMallocator*, GMallocatorTLS)->FreeAligned(p, align);
-		return;
+		HLVM_ENSURE(GFallBacllMallocatorTLS->FreeAligned(p, align), TXT("delete failed {}"), p);
 	}
-	HLVM_STACK_OWNED(p)
-	{
-		GMallocatorTLS->FreeAligned(p, align);
-		return;
-	}
-	GMiMallocatorTLS.FreeAligned(p, align);
 }
 void operator delete[](void* p, std::align_val_t al, const std::nothrow_t&) noexcept
 {
 	size_t align = static_cast<size_t>(al);
-	HLVM_MIMALLOC_OWNED(p)
+	if (GMallocatorTLS->FreeAligned(p, align) != EFreeRetType::Success)
 	{
-		S_C(FMiMallocator*, GMallocatorTLS)->FreeAligned(p, align);
-		return;
+		HLVM_ENSURE(GFallBacllMallocatorTLS->FreeAligned(p, align), TXT("delete failed {}"), p);
 	}
-	HLVM_STACK_OWNED(p)
-	{
-		GMallocatorTLS->FreeAligned(p, align);
-		return;
-	}
-	GMiMallocatorTLS.FreeAligned(p, align);
 }
 
 void* operator new(std::size_t n, std::align_val_t al) noexcept(false)
 {
 	size_t align = static_cast<size_t>(al);
 	n = AlignUp(n, align);
-	HLVM_MIMALLOC_USE()
+	void* p = GMallocatorTLS->MallocAligned(n, align);
+	if (!p)
 	{
-		void* p = S_C(FMiMallocator*, GMallocatorTLS)->MallocAligned(n, align);
-		CALLOC(p, n);
-		return p;
+		p = GFallBacllMallocatorTLS->MallocAligned(n, align);
 	}
-	HLVM_STACK_USE()
-	{
-		void* p = GMallocatorTLS->MallocAligned(n, align);
-		CALLOC(p, n);
-		return p;
-	}
-	void* p = GMiMallocatorTLS.MallocAligned(n, align);
+	HLVM_ENSURE(p, TXT("new failed {}"), n);
 	CALLOC(p, n);
 	return p;
 }
@@ -438,19 +320,12 @@ void* operator new[](std::size_t n, std::align_val_t al) noexcept(false)
 {
 	size_t align = static_cast<size_t>(al);
 	n = AlignUp(n, align);
-	HLVM_MIMALLOC_USE()
+	void* p = GMallocatorTLS->MallocAligned(n, align);
+	if (!p)
 	{
-		void* p = S_C(FMiMallocator*, GMallocatorTLS)->MallocAligned(n, align);
-		CALLOC(p, n);
-		return p;
+		p = GFallBacllMallocatorTLS->MallocAligned(n, align);
 	}
-	HLVM_STACK_USE()
-	{
-		void* p = GMallocatorTLS->MallocAligned(n, align);
-		CALLOC(p, n);
-		return p;
-	}
-	void* p = GMiMallocatorTLS.MallocAligned(n, align);
+	HLVM_ENSURE(p, TXT("new failed {}"), n);
 	CALLOC(p, n);
 	return p;
 }
@@ -458,19 +333,12 @@ void* operator new(std::size_t n, std::align_val_t al, const std::nothrow_t&) no
 {
 	size_t align = static_cast<size_t>(al);
 	n = AlignUp(n, align);
-	HLVM_MIMALLOC_USE()
+	void* p = GMallocatorTLS->MallocAligned2(n, align);
+	if (!p)
 	{
-		void* p = S_C(FMiMallocator*, GMallocatorTLS)->MallocAligned2(n, align);
-		CALLOC(p, n);
-		return p;
+		p = GFallBacllMallocatorTLS->MallocAligned2(n, align);
 	}
-	HLVM_STACK_USE()
-	{
-		void* p = GMallocatorTLS->MallocAligned2(n, align);
-		CALLOC(p, n);
-		return p;
-	}
-	void* p = GMiMallocatorTLS.MallocAligned2(n, align);
+	HLVM_ENSURE(p, TXT("new failed {}"), n);
 	CALLOC(p, n);
 	return p;
 }
@@ -478,19 +346,12 @@ void* operator new[](std::size_t n, std::align_val_t al, const std::nothrow_t&) 
 {
 	size_t align = static_cast<size_t>(al);
 	n = AlignUp(n, align);
-	HLVM_MIMALLOC_USE()
+	void* p = GMallocatorTLS->MallocAligned2(n, align);
+	if (!p)
 	{
-		void* p = S_C(FMiMallocator*, GMallocatorTLS)->MallocAligned2(n, align);
-		CALLOC(p, n);
-		return p;
+		p = GFallBacllMallocatorTLS->MallocAligned2(n, align);
 	}
-	HLVM_STACK_USE()
-	{
-		void* p = GMallocatorTLS->MallocAligned2(n, align);
-		CALLOC(p, n);
-		return p;
-	}
-	void* p = GMiMallocatorTLS.MallocAligned2(n, align);
+	HLVM_ENSURE(p, TXT("new failed {}"), n);
 	CALLOC(p, n);
 	return p;
 }
@@ -502,7 +363,9 @@ void* operator new[](std::size_t n, std::align_val_t al, const std::nothrow_t&) 
 #else
 
 HLVM_TLS_VAR IMallocator* GMallocatorTLS = nullptr;
-void					  SwapMallocator(IMallocator*)
+HLVM_TLS_VAR IMallocator* GFallBacllMallocatorTLS = nullptr;
+
+void SwapMallocator(IMallocator*)
 {
 }
 

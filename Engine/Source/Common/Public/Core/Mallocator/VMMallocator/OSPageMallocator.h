@@ -26,7 +26,8 @@ public:
 		while (Small)
 		{
 			Small->~FSmallAllocator();
-			GStdMallocator.FreeAligned(Small, sizeof(FSmallAllocator));
+			HLVM_ENSURE(GStdMallocator.FreeAligned(Small, sizeof(FSmallAllocator)) == EFreeRetType::Success,
+				TXT("~FOSPageMallocator failed {}"), R_C(void*, Small));
 			Small = Small->Next;
 		}
 
@@ -34,8 +35,10 @@ public:
 		while (Large)
 		{
 			auto Next = Large->Next;
-			GStdMallocator.FreeAligned(Large->Heap, sizeof(FLargeHeap));
-			GStdMallocator.Free(Large);
+			HLVM_ENSURE(GStdMallocator.FreeAligned(Large->Heap, sizeof(FLargeHeap)) == EFreeRetType::Success,
+				TXT("~FOSPageMallocator failed {}"), R_C(void*, Small));
+			HLVM_ENSURE(GStdMallocator.Free(Large) == EFreeRetType::Success,
+				TXT("~FOSPageMallocator failed {}"), R_C(void*, Small));
 			Large = Next;
 		}
 	}
@@ -104,7 +107,8 @@ public:
 		{
 			if (Small->StackMallocator.Owned(ptr))
 			{
-				Small->StackMallocator.Free(ptr);
+				HLVM_ENSURE(Small->StackMallocator.Free(ptr) == EFreeRetType::Success,
+					TXT("FreeSmall failed {}"), R_C(void*, Small));
 				return;
 			}
 			Small = Small->Next;
@@ -143,7 +147,8 @@ public:
 		{
 			if (Large->Heap == ptr)
 			{
-				GStdMallocator.FreeAligned(ptr, sizeof(FLargeHeap));
+				HLVM_ENSURE(GStdMallocator.FreeAligned(ptr, sizeof(FLargeHeap)) == EFreeRetType::Success,
+					TXT("FreeLargeHeap failed {}"), R_C(void*, ptr));
 				Large->Heap = nullptr;
 				bFound = true;
 			}

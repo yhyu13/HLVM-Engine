@@ -17,7 +17,7 @@ class FSmallBinnedMallocator final : public ISmallBinnedMallocator
 public:
 	NOCOPYMOVE(FSmallBinnedMallocator)
 	FSmallBinnedMallocator() = default;
-	~FSmallBinnedMallocator() noexcept final override
+	virtual ~FSmallBinnedMallocator() noexcept final override
 	{
 		while (mFirstBlocks32)
 		{
@@ -27,12 +27,12 @@ public:
 		}
 	}
 
-	void Init(FVMArena* _Mallocator) final override
+	virtual void Init(FVMArena* _Mallocator) final override
 	{
 		Mallocator = _Mallocator;
 	}
 
-	void* Malloc() final override
+	virtual void* Malloc() final override
 	{
 		// Allocate first block
 		if (!mFirstBlocks32)
@@ -65,7 +65,7 @@ public:
 		return R_C(TBYTE*, BlockHead) + sizeof(FSmallBinnedBlockHead);
 	}
 
-	void Free(void* p) noexcept final override
+	virtual void Free(void* p) noexcept final override
 	{
 		FSmallBinnedBlockHead* BlockHead = R_C(FSmallBinnedBlockHead*, R_C(TBYTE*, p) - sizeof(FSmallBinnedBlockHead));
 		HLVM_CONSTEXPR_ASSERT(bValidate, BlockHead->Alignment == Alignment);

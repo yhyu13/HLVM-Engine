@@ -23,6 +23,7 @@ public:
 		std::call_once(once, []() {
 			{
 				sInstance->InternalInit();
+				sInstance->ReportDump();
 			}
 		});
 	}
