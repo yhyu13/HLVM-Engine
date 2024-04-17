@@ -28,3 +28,6 @@ HLVM_EXTERN_VAR bool GGperfEnabled;
 #endif
 
 HLVM_EXTERN_VAR int GVerbosity;
+
+#include <boost/program_options.hpp>
+HLVM_INLINE_VAR boost::program_options::variables_map GVariableMap;

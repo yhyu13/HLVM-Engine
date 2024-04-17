@@ -247,8 +247,8 @@ namespace hlvm_private
 {
 	HLVM_INLINE_VAR FThreadAffinityMode2 AllPhysicalCores{
 		.Priority = EThreadPriority::Normal,
-		.NumThreads = S_C(TUINT32, std::thread::hardware_concurrency() / HLVM_PLATFORM_SIMT),
-		.TargetedCores = FCoreDescription::NPhysicalCores(std::thread::hardware_concurrency() / HLVM_PLATFORM_SIMT)
+		.NumThreads = S_C(TUINT32, std::thread::hardware_concurrency() / HLVM_PLATFORM_SIMT_MULTIPLIER),
+		.TargetedCores = FCoreDescription::NPhysicalCores(std::thread::hardware_concurrency() / HLVM_PLATFORM_SIMT_MULTIPLIER)
 	};
 	HLVM_INLINE_VAR FThreadAffinityMode2 BgTwoPhysicalCores{
 		.Priority = EThreadPriority::Background,

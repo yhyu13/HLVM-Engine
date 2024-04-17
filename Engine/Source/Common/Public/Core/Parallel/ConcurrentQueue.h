@@ -99,7 +99,7 @@ public:
 		while (QueueNode* temp = mTail)
 		{
 			mTail = mTail->mNextNode;
-			ATOMIC_THREAD_FENCE();
+			HLVM_ATOMIC_THREAD_FENCE();
 			delete temp;
 		}
 	}
@@ -297,7 +297,7 @@ private:
 #if QUEUE_NODE_USE_ATOMIC_PTR
 			FGenericPlatformAtomicPointer::AtomicExchange(&old_head->mNextNode, NewNode);
 #else
-			ATOMIC_THREAD_FENCE();
+			HLVM_ATOMIC_THREAD_FENCE();
 			old_head->mNextNode = NewNode;
 #endif
 		}
@@ -309,7 +309,7 @@ private:
 
 			// Step2, chain pointer
 			// Prevent compiler reordering step2 into step1
-			ATOMIC_THREAD_FENCE();
+			HLVM_ATOMIC_THREAD_FENCE();
 			old_head->mNextNode = NewNode;
 		}
 

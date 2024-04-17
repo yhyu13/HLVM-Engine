@@ -10,7 +10,7 @@ DECLARE_LOG_CATEGORY(LogZstd)
 
 HLVM_NODISCARD TVector<TBYTE> FZstd::Compress(const FConstByteBuffer& data, int compress_level, bool bShrink)
 {
-	HLVM_SCOPED_TIMER(FString::Format(TXT("Zstd compress size {} level {}"), data.size(), compress_level));
+	HLVM_SCOPED_TIMER_LOG(FString::Format(TXT("Zstd compress size {} level {}"), data.size(), compress_level));
 
 	size_t est_compress_size = ZSTD_compressBound(data.size());
 	HLVM_ENSURE(ZSTD_isError(est_compress_size) == 0, TXT("ZSTD_compressBound = {}, ErrMsg: {}"),
@@ -34,7 +34,7 @@ HLVM_NODISCARD TVector<TBYTE> FZstd::Compress(const FConstByteBuffer& data, int 
 
 HLVM_NODISCARD TVector<TBYTE> FZstd::Decompress(const FConstByteBuffer& data, bool bShrink)
 {
-	HLVM_SCOPED_TIMER(FString::Format(TXT("Zstd decompress size {}"), data.size()));
+	HLVM_SCOPED_TIMER_LOG(FString::Format(TXT("Zstd decompress size {}"), data.size()));
 
 	auto const est_decomp_size = ZSTD_getFrameContentSize(data.data(), data.size());
 	HLVM_ENSURE(est_decomp_size != ZSTD_CONTENTSIZE_UNKNOWN, TXT("ZSTD_getFrameContentSize = {}, ErrMsg: {}"),

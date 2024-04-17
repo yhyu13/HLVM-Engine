@@ -14,7 +14,7 @@ constexpr size_t SignatureDigestSize = 4096;
 HLVM_NODISCARD std::vector<TUINT8> FRSA::Encrypt(const FConstByteBuffer& Buffer)
 {
 	using namespace hlvm_private;
-	HLVM_SCOPED_TIMER(FString::Format(TXT("RSA Encrypt size {}"), Buffer.size()));
+	HLVM_SCOPED_TIMER_LOG(FString::Format(TXT("RSA Encrypt size {}"), Buffer.size()));
 	const bool bValidBuffer = Buffer.size() > 0;
 	HLVM_ASSERT(bValidBuffer, TXT("Buffer must has content"));
 
@@ -31,7 +31,7 @@ HLVM_NODISCARD std::vector<TUINT8> FRSA::Encrypt(const FConstByteBuffer& Buffer)
 HLVM_NODISCARD Botan::secure_vector<TUINT8> FRSA::Decrypt(const FConstByteBuffer& Buffer)
 {
 	using namespace hlvm_private;
-	HLVM_SCOPED_TIMER(FString::Format(TXT("RSA Decrypt size {}"), Buffer.size()));
+	HLVM_SCOPED_TIMER_LOG(FString::Format(TXT("RSA Decrypt size {}"), Buffer.size()));
 	const bool bValidBuffer = Buffer.size() > 0;
 	HLVM_ASSERT(bValidBuffer, TXT("Buffer must has content"));
 
@@ -62,7 +62,7 @@ static void digest_buffer(const FConstByteBuffer& Buffer, std::span<TUINT8>& out
 void FRSA::SignToFile(const FConstByteBuffer& Buffer, const FPath& signature_path)
 {
 	using namespace hlvm_private;
-	HLVM_SCOPED_TIMER(FString::Format(TXT("RSA SignToFile size {} path {}"), Buffer.size(), *signature_path));
+	HLVM_SCOPED_TIMER_LOG(FString::Format(TXT("RSA SignToFile size {} path {}"), Buffer.size(), *signature_path));
 	const bool bValidBuffer = Buffer.size() > 0;
 	HLVM_ASSERT(bValidBuffer, TXT("Buffer must has content"));
 
@@ -99,7 +99,7 @@ void FRSA::SignToFile(const FPath& FilePath, const FPath& signature_path)
 HLVM_NODISCARD bool FRSA::VerifyFileSignature(const FConstByteBuffer& Buffer, const FPath& signature_path)
 {
 	using namespace hlvm_private;
-	HLVM_SCOPED_TIMER(FString::Format(TXT("RSA VerifyFromFile size {} path {}"), Buffer.size(), *signature_path));
+	HLVM_SCOPED_TIMER_LOG(FString::Format(TXT("RSA VerifyFromFile size {} path {}"), Buffer.size(), *signature_path));
 	const bool bValidBuffer = Buffer.size() > 0;
 	HLVM_ASSERT(bValidBuffer, TXT("Buffer must has content"));
 

@@ -35,12 +35,12 @@ public:
 		{
 			TCallFunc(_Func1);
 		}
-		ATOMIC_THREAD_FENCE();
+		HLVM_ATOMIC_THREAD_FENCE();
 	}
 
 	~TScopedVariable()
 	{
-		ATOMIC_THREAD_FENCE();
+		HLVM_ATOMIC_THREAD_FENCE();
 		if constexpr (std::is_convertible_v<decltype(TCallFunc(Func2)), bool>)
 		{
 			HLVM_ENSURE(TCallFunc(Func2), TXT("TScopedVariable constructor failed"));
@@ -57,15 +57,15 @@ private:
 
 #define HLVM_SCOPED_VARIABLE(var, FuncConstruct, FuncDestruct)                                        \
 	TScopedVariable<std::function<void()>, std::function<void()>> var{ FuncConstruct, FuncDestruct }; \
-	ATOMIC_THREAD_FENCE()
+	HLVM_ATOMIC_THREAD_FENCE()
 
 #define HLVM_SCOPED_VARIABLE1(var, FuncType, FuncConstruct, FuncDestruct)                                 \
 	TScopedVariable<std::function<FuncType>, std::function<FuncType>> var{ FuncConstruct, FuncDestruct }; \
-	ATOMIC_THREAD_FENCE()
+	HLVM_ATOMIC_THREAD_FENCE()
 
 #define HLVM_SCOPED_VARIABLE2(var, FuncType1, FuncConstruct, FuncType2, FuncDestruct)                       \
 	TScopedVariable<std::function<FuncType1>, std::function<FuncType2>> var{ FuncConstruct, FuncDestruct }; \
-	ATOMIC_THREAD_FENCE()
+	HLVM_ATOMIC_THREAD_FENCE()
 
 // template <typename FuncConstruct, typename FuncDestruct, typename... Args>
 // class TScopedVariable2
@@ -83,12 +83,12 @@ private:
 //		{
 //			TCallFunc(_Func1, _Args...);
 //		}
-//		ATOMIC_THREAD_FENCE();
+//		HLVM_ATOMIC_THREAD_FENCE();
 //	}
 //
 //	~TScopedVariable2()
 //	{
-//		ATOMIC_THREAD_FENCE();
+//		HLVM_ATOMIC_THREAD_FENCE();
 //		if constexpr (std::is_convertible_v<decltype(TApplyFunc(Func2, Values)), bool>)
 //		{
 //			HLVM_ENSURE(TApplyFunc(Func2, Values), TXT("TScopedVariable2 constructor failed"));

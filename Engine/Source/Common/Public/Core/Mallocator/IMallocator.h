@@ -46,11 +46,13 @@ public:
 /**
  * Global mallocator
  */
-void									  InitMallocator();
-void									  SwapMallocator(IMallocator* Mallocator = nullptr);
+HLVM_EXTERN_FUNC void					  InitMallocator();
+HLVM_EXTERN_FUNC void					  FnalMallocator();
+HLVM_EXTERN_FUNC void					  SwapMallocator(IMallocator* Mallocator = nullptr);
 HLVM_TLS_VAR HLVM_EXTERN_VAR IMallocator* GMallocatorTLS;
 HLVM_TLS_VAR HLVM_EXTERN_VAR IMallocator* GFallBacllMallocatorTLS;
 namespace hlvm_private
 {
 	HLVM_TLS_VAR HLVM_INLINE_VAR IMallocator* GMallocatorTLSSwap = nullptr;
 }
+HLVM_EXTERN_VAR std::atomic<double> GMallocatorDurationCounter;

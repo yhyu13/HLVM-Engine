@@ -130,8 +130,6 @@ inline double RunTestAndCalculateAvg(const TestFuncType& func, int num_iteration
 	return avg / (num_iterations - 2);
 }
 
-#include <boost/program_options.hpp>
-
 #if HLVM_ALLOW_GPERF
 	#include <gperftools/profiler.h>
 #endif
@@ -152,19 +150,18 @@ int main(int ac, char* av[])
 
 	try
 	{
-		po::variables_map		vm;
 		po::options_description desc("Allowed options");
 		desc.add_options()("help", "produce help message")("verbose,v", po::value<int>()->implicit_value(-1),
 			"enable verbosity override to specify level")("gperf",
 			po::value<int>()->implicit_value(0), "enable gerpftools profiling by cpu sample (linux only!)");
 
-		po::store(po::command_line_parser(ac, av).options(desc).run(), vm);
-		po::notify(vm);
+		po::store(po::command_line_parser(ac, av).options(desc).run(), GVariableMap);
+		po::notify(GVariableMap);
 
 		/**
 		 * Print help
 		 */
-		if (vm.count("help"))
+		if (GVariableMap.count("help"))
 		{
 			cout << "Usage: options_description [options]\n";
 			cout << desc;
@@ -173,9 +170,9 @@ int main(int ac, char* av[])
 		/**
 		 * Change verbosity
 		 */
-		if (vm.count("verbose"))
+		if (GVariableMap.count("verbose"))
 		{
-			GVerbosity = vm["verbose"].as<int>();
+			GVerbosity = GVariableMap["verbose"].as<int>();
 			cout << "options: Verbosity override enabled.  Level is " << GVerbosity
 				 << "\n";
 		}
@@ -184,7 +181,7 @@ int main(int ac, char* av[])
 		 */
 		if constexpr (HLVM_ALLOW_GPERF)
 		{
-			if (vm.count("gperf") && vm["gperf"].as<int>() == 1)
+			if (GVariableMap.count("gperf") && GVariableMap["gperf"].as<int>() == 1)
 			{
 				GGperfEnabled = true;
 				cout << "options: gperf enabled"
@@ -237,5 +234,8 @@ int main(int ac, char* av[])
 		}
 	}
 
+	{
+		FnalMallocator();
+	}
 	return 0;
 }

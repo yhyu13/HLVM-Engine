@@ -27,10 +27,10 @@
 #include <spdlog/async.h>
 #include <magic_enum_all.hpp>
 
-#define BOOST_STACKTRACE_USE_BACKTRACE
 /**
  * Boost include
  */
+#define BOOST_STACKTRACE_USE_BACKTRACE
 #include <boost/stacktrace.hpp>
 #include <boost/filesystem.hpp>
 

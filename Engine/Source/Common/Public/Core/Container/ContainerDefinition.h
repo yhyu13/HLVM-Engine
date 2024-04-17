@@ -8,6 +8,7 @@
 
 #include <span>
 #include <boost/container/vector.hpp>
+#include <boost/circular_buffer.hpp>
 #include <boost/container/small_vector.hpp>
 #include <boost/algorithm/string/join.hpp>
 
@@ -30,7 +31,10 @@ using TSmallVector = boost::container::small_vector<T, N>;
 template <typename T>
 using TSmallVector32 = boost::container::small_vector<T, 32>;
 
-template <typename T, typename Allocator = void>
+template <typename T>
+using TSmallVector64 = boost::container::small_vector<T, 32>;
+
+template <typename T, typename Allocator = boost::container::new_allocator<T>>
 using TVector = boost::container::vector<T, Allocator>;
 
 template <typename Key, typename Value>
@@ -56,3 +60,6 @@ using FConstByteBuffer = std::span<const TBYTE>;
 	{                                                 \
 		R_C(const TBYTE*, (vec).data()), (vec).size() \
 	}
+
+template <typename T, typename Allocator = boost::container::new_allocator<T>>
+using TRingBuffer = boost::circular_buffer<T, Allocator>;

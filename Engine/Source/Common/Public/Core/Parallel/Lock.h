@@ -78,7 +78,7 @@ private:
 #define ATOMIC_LOCK_GUARD(x)                                                                           \
 	TAtomicLockGuard<typename TOptionalRemoved<typename TReferenceRemoved<decltype((x))>::Type>::Type> \
 		__lock_guard((x));                                                                             \
-	ATOMIC_THREAD_FENCE()
+	HLVM_ATOMIC_THREAD_FENCE()
 
 /**
  * @class FAtomicFlagStatic
@@ -89,7 +89,7 @@ class FAtomicFlagStatic
 public:
 #define LOCK_GUARD_S()                        \
 	FAtomicLockGuard __lock_guard_s(sc_flag); \
-	ATOMIC_THREAD_FENCE()
+	HLVM_ATOMIC_THREAD_FENCE()
 
 	static void Lock() noexcept(!HLVM_DEADLOCK_TIMER);
 	static void Unlock() noexcept;
@@ -108,7 +108,7 @@ public:
 	NOINSTANT(FAtomicFlagNI)
 #define LOCK_GUARD_NI()                        \
 	FAtomicLockGuard __lock_guard_ni(ni_flag); \
-	ATOMIC_THREAD_FENCE()
+	HLVM_ATOMIC_THREAD_FENCE()
 
 	static void Lock() noexcept(!HLVM_DEADLOCK_TIMER);
 	static void Unlock() noexcept;
@@ -128,7 +128,7 @@ public:
 
 #define LOCK_GUARD_NC()                        \
 	FAtomicLockGuard __lock_guard_nc(nc_flag); \
-	ATOMIC_THREAD_FENCE()
+	HLVM_ATOMIC_THREAD_FENCE()
 
 	FAtomicFlagNC() = default;
 
@@ -153,7 +153,7 @@ class FAtomicFlag
 public:
 #define LOCK_GUARD()                       \
 	FAtomicLockGuard __lock_guard_(mFlag); \
-	ATOMIC_THREAD_FENCE()
+	HLVM_ATOMIC_THREAD_FENCE()
 
 	FAtomicFlag() noexcept = default;
 	~FAtomicFlag() noexcept = default;
@@ -203,7 +203,7 @@ class FRecursiveAtomicFlag
 public:
 #define LOCK_GUARD_RECURSIVE()                                                                                                                             \
 	TScopedVariable<std::function<void()>, std::function<void()>> __lock_guard_([this]() -> void { this->Lock(); }, [this]() -> void { this->Unlock(); }); \
-	ATOMIC_THREAD_FENCE()
+	HLVM_ATOMIC_THREAD_FENCE()
 
 	FRecursiveAtomicFlag() noexcept = default;
 	~FRecursiveAtomicFlag() noexcept = default;
@@ -302,7 +302,7 @@ private:
 
 #define LOCK_GUARD_RIVAL(lock, group, ...)                                           \
 	RivialLockGuardCond<FRWRivalLock> __lock_rival_cond(lock, group, ##__VA_ARGS__); \
-	ATOMIC_THREAD_FENCE()
+	HLVM_ATOMIC_THREAD_FENCE()
 
 #if HLVM_ATOMIC_LOCK_ENABLE_PADDING
 	#pragma clang diagnostic pop

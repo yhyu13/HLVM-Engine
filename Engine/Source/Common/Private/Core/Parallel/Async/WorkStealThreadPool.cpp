@@ -89,7 +89,7 @@ FWorkStealThreadPool::FWorkStealThreadPool(const FThreadAffinityMode& AffinityMo
 
 				if constexpr (HLVM_DEBUG_THREAD_UTIL)
 				{
-					FScopedTimer Timer(FString::Format(TXT("Thread {}"), index));
+					FScopedTimerLog Timer(FString::Format(TXT("Thread {}"), index));
 					task();
 				}
 				else

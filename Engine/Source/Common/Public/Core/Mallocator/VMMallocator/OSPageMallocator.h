@@ -4,8 +4,18 @@
 
 #pragma once
 
-#include "Core/Mallocator/StdMallocator.h"
 #include "Core/Mallocator/StackMallocator.h"
+#include "Core/Parallel/Lock.h"
+
+#include "VMMallocatorDefinition.h"
+
+#if HLVM_MALLOC_USE_MIMALLOC_OVER_STD
+	#include "Core/Mallocator/MiMallocator.h"
+	#define GMALLOCATOR GMiMallocatorTLS
+#else
+	#include "Core/Mallocator/StdMallocator.h"
+	#define GMALLOCATOR GStdMallocator
+#endif
 
 class FOSPageMallocator
 {
@@ -16,8 +26,8 @@ public:
 
 	FOSPageMallocator() noexcept
 	{
-		mSmallAllocatorHead = new (GStdMallocator.MallocAligned(sizeof(FSmallAllocator), sizeof(FSmallAllocator))) FSmallAllocator();
-		mLargeHeapChainHead = R_C(FLargeHeapChain*, GStdMallocator.Malloc(sizeof(FLargeHeapChain)));
+		mSmallAllocatorHead = new (GMALLOCATOR.MallocAligned(sizeof(FSmallAllocator), sizeof(FSmallAllocator))) FSmallAllocator();
+		mLargeHeapChainHead = R_C(FLargeHeapChain*, GMALLOCATOR.Malloc(sizeof(FLargeHeapChain)));
 	}
 
 	~FOSPageMallocator() noexcept
@@ -26,7 +36,7 @@ public:
 		while (Small)
 		{
 			Small->~FSmallAllocator();
-			HLVM_ENSURE(GStdMallocator.FreeAligned(Small, sizeof(FSmallAllocator)) == EFreeRetType::Success,
+			HLVM_ENSURE(GMALLOCATOR.FreeAligned(Small, sizeof(FSmallAllocator)) == EFreeRetType::Success,
 				TXT("~FOSPageMallocator failed {}"), R_C(void*, Small));
 			Small = Small->Next;
 		}
@@ -35,9 +45,9 @@ public:
 		while (Large)
 		{
 			auto Next = Large->Next;
-			HLVM_ENSURE(GStdMallocator.FreeAligned(Large->Heap, sizeof(FLargeHeap)) == EFreeRetType::Success,
+			HLVM_ENSURE(GMALLOCATOR.FreeAligned(Large->Heap, sizeof(FLargeHeap)) == EFreeRetType::Success,
 				TXT("~FOSPageMallocator failed {}"), R_C(void*, Small));
-			HLVM_ENSURE(GStdMallocator.Free(Large) == EFreeRetType::Success,
+			HLVM_ENSURE(GMALLOCATOR.Free(Large) == EFreeRetType::Success,
 				TXT("~FOSPageMallocator failed {}"), R_C(void*, Small));
 			Large = Next;
 		}
@@ -45,6 +55,7 @@ public:
 
 	bool Owned(void* ptr) const noexcept
 	{
+		LOCK_GUARD_RIVAL(mRWLock, 0);
 		auto Large = mLargeHeapChainHead;
 		while (Large)
 		{
@@ -81,10 +92,11 @@ public:
 			{
 				if (!Small->Next)
 				{
+					LOCK_GUARD_RIVAL(mRWLock, 1);
 					/**
-					 *  Allocate new small heap
+					 *  Allocate new small heap, and ensure we can allocate enough memory right away
 					 */
-					Small->Next = R_C(FSmallAllocator*, GStdMallocator.MallocAligned(sizeof(FSmallAllocator), sizeof(FSmallAllocator)));
+					Small->Next = R_C(FSmallAllocator*, GMALLOCATOR.MallocAligned(sizeof(FSmallAllocator), sizeof(FSmallAllocator)));
 					Small = Small->Next;
 					p = Small->StackMallocator.Malloc(size);
 					HLVM_CONSTEXPR_ASSERT(bValidate, p != nullptr);
@@ -123,14 +135,15 @@ public:
 		{
 			if (!Large->Heap)
 			{
-				p = Large->Heap = R_C(FLargeHeap*, GStdMallocator.MallocAligned(sizeof(FLargeHeap), sizeof(FLargeHeap)));
+				p = Large->Heap = R_C(FLargeHeap*, GMALLOCATOR.MallocAligned(sizeof(FLargeHeap), sizeof(FLargeHeap)));
 				HLVM_CONSTEXPR_ASSERT(bValidate, p != nullptr);
 			}
 			else
 			{
 				if (!Large->Next)
 				{
-					Large->Next = R_C(FLargeHeapChain*, GStdMallocator.Malloc(sizeof(FLargeHeapChain)));
+					LOCK_GUARD_RIVAL(mRWLock, 1);
+					Large->Next = R_C(FLargeHeapChain*, GMALLOCATOR.Malloc(sizeof(FLargeHeapChain)));
 				}
 				Large = Large->Next;
 			}
@@ -147,7 +160,7 @@ public:
 		{
 			if (Large->Heap == ptr)
 			{
-				HLVM_ENSURE(GStdMallocator.FreeAligned(ptr, sizeof(FLargeHeap)) == EFreeRetType::Success,
+				HLVM_ENSURE(GMALLOCATOR.FreeAligned(ptr, sizeof(FLargeHeap)) == EFreeRetType::Success,
 					TXT("FreeLargeHeap failed {}"), R_C(void*, ptr));
 				Large->Heap = nullptr;
 				bFound = true;
@@ -164,6 +177,9 @@ private:
 		FSmallAllocator*														   Next{};
 	};
 	static_assert(sizeof(FSmallAllocator) == HLVM_VMA_SMALL_HEAP_SIZE, "SmallHeap size must be HLVM_VMA_SMALL_HEAP_SIZE");
+	/**
+	 *  Small heap chain
+	 */
 	FSmallAllocator* mSmallAllocatorHead{ nullptr };
 
 	struct FLargeHeap
@@ -182,5 +198,15 @@ private:
 		FLargeHeap*		 Heap{ nullptr };
 		FLargeHeapChain* Next{ nullptr };
 	};
+	/**
+	 * Large heap chain
+	 */
 	FLargeHeapChain* mLargeHeapChainHead{ nullptr };
+
+	/**
+	 * Read write mutex lock
+	 */
+	mutable FRWRivalLock mRWLock;
 };
+
+#undef GMALLOCATOR

@@ -8,7 +8,16 @@
 #include "Platform/PlatformDefinition.h"
 
 #include <atomic>
-#define ATOMIC_THREAD_FENCE() std::atomic_thread_fence(std::memory_order_acq_rel)
+
+#if defined(__x86_64__)
+	/**
+	 * https://en.cppreference.com/w/cpp/atomic/atomic_thread_fence
+	 * On x86 (including x86-64), atomic_thread_fence functions issue no CPU instructions and only affect compile-time code motion, except for std::atomic_thread_fence(std::memory_order::seq_cst).
+	 */
+	#define HLVM_ATOMIC_THREAD_FENCE() std::atomic_thread_fence(std::memory_order_acq_rel)
+#else
+	#error "HLVM_ATOMIC_THREAD_FENCE Unsupported architecture! Solve me!"
+#endif
 
 /**
  * thread local storage declared here

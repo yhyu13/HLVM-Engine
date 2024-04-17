@@ -33,7 +33,7 @@ protected:
 					{
 						if (core.Type == ECoreType::Physical)
 						{
-							CPU_SET(core.ID * HLVM_PLATFORM_SIMT, &cpuset);
+							CPU_SET(core.ID * HLVM_PLATFORM_SIMT_MULTIPLIER, &cpuset);
 						}
 						else if (core.Type == ECoreType::Logical)
 						{

@@ -78,17 +78,17 @@ static constexpr std::chrono::microseconds us0{ 0 };
 				break;                                                           \
 			}                                                                    \
 		}                                                                        \
-		ATOMIC_THREAD_FENCE()
+		HLVM_ATOMIC_THREAD_FENCE()
 #else
 	#define LOCK_BODY(lock)                                     \
 		while ((lock)->test_and_set(std::memory_order_acq_rel)) \
 		{                                                       \
 		}                                                       \
-		ATOMIC_THREAD_FENCE()
+		HLVM_ATOMIC_THREAD_FENCE()
 #endif
 
 #define UNLOCK_BODY(lock)  \
-	ATOMIC_THREAD_FENCE(); \
+	HLVM_ATOMIC_THREAD_FENCE(); \
 	(lock)->clear(std::memory_order_release)
 
 FAtomicLockGuard::FAtomicLockGuard(std::atomic_flag& flag) noexcept(!HLVM_DEADLOCK_TIMER)
