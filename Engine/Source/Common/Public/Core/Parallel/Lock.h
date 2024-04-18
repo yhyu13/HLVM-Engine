@@ -94,6 +94,11 @@ public:
 	static void Lock() noexcept(!HLVM_DEADLOCK_TIMER);
 	static void Unlock() noexcept;
 
+	static std::atomic_flag& GetAtomicFlagStatic() noexcept
+	{
+		return sc_flag;
+	}
+
 protected:
 	HLVM_CACHE_ALIGN HLVM_INLINE_VAR HLVM_STATIC_VAR std::atomic_flag sc_flag{ 0 };
 };
@@ -112,6 +117,11 @@ public:
 
 	static void Lock() noexcept(!HLVM_DEADLOCK_TIMER);
 	static void Unlock() noexcept;
+
+	static std::atomic_flag& GetAtomicFlagNI() noexcept
+	{
+		return ni_flag;
+	}
 
 protected:
 	HLVM_CACHE_ALIGN HLVM_INLINE_VAR HLVM_STATIC_VAR std::atomic_flag ni_flag{ 0 };
@@ -134,6 +144,11 @@ public:
 
 	void Lock() const noexcept(!HLVM_DEADLOCK_TIMER);
 	void Unlock() const noexcept;
+
+	std::atomic_flag& GetAtomicFlagNC() noexcept
+	{
+		return nc_flag;
+	}
 
 protected:
 	mutable std::atomic_flag nc_flag{ 0 };
@@ -184,6 +199,11 @@ public:
 
 	void Lock() const noexcept(!HLVM_DEADLOCK_TIMER);
 	void Unlock() const noexcept;
+
+	std::atomic_flag& GetAtomicFlag() noexcept
+	{
+		return mFlag;
+	}
 
 protected:
 	mutable std::atomic_flag mFlag{ 0 };

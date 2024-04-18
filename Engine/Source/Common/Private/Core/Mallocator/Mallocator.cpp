@@ -6,7 +6,6 @@
 #include "Core/Mallocator/StdMallocator.h"
 #include "Core/Mallocator/StackMallocator.h"
 #include "Core/Log.h"
-#include "Platform/GenericPlatformStackTrace.h"
 #include "Template/PrintTemplate.tpp"
 #include "Template/AlignmentTemplate.tpp"
 
@@ -33,10 +32,32 @@
 #if HLVM_MALLOC_USE_CALLOC
 	#define CALLOC(p, n) std::memset(p, 0, n)
 #else
-	#define CALLOC(...)
+	#define CALLOC(p, n) ((void)0)
 #endif
 
 DECLARE_LOG_CATEGORY(LogMiMallocator)
+
+/**
+ * Mallocator time cost statistics
+ */
+HLVM_STATIC_VAR std::atomic<double> GMallocDurationCounter;
+HLVM_STATIC_VAR std::atomic_uint_fast64_t GMallocCounter;
+HLVM_STATIC_VAR std::atomic<double> GFreeDurationCounter;
+HLVM_STATIC_VAR std::atomic_uint_fast64_t GFreeCounter;
+#if !HLVM_BUILD_RELEASE
+	#define TIME_MALLOC_CUM()                                   \
+		GMallocCounter.fetch_add(1, std::memory_order_relaxed); \
+		HLVM_SCOPED_TIMER_CUM_ATOMIC(GMallocDurationCounter, std::micro)
+#else
+	#define TIME_MALLOC_CUM() ((void)0)
+#endif
+#if !HLVM_BUILD_RELEASE
+	#define TIME_FREE_CUM()                                   \
+		GFreeCounter.fetch_add(1, std::memory_order_relaxed); \
+		HLVM_SCOPED_TIMER_CUM_ATOMIC(GFreeDurationCounter, std::micro)
+#else
+	#define TIME_FREE_CUM() ((void)0)
+#endif
 
 void InitMallocator() // extern
 {
@@ -49,8 +70,13 @@ void InitMallocator() // extern
 
 void FnalMallocator() // extern
 {
-	HLVM_LOG(LogMiMallocator, info, TXT("Mallocator finalize:\nCumulative time spent on mallocator {} micro sec"),
-		S_C(TUINT64, GMallocatorDurationCounter.load()));
+	HLVM_LOG(LogMiMallocator, trace, TXT("Mallocator finalize:\nCumulative time spent on malloc {} micro sec\nCumulative number of malloc {}\nPer malloc time {} micro sec\nCumulative time spent on free {} micro sec\nCumulative number of free {}\nPer free time {} micro sec"),
+		GMallocDurationCounter.load(),
+		GMallocCounter.load(),
+		GMallocDurationCounter.load() / static_cast<double>(GMallocCounter.load()),
+		GFreeDurationCounter.load(),
+		GFreeCounter.load(),
+		GFreeDurationCounter.load() / static_cast<double>(GFreeCounter.load()));
 }
 
 bool FMiMallocator::Owned(void* ptr) noexcept
@@ -66,13 +92,10 @@ bool FMiMallocator::Owned(void* ptr) noexcept
 	}
 }
 
-std::atomic<double> GMallocatorDurationCounter = 0; // extern
-#define TIME_NEW_DELETE_CUM() HLVM_SCOPED_TIMER_CUM_ATOMIC(GMallocatorDurationCounter, std::micro)
-
-// TODO : throw std::bad_alloc(); on nullptr malloc
 #if HLVM_MALLOC_OVERRIDE
-HLVM_TLS_VAR IMallocator* GMallocatorTLS = &GMiMallocatorTLS;		   // extern
-HLVM_TLS_VAR IMallocator* GFallBacllMallocatorTLS = &GMiMallocatorTLS; // extern
+
+HLVM_THREAD_LOCAL_VAR IMallocator* GMallocatorTLS = &GMiMallocatorTLS;		   // extern
+HLVM_THREAD_LOCAL_VAR IMallocator* GFallBacllMallocatorTLS = &GMiMallocatorTLS; // extern
 
 void SwapMallocator(IMallocator* Mallocator) // extern
 {
@@ -92,42 +115,6 @@ void SwapMallocator(IMallocator* Mallocator) // extern
 // MIMALLOC_SHOW_STATS=1 ./Engine/Source/Common/Test/Test3rdParty
 // <mimalloc-new-delete.h> is used as references to see what mimalloc has done in terms of overriding
 // #include <mimalloc-new-delete.h>
-
-	#if HLVM_MALLOC_USE_MIMALLOC_OVER_STD
-		#define HLVM_MIMALLOC_USE() \
-			if (GMallocatorTLS->Type == EMallocator::Mimalloc)
-	#else
-		#define HLVM_MIMALLOC_USE() \
-			if (false)
-	#endif
-
-	#if HLVM_MALLOC_USE_GENERAL_PURPOSE_STACK_ALLOCATOR
-		#define HLVM_STACK_USE() \
-			if (GMallocatorTLS->Type == EMallocator::Stack)
-	#else
-		#define HLVM_STACK_USE() \
-			if (false)
-	#endif
-
-/**
- * Mimalloc checks thread local allocated pointer as well as non thread local allocated pointer.
- * So just let mimalloc does its job on freeing w/o checking owner ship
- */
-	#if HLVM_MALLOC_USE_MIMALLOC_OVER_STD
-		#define HLVM_MIMALLOC_OWNED(p) \
-			if (GMallocatorTLS->Type == EMallocator::Mimalloc)
-	#else
-		#define HLVM_MIMALLOC_OWNED() \
-			if (false)
-	#endif
-
-	#if HLVM_MALLOC_USE_GENERAL_PURPOSE_STACK_ALLOCATOR
-		#define HLVM_STACK_OWNED(p) \
-			if (GMallocatorTLS->Type == EMallocator::Stack && GMallocatorTLS->Owned(p))
-	#else
-		#define HLVM_STACK_OWNED(p) \
-			if (false)
-	#endif
 
 // Below is the implementation of the new and delete operators copied from mimalloc
 //*************************************************************************************************
@@ -159,7 +146,7 @@ void SwapMallocator(IMallocator* Mallocator) // extern
 
 void operator delete(void* p) noexcept
 {
-	TIME_NEW_DELETE_CUM();
+	TIME_FREE_CUM();
 	// StreamPrintf(&std::cout, "delete %s\n", R_C(uintptr_t, p));
 	if (GMallocatorTLS->Free(p) != EFreeRetType::Success)
 	{
@@ -168,7 +155,7 @@ void operator delete(void* p) noexcept
 };
 void operator delete[](void* p) noexcept
 {
-	TIME_NEW_DELETE_CUM();
+	TIME_FREE_CUM();
 	// StreamPrintf(&std::cout, "delete[] %s\n", R_C(uintptr_t, p));
 	if (GMallocatorTLS->Free(p) != EFreeRetType::Success)
 	{
@@ -178,7 +165,7 @@ void operator delete[](void* p) noexcept
 
 void operator delete(void* p, const std::nothrow_t&) noexcept
 {
-	TIME_NEW_DELETE_CUM();
+	TIME_FREE_CUM();
 	// StreamPrintf(&std::cout, "delete %s\n", R_C(uintptr_t, p));
 	if (GMallocatorTLS->Free(p) != EFreeRetType::Success)
 	{
@@ -193,7 +180,7 @@ void operator delete(void* p, const std::nothrow_t&) noexcept
 }
 void operator delete[](void* p, const std::nothrow_t&) noexcept
 {
-	TIME_NEW_DELETE_CUM();
+	TIME_FREE_CUM();
 	// StreamPrintf(&std::cout, "delete[] %s\n", R_C(uintptr_t, p));
 	if (GMallocatorTLS->Free(p) != EFreeRetType::Success)
 	{
@@ -209,7 +196,7 @@ void operator delete[](void* p, const std::nothrow_t&) noexcept
 
 mi_decl_new(n) void* operator new(std::size_t n) noexcept(false)
 {
-	TIME_NEW_DELETE_CUM();
+	TIME_MALLOC_CUM();
 	// StreamPrintf(&std::cout, "new %s\n", n);
 	n = AlignUp(n, HLVM_MALLOC_ALIGNMENT);
 	void* p = GMallocatorTLS->Malloc(n);
@@ -223,7 +210,7 @@ mi_decl_new(n) void* operator new(std::size_t n) noexcept(false)
 }
 mi_decl_new(n) void* operator new[](std::size_t n) noexcept(false)
 {
-	TIME_NEW_DELETE_CUM();
+	TIME_MALLOC_CUM();
 	// StreamPrintf(&std::cout, "new[] %s\n", n);
 	n = AlignUp(n, HLVM_MALLOC_ALIGNMENT);
 	void* p = GMallocatorTLS->Malloc(n);
@@ -238,7 +225,7 @@ mi_decl_new(n) void* operator new[](std::size_t n) noexcept(false)
 
 mi_decl_new_nothrow(n) void* operator new(std::size_t n, const std::nothrow_t&) noexcept
 {
-	TIME_NEW_DELETE_CUM();
+	TIME_MALLOC_CUM();
 	// StreamPrintf(&std::cout, "new %s\n", n);
 	n = AlignUp(n, HLVM_MALLOC_ALIGNMENT);
 	void* p = GMallocatorTLS->Malloc(n);
@@ -259,7 +246,7 @@ mi_decl_new_nothrow(n) void* operator new(std::size_t n, const std::nothrow_t&) 
 }
 mi_decl_new_nothrow(n) void* operator new[](std::size_t n, const std::nothrow_t&) noexcept
 {
-	TIME_NEW_DELETE_CUM();
+	TIME_MALLOC_CUM();
 	// StreamPrintf(&std::cout, "new[] %s\n", n);
 	n = AlignUp(n, HLVM_MALLOC_ALIGNMENT);
 	void* p = GMallocatorTLS->Malloc2(n);
@@ -282,7 +269,7 @@ mi_decl_new_nothrow(n) void* operator new[](std::size_t n, const std::nothrow_t&
 		#if (__cplusplus >= 201402L || _MSC_VER >= 1916)
 void operator delete(void* p, std::size_t n) noexcept
 {
-	TIME_NEW_DELETE_CUM();
+	TIME_FREE_CUM();
 	if (GMallocatorTLS->FreeSize(p, n) != EFreeRetType::Success)
 	{
 		HLVM_ENSURE(GFallBacllMallocatorTLS->FreeSize(p, n) == EFreeRetType::Success, TXT("delete failed {}"), p);
@@ -290,7 +277,7 @@ void operator delete(void* p, std::size_t n) noexcept
 };
 void operator delete[](void* p, std::size_t n) noexcept
 {
-	TIME_NEW_DELETE_CUM();
+	TIME_FREE_CUM();
 	if (GMallocatorTLS->FreeSize(p, n) != EFreeRetType::Success)
 	{
 		HLVM_ENSURE(GFallBacllMallocatorTLS->FreeSize(p, n) == EFreeRetType::Success, TXT("delete failed {}"), p);
@@ -301,7 +288,7 @@ void operator delete[](void* p, std::size_t n) noexcept
 		#if (__cplusplus > 201402L || defined(__cpp_aligned_new))
 void operator delete(void* p, std::align_val_t al) noexcept
 {
-	TIME_NEW_DELETE_CUM();
+	TIME_FREE_CUM();
 	size_t align = static_cast<size_t>(al);
 	if (GMallocatorTLS->FreeAligned(p, align) != EFreeRetType::Success)
 	{
@@ -310,7 +297,7 @@ void operator delete(void* p, std::align_val_t al) noexcept
 }
 void operator delete[](void* p, std::align_val_t al) noexcept
 {
-	TIME_NEW_DELETE_CUM();
+	TIME_FREE_CUM();
 	size_t align = static_cast<size_t>(al);
 	if (GMallocatorTLS->FreeAligned(p, align) != EFreeRetType::Success)
 	{
@@ -319,7 +306,7 @@ void operator delete[](void* p, std::align_val_t al) noexcept
 }
 void operator delete(void* p, std::size_t n, std::align_val_t al) noexcept
 {
-	TIME_NEW_DELETE_CUM();
+	TIME_FREE_CUM();
 	size_t align = static_cast<size_t>(al);
 	if (GMallocatorTLS->FreeSizeAligned(p, n, align) != EFreeRetType::Success)
 	{
@@ -328,7 +315,7 @@ void operator delete(void* p, std::size_t n, std::align_val_t al) noexcept
 };
 void operator delete[](void* p, std::size_t n, std::align_val_t al) noexcept
 {
-	TIME_NEW_DELETE_CUM();
+	TIME_FREE_CUM();
 	size_t align = static_cast<size_t>(al);
 	if (GMallocatorTLS->FreeSizeAligned(p, n, align) != EFreeRetType::Success)
 	{
@@ -337,7 +324,7 @@ void operator delete[](void* p, std::size_t n, std::align_val_t al) noexcept
 };
 void operator delete(void* p, std::align_val_t al, const std::nothrow_t&) noexcept
 {
-	TIME_NEW_DELETE_CUM();
+	TIME_FREE_CUM();
 	size_t align = static_cast<size_t>(al);
 	if (GMallocatorTLS->FreeAligned(p, align) != EFreeRetType::Success)
 	{
@@ -352,7 +339,7 @@ void operator delete(void* p, std::align_val_t al, const std::nothrow_t&) noexce
 }
 void operator delete[](void* p, std::align_val_t al, const std::nothrow_t&) noexcept
 {
-	TIME_NEW_DELETE_CUM();
+	TIME_FREE_CUM();
 	size_t align = static_cast<size_t>(al);
 	if (GMallocatorTLS->FreeAligned(p, align) != EFreeRetType::Success)
 	{
@@ -368,7 +355,7 @@ void operator delete[](void* p, std::align_val_t al, const std::nothrow_t&) noex
 
 void* operator new(std::size_t n, std::align_val_t al) noexcept(false)
 {
-	TIME_NEW_DELETE_CUM();
+	TIME_MALLOC_CUM();
 	size_t align = static_cast<size_t>(al);
 	n = AlignUp(n, align);
 	void* p = GMallocatorTLS->MallocAligned(n, align);
@@ -382,7 +369,7 @@ void* operator new(std::size_t n, std::align_val_t al) noexcept(false)
 }
 void* operator new[](std::size_t n, std::align_val_t al) noexcept(false)
 {
-	TIME_NEW_DELETE_CUM();
+	TIME_MALLOC_CUM();
 	size_t align = static_cast<size_t>(al);
 	n = AlignUp(n, align);
 	void* p = GMallocatorTLS->MallocAligned(n, align);
@@ -396,7 +383,7 @@ void* operator new[](std::size_t n, std::align_val_t al) noexcept(false)
 }
 void* operator new(std::size_t n, std::align_val_t al, const std::nothrow_t&) noexcept
 {
-	TIME_NEW_DELETE_CUM();
+	TIME_MALLOC_CUM();
 	size_t align = static_cast<size_t>(al);
 	n = AlignUp(n, align);
 	void* p = GMallocatorTLS->MallocAligned2(n, align);
@@ -417,7 +404,7 @@ void* operator new(std::size_t n, std::align_val_t al, const std::nothrow_t&) no
 }
 void* operator new[](std::size_t n, std::align_val_t al, const std::nothrow_t&) noexcept
 {
-	TIME_NEW_DELETE_CUM();
+	TIME_MALLOC_CUM();
 	size_t align = static_cast<size_t>(al);
 	n = AlignUp(n, align);
 	void* p = GMallocatorTLS->MallocAligned2(n, align);
@@ -443,10 +430,11 @@ void* operator new[](std::size_t n, std::align_val_t al, const std::nothrow_t&) 
 
 #else
 
-HLVM_TLS_VAR IMallocator* GMallocatorTLS = nullptr;			 // extern
-HLVM_TLS_VAR IMallocator* GFallBacllMallocatorTLS = nullptr; // extern
+HLVM_THREAD_LOCAL_VAR IMallocator* GMallocatorTLS = nullptr;			 // extern
+HLVM_THREAD_LOCAL_VAR IMallocator* GFallBacllMallocatorTLS = nullptr; // extern
 void					  SwapMallocator(IMallocator*)		 // extern
 {
+	HLVM_NOT_IMPLEMENTED();
 }
 
 #endif

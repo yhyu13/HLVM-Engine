@@ -36,7 +36,7 @@ private:
 		};                                               \
 		HLVM_ATOMIC_THREAD_FENCE()
 #else
-	#define HLVM_SCOPED_TIMER_LOG(Msg)
+	#define HLVM_SCOPED_TIMER_LOG(Msg) ((void)0)
 #endif
 
 template <typename ratio = std::ratio<1>, typename duration_type = double>

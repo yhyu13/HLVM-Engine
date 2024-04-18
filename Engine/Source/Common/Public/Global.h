@@ -7,6 +7,9 @@
 #include "GlobalDefinition.h"
 #include "Platform/PlatformDefinition.h"
 
+/**
+ * Executable name
+ */
 HLVM_EXTERN_VAR FString GExecutableName;
 
 #ifdef PLATFORM_LINUXGNU
@@ -22,12 +25,20 @@ HLVM_EXTERN_VAR FString GExecutableName;
 	#endif
 	#define HLVM_ALLOW_GPERF 0
 #endif
-
 #if HLVM_ALLOW_GPERF
+/**
+ * Gperf enabled
+ */
 HLVM_EXTERN_VAR bool GGperfEnabled;
 #endif
 
-HLVM_EXTERN_VAR int GVerbosity;
+/**
+ * Log Verbosity level
+ */
+HLVM_EXTERN_VAR int GLogVerbosity;
 
 #include <boost/program_options.hpp>
-HLVM_INLINE_VAR boost::program_options::variables_map GVariableMap;
+/**
+ * Variable map that parses cmd line arguments
+ */
+HLVM_EXTERN_VAR boost::program_options::variables_map GVariableMap;

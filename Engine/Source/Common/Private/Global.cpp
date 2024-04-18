@@ -4,6 +4,9 @@
 
 #include "Global.h"
 
+/**
+ * Default to empty string
+ */
 FString GExecutableName{};
 
 #if HLVM_ALLOW_GPERF
@@ -16,4 +19,9 @@ bool GGperfEnabled = false;
 /**
  * Default to -1 so that any verbosity is allowed
  */
-int GVerbosity = -1;
+int GLogVerbosity = -1;
+
+/**
+ * Default to variable map
+ */
+boost::program_options::variables_map GVariableMap;

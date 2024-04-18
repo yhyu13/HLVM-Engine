@@ -172,8 +172,8 @@ int main(int ac, char* av[])
 		 */
 		if (GVariableMap.count("verbose"))
 		{
-			GVerbosity = GVariableMap["verbose"].as<int>();
-			cout << "options: Verbosity override enabled.  Level is " << GVerbosity
+			GLogVerbosity = GVariableMap["verbose"].as<int>();
+			cout << "options: Verbosity override enabled.  Level is " << GLogVerbosity
 				 << "\n";
 		}
 		/**

@@ -89,4 +89,4 @@ private:
 	mi_heap_t*			 mHeap;
 	FMiMallocatorContext mCtx;
 };
-HLVM_TLS_VAR HLVM_INLINE_VAR FMiMallocator GMiMallocatorTLS{};
+HLVM_THREAD_LOCAL_VAR HLVM_INLINE_VAR FMiMallocator GMiMallocatorTLS{};
