@@ -34,6 +34,10 @@ private:
 	std::atomic_flag* mLock;
 };
 
+#define LOCK_GUARD_FLAG(x)                                      \
+	FAtomicLockGuard TOKENPASTE2(__lock_guard_, __LINE__)((x)); \
+	HLVM_ATOMIC_THREAD_FENCE()
+
 template <typename T>
 concept Lockable = requires(T t) {
 	{
@@ -81,20 +85,20 @@ private:
 	HLVM_ATOMIC_THREAD_FENCE()
 
 /**
- * @class FAtomicFlagStatic
+ * @class FAtomicFlagS
  * @brief 一个静态原子标志类
  */
-class FAtomicFlagStatic
+class FAtomicFlagS
 {
 public:
-#define LOCK_GUARD_S()                        \
-	FAtomicLockGuard __lock_guard_s(sc_flag); \
+#define LOCK_GUARD_S()                                                \
+	FAtomicLockGuard TOKENPASTE2(__lock_guard_s_, __LINE__)(sc_flag); \
 	HLVM_ATOMIC_THREAD_FENCE()
 
 	static void Lock() noexcept(!HLVM_DEADLOCK_TIMER);
 	static void Unlock() noexcept;
 
-	static std::atomic_flag& GetAtomicFlagStatic() noexcept
+	static std::atomic_flag& GetAtomicFlagS() noexcept
 	{
 		return sc_flag;
 	}
@@ -111,8 +115,8 @@ class FAtomicFlagNI
 {
 public:
 	NOINSTANT(FAtomicFlagNI)
-#define LOCK_GUARD_NI()                        \
-	FAtomicLockGuard __lock_guard_ni(ni_flag); \
+#define LOCK_GUARD_NI()                                                \
+	FAtomicLockGuard TOKENPASTE2(__lock_guard_ni_, __LINE__)(ni_flag); \
 	HLVM_ATOMIC_THREAD_FENCE()
 
 	static void Lock() noexcept(!HLVM_DEADLOCK_TIMER);
@@ -136,8 +140,8 @@ class FAtomicFlagNC
 public:
 	NOCOPYMOVE(FAtomicFlagNC)
 
-#define LOCK_GUARD_NC()                        \
-	FAtomicLockGuard __lock_guard_nc(nc_flag); \
+#define LOCK_GUARD_NC()                                                \
+	FAtomicLockGuard TOKENPASTE2(__lock_guard_nc_, __LINE__)(nc_flag); \
 	HLVM_ATOMIC_THREAD_FENCE()
 
 	FAtomicFlagNC() = default;
@@ -166,8 +170,8 @@ private:
 class FAtomicFlag
 {
 public:
-#define LOCK_GUARD()                       \
-	FAtomicLockGuard __lock_guard_(mFlag); \
+#define LOCK_GUARD()                                                \
+	FAtomicLockGuard TOKENPASTE2(__lock_guard_m_, __LINE__)(mFlag); \
 	HLVM_ATOMIC_THREAD_FENCE()
 
 	FAtomicFlag() noexcept = default;
@@ -221,8 +225,8 @@ private:
 class FRecursiveAtomicFlag
 {
 public:
-#define LOCK_GUARD_RECURSIVE()                                                                                                                             \
-	TScopedVariable<std::function<void()>, std::function<void()>> __lock_guard_([this]() -> void { this->Lock(); }, [this]() -> void { this->Unlock(); }); \
+#define LOCK_GUARD_RECURSIVE()                                                                                                                                                              \
+	TScopedVariable<std::function<void()>, std::function<void()>> TOKENPASTE2(__lock_guard_recursive_, __LINE__)([this]() -> void { this->Lock(); }, [this]() -> void { this->Unlock(); }); \
 	HLVM_ATOMIC_THREAD_FENCE()
 
 	FRecursiveAtomicFlag() noexcept = default;
@@ -320,8 +324,8 @@ private:
 	BIT_FLAG(mEnabled);
 };
 
-#define LOCK_GUARD_RIVAL(lock, group, ...)                                           \
-	RivialLockGuardCond<FRWRivalLock> __lock_rival_cond(lock, group, ##__VA_ARGS__); \
+#define LOCK_GUARD_RIVAL(lock, group, ...)                                                                    \
+	RivialLockGuardCond<FRWRivalLock> TOKENPASTE2(__lock_guard_rival_, __LINE__)(lock, group, ##__VA_ARGS__); \
 	HLVM_ATOMIC_THREAD_FENCE()
 
 #if HLVM_ATOMIC_LOCK_ENABLE_PADDING

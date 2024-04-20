@@ -87,7 +87,7 @@ static constexpr std::chrono::microseconds us0{ 0 };
 		HLVM_ATOMIC_THREAD_FENCE()
 #endif
 
-#define UNLOCK_BODY(lock)  \
+#define UNLOCK_BODY(lock)       \
 	HLVM_ATOMIC_THREAD_FENCE(); \
 	(lock)->clear(std::memory_order_release)
 
@@ -102,12 +102,12 @@ FAtomicLockGuard::~FAtomicLockGuard() noexcept
 	UNLOCK_BODY(mLock);
 }
 
-void FAtomicFlagStatic::Lock() noexcept(!HLVM_DEADLOCK_TIMER)
+void FAtomicFlagS::Lock() noexcept(!HLVM_DEADLOCK_TIMER)
 {
 	LOCK_BODY(&sc_flag);
 }
 
-void FAtomicFlagStatic::Unlock() noexcept
+void FAtomicFlagS::Unlock() noexcept
 {
 	UNLOCK_BODY(&sc_flag);
 }

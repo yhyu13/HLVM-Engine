@@ -7,6 +7,12 @@
 #include "GlobalDefinition.h"
 #include "Platform/PlatformDefinition.h"
 
+#include "Utility/Timer.h"
+/**
+ * A global timer that usually query for time elapsed since startup
+ */
+HLVM_EXTERN_VAR FTimer GlobalTimerFromStart;
+
 /**
  * Executable name
  */

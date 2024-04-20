@@ -1,0 +1,37 @@
+Inspired by Flax Engine :
+https://github.com/yhyu13/FlaxEngine/blob/b2f9da4113a7c80586ce3c0e7a916a40f0c63f04/Source/Engine/Profiler/
+https://flaxengine.com/licensing
+
+FLAX to hlvm prompt:
+
+Given sample script
+
+/// <summary>
+/// Contains information about current memory usage and capacity.
+/// </summary>
+API_STRUCT()
+struct MemoryStats
+{
+    DECLARE_SCRIPTING_TYPE_MINIMAL(MemoryStats);
+
+	/// <summary>
+	/// Total amount of physical memory in bytes.
+	/// </summary>
+	API_FIELD()
+	uint64 TotalPhysicalMemory;
+}
+
+can be rewrite into
+
+/**
+ * Contains information about current memory usage and capacity.
+*/
+struct FMemoryStats
+{
+	/**
+	 * Total amount of physical memory in bytes.
+	*/
+	TUINT64 TotalPhysicalMemory;
+}
+
+Now rewrite :

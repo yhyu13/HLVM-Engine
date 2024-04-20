@@ -5,6 +5,11 @@
 #include "Global.h"
 
 /**
+ * Default to timer reset on start up
+ */
+FTimer GlobalTimerFromStart{ true };
+
+/**
  * Default to empty string
  */
 FString GExecutableName{};

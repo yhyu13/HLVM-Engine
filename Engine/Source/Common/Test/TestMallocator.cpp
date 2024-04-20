@@ -12,7 +12,7 @@ DECLARE_LOG_CATEGORY(LogTest)
 
 RECORD(mallocator_test)
 {
-	ZoneScopedN("mallocator_test");
+	HLVM_PROFILE_CPU_NAMED("mallocator_test");
 
 	{
 		FMiMallocator MiMallocator{ { .bNewHeap = true } };

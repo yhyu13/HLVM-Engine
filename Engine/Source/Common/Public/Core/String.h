@@ -131,41 +131,26 @@ public:
 };
 
 template <size_t N, typename CHAR = TCHAR>
-PACK(struct TCharArrayStr {
-	static_assert(sizeof(CHAR) / sizeof(char) == 1, "Only support same size as char");
+PACK(class TCharArrayStr {
+public:
 	static constexpr size_t Capacity{ N };
-	TCHAR					Buffer[Capacity + 1];
-	size_t					Size{ 0 };
 
-	TCharArrayStr()
-	{
-		std::memset(Buffer, 0, (Capacity + 1));
-	}
+	TCharArrayStr() = default;
 
-	// 构造函数接受一个C风格字符串进行初始化
-	explicit TCharArrayStr(const CHAR* input)
-	{
-		Size = std::strlen(reinterpret_cast<const char*>(input));
-		// Have to truncate size into capacity
-		if (Size > Capacity)
-		{
-			Size = Capacity;
-		}
-		std::strncpy(reinterpret_cast<char*>(Buffer), reinterpret_cast<const char*>(input), Size);
-		Buffer[Size + 1] = CHAR(0); // 确保总是以空字符结束
-	}
-
-	// = operator
 	TCharArrayStr& operator=(const CHAR* input)
 	{
-		Size = std::strlen(reinterpret_cast<const char*>(input));
-		// Have to truncate size into capacity
-		if (Size > Capacity)
+		if (input)
 		{
-			Size = Capacity;
+			Size = std::strlen(R_C(const char*, input));
+			// Have to truncate size into capacity
+			if (Size > Capacity)
+			{
+				Size = Capacity;
+			}
+			std::strncpy(R_C(char*, Buffer), R_C(const char*, input), Size);
+			Buffer[Size + 1] = CHAR(0); // 确保总是以空字符结束
 		}
-		std::strncpy(reinterpret_cast<char*>(Buffer), reinterpret_cast<const char*>(input), Size);
-		Buffer[Size + 1] = CHAR(0); // 确保总是以空字符结束
+		return *this;
 	}
 
 	// 获取字符串内容
@@ -178,4 +163,14 @@ PACK(struct TCharArrayStr {
 	{
 		return Buffer;
 	}
+
+	size_t size() const
+	{
+		return Size;
+	}
+
+private:
+	static_assert(sizeof(CHAR) / sizeof(char) == 1, "Only support same size as char");
+	TCHAR  Buffer[Capacity + 1];
+	size_t Size{ 0 };
 });

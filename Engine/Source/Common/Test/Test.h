@@ -7,9 +7,11 @@
 #include "Core/Log.h"
 #include "Core/String.h"
 #include "Core/Assert.h"
-#include "Utility/Timer.h"
 #include "Core/Mallocator/IMallocator.h"
 #include "Platform/GenericPlatformCrashDump.h"
+
+#include "Utility/Timer.h"
+#include "Utility/Profiler/ProfilerCPU.h"
 
 #include <iostream>
 #include <vector>

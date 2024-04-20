@@ -59,7 +59,7 @@ HLVM_STATIC_VAR std::atomic_uint_fast64_t GFreeCounter;
 	#define TIME_FREE_CUM() ((void)0)
 #endif
 
-void InitMallocator() // extern
+void InitMallocator() // Extern
 {
 #if !HLVM_BUILD_RELEASE && HLVM_MALLOC_USE_MIMALLOC_OVER_STD
 	mi_option_enable(mi_option_t::mi_option_show_errors);
@@ -68,7 +68,7 @@ void InitMallocator() // extern
 #endif
 }
 
-void FnalMallocator() // extern
+void FnalMallocator() // Extern
 {
 	HLVM_LOG(LogMiMallocator, trace, TXT("Mallocator finalize:\nCumulative time spent on malloc {} micro sec\nCumulative number of malloc {}\nPer malloc time {} micro sec\nCumulative time spent on free {} micro sec\nCumulative number of free {}\nPer free time {} micro sec"),
 		GMallocDurationCounter.load(),
@@ -94,10 +94,10 @@ bool FMiMallocator::Owned(void* ptr) noexcept
 
 #if HLVM_MALLOC_OVERRIDE
 
-HLVM_THREAD_LOCAL_VAR IMallocator* GMallocatorTLS = &GMiMallocatorTLS;		   // extern
-HLVM_THREAD_LOCAL_VAR IMallocator* GFallBacllMallocatorTLS = &GMiMallocatorTLS; // extern
+HLVM_THREAD_LOCAL_VAR IMallocator* GMallocatorTLS = &GMiMallocatorTLS;			// Extern
+HLVM_THREAD_LOCAL_VAR IMallocator* GFallBacllMallocatorTLS = &GMiMallocatorTLS; // Extern
 
-void SwapMallocator(IMallocator* Mallocator) // extern
+void SwapMallocator(IMallocator* Mallocator) // Extern
 {
 	if (hlvm_private::GMallocatorTLSSwap == nullptr)
 	{
@@ -430,9 +430,9 @@ void* operator new[](std::size_t n, std::align_val_t al, const std::nothrow_t&) 
 
 #else
 
-HLVM_THREAD_LOCAL_VAR IMallocator* GMallocatorTLS = nullptr;			 // extern
-HLVM_THREAD_LOCAL_VAR IMallocator* GFallBacllMallocatorTLS = nullptr; // extern
-void					  SwapMallocator(IMallocator*)		 // extern
+HLVM_THREAD_LOCAL_VAR IMallocator* GMallocatorTLS = nullptr;		  // Extern
+HLVM_THREAD_LOCAL_VAR IMallocator* GFallBacllMallocatorTLS = nullptr; // Extern
+void							   SwapMallocator(IMallocator*)		  // Extern
 {
 	HLVM_NOT_IMPLEMENTED();
 }
