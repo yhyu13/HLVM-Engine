@@ -195,7 +195,7 @@ void FProfilerCPU::Dispose()
 	Enabled = false;
 }
 
-void FProfilerCPU::OnMemoryMalloc(void* ptr, size_t size)
+void FProfilerCPU::OnMemMalloc(void* ptr, size_t size)
 {
 	if (!ptr || size == 0)
 	{
@@ -215,7 +215,7 @@ void FProfilerCPU::OnMemoryMalloc(void* ptr, size_t size)
 	}
 }
 
-void FProfilerCPU::OnMemoryFree(void* ptr)
+void FProfilerCPU::OnMemFree(void* ptr)
 {
 	if (!ptr)
 	{

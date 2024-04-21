@@ -20,7 +20,6 @@ vcpkg_cxt = VcpkgContenxt(vcpkg_root_path='../Dependency/vcpkg',
                                                             # "catch2"
                                                             "gperftools",  # linux cpu sampling
                                                             "minitrace",  # chrome format tracing
-                                                            # "tracy",  # general tracing
                                                         ],
                                                         builtin_baseline='53bef8994c541b6561884a8395ea35715ece75db'))
 
@@ -122,21 +121,6 @@ minitrace = FindPackage(name='minitrace',
                         dependant_target_link_libs=[
                             DomainValueModel(domain=DomainEnum.PUBLIC, values=['minitrace::minitrace'])])
 
-# # Find the minitrace package with the specified options
-# tracy = FindPackage(name='Tracy',
-#                     config=True,
-#                     required=True,
-#                     target_compile_options=[TargetDomainValueModel(target='Tracy::TracyClient',
-#                                                       domain=DomainEnum.INTERFACE,
-#                                                       values=['-DTRACY_ENABLE=ON',
-#                                                               '-DTRACY_ON_DEMAND=ON',
-#                                                               '-DTRACY_ONLY_LOCALHOST=ON',
-#                                                               '-DTRACY_NO_FRAME_IMAGE=ON',
-#                                                               '-DTRACY_ONLY_IPV4=ON',
-#                                                               '-DTRACY_NO_CALLSTACK=ON'])],
-#                     dependant_target_link_libs=[
-#                         DomainValueModel(domain=DomainEnum.PUBLIC, values=['Tracy::TracyClient'])])
-
 ##########################################################
 
 # Fetch the Yalantinglibs package from GitHub with the specified options
@@ -188,10 +172,9 @@ ctre = FetchContent(name='ctre',
 # Find the minitrace package with the specified options
 tracy = FetchContent(name='Tracy',
                      git_repo_url='https://github.com/yhyu13/tracy.git',
-                     git_tag='b5b985d1d09e2c757338a51f8a82115626bf81ab',
+                     git_tag= 'a9920c8672c95591576cc20222e004e7a4db2f69', #'719d85536ec88490f11dd9045daee4907e235470', #'b5b985d1d09e2c757338a51f8a82115626bf81ab',
                      target_compile_options=[TargetDomainValueModel(target='TracyClient', domain=DomainEnum.INTERFACE,
-                                                                    values=['-DTRACY_ON_DEMAND=ON',
-                                                                            '-DTRACY_ONLY_LOCALHOST=ON',
+                                                                    values=['-DTRACY_ONLY_LOCALHOST=ON',
                                                                             '-DTRACY_NO_FRAME_IMAGE=ON',
                                                                             '-DTRACY_ONLY_IPV4=ON',
                                                                             '-DTRACY_NO_CALLSTACK=OFF',

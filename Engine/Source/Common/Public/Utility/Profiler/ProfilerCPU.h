@@ -153,12 +153,12 @@ public:
 	/**
 	 * Record malloc event
 	 */
-	HLVM_STATIC_FUNC void OnMemoryMalloc(void* ptr, size_t size);
+	HLVM_STATIC_FUNC void OnMemMalloc(void* ptr, size_t size);
 
 	/**
 	 * Record free event
 	 */
-	HLVM_STATIC_FUNC void OnMemoryFree(void* ptr);
+	HLVM_STATIC_FUNC void OnMemFree(void* ptr);
 
 public:
 	/**
@@ -202,21 +202,42 @@ struct FScopeEventCPU
 };
 #endif
 
-// Placeholder macros for disabled profiler
-// Override these in each profiler backend
-#define HLVM_PROFILE_CPU() ((void)0)
-#define HLVM_PROFILE_CPU_NAMED(name) ((void)0)
-#define HLVM_PROFILE_CPU_SRC_LOC(srcLoc) ((void)0)
+/**
+ * Override these in each profiler backend
+ */
+#if HLVM_COMPILE_WITH_PROFILER
+	/**
+	 * By default, cpu profiler will trigger event on every call,
+	 * which has potential of recursive calling that evatually run out of stack.
+	 * For low level cpu profiling, especially for memory allocation, use no event macro
+	 * to avoid creating an tracking event
+	 */
+	#define HLVM_PROFILE_CPU_NO_TRACK_EVENT() ((void)0)
+	#define HLVM_PROFILE_CPU_NAMED_NO_TRACK_EVENT(name) ((void)0)
+	#define HLVM_PROFILE_CPU_SRC_LOC_NO_TRACK_EVENT(srcLoc) ((void)0)
+	#define HLVM_PROFILE_CPU() FScopeEventCPU ProfileBlockCPU(__FUNCTION__)
+	#define HLVM_PROFILE_CPU_NAMED(name) FScopeEventCPU ProfileBlockCPU(name)
+	#define HLVM_PROFILE_CPU_SRC_LOC(srcLoc) FScopeEventCPU ProfileBlockCPU((srcLoc).name)
+#else
+	#define HLVM_PROFILE_CPU_NO_TRACK_EVENT() ((void)0)
+	#define HLVM_PROFILE_CPU_NAMED_NO_TRACK_EVENT(name) ((void)0)
+	#define HLVM_PROFILE_CPU_SRC_LOC_NO_TRACK_EVENT(srcLoc) ((void)0)
+	#define HLVM_PROFILE_CPU() ((void)0)
+	#define HLVM_PROFILE_CPU_NAMED(name) ((void)0)
+	#define HLVM_PROFILE_CPU_SRC_LOC(srcLoc) ((void)0)
+#endif
 
 /**
- * By default, cpu profiler will trigger event on every call,
- * which has potential of recursive calling that evatually run out of stack
- * For low level cpu profiling, especially for memory allocation, use no event macro
- * to avoid creating an tracking event
+ * Memory Allocation macro for tracking memory allocation
+ * Override these at will
  */
-#define HLVM_PROFILE_CPU_NO_TRACK_EVENT() ((void)0)
-#define HLVM_PROFILE_CPU_NAMED_NO_TRACK_EVENT(name) ((void)0)
-#define HLVM_PROFILE_CPU_SRC_LOC_NO_TRACK_EVENT(srcLoc) ((void)0)
+#if HLVM_COMPILE_WITH_PROFILER
+	#define HLVM_TRACK_CPU_MALLOC(ptr, size) FProfilerCPU::OnMemMalloc(ptr, size)
+	#define HLVM_TRACK_CPU_FREE(ptr) FProfilerCPU::OnMemFree(ptr)
+#else
+	#define HLVM_TRACK_CPU_MALLOC(ptr, size) ((void)0)
+	#define HLVM_TRACK_CPU_FREE(ptr) ((void)0)
+#endif
 
 #if HLVM_PROFILER_USE_TRACY
 	#include "Tracy/TracyProfilerCPU.h"

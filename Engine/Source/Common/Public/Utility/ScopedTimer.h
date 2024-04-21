@@ -21,7 +21,7 @@ public:
 
 	~FScopedTimerLog()
 	{
-		HLVM_LOG(LogScopedTimer, trace, TXT("{}: took {} sec"), *mMsg, mTimer.Mark());
+		HLVM_LOG(LogScopedTimer, info, TXT("{}: took {} sec"), *mMsg, mTimer.Mark());
 	}
 
 private:
@@ -29,7 +29,7 @@ private:
 	FTimer	mTimer;
 };
 
-#if !HLVM_BUILD_RELEASE
+#if !HLVM_SHIPPING
 	#define HLVM_SCOPED_TIMER_LOG(Msg)                   \
 		FScopedTimerLog TOKENPASTE2(__timer_, __LINE__){ \
 			Msg                                          \
@@ -60,24 +60,28 @@ private:
 	FTimer		   mTimer;
 };
 
-#define HLVM_SCOPED_TIMER(Duration)               \
-	FScopedTimer TOKENPASTE2(__timer_, __LINE__){ \
-		Duration                                  \
-	};                                            \
-	HLVM_ATOMIC_THREAD_FENCE()
+#if !HLVM_SHIPPING
+	#define HLVM_SCOPED_TIMER(Duration)               \
+		FScopedTimer TOKENPASTE2(__timer_, __LINE__){ \
+			Duration                                  \
+		};                                            \
+		HLVM_ATOMIC_THREAD_FENCE()
+#else
+	#define HLVM_SCOPED_TIMER(Msg) ((void)0)
+#endif
 
 template <typename ratio = std::ratio<1>, typename duration_type = double>
-class FScopedTimerCum
+class FScopedTimerCumu
 {
 public:
-	FScopedTimerCum() = delete;
-	explicit FScopedTimerCum(duration_type& Duration)
+	FScopedTimerCumu() = delete;
+	explicit FScopedTimerCumu(duration_type& Duration)
 		: mDuration(&Duration)
 	{
 		mTimer.Reset();
 	}
 
-	~FScopedTimerCum()
+	~FScopedTimerCumu()
 	{
 		*mDuration += mTimer.Mark<ratio, duration_type>();
 	}
@@ -87,24 +91,28 @@ private:
 	FTimer		   mTimer;
 };
 
-#define HLVM_SCOPED_TIMER_CUM(Duration)              \
-	FScopedTimerCum TOKENPASTE2(__timer_, __LINE__){ \
-		Duration                                     \
-	};                                               \
-	HLVM_ATOMIC_THREAD_FENCE()
+#if !HLVM_SHIPPING
+	#define HLVM_SCOPED_TIMER_CUMU(Duration)              \
+		FScopedTimerCumu TOKENPASTE2(__timer_, __LINE__){ \
+			Duration                                      \
+		};                                                \
+		HLVM_ATOMIC_THREAD_FENCE()
+#else
+	#define HLVM_SCOPED_TIMER_CUMU(Msg) ((void)0)
+#endif
 
 template <typename ratio = std::ratio<1>, typename duration_type = double>
-class FScopedTimerCumAtomic
+class FScopedTimerCumuAtomic
 {
 public:
-	FScopedTimerCumAtomic() = delete;
-	explicit FScopedTimerCumAtomic(std::atomic<duration_type>& Duration)
+	FScopedTimerCumuAtomic() = delete;
+	explicit FScopedTimerCumuAtomic(std::atomic<duration_type>& Duration)
 		: mDuration(&Duration)
 	{
 		mTimer.Reset();
 	}
 
-	~FScopedTimerCumAtomic()
+	~FScopedTimerCumuAtomic()
 	{
 		mDuration->fetch_add(mTimer.Mark<ratio, duration_type>(), std::memory_order_relaxed);
 	}
@@ -114,8 +122,12 @@ private:
 	FTimer						mTimer;
 };
 
-#define HLVM_SCOPED_TIMER_CUM_ATOMIC(Duration, ratio)                                             \
-	FScopedTimerCumAtomic<ratio, decltype(Duration)::value_type> TOKENPASTE2(__timer_, __LINE__){ \
-		Duration                                                                                  \
-	};                                                                                            \
-	HLVM_ATOMIC_THREAD_FENCE()
+#if !HLVM_SHIPPING
+	#define HLVM_SCOPED_TIMER_CUMU_ATOMIC(Duration, ratio)                                             \
+		FScopedTimerCumuAtomic<ratio, decltype(Duration)::value_type> TOKENPASTE2(__timer_, __LINE__){ \
+			Duration                                                                                   \
+		};                                                                                             \
+		HLVM_ATOMIC_THREAD_FENCE()
+#else
+	#define HLVM_SCOPED_TIMER_CUMU_ATOMIC(Msg) ((void)0)
+#endif
