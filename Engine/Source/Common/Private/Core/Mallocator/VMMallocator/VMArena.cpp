@@ -20,7 +20,7 @@ FVMArena::FVMArena(const FVMArenaInitContext& _InitContext)
 	auto _Heap = mHeapChainHead;
 	for (size_t i = 0; i < mInitCtx.LargeHeapInitNum; ++i)
 	{
-		auto Heap = new (mOSPageMallocator.MallocSmall(sizeof(FHeapChain))) FHeapChain();
+		auto Heap = new (mOSPageMallocator.MallocSmall(sizeof(FVMHeapChain))) FVMHeapChain();
 		Heap->HeapAllocator.Init(this, mInitCtx.LargeHeapSize);
 		if (!mHeapChainHead)
 		{
@@ -47,6 +47,31 @@ FVMArena::FVMArena(const FVMArenaInitContext& _InitContext)
 FVMArena::~FVMArena()
 {
 	/**
+	 * Handle cache free list
+	 */
+	while (mPendingFressLists.GenericFreeList.size())
+	{
+		auto LastGenericPtr = mPendingFressLists.GenericFreeList.back();
+		if (mOSPageMallocator.Owned(LastGenericPtr))
+		{
+			/**
+			 * Ignore freeing of memory owned by current VM that is about to be destructed
+			 */
+			continue;
+		}
+		else
+		{
+			while (mPendingFressLists.NonLocalFreeList.size())
+			{
+				// auto LastNonLocalPtr = mPendingFressLists.NonLocalFreeList.back();
+				//  TODO : Push LastNonLocalPtr to global free list
+				mPendingFressLists.NonLocalFreeList.pop_back();
+			}
+		}
+		mPendingFressLists.GenericFreeList.pop_back();
+	}
+
+	/**
 	 * Free all small binned allocators
 	 */
 	for (size_t i = 0; i < HLVM_VMA_SMALL_ALLOC_THRESHOLD / HLVM_VMA_SMALL_ALLOC_ALIGNMENT; ++i)
@@ -63,7 +88,7 @@ FVMArena::~FVMArena()
 	while (mHeapChainHead)
 	{
 		auto Next = mHeapChainHead->Next;
-		mHeapChainHead->~FHeapChain();
+		mHeapChainHead->~FVMHeapChain();
 		mOSPageMallocator.FreeSmall(mHeapChainHead);
 		mHeapChainHead = Next;
 	}
@@ -76,20 +101,56 @@ void* FVMArena::Malloc(size_t size)
 
 void FVMArena::Free(void* p)
 {
-	if (mOSPageMallocator.Owned(p))
+	if (mPendingFressLists.GenericFreeList.size() == mPendingFressLists.GenericFreeList.max_size())
 	{
-		if (auto alignment = FSmallBinnedBlockHead::IsSmallAlloc(p))
+		while (mPendingFressLists.GenericFreeList.size())
 		{
-			FreeBinned(p, alignment);
-		}
-		else
-		{
-			FreeHeap(p);
+			auto LastGenericPtr = mPendingFressLists.GenericFreeList.back();
+			if (mOSPageMallocator.Owned(LastGenericPtr))
+			{
+				if (mPendingFressLists.LocalFreeList.size() == mPendingFressLists.LocalFreeList.max_size())
+				{
+					while (mPendingFressLists.LocalFreeList.size())
+					{
+						auto LastLocalPtr = mPendingFressLists.LocalFreeList.back();
+						if (auto alignment = FSmallBinnedBlockHead::IsSmallAlloc(LastLocalPtr))
+						{
+							FreeBinned(LastLocalPtr, alignment);
+						}
+						else
+						{
+							FreeHeap(LastLocalPtr);
+						}
+						mPendingFressLists.LocalFreeList.pop_back();
+					}
+				}
+				else
+				{
+					mPendingFressLists.LocalFreeList.push_back(LastGenericPtr);
+				}
+			}
+			else
+			{
+				if (mPendingFressLists.NonLocalFreeList.size() == mPendingFressLists.NonLocalFreeList.max_size())
+				{
+					while (mPendingFressLists.NonLocalFreeList.size())
+					{
+						// auto LastNonLocalPtr = mPendingFressLists.NonLocalFreeList.back();
+						//  TODO : Push LastNonLocalPtr to global free list
+						mPendingFressLists.NonLocalFreeList.pop_back();
+					}
+				}
+				else
+				{
+					mPendingFressLists.NonLocalFreeList.push_back(LastGenericPtr);
+				}
+			}
+			mPendingFressLists.GenericFreeList.pop_back();
 		}
 	}
 	else
 	{
-		// TODO, handle
+		mPendingFressLists.GenericFreeList.push_back(p);
 	}
 }
 
@@ -118,9 +179,9 @@ void* FVMArena::MallocHeap(size_t size)
 
 	// Allocate new heap space for this allocation since we don't have an available heap
 	HLVM_CONSTEXPR_ASSERT(bValidate, Heap->Next == nullptr);
-	Heap->Next = new (mOSPageMallocator.MallocSmall(sizeof(FHeapChain))) FHeapChain();
+	Heap->Next = new (mOSPageMallocator.MallocSmall(sizeof(FVMHeapChain))) FVMHeapChain();
 	auto& HeapMallocator = Heap->Next->HeapAllocator;
-	auto  Capacity = FHeapMallocator::CalculateCapacity(size);
+	auto  Capacity = FVMHeap::CalculateCapacity(size);
 	if (Capacity <= mInitCtx.LargeHeapSize)
 	{
 		HeapMallocator.Init(this, mInitCtx.LargeHeapSize);

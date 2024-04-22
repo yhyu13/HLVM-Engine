@@ -11,6 +11,7 @@
 #include <boost/circular_buffer.hpp>
 #include <boost/container/small_vector.hpp>
 #include <boost/algorithm/string/join.hpp>
+#include <boost/container/static_vector.hpp>
 
 /**
  * phmap has alot of unconventional warnings, pretty bad code though
@@ -25,6 +26,7 @@
 
 #define HLVM_CONTAINER_SHRINK false
 
+// TODO : set all container growth factor to 1
 template <typename T, size_t N>
 using TSmallVector = boost::container::small_vector<T, N>;
 
@@ -63,3 +65,6 @@ using FConstByteBuffer = std::span<const TBYTE>;
 
 template <typename T, typename Allocator = boost::container::new_allocator<T>>
 using TRingBuffer = boost::circular_buffer<T, Allocator>;
+
+template <typename T, std::size_t N>
+using TFixedSizeVector = boost::container::static_vector<T, N>;

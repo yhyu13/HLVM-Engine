@@ -7,16 +7,16 @@
 #include "VMMallocatorDefinition.h"
 
 class FVMArena;
-class FHeapMallocator
+class FVMHeap
 {
 	HLVM_INLINE_VAR HLVM_STATIC_VAR constexpr bool bValidate = HLVM_MALLOC_VALIDATION;
 
 public:
 	using SizeType = int32_t;
 
-	NOCOPYMOVE(FHeapMallocator)
-	FHeapMallocator() = default;
-	~FHeapMallocator()
+	NOCOPYMOVE(FVMHeap)
+	FVMHeap() = default;
+	~FVMHeap()
 	{
 		Destroy();
 	}

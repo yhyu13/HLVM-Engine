@@ -2,13 +2,13 @@
  * Copyright (c) 2024. MIT License. All rights reserved.
  */
 
-#include "Core/Mallocator/VMMallocator/HeapMallocator.h"
+#include "Core/Mallocator/VMMallocator/VMHeap.h"
 #include "Core/Mallocator/VMMallocator/VMArena.h"
 #include "Core/Log.h"
 
 DECLARE_LOG_CATEGORY(LogHeapMallocator)
 
-void FHeapMallocator::Init(FVMArena* _VMArena, size_t _size, bool bForceUnManaged)
+void FVMHeap::Init(FVMArena* _VMArena, size_t _size, bool bForceUnManaged)
 {
 	VMArena = _VMArena;
 	N = _size;
@@ -51,7 +51,7 @@ void FHeapMallocator::Init(FVMArena* _VMArena, size_t _size, bool bForceUnManage
 	}
 }
 
-void FHeapMallocator::Destroy()
+void FVMHeap::Destroy()
 {
 	if (mHeap)
 	{
@@ -61,7 +61,7 @@ void FHeapMallocator::Destroy()
 	}
 }
 
-void* FHeapMallocator::Malloc(size_t _size)
+void* FVMHeap::Malloc(size_t _size)
 {
 	if (!bManaged)
 	{
@@ -163,7 +163,7 @@ void* FHeapMallocator::Malloc(size_t _size)
 	}
 }
 
-void FHeapMallocator::Free(void* p)
+void FVMHeap::Free(void* p)
 {
 	HLVM_CONSTEXPR_ASSERT(bValidate, Owned(p));
 	HLVM_ENSURE(mHeap, TXT("calling free on nullptr heap with pointer {} to be free"), p);

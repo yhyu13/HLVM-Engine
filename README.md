@@ -64,7 +64,7 @@ https://zhuanlan.zhihu.com/p/677704467
    - Implement custom mimalloc-like VM mallocator  (WIP) 
      - the goal is to be thread-local and lock-free and replicate a simplified version of free list sharding (WIP)
      - Virtual memory arena [link](Engine/Source/Common/Public/Core/Mallocator/VMMallocator/VMArena.h)
-      - Multiple Heap live inside a single virtual memory arena, heaps are used to large blocks allocation [link](Engine/Source/Common/Public/Core/Mallocator/VMMallocator/HeapMallocator.h)
+      - Multiple Heap live inside a single virtual memory arena, heaps are used to large blocks allocation [link](Engine/Source/Common/Public/Core/Mallocator/VMMallocator/VMHeap.h)
       - small binned allocator designed to be fast and lock-free [link](Engine/Source/Common/Public/Core/Mallocator/VMMallocator/SmallBinnedMallocator.h)
  - Obfuscation techniques for sensitive strings [link](Engine/Source/Common/Public/Template/Obfuscate/MetaString.tpp)
    - Use `AdvoObfuscator` to obfuscate short strings

@@ -8,7 +8,7 @@
 #include "Core/Parallel/Lock.h"
 #include "Core/Container/ContainerDefinition.h"
 #include "ISmallBinnedMallocator.h"
-#include "HeapMallocator.h"
+#include "VMHeap.h"
 #include "OSPageMallocator.h"
 
 struct FVMArenaInitContext
@@ -64,16 +64,27 @@ private:
 	};
 
 private:
-	struct FHeapChain
-	{
-		FHeapMallocator HeapAllocator{};
-		FHeapChain*		Next{ nullptr };
-	};
-
 	friend class ISmallBinnedMallocator;
 
+	struct FVMHeapChain
+	{
+		FVMHeap		  HeapAllocator{};
+		FVMHeapChain* Next{ nullptr };
+	};
+	struct FPendingFreeLists
+	{
+		TFixedSizeVector<void*, HLVM_VMA_GENERIC_PENDING_FREE_LIST_SIZE>  GenericFreeList;
+		TFixedSizeVector<void*, HLVM_VMA_LOCAL_PENDING_FREE_LIST_SIZE>	  LocalFreeList;
+		TFixedSizeVector<void*, HLVM_VMA_NONLOCAL_PENDING_FREE_LIST_SIZE> NonLocalFreeList;
+	};
+	static_assert(sizeof(FPendingFreeLists) >= sizeof(void*) * HLVM_VMA_GENERIC_PENDING_FREE_LIST_SIZE
+				+ sizeof(void*) * HLVM_VMA_LOCAL_PENDING_FREE_LIST_SIZE
+				+ sizeof(void*) * HLVM_VMA_NONLOCAL_PENDING_FREE_LIST_SIZE,
+		"Pending free list size is too small, potential heap allocation instead of stack allocation");
+
+	FPendingFreeLists		mPendingFressLists;
 	ISmallBinnedMallocator* mSmallBinnedMallocators[HLVM_VMA_SMALL_ALLOC_THRESHOLD / HLVM_VMA_SMALL_ALLOC_ALIGNMENT];
-	FHeapChain*				mHeapChainHead{ nullptr };
+	FVMHeapChain*			mHeapChainHead{ nullptr };
 	FOSPageMallocator		mOSPageMallocator{};
 	FVMArenaInitContext		mInitCtx{};
 };

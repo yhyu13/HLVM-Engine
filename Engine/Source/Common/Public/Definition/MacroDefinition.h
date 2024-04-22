@@ -4,13 +4,22 @@
 
 #pragma once
 
-#define HLVM_NOT_IMPLEMENTED() \
+/**
+ * https://compiler-explorer.com/z/5GsaxMe4h
+ * x86-64 asm
+ *      mov     qword ptr [rbp - 8], 0
+		mov     rax, qword ptr [rbp - 8]
+		mov     dword ptr [rax], 0
+ */
+#define HLVM_SEGFAULT_INLINE() \
 	do                         \
 	{                          \
 		int* _ = nullptr;      \
 		*_ = 0;                \
 	}                          \
 	while (0)
+
+#define HLVM_NOT_IMPLEMENTED() HLVM_SEGFAULT_INLINE()
 
 #define HLVM_DELETE(ptr)    \
 	do                      \
