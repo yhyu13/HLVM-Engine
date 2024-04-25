@@ -10,8 +10,8 @@
 struct FSmallBinnedBlockHead
 {
 	// Use this FSmallBinnedBlockHead* - Pos * Alignment to get FBlocks32's P pointer location
-	TUINT8 Pos;
 	TUINT8 Alignment;
+	TUINT8 Pos;
 
 	bool Valid() const
 	{

@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include "GlobalDefinition.h"
+
 /**
  * Contains information about current memory usage and capacity.
  */

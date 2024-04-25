@@ -12,7 +12,7 @@ class FVMHeap
 	HLVM_INLINE_VAR HLVM_STATIC_VAR constexpr bool bValidate = HLVM_MALLOC_VALIDATION;
 
 public:
-	using SizeType = int32_t;
+	using SizeType = TINT32;
 
 	NOCOPYMOVE(FVMHeap)
 	FVMHeap() = default;
@@ -48,40 +48,48 @@ public:
 		return N;
 	}
 
-	HLVM_STATIC_FUNC size_t CalculateCapacity(size_t size)
+	HLVM_STATIC_FUNC size_t EstimateHeapCapacityBySize(size_t size)
 	{
-		return size + 2 * FBlock_Size;
+		return size + 2 * sizeof(FBlock) + sizeof(FHeapHeadBlock);
 	}
 
 	size_t GetManagedSize() const
 	{
-		return Managed() ? GetHeapSize() - 2 * sizeof(FBlock) : 0;
+		return Managed() ? GetHeapSize() - 2 * sizeof(FBlock) - sizeof(FHeapHeadBlock) : 0;
 	}
 
 	void* Malloc(size_t size);
 	void  Free(void* p);
 
 private:
-	FVMArena* VMArena{ nullptr };
-	size_t	  N{ 0 };
-	BIT_FLAG(bManaged){ true };
-	TBYTE* mHeap{ nullptr }; // TODO Allocate pointer to HeapAllocator in the beginning of Heap so that we can get the size of Heap
+	struct FHeapHeadBlock
+	{
+		FVMHeap* OwnerHeap{ nullptr };
+	};
+	static_assert(sizeof(FHeapHeadBlock) == 8, "FHeapHeadBlock size must be 16 bytes");
 
 	PACK(struct FBlock {
+		NOCOPYMOVE(FBlock)
+		FBlock() = default;
 		TOffsetPtr32<FBlock> prevFreeBlock{};
 		TOffsetPtr32<FBlock> nextFreeBlock{};
 		SizeType			 size{ 0 };
-		uint16_t			 _{ 0xFFFF }; // Reserved 2 bytes to not mis-interpreting with FSmallBinnedBlockHead block heads
+		TUINT32				 _{ ~(0u) }; // Masked bytes to not mis-interpreting with FSmallBinnedBlockHead block heads
 
 		HLVM_INLINE_FUNC bool GetFree() const
 		{
 			return size >= 0;
 		}
 	});
-	static_assert(sizeof(FBlock) == 14, "FBlock size must be 14 bytes");
-
+	static_assert(sizeof(FBlock) == 16, "FBlock size must be 16 bytes");
 	HLVM_INLINE_VAR HLVM_STATIC_VAR constexpr SizeType FBlock_Size = S_C(SizeType, sizeof(FBlock));
 	HLVM_INLINE_VAR HLVM_STATIC_VAR constexpr SizeType Minimal_Block_Size = HLVM_VMA_SMALL_ALLOC_THRESHOLD;
+
+private:
+	FVMArena* VMArena{ nullptr };
+	size_t	  N{ 0 };
+	BIT_FLAG(bManaged){ true };
+	TBYTE* mHeap{ nullptr }; // TODO Allocate pointer to HeapAllocator in the beginning of Heap so that we can get the size of Heap
 
 	FBlock*	 mFreeBlockHead{ nullptr };
 	FBlock*	 mTail{ nullptr };

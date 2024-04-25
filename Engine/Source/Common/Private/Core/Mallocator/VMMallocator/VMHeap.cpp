@@ -25,29 +25,34 @@ void FVMHeap::Init(FVMArena* _VMArena, size_t _size, bool bForceUnManaged)
 	{
 		HLVM_CONSTEXPR_ASSERT(bValidate, (N & (N - 1)) == 0); // Must be power of 2
 		HLVM_CONSTEXPR_ASSERT(bValidate, (GetManagedSize() > 0));
-		mHeap = R_C(TBYTE*, VMArena->MallocOSPage(N, N));
+		mHeap = R_C(TBYTE*, VMArena->MallocOSPage(N));
+
+		// Init head block
+		FHeapHeadBlock* HeapHead = std::construct_at(R_C(FHeapHeadBlock*, mHeap));
+		HeapHead->OwnerHeap = this;
 
 		// Init stack and free block head which occupy the whole stack
-		mFreeBlockHead = R_C(FBlock*, mHeap);
-		*mFreeBlockHead = FBlock();
+		mFreeBlockHead = std::construct_at(R_C(FBlock*, mHeap + sizeof(FHeapHeadBlock)));
 		mFreeBlockHead->size = S_C(SizeType, GetManagedSize()); // Stack size minus head block and tail block
 		HLVM_CONSTEXPR_ASSERT(bValidate, mFreeBlockHead->size > 0);
 		mFreeSizeUpperBound = mFreeBlockHead->size;
 
 		// Init tail which is trivially free
-		mTail = R_C(FBlock*, mHeap + N - FBlock_Size);
-		*mTail = FBlock();
+		mTail = std::construct_at(R_C(FBlock*, mHeap + N - FBlock_Size));
 		mTail->prevFreeBlock = mFreeBlockHead;
 
 		// Connect head to tail
 		mFreeBlockHead->nextFreeBlock = mTail;
 
-		// Cache the lower bound memory address for stack pointers
-		mLowerBound = mHeap + FBlock_Size;
+		// Cache the lower bound memory address for allocatable heap pointers
+		mLowerBound = mFreeBlockHead + FBlock_Size;
 	}
 	else
 	{
 		mHeap = R_C(TBYTE*, VMArena->MallocLowLevel(N));
+		// Init head block
+		FHeapHeadBlock* HeapHead = std::construct_at(R_C(FHeapHeadBlock*, mHeap));
+		HeapHead->OwnerHeap = this;
 	}
 }
 
@@ -55,7 +60,7 @@ void FVMHeap::Destroy()
 {
 	if (mHeap)
 	{
-		VMArena->FreeLowLevel(mHeap);
+		VMArena->FreeOSPage(mHeap);
 		mHeap = nullptr;
 		bManaged = false;
 	}
@@ -66,7 +71,7 @@ void* FVMHeap::Malloc(size_t _size)
 	if (!bManaged)
 	{
 		HLVM_CONSTEXPR_ASSERT(bValidate, mHeap != nullptr);
-		return mHeap;
+		return mHeap + sizeof(FHeapHeadBlock);
 	}
 	else
 	{

@@ -36,26 +36,9 @@ public:
 
 	NOCOPYMOVE(TStackMallocator)
 	TStackMallocator() noexcept
-		: mFreeSizeUpperBound(-1)
 	{
 		Type = EMallocator::Stack;
-
-		// Init stack and free block head which occupy the whole stack
-		mFreeBlockHead = R_C(FBlock*, mStack);
-		*mFreeBlockHead = FBlock();
-		mFreeBlockHead->size = (N - 2 * FBlock_Size); // Stack size minus head block and tail block
-		HLVM_CONSTEXPR_ASSERT(bValidate, mFreeBlockHead->size > 0);
-
-		// Init tail which is trivially free
-		mTail = R_C(FBlock*, mStack + N - FBlock_Size);
-		*mTail = FBlock();
-		mTail->prevFreeBlock = mFreeBlockHead;
-
-		// Connect head to tail
-		mFreeBlockHead->nextFreeBlock = mTail;
-	}
-	virtual ~TStackMallocator() noexcept final override
-	{
+		Reset();
 	}
 
 	/**
@@ -64,20 +47,20 @@ public:
 	 */
 	HLVM_INLINE_FUNC void Reset() noexcept
 	{
-		// Init free size upper bound
-		mFreeSizeUpperBound = -1;
-
 		// Init stack and free block head which occupy the whole stack
-		mFreeBlockHead = R_C(FBlock*, mStack);
-		*mFreeBlockHead = FBlock();
+		mFreeBlockHead = std::construct_at(R_C(FBlock*, mStack));
 		mFreeBlockHead->size = (N - 2 * FBlock_Size); // Stack size minus head block and tail block
 		HLVM_CONSTEXPR_ASSERT(bValidate, mFreeBlockHead->size > 0);
 
 		// Init tail which is trivially free
-		mTail = R_C(FBlock*, mStack + N - FBlock_Size);
+		mTail = std::construct_at(R_C(FBlock*, mStack + N - FBlock_Size));
+		mTail->prevFreeBlock = mFreeBlockHead;
 
 		// Connect head to tail
 		mFreeBlockHead->nextFreeBlock = mTail;
+
+		// Init free size upper bound
+		mFreeSizeUpperBound = -1;
 	}
 
 	HLVM_NODISCARD HLVM_INLINE_FUNC virtual bool Owned(void* ptr) noexcept final override
@@ -184,6 +167,8 @@ private:
 #else
 	struct FBlock
 	{
+		NOCOPYMOVE(FBlock)
+		FBlock() = default;
 		TOffsetPtr32<FBlock> prevFreeBlock{};
 		TOffsetPtr32<FBlock> nextFreeBlock{};
 		SizeType			 size{ 0 };

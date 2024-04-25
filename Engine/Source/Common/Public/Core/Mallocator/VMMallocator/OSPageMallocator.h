@@ -26,54 +26,72 @@ public:
 
 	FOSPageMallocator() noexcept
 	{
-		mSmallAllocatorHead = new (GMALLOCATOR.MallocAligned(sizeof(FSmallAllocator), sizeof(FSmallAllocator))) FSmallAllocator();
-		mLargeHeapChainHead = R_C(FLargeHeapChain*, GMALLOCATOR.Malloc(sizeof(FLargeHeapChain)));
+		mSmallAllocatorHead = std::construct_at(R_C(FSmallAllocator*, GMALLOCATOR.MallocAligned(sizeof(FSmallAllocator), sizeof(FSmallAllocator))));
+		mLargeHeapChainHead = std::construct_at(R_C(FLargeHeapChain*, GMALLOCATOR.Malloc(sizeof(FLargeHeapChain))));
 	}
 
 	~FOSPageMallocator() noexcept
 	{
-		auto Small = mSmallAllocatorHead;
-		while (Small)
 		{
-			Small->~FSmallAllocator();
-			HLVM_ENSURE(GMALLOCATOR.FreeAligned(Small, sizeof(FSmallAllocator)) == EFreeRetType::Success,
-				TXT("~FOSPageMallocator failed {}"), R_C(void*, Small));
-			Small = Small->Next;
+			auto Small = mSmallAllocatorHead;
+			while (Small)
+			{
+				auto tmp = Small->Next;
+				std::destroy_at(Small);
+				try
+				{
+					HLVM_ENSURE(GMALLOCATOR.FreeAligned(Small, sizeof(FSmallAllocator)) == EFreeRetType::Success,
+						TXT("~FOSPageMallocator small failed {}"), R_C(void*, Small));
+				}
+				catch (...)
+				{
+				}
+				Small = tmp;
+			}
 		}
-
-		auto Large = mLargeHeapChainHead;
-		while (Large)
 		{
-			auto Next = Large->Next;
-			HLVM_ENSURE(GMALLOCATOR.FreeAligned(Large->Heap, sizeof(FLargeHeap)) == EFreeRetType::Success,
-				TXT("~FOSPageMallocator failed {}"), R_C(void*, Small));
-			HLVM_ENSURE(GMALLOCATOR.Free(Large) == EFreeRetType::Success,
-				TXT("~FOSPageMallocator failed {}"), R_C(void*, Small));
-			Large = Next;
+			auto Large = mLargeHeapChainHead;
+			while (Large)
+			{
+				auto Next = Large->Next;
+				std::destroy_at(Large);
+				try
+				{
+					HLVM_ENSURE(GMALLOCATOR.Free(Large) == EFreeRetType::Success,
+						TXT("~FOSPageMallocator large failed {}"), R_C(void*, Large));
+				}
+				catch (...)
+				{
+				}
+				Large = Next;
+			}
 		}
 	}
 
 	bool Owned(void* ptr) const noexcept
 	{
 		LOCK_GUARD_RIVAL(mRWLock, 0);
-		auto Large = mLargeHeapChainHead;
-		while (Large)
 		{
-			if (Large->Heap->Owned(ptr))
+			auto Large = mLargeHeapChainHead;
+			while (Large)
 			{
-				return true;
+				if (Large->Heap->Owned(ptr))
+				{
+					return true;
+				}
+				Large = Large->Next;
 			}
-			Large = Large->Next;
 		}
-
-		auto Small = mSmallAllocatorHead;
-		while (Small)
 		{
-			if (Small->StackMallocator.Owned(ptr))
+			auto Small = mSmallAllocatorHead;
+			while (Small)
 			{
-				return true;
+				if (Small->StackMallocator.Owned(ptr))
+				{
+					return true;
+				}
+				Small = Small->Next;
 			}
-			Small = Small->Next;
 		}
 		return false;
 	}
@@ -96,16 +114,11 @@ public:
 					/**
 					 *  Allocate new small heap, and ensure we can allocate enough memory right away
 					 */
-					Small->Next = R_C(FSmallAllocator*, GMALLOCATOR.MallocAligned(sizeof(FSmallAllocator), sizeof(FSmallAllocator)));
-					Small = Small->Next;
-					p = Small->StackMallocator.Malloc(size);
-					HLVM_CONSTEXPR_ASSERT(bValidate, p != nullptr);
-					return p;
+					Small->Next = std::construct_at(R_C(FSmallAllocator*, GMALLOCATOR.MallocAligned(sizeof(FSmallAllocator), sizeof(FSmallAllocator))));
+					p = Small->Next->StackMallocator.Malloc(size);
+					break;
 				}
-				else
-				{
-					Small = Small->Next;
-				}
+				Small = Small->Next;
 			}
 		}
 		HLVM_CONSTEXPR_ASSERT(bValidate, p != nullptr);
@@ -136,14 +149,14 @@ public:
 			if (!Large->Heap)
 			{
 				p = Large->Heap = R_C(FLargeHeap*, GMALLOCATOR.MallocAligned(sizeof(FLargeHeap), sizeof(FLargeHeap)));
-				HLVM_CONSTEXPR_ASSERT(bValidate, p != nullptr);
+				break;
 			}
 			else
 			{
 				if (!Large->Next)
 				{
 					LOCK_GUARD_RIVAL(mRWLock, 1);
-					Large->Next = R_C(FLargeHeapChain*, GMALLOCATOR.Malloc(sizeof(FLargeHeapChain)));
+					Large->Next = std::construct_at(R_C(FLargeHeapChain*, GMALLOCATOR.Malloc(sizeof(FLargeHeapChain))));
 				}
 				Large = Large->Next;
 			}
@@ -174,7 +187,7 @@ private:
 	struct FSmallAllocator
 	{
 		TStackMallocator<HLVM_VMA_SMALL_HEAP_SIZE - 48, false, true, false, false> StackMallocator;
-		FSmallAllocator*														   Next{};
+		FSmallAllocator*														   Next{ nullptr };
 	};
 	static_assert(sizeof(FSmallAllocator) == HLVM_VMA_SMALL_HEAP_SIZE, "SmallHeap size must be HLVM_VMA_SMALL_HEAP_SIZE");
 	/**
@@ -197,6 +210,12 @@ private:
 	{
 		FLargeHeap*		 Heap{ nullptr };
 		FLargeHeapChain* Next{ nullptr };
+
+		~FLargeHeapChain()
+		{
+			HLVM_ENSURE(GMALLOCATOR.FreeAligned(this->Heap, sizeof(FLargeHeap)) == EFreeRetType::Success,
+				TXT("~FOSPageMallocator Heap failed {}"), R_C(void*, this->Heap));
+		}
 	};
 	/**
 	 * Large heap chain

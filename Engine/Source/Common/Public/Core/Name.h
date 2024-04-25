@@ -5,8 +5,7 @@
 #pragma once
 #include "String.h"
 
-#include "Core/Object/RefObject.h"
-// #include <StringPool.h>
+#include "Core/Object/RefCountPtr.h"
 
 class FName
 {
@@ -30,11 +29,11 @@ public:
 	~FName() = default;
 
 	FName(const FString& str)
-		: mInternal(MoveTemp(FNameInternal{ CopyTemp(str) }))
+		: mInternal(new FNameInternal{ CopyTemp(str) })
 	{
 	}
 	FName(FString&& str)
-		: mInternal(MoveTemp(FNameInternal{ MoveTemp(str) }))
+		: mInternal(new FNameInternal{ MoveTemp(str) })
 	{
 	}
 	FName(const FName& other) noexcept
@@ -81,5 +80,5 @@ public:
 	}
 
 private:
-	TRefObject<FNameInternal> mInternal;
+	TRefCountPtr<FNameInternal> mInternal;
 };

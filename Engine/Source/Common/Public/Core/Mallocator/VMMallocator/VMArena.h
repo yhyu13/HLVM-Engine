@@ -13,13 +13,11 @@
 
 struct FVMArenaInitContext
 {
-	size_t LargeHeapSize{ HLVM_VMA_LARGE_HEAP_SIZE };
 	size_t LargeHeapInitNum{ 0 };
 
 	bool Valid() const
 	{
-		return LargeHeapSize > 0
-			&& LargeHeapSize <= HLVM_VMA_LARGE_HEAP_SIZE;
+		return true;
 	}
 };
 
@@ -45,8 +43,8 @@ public:
 	void* MallocBinned(size_t size);
 	void  FreeBinned(void* p, TUINT8 size);
 
-	void* MallocOSPage(size_t size, size_t alignment);
-	void  FreeOSPage(void* p, size_t alignment);
+	void* MallocOSPage(size_t size);
+	void  FreeOSPage(void* p);
 
 	void* MallocLowLevel(size_t size);
 	void  FreeLowLevel(void* p);

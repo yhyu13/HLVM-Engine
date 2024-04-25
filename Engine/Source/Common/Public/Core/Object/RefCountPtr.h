@@ -11,37 +11,23 @@
  *  The template class should maintain a mutable atomic reference counter, and the template class should align itself to avoid
  *  false sharing.
  *
- *  @details On construction, the TRefObject increment the reference counting.
- *          On destruction, the TRefObject tries to decrement the reference counting.
+ *  @details On construction, the TRefCountPtr increment the reference counting.
+ *          On destruction, the TRefCountPtr tries to decrement the reference counting.
  */
 template <ReferenceCountable T>
-class TRefObject
+class TRefCountPtr
 {
 public:
 	// Big Five----------------------------------------------------------------------------------------------------
-	TRefObject() = default;
+	TRefCountPtr() = default;
 
-	explicit TRefObject(T* obj)
+	explicit TRefCountPtr(T* obj)
 		: m_ptr(obj)
 	{
 		m_ptr->IncrementRef();
 	}
 
-	explicit TRefObject(const T& obj)
-		requires(std::is_copy_constructible_v<T>)
-		: m_ptr(new T(CopyTemp(obj)))
-	{
-		m_ptr->IncrementRef();
-	}
-
-	explicit TRefObject(T&& obj)
-		requires(std::is_move_constructible_v<T>)
-		: m_ptr(new T(MoveTemp(obj)))
-	{
-		m_ptr->IncrementRef();
-	}
-
-	~TRefObject()
+	~TRefCountPtr()
 	{
 		if (m_ptr && !m_ptr->DecrementRef())
 		{
@@ -50,7 +36,7 @@ public:
 		m_ptr = nullptr;
 	}
 
-	TRefObject(const TRefObject& other)
+	TRefCountPtr(const TRefCountPtr& other)
 		: m_ptr(other.m_ptr)
 	{
 		if (m_ptr)
@@ -59,17 +45,17 @@ public:
 		}
 	}
 
-	TRefObject(TRefObject&& other) noexcept
+	TRefCountPtr(TRefCountPtr&& other) noexcept
 		: m_ptr(other.m_ptr)
 	{
 		other.m_ptr = nullptr;
 	}
 
-	TRefObject& operator=(const TRefObject& other)
+	TRefCountPtr& operator=(const TRefCountPtr& other)
 	{
 		if (this != &other)
 		{
-			this->~TRefObject();
+			this->~TRefCountPtr();
 			m_ptr = other.m_ptr;
 			if (m_ptr)
 			{
@@ -79,11 +65,11 @@ public:
 		return *this;
 	}
 
-	TRefObject& operator=(TRefObject&& other) noexcept
+	TRefCountPtr& operator=(TRefCountPtr&& other) noexcept
 	{
 		if (this != &other)
 		{
-			this->~TRefObject();
+			this->~TRefCountPtr();
 			m_ptr = other.m_ptr;
 			other.m_ptr = nullptr;
 		}
@@ -93,27 +79,27 @@ public:
 	// Polymorphism Casting---------------------------------------------------------------------------------------------
 
 	template <class U>
-	TRefObject(const TRefObject<U>&) noexcept
+	TRefCountPtr(const TRefCountPtr<U>&) noexcept
 	{
-		static_assert(std::is_same_v<T, U>, "TRefObject Polymorphism Casting not allowed!");
+		static_assert(std::is_same_v<T, U>, "TRefCountPtr Polymorphism Casting not allowed!");
 	}
 
 	template <class U>
-	TRefObject(TRefObject<U>&&) noexcept
+	TRefCountPtr(TRefCountPtr<U>&&) noexcept
 	{
-		static_assert(std::is_same_v<T, U>, "TRefObject Polymorphism Casting not allowed!");
+		static_assert(std::is_same_v<T, U>, "TRefCountPtr Polymorphism Casting not allowed!");
 	}
 
 	template <class U>
-	TRefObject& operator=(const TRefObject<U>&) noexcept
+	TRefCountPtr& operator=(const TRefCountPtr<U>&) noexcept
 	{
-		static_assert(std::is_same_v<T, U>, "TRefObject Polymorphism Casting not allowed!");
+		static_assert(std::is_same_v<T, U>, "TRefCountPtr Polymorphism Casting not allowed!");
 	}
 
 	template <class U>
-	TRefObject& operator=(TRefObject<U>&&) noexcept
+	TRefCountPtr& operator=(TRefCountPtr<U>&&) noexcept
 	{
-		static_assert(std::is_same_v<T, U>, "TRefObject Polymorphism Casting not allowed!");
+		static_assert(std::is_same_v<T, U>, "TRefCountPtr Polymorphism Casting not allowed!");
 	}
 
 	// Operator overloading---------------------------------------------------------------------------------------------
@@ -121,28 +107,28 @@ public:
 	T* operator->() noexcept
 	{
 		auto bValid = Valid();
-		HLVM_ASSERT(bValid, TXT("TRefObject nullptr error!"));
+		HLVM_ASSERT(bValid, TXT("TRefCountPtr nullptr error!"));
 		return m_ptr;
 	}
 
 	T& operator*() noexcept
 	{
 		auto bValid = Valid();
-		HLVM_ASSERT(bValid, TXT("TRefObject nullptr error!"));
+		HLVM_ASSERT(bValid, TXT("TRefCountPtr nullptr error!"));
 		return *m_ptr;
 	}
 
 	const T* operator->() const noexcept
 	{
 		auto bValid = Valid();
-		HLVM_ASSERT(bValid, TXT("TRefObject nullptr error!"));
+		HLVM_ASSERT(bValid, TXT("TRefCountPtr nullptr error!"));
 		return m_ptr;
 	}
 
 	const T& operator*() const noexcept
 	{
 		auto bValid = Valid();
-		HLVM_ASSERT(bValid, TXT("TRefObject nullptr error!"));
+		HLVM_ASSERT(bValid, TXT("TRefCountPtr nullptr error!"));
 		return *m_ptr;
 	}
 
@@ -153,7 +139,7 @@ public:
 	{
 		if constexpr (bValidate)
 		{
-			HLVM_ENSURE(Valid(), TXT("TRefObject nullptr error!"));
+			HLVM_ENSURE(Valid(), TXT("TRefCountPtr nullptr error!"));
 		}
 		return m_ptr;
 	}
@@ -163,14 +149,14 @@ public:
 	{
 		if constexpr (bValidate)
 		{
-			HLVM_ENSURE(Valid(), TXT("TRefObject nullptr error!"));
+			HLVM_ENSURE(Valid(), TXT("TRefCountPtr nullptr error!"));
 		}
 		return m_ptr;
 	}
 
 	void Reset() noexcept
 	{
-		this->~TRefObject();
+		this->~TRefCountPtr();
 	}
 
 	HLVM_NODISCARD bool Valid() const noexcept
@@ -183,14 +169,14 @@ private:
 };
 
 /*
-	Custum hash function for TRefObject<T>
+	Custum hash function for TRefCountPtr<T>
 */
 namespace std
 {
 	template <class T>
-	struct hash<TRefObject<T>>
+	struct hash<TRefCountPtr<T>>
 	{
-		std::size_t operator()(const TRefObject<T>& ptr) const noexcept
+		std::size_t operator()(const TRefCountPtr<T>& ptr) const noexcept
 		{
 			return hash<T*>()(ptr.template Get<false>());
 		}

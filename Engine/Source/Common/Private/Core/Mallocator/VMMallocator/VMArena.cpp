@@ -17,17 +17,19 @@ FVMArena::FVMArena(const FVMArenaInitContext& _InitContext)
 	 * Initialize heap chain, heaps are where we acquire memory from mimalloc and manage small/large allocations on our own
 	 */
 	HLVM_CONSTEXPR_ASSERT(bValidate, mInitCtx.Valid());
-	auto _Heap = mHeapChainHead;
+	auto _Heap = mHeapChainHead; // Create a dummy that holds the head of the heap chain temporarily
 	for (size_t i = 0; i < mInitCtx.LargeHeapInitNum; ++i)
 	{
-		auto Heap = new (mOSPageMallocator.MallocSmall(sizeof(FVMHeapChain))) FVMHeapChain();
-		Heap->HeapAllocator.Init(this, mInitCtx.LargeHeapSize);
+		auto Heap = std::construct_at(R_C(FVMHeapChain*, mOSPageMallocator.MallocSmall(sizeof(FVMHeapChain))));
+		Heap->HeapAllocator.Init(this, HLVM_VMA_LARGE_HEAP_SIZE);
 		if (!mHeapChainHead)
 		{
+			// Set head if null
 			_Heap = mHeapChainHead = Heap;
 		}
 		else
 		{
+			// Set next
 			_Heap->Next = Heap;
 			_Heap = Heap;
 		}
@@ -38,8 +40,9 @@ FVMArena::FVMArena(const FVMArenaInitContext& _InitContext)
 	 * Intialize small binning allocators (using fancy compile time for-loop)
 	 */
 	ct_for<0, HLVM_VMA_SMALL_ALLOC_THRESHOLD / HLVM_VMA_SMALL_ALLOC_ALIGNMENT, 1, TUINT8>([&](auto i) {
+		// Initialize binned allocator
 		using BinnedMallocatorType = FSmallBinnedMallocator<(i.value + 1) * HLVM_VMA_SMALL_ALLOC_ALIGNMENT>;
-		mSmallBinnedMallocators[i] = new (mOSPageMallocator.MallocSmall(sizeof(BinnedMallocatorType))) BinnedMallocatorType();
+		mSmallBinnedMallocators[i] = std::construct_at(R_C(BinnedMallocatorType*, mOSPageMallocator.MallocSmall(sizeof(BinnedMallocatorType))));
 		mSmallBinnedMallocators[i]->Init(this);
 	});
 }
@@ -78,7 +81,7 @@ FVMArena::~FVMArena()
 	{
 		if (mSmallBinnedMallocators[i])
 		{
-			mSmallBinnedMallocators[i]->~ISmallBinnedMallocator();
+			std::destroy_at(mSmallBinnedMallocators[i]);
 			mOSPageMallocator.FreeSmall(mSmallBinnedMallocators[i]);
 		}
 	}
@@ -88,7 +91,7 @@ FVMArena::~FVMArena()
 	while (mHeapChainHead)
 	{
 		auto Next = mHeapChainHead->Next;
-		mHeapChainHead->~FVMHeapChain();
+		std::destroy_at(mHeapChainHead);
 		mOSPageMallocator.FreeSmall(mHeapChainHead);
 		mHeapChainHead = Next;
 	}
@@ -154,7 +157,6 @@ void FVMArena::Free(void* p)
 	}
 }
 
-// TODO : TLS cached free list
 void* FVMArena::MallocHeap(size_t size)
 {
 	HLVM_CONSTEXPR_ASSERT(bValidate, size > HLVM_VMA_SMALL_ALLOC_THRESHOLD);
@@ -179,15 +181,18 @@ void* FVMArena::MallocHeap(size_t size)
 
 	// Allocate new heap space for this allocation since we don't have an available heap
 	HLVM_CONSTEXPR_ASSERT(bValidate, Heap->Next == nullptr);
-	Heap->Next = new (mOSPageMallocator.MallocSmall(sizeof(FVMHeapChain))) FVMHeapChain();
+	Heap->Next = std::construct_at(R_C(FVMHeapChain*, mOSPageMallocator.MallocSmall(sizeof(FVMHeapChain))));
 	auto& HeapMallocator = Heap->Next->HeapAllocator;
-	auto  Capacity = FVMHeap::CalculateCapacity(size);
-	if (Capacity <= mInitCtx.LargeHeapSize)
+	/**
+	 * Initialize heap with the size of the allocation
+	 */
+	if (FVMHeap::EstimateHeapCapacityBySize(size) <= HLVM_VMA_LARGE_HEAP_SIZE)
 	{
-		HeapMallocator.Init(this, mInitCtx.LargeHeapSize);
+		HeapMallocator.Init(this, HLVM_VMA_LARGE_HEAP_SIZE);
 	}
 	else
 	{
+		// Init heap with unmanged setting if the size is too large
 		HeapMallocator.Init(this, size, true);
 	}
 	HLVM_CONSTEXPR_ASSERT(bValidate, HeapMallocator.GetHeapSize() >= size);
@@ -199,6 +204,7 @@ void* FVMArena::MallocHeap(size_t size)
 void FVMArena::FreeHeap(void* p)
 {
 	// TODO : use 32MB alignment to quickly find heap allocation instead of traversal
+	// Use 32MB mask to find head pointer of 32MB page which holds some pointers that point to allocator
 	auto Heap = mHeapChainHead;
 	while (Heap)
 	{
@@ -211,7 +217,6 @@ void FVMArena::FreeHeap(void* p)
 		}
 		Heap = Heap->Next;
 	}
-	// TODO, should use stack string assert
 	HLVM_ENSURE(false, TXT("FVMArena::FreeHeap : Failed to free heap allocation"));
 }
 
@@ -230,12 +235,14 @@ void FVMArena::FreeBinned(void* p, TUINT8 size)
 	mSmallBinnedMallocators[size / HLVM_VMA_SMALL_ALLOC_ALIGNMENT]->Free(p);
 }
 
-void* FVMArena::MallocOSPage(size_t, size_t)
+void* FVMArena::MallocOSPage(size_t N)
 {
+	const bool bValid = N <= HLVM_VMA_LARGE_HEAP_SIZE;
+	HLVM_CONSTEXPR_ASSERT(bValidate, bValid);
 	return mOSPageMallocator.MallocLargeHeap();
 }
 
-void FVMArena::FreeOSPage(void* p, size_t)
+void FVMArena::FreeOSPage(void* p)
 {
 	mOSPageMallocator.FreeLargeHeap(p);
 }
