@@ -90,3 +90,8 @@ private:
 	FMiMallocatorContext mCtx;
 };
 HLVM_THREAD_LOCAL_VAR HLVM_INLINE_VAR FMiMallocator GMiMallocatorTLS{};
+
+#if HLVM_MALLOC_USE_MIMALLOC_OVER_STD
+	#undef HLVM_LOWLVL_GMALLOCATOR
+	#define HLVM_LOWLVL_GMALLOCATOR GMiMallocatorTLS
+#endif

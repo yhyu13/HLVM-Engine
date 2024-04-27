@@ -46,12 +46,18 @@ public:
 /**
  * Global mallocator
  */
-HLVM_EXTERN_FUNC void					  InitMallocator();
-HLVM_EXTERN_FUNC void					  FnalMallocator();
-HLVM_EXTERN_FUNC void					  SwapMallocator(IMallocator* Mallocator = nullptr);
+HLVM_EXTERN_FUNC void							   InitMallocator();
+HLVM_EXTERN_FUNC void							   FnalMallocator();
+HLVM_EXTERN_FUNC void							   SwapMallocator(IMallocator* Mallocator = nullptr);
 HLVM_THREAD_LOCAL_VAR HLVM_EXTERN_VAR IMallocator* GMallocatorTLS;
 HLVM_THREAD_LOCAL_VAR HLVM_EXTERN_VAR IMallocator* GFallBacllMallocatorTLS;
 namespace hlvm_private
 {
 	HLVM_THREAD_LOCAL_VAR HLVM_INLINE_VAR IMallocator* GMallocatorTLSSwap = nullptr;
 }
+
+/**
+ * Global mallocator for low level mallocation, defined at compile time
+ * which is different from GmallocatorTLS which can be swapped during runtime
+ */
+#define HLVM_LOWLVL_GMALLOCATOR ((void)0)

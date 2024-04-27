@@ -5,13 +5,8 @@
 #pragma once
 
 #include "MallocatorDefinition.h"
-#if HLVM_MALLOC_USE_MIMALLOC_OVER_STD
-	#include "MiMallocator.h"
-	#define GMALLOCATOR GMiMallocatorTLS
-#else
-	#include "StdMallocator.h"
-	#define GMALLOCATOR GStdMallocator
-#endif
+#include "MiMallocator.h"
+#include "StdMallocator.h"
 
 #include "Core/Assert.h"
 #include "Template/PointerTemplate.tpp"
@@ -86,11 +81,7 @@ public:
 	{
 		if constexpr (bUseHeapForAlignedAlloc)
 		{
-#if HLVM_MALLOC_USE_MIMALLOC_OVER_STD
-			return GMALLOCATOR.MallocAligned(size, align);
-#else
-			return GMALLOCATOR.MallocAligned(size, align);
-#endif
+			return HLVM_LOWLVL_GMALLOCATOR.MallocAligned(size, align);
 		}
 		else
 		{
@@ -101,11 +92,7 @@ public:
 	{
 		if constexpr (bUseHeapForAlignedAlloc)
 		{
-#if HLVM_MALLOC_USE_MIMALLOC_OVER_STD
-			return GMALLOCATOR.MallocAligned2(size, align);
-#else
-			return GMALLOCATOR.MallocAligned2(size, align);
-#endif
+			return HLVM_LOWLVL_GMALLOCATOR.MallocAligned2(size, align);
 		}
 		else
 		{
@@ -124,11 +111,7 @@ public:
 	{
 		if constexpr (bUseHeapForAlignedAlloc)
 		{
-#if HLVM_MALLOC_USE_MIMALLOC_OVER_STD
-			return GMALLOCATOR.FreeAligned(ptr, align);
-#else
-			return GMALLOCATOR.FreeAligned(ptr, align);
-#endif
+			return HLVM_LOWLVL_GMALLOCATOR.FreeAligned(ptr, align);
 		}
 		else
 		{
@@ -139,11 +122,7 @@ public:
 	{
 		if constexpr (bUseHeapForAlignedAlloc)
 		{
-#if HLVM_MALLOC_USE_MIMALLOC_OVER_STD
-			return GMALLOCATOR.FreeSizeAligned(ptr, size, align);
-#else
-			return GMALLOCATOR.FreeSizeAligned(ptr, size, align);
-#endif
+			return HLVM_LOWLVL_GMALLOCATOR.FreeSizeAligned(ptr, size, align);
 		}
 		else
 		{
@@ -271,11 +250,7 @@ private:
 		// Running out of free blocks in stack, try heap
 		if constexpr (bAllowOverflowToHeap)
 		{
-#if HLVM_MALLOC_USE_MIMALLOC_OVER_STD
-			return GMALLOCATOR.Malloc(_size);
-#else
-			return GMALLOCATOR.Malloc(_size);
-#endif
+			return HLVM_LOWLVL_GMALLOCATOR.Malloc(_size);
 		}
 		else
 		{
@@ -449,11 +424,7 @@ private:
 		{
 			if constexpr (bAllowOverflowToHeap)
 			{
-#if HLVM_MALLOC_USE_MIMALLOC_OVER_STD
-				return GMALLOCATOR.Free(ptr);
-#else
-				return GMALLOCATOR.Free(ptr);
-#endif
+				return HLVM_LOWLVL_GMALLOCATOR.Free(ptr);
 			}
 		}
 		return EFreeRetType::NotOwned;
@@ -475,5 +446,3 @@ private:
  */
 template <int32_t N = HLVM_STACK_MALLOCATOR_DEFAULT_SIZE>
 using TStackMonolithicAllocator = TStackMallocator<N, true>;
-
-#undef GMALLOCATOR

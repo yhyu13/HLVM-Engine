@@ -5,6 +5,7 @@
 #pragma once
 
 #include "GlobalDefinition.h"
+#include "Platform/PlatformDefinition.h"
 
 #ifndef HLVM_MALLOC_VALIDATION
 	#define HLVM_MALLOC_VALIDATION !HLVM_BUILD_RELEASE

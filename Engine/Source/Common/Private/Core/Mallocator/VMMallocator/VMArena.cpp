@@ -5,35 +5,34 @@
 #include "Core/Mallocator/VMMallocator/VMArena.h"
 #include "Core/Mallocator/VMMallocator/SmallBinnedMallocator.h"
 #include "Core/Assert.h"
-#include "Template/ExpressionTemplate.tpp"
 #include "Core/Log.h"
+
+#include "Template/ExpressionTemplate.tpp"
 
 DECLARE_LOG_CATEGORY(LogVMArena)
 
-FVMArena::FVMArena(const FVMArenaInitContext& _InitContext)
-	: mInitCtx(_InitContext)
+FVMArena::FVMArena()
 {
-	/**
-	 * Initialize heap chain, heaps are where we acquire memory from mimalloc and manage small/large allocations on our own
-	 */
-	HLVM_CONSTEXPR_ASSERT(bValidate, mInitCtx.Valid());
-	auto _Heap = mHeapChainHead; // Create a dummy that holds the head of the heap chain temporarily
-	for (size_t i = 0; i < mInitCtx.LargeHeapInitNum; ++i)
 	{
-		auto Heap = std::construct_at(R_C(FVMHeapChain*, mOSPageMallocator.MallocSmall(sizeof(FVMHeapChain))));
-		Heap->HeapAllocator.Init(this, HLVM_VMA_LARGE_HEAP_SIZE);
-		if (!mHeapChainHead)
+		auto _Heap = mHeapChainHead;
+		// Init at least one large heap
+		for (size_t i = 0; i < 1; ++i)
 		{
-			// Set head if null
-			_Heap = mHeapChainHead = Heap;
+			auto Heap = std::construct_at(R_C(FVMHeapChain*, mOSPageMallocator.MallocSmall(sizeof(FVMHeapChain))));
+			Heap->HeapAllocator.Init(this, HLVM_VMA_LARGE_HEAP_SIZE);
+			if (!mHeapChainHead)
+			{
+				// Set head if null
+				_Heap = mHeapChainHead = Heap;
+			}
+			else
+			{
+				// Set next
+				_Heap->Next = Heap;
+				_Heap = Heap;
+			}
+			HLVM_LOG(LogVMArena, debug, TXT("VMArena: Initialized %d large heaps"), i + 1);
 		}
-		else
-		{
-			// Set next
-			_Heap->Next = Heap;
-			_Heap = Heap;
-		}
-		HLVM_LOG(LogVMArena, debug, TXT("VMArena: Initialized %d large heaps"), i + 1);
 	}
 
 	/**
@@ -44,6 +43,7 @@ FVMArena::FVMArena(const FVMArenaInitContext& _InitContext)
 		using BinnedMallocatorType = FSmallBinnedMallocator<(i.value + 1) * HLVM_VMA_SMALL_ALLOC_ALIGNMENT>;
 		mSmallBinnedMallocators[i] = std::construct_at(R_C(BinnedMallocatorType*, mOSPageMallocator.MallocSmall(sizeof(BinnedMallocatorType))));
 		mSmallBinnedMallocators[i]->Init(this);
+		HLVM_LOG(LogVMArena, debug, TXT("VMArena: Initialized %d SmallBinnedMallocator"), i + 1);
 	});
 }
 
@@ -66,8 +66,8 @@ FVMArena::~FVMArena()
 		{
 			while (mPendingFressLists.NonLocalFreeList.size())
 			{
-				// auto LastNonLocalPtr = mPendingFressLists.NonLocalFreeList.back();
-				//  TODO : Push LastNonLocalPtr to global free list
+				auto LastNonLocalPtr = mPendingFressLists.NonLocalFreeList.back();
+				sGlobalPendingFreeList.Push({ .ptrToBeFree = LastNonLocalPtr, .tidNotOwned = GCurrentTID });
 				mPendingFressLists.NonLocalFreeList.pop_back();
 			}
 		}
@@ -138,8 +138,8 @@ void FVMArena::Free(void* p)
 				{
 					while (mPendingFressLists.NonLocalFreeList.size())
 					{
-						// auto LastNonLocalPtr = mPendingFressLists.NonLocalFreeList.back();
-						//  TODO : Push LastNonLocalPtr to global free list
+						auto LastNonLocalPtr = mPendingFressLists.NonLocalFreeList.back();
+						sGlobalPendingFreeList.Push({ .ptrToBeFree = LastNonLocalPtr, .tidNotOwned = GCurrentTID });
 						mPendingFressLists.NonLocalFreeList.pop_back();
 					}
 				}
@@ -154,6 +154,19 @@ void FVMArena::Free(void* p)
 	else
 	{
 		mPendingFressLists.GenericFreeList.push_back(p);
+	}
+
+	while (mPendingFressLists.LocalFreeList.size() < mPendingFressLists.LocalFreeList.max_size())
+	{
+		FLocalPendingFree PendingFree;
+		if (mLocalPendingFreeListReceiver.PopFront(PendingFree))
+		{
+			mPendingFressLists.LocalFreeList.push_back(PendingFree.ptrToBeFree);
+		}
+		else
+		{
+			break;
+		}
 	}
 }
 
@@ -249,11 +262,11 @@ void FVMArena::FreeOSPage(void* p)
 
 void* FVMArena::MallocLowLevel(size_t size)
 {
-	return GStdMallocator.Malloc(size);
+	return HLVM_LOWLVL_GMALLOCATOR.Malloc(size);
 }
 
 void FVMArena::FreeLowLevel(void* p)
 {
-	HLVM_ENSURE(GStdMallocator.Free(p) == EFreeRetType::Success,
+	HLVM_ENSURE(HLVM_LOWLVL_GMALLOCATOR.Free(p) == EFreeRetType::Success,
 		TXT("FreeLowLevel failed {}"), R_C(void*, p));
 }

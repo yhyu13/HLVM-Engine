@@ -164,6 +164,7 @@ RECORD(lock_test, true)
 
 RECORD(lock_free_queue_test, true)
 {
+	HLVM_PROFILER_CPU_ONOFF(false);
 	HLVM_LOG(LogTest, info, TXT("Queue test:"));
 
 	constexpr int kNumThreads = 10;
@@ -300,6 +301,7 @@ RECORD(lock_free_queue_test, true)
 
 RECORD(fixed_queue_test, true)
 {
+	HLVM_PROFILER_CPU_ONOFF(false);
 	HLVM_LOG(LogTest, info, TXT("Fixed Queue test:"));
 
 	constexpr int kNumThreads = 10;
@@ -441,6 +443,7 @@ RECORD(fixed_queue_test, true)
 
 RECORD(pool_test, true)
 {
+	HLVM_PROFILER_CPU_ONOFF(false);
 	HLVM_LOG(LogTest, info, TXT("Pool test:"));
 
 	constexpr int kNumThreads = 10;
@@ -456,7 +459,7 @@ RECORD(pool_test, true)
 			std::atomic_int_fast32_t	   Counter{ kNumThreads };
 			std::vector<std::future<void>> PushThreads;
 			std::vector<std::future<void>> PopThreads;
-			FWorkStealThreadPool		   Pool{ BgTwoPhysicalCores };
+			FWorkStealThreadPool		   Pool{ FThreadAffinityMode::BgTwoPhysicalCores() };
 
 			for (int i = 0; i < kNumThreads; ++i)
 			{
@@ -508,7 +511,7 @@ RECORD(pool_test, true)
 			std::atomic_int_fast32_t				 Counter{ kNumThreads };
 			std::vector<boost::fibers::future<void>> PushThreads;
 			std::vector<boost::fibers::future<void>> PopThreads;
-			FWorkStealFiberPool						 Pool{ BgTwoPhysicalCores };
+			FWorkStealFiberPool						 Pool{ FThreadAffinityMode::BgTwoPhysicalCores() };
 
 			for (int i = 0; i < kNumThreads; ++i)
 			{

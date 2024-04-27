@@ -22,7 +22,7 @@
 /**
  * thread local storage declared here
  */
-HLVM_THREAD_LOCAL_VAR HLVM_INLINE_VAR const std::thread::id GCurrentThreadID = std::this_thread::get_id();
+HLVM_THREAD_LOCAL_VAR HLVM_INLINE_VAR const std::thread::id GCurrentTID = std::this_thread::get_id();
 static_assert(sizeof(std::thread::id) == sizeof(uint64_t), "std::thread::id is not 8 bytes!");
 
 /**

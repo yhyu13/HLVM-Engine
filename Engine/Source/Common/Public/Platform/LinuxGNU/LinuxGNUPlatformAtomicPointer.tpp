@@ -51,7 +51,7 @@ public:
 	 */
 	ValueType Release() noexcept
 	{
-		return Ptr.exchange(nullptr, std::memory_order_acq_rel);
+		return Ptr.exchange(nullptr, std::memory_order_relaxed);
 	}
 	bool IsLockFree() const noexcept
 	{

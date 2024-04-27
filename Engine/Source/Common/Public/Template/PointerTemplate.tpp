@@ -10,14 +10,13 @@ template <typename T>
 struct TNoNullPointer
 {
 	using Type = T;
-	using PointerType = T*;
+	using ValueType = T*;
 
-	NOCOPYMOVE(TNoNullPointer)
 	TNoNullPointer() = delete;
-	TNoNullPointer(T* handle)
+	explicit TNoNullPointer(T* handle)
 		: pFileHandle(handle)
 	{
-		HLVM_ENSURE(pFileHandle != nullptr, TXT("Handle is null"));
+		HLVM_ENSURE(pFileHandle != nullptr, TXT("Pointer is null"));
 	}
 
 	T* operator->()

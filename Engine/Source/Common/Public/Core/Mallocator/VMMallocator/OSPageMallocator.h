@@ -4,18 +4,10 @@
 
 #pragma once
 
-#include "Core/Mallocator/StackMallocator.h"
+#include "Core/Mallocator/PMR.h"
 #include "Core/Parallel/Lock.h"
 
 #include "VMMallocatorDefinition.h"
-
-#if HLVM_MALLOC_USE_MIMALLOC_OVER_STD
-	#include "Core/Mallocator/MiMallocator.h"
-	#define GMALLOCATOR GMiMallocatorTLS
-#else
-	#include "Core/Mallocator/StdMallocator.h"
-	#define GMALLOCATOR GStdMallocator
-#endif
 
 class FOSPageMallocator
 {
@@ -26,8 +18,8 @@ public:
 
 	FOSPageMallocator() noexcept
 	{
-		mSmallAllocatorHead = std::construct_at(R_C(FSmallAllocator*, GMALLOCATOR.MallocAligned(sizeof(FSmallAllocator), sizeof(FSmallAllocator))));
-		mLargeHeapChainHead = std::construct_at(R_C(FLargeHeapChain*, GMALLOCATOR.Malloc(sizeof(FLargeHeapChain))));
+		mSmallAllocatorHead = std::construct_at(R_C(FSmallAllocator*, HLVM_LOWLVL_GMALLOCATOR.MallocAligned(sizeof(FSmallAllocator), sizeof(FSmallAllocator))));
+		mLargeHeapChainHead = std::construct_at(R_C(FLargeHeapChain*, HLVM_LOWLVL_GMALLOCATOR.Malloc(sizeof(FLargeHeapChain))));
 	}
 
 	~FOSPageMallocator() noexcept
@@ -40,7 +32,7 @@ public:
 				std::destroy_at(Small);
 				try
 				{
-					HLVM_ENSURE(GMALLOCATOR.FreeAligned(Small, sizeof(FSmallAllocator)) == EFreeRetType::Success,
+					HLVM_ENSURE(HLVM_LOWLVL_GMALLOCATOR.FreeAligned(Small, sizeof(FSmallAllocator)) == EFreeRetType::Success,
 						TXT("~FOSPageMallocator small failed {}"), R_C(void*, Small));
 				}
 				catch (...)
@@ -57,7 +49,7 @@ public:
 				std::destroy_at(Large);
 				try
 				{
-					HLVM_ENSURE(GMALLOCATOR.Free(Large) == EFreeRetType::Success,
+					HLVM_ENSURE(HLVM_LOWLVL_GMALLOCATOR.Free(Large) == EFreeRetType::Success,
 						TXT("~FOSPageMallocator large failed {}"), R_C(void*, Large));
 				}
 				catch (...)
@@ -114,7 +106,7 @@ public:
 					/**
 					 *  Allocate new small heap, and ensure we can allocate enough memory right away
 					 */
-					Small->Next = std::construct_at(R_C(FSmallAllocator*, GMALLOCATOR.MallocAligned(sizeof(FSmallAllocator), sizeof(FSmallAllocator))));
+					Small->Next = std::construct_at(R_C(FSmallAllocator*, HLVM_LOWLVL_GMALLOCATOR.MallocAligned(sizeof(FSmallAllocator), sizeof(FSmallAllocator))));
 					p = Small->Next->StackMallocator.Malloc(size);
 					break;
 				}
@@ -148,7 +140,7 @@ public:
 		{
 			if (!Large->Heap)
 			{
-				p = Large->Heap = R_C(FLargeHeap*, GMALLOCATOR.MallocAligned(sizeof(FLargeHeap), sizeof(FLargeHeap)));
+				p = Large->Heap = R_C(FLargeHeap*, HLVM_LOWLVL_GMALLOCATOR.MallocAligned(sizeof(FLargeHeap), sizeof(FLargeHeap)));
 				break;
 			}
 			else
@@ -156,7 +148,7 @@ public:
 				if (!Large->Next)
 				{
 					LOCK_GUARD_RIVAL(mRWLock, 1);
-					Large->Next = std::construct_at(R_C(FLargeHeapChain*, GMALLOCATOR.Malloc(sizeof(FLargeHeapChain))));
+					Large->Next = std::construct_at(R_C(FLargeHeapChain*, HLVM_LOWLVL_GMALLOCATOR.Malloc(sizeof(FLargeHeapChain))));
 				}
 				Large = Large->Next;
 			}
@@ -173,7 +165,7 @@ public:
 		{
 			if (Large->Heap == ptr)
 			{
-				HLVM_ENSURE(GMALLOCATOR.FreeAligned(ptr, sizeof(FLargeHeap)) == EFreeRetType::Success,
+				HLVM_ENSURE(HLVM_LOWLVL_GMALLOCATOR.FreeAligned(ptr, sizeof(FLargeHeap)) == EFreeRetType::Success,
 					TXT("FreeLargeHeap failed {}"), R_C(void*, ptr));
 				Large->Heap = nullptr;
 				bFound = true;
@@ -213,7 +205,7 @@ private:
 
 		~FLargeHeapChain()
 		{
-			HLVM_ENSURE(GMALLOCATOR.FreeAligned(this->Heap, sizeof(FLargeHeap)) == EFreeRetType::Success,
+			HLVM_ENSURE(HLVM_LOWLVL_GMALLOCATOR.FreeAligned(this->Heap, sizeof(FLargeHeap)) == EFreeRetType::Success,
 				TXT("~FOSPageMallocator Heap failed {}"), R_C(void*, this->Heap));
 		}
 	};
@@ -227,5 +219,3 @@ private:
 	 */
 	mutable FRWRivalLock mRWLock;
 };
-
-#undef GMALLOCATOR

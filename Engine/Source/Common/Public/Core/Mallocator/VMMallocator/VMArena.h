@@ -5,21 +5,12 @@
 #pragma once
 
 #include "Core/Mallocator/PMR.h"
-#include "Core/Parallel/Lock.h"
 #include "Core/Container/ContainerDefinition.h"
+#include "Core/Parallel/ConcurrentQueue.h"
+
 #include "ISmallBinnedMallocator.h"
 #include "VMHeap.h"
 #include "OSPageMallocator.h"
-
-struct FVMArenaInitContext
-{
-	size_t LargeHeapInitNum{ 0 };
-
-	bool Valid() const
-	{
-		return true;
-	}
-};
 
 /**
  * Malloc reserved memory pages as virtual memory arena, and return a sized block within a page on malloc.
@@ -31,7 +22,7 @@ class FVMArena
 
 public:
 	NOCOPYMOVE(FVMArena)
-	FVMArena(const FVMArenaInitContext& _InitContext = FVMArenaInitContext{});
+	FVMArena();
 	~FVMArena();
 
 	void* Malloc(size_t size);
@@ -50,25 +41,21 @@ public:
 	void  FreeLowLevel(void* p);
 
 private:
-	struct FVMArenaShared
+	struct FNonLocalPendingFree
 	{
-		// Use RW lock to protect shared data
-		FRWRivalLock RWLock{};
-
-		// Shared lookup table for Threaded free list (which all uses std allocator underneath)
-		using Tid = std::thread::id;
-		using TLSList = TVector<void*, TStdMallocator<void*>>*;
-		TStableMap<Tid, TLSList, TStdMallocator<std::pair<Tid, TLSList>>> ThreadFreeListMap;
+		void*			ptrToBeFree;
+		std::thread::id tidNotOwned; // Helper data which we already known a tid that ptr does not belong to
 	};
+	/**
+	 * Global pending free list, accepting pending free pointer from non-local frees,
+	 * and then pump these pending free to corresponding local free list.
+	 */
+	HLVM_INLINE_VAR HLVM_STATIC_VAR TConcurrentQueue<FNonLocalPendingFree,
+		EConcurrentQueueMode::Mpsc, false,
+		TPMRGMallocator<hlvm_private::TQueueNode<FNonLocalPendingFree>>>
+									sGlobalPendingFreeList;
 
 private:
-	friend class ISmallBinnedMallocator;
-
-	struct FVMHeapChain
-	{
-		FVMHeap		  HeapAllocator{};
-		FVMHeapChain* Next{ nullptr };
-	};
 	struct FPendingFreeLists
 	{
 		TFixedSizeVector<void*, HLVM_VMA_GENERIC_PENDING_FREE_LIST_SIZE>  GenericFreeList;
@@ -80,9 +67,27 @@ private:
 				+ sizeof(void*) * HLVM_VMA_NONLOCAL_PENDING_FREE_LIST_SIZE,
 		"Pending free list size is too small, potential heap allocation instead of stack allocation");
 
-	FPendingFreeLists		mPendingFressLists;
+	struct FVMHeapChain
+	{
+		FVMHeap		  HeapAllocator{};
+		FVMHeapChain* Next{ nullptr };
+	};
+
+	FPendingFreeLists		mPendingFressLists{};
 	ISmallBinnedMallocator* mSmallBinnedMallocators[HLVM_VMA_SMALL_ALLOC_THRESHOLD / HLVM_VMA_SMALL_ALLOC_ALIGNMENT];
 	FVMHeapChain*			mHeapChainHead{ nullptr };
 	FOSPageMallocator		mOSPageMallocator{};
-	FVMArenaInitContext		mInitCtx{};
+
+	/**
+	 * Local pending free list pumped by global free list
+	 * These free pointers come from global free list finding a corresponding local free list
+	 */
+	struct FLocalPendingFree
+	{
+		void* ptrToBeFree;
+	};
+	TConcurrentQueue<FLocalPendingFree,
+		EConcurrentQueueMode::Spsc, false,
+		TPMRGMallocator<hlvm_private::TQueueNode<FLocalPendingFree>>>
+		mLocalPendingFreeListReceiver;
 };

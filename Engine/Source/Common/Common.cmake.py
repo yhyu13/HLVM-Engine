@@ -11,7 +11,6 @@ vcpkg_cxt = VcpkgContenxt(vcpkg_root_path='../Dependency/vcpkg',
                                                             "magic-enum",
                                                             "boost",
                                                             "libbacktrace",  # used by boost stack trace on linux
-                                                            # "elfutils",  # used for backward
                                                             "zstd",
                                                             "botan",
                                                             "rapidjson",
@@ -136,14 +135,6 @@ yalantinlibs = FetchContent(name='yalantinglibs',
                                 DomainValueModel(domain=DomainEnum.PUBLIC, values=['yalantinglibs::yalantinglibs'])]
                             )
 
-# # Fetch the Backward package from GitHub with the specified options
-# backward = FetchContent(name='backward',
-#                         git_repo_url='https://github.com/yhyu13/backward-cpp.git',
-#                         git_tag='51f0700452cf71c57d43c2d028277b24cde32502',
-#                         dependant_target_link_libs=[DomainValueModel(domain=DomainEnum.PUBLIC,
-#                                                            values=['Backward::Interface', '${CMAKE_DL_LIBS}'])]
-#                         )
-
 # Fetch the parallel-hashmap package from GitHub with the specified options
 parallel_hashmap = FetchContent(name='parallel-hashmap',
                                 git_repo_url='https://github.com/yhyu13/parallel-hashmap.git',
@@ -161,14 +152,6 @@ ctre = FetchContent(name='ctre',
                                                                  values=['ctre::ctre'])]
                     )
 
-# # Find the cpptrace package with the specified options
-# # cpptrace's fancy stack trace used too much memory (~16MB compare to <64K used by backwardcpp), so we would not use it
-# cpptrace = FetchContent(name='cpptrace',
-#                         git_repo_url='https://github.com/yhyu13/cpptrace.git',
-#                         git_tag='ce353dc3abde5286bcff799206686934f0150bf2',
-#                         dependant_target_link_libs=[DomainValueModel(domain=DomainEnum.PUBLIC,
-#                                                            values=['cpptrace::cpptrace'])])
-
 # Find the minitrace package with the specified options
 tracy = FetchContent(name='Tracy',
                      git_repo_url='https://github.com/yhyu13/tracy.git',
@@ -183,7 +166,7 @@ tracy = FetchContent(name='Tracy',
                          DomainValueModel(domain=DomainEnum.PUBLIC, values=['Tracy::TracyClient'])]
                      )
 
-
+bThreadSanitizer = False
 # Create a CommonModule object with the specified options
 class CommonModule(BaseModule):
     def __init__(self):
@@ -229,6 +212,10 @@ class CommonModule(BaseModule):
         self.target_interface.add_pch_files(domain=DomainEnum.PUBLIC,
                                             values=['./Public/Common.shared.pch'])
 
+        if bThreadSanitizer:
+            self.target_interface.add_compile_options(domain=DomainEnum.PUBLIC, values=['${CMAKE_CXX_FLAGS_TSAN}'])
+            self.target_interface.add_link_libs(domain=DomainEnum.PUBLIC, values=['tsan'])
+
 
 # Create a TestCommonModule object with the specified options
 class TestCommonModule(BaseModule):
@@ -261,6 +248,7 @@ class CommonProject(BaseProject):
         self.global_interface.add_global_set('CMAKE_RUNTIME_OUTPUT_DIRECTORY', [bin_output_dir])
         self.global_interface.add_global_set('CMAKE_LIBRARY_OUTPUT_DIRECTORY', [bin_output_dir])
         self.global_interface.add_global_set('CMAKE_ARCHIVE_OUTPUT_DIRECTORY', [bin_output_dir])
+        self.global_interface.add_global_set('CMAKE_CXX_FLAGS_TSAN', ['-fsanitize=thread'])
 
         self.global_interface.add_compile_definitions(domain=DomainEnum.GLOBAL,
                                                       values=["$<$<CONFIG:Debug>:HLVM_BUILD_DEBUG=1>",

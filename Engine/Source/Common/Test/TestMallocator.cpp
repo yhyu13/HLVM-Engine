@@ -28,7 +28,7 @@ RECORD(mallocator_test)
 			delete[] p2;
 		}
 		{
-			TVector<int, TMallocator<int>> vec{ TMallocator<int>(&MiMallocator) };
+			TVector<int, TPMRIMallocator<int>> vec{ TPMRIMallocator<int>(&MiMallocator) };
 			vec.reserve(1000);
 			for (size_t i = 0; i < 1000; i++)
 			{
@@ -51,7 +51,7 @@ RECORD(mallocator_test)
 			delete[] p2;
 		}
 		{
-			TVector<int, TMallocator<int>> vec{ TMallocator<int>(&StackMallocator) };
+			TVector<int, TPMRIMallocator<int>> vec{ TPMRIMallocator<int>(&StackMallocator) };
 			vec.reserve(1000);
 			for (size_t i = 0; i < 1000; i++)
 			{

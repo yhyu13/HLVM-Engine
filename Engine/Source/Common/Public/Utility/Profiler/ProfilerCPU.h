@@ -229,14 +229,24 @@ struct FScopeEventCPU
 
 /**
  * Memory Allocation macro for tracking memory allocation
- * Override these at will
+ * Usually no need to override
  */
 #if HLVM_COMPILE_WITH_PROFILER
-	#define HLVM_TRACK_CPU_MALLOC(ptr, size) FProfilerCPU::OnMemMalloc(ptr, size)
-	#define HLVM_TRACK_CPU_FREE(ptr) FProfilerCPU::OnMemFree(ptr)
+	#define HLVM_PROFILER_CPU_ON_MALLOC(ptr, size) FProfilerCPU::OnMemMalloc(ptr, size)
+	#define HLVM_PROFILER_CPU_ON_FREE(ptr) FProfilerCPU::OnMemFree(ptr)
 #else
-	#define HLVM_TRACK_CPU_MALLOC(ptr, size) ((void)0)
-	#define HLVM_TRACK_CPU_FREE(ptr) ((void)0)
+	#define HLVM_PROFILER_CPU_ON_MALLOC(ptr, size) ((void)0)
+	#define HLVM_PROFILER_CPU_ON_FREE(ptr) ((void)0)
+#endif
+
+#if HLVM_COMPILE_WITH_PROFILER
+	#define HLVM_PROFILER_CPU_ONOFF(cond)                   \
+		HLVM_SCOPED_VARIABLE(                               \
+			ScopedProfilerCPU,                              \
+			[]() -> void { FProfilerCPU::Enabled = cond; }, \
+			[]() -> void { FProfilerCPU::Enabled = !cond; })
+#else
+	#define HLVM_PROFILER_CPU_ONOFF(cond) ((void)0)
 #endif
 
 #if HLVM_PROFILER_USE_TRACY

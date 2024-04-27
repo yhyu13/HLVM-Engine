@@ -30,10 +30,10 @@ private:
 };
 
 #if !HLVM_SHIPPING
-	#define HLVM_SCOPED_TIMER_LOG(Msg)                   \
-		FScopedTimerLog TOKENPASTE2(__timer_, __LINE__){ \
-			Msg                                          \
-		};                                               \
+	#define HLVM_SCOPED_TIMER_LOG(Msg)             \
+		FScopedTimerLog TOKENPASTE2LINE(__timer_){ \
+			Msg                                    \
+		};                                         \
 		HLVM_ATOMIC_THREAD_FENCE()
 #else
 	#define HLVM_SCOPED_TIMER_LOG(Msg) ((void)0)
@@ -61,10 +61,10 @@ private:
 };
 
 #if !HLVM_SHIPPING
-	#define HLVM_SCOPED_TIMER(Duration)               \
-		FScopedTimer TOKENPASTE2(__timer_, __LINE__){ \
-			Duration                                  \
-		};                                            \
+	#define HLVM_SCOPED_TIMER(Duration)         \
+		FScopedTimer TOKENPASTE2LINE(__timer_){ \
+			Duration                            \
+		};                                      \
 		HLVM_ATOMIC_THREAD_FENCE()
 #else
 	#define HLVM_SCOPED_TIMER(Msg) ((void)0)
@@ -92,10 +92,10 @@ private:
 };
 
 #if !HLVM_SHIPPING
-	#define HLVM_SCOPED_TIMER_CUMU(Duration)              \
-		FScopedTimerCumu TOKENPASTE2(__timer_, __LINE__){ \
-			Duration                                      \
-		};                                                \
+	#define HLVM_SCOPED_TIMER_CUMU(Duration)        \
+		FScopedTimerCumu TOKENPASTE2LINE(__timer_){ \
+			Duration                                \
+		};                                          \
 		HLVM_ATOMIC_THREAD_FENCE()
 #else
 	#define HLVM_SCOPED_TIMER_CUMU(Msg) ((void)0)
@@ -123,10 +123,10 @@ private:
 };
 
 #if !HLVM_SHIPPING
-	#define HLVM_SCOPED_TIMER_CUMU_ATOMIC(Duration, ratio)                                             \
-		FScopedTimerCumuAtomic<ratio, decltype(Duration)::value_type> TOKENPASTE2(__timer_, __LINE__){ \
-			Duration                                                                                   \
-		};                                                                                             \
+	#define HLVM_SCOPED_TIMER_CUMU_ATOMIC(Duration, ratio)                                       \
+		FScopedTimerCumuAtomic<ratio, decltype(Duration)::value_type> TOKENPASTE2LINE(__timer_){ \
+			Duration                                                                             \
+		};                                                                                       \
 		HLVM_ATOMIC_THREAD_FENCE()
 #else
 	#define HLVM_SCOPED_TIMER_CUMU_ATOMIC(Msg) ((void)0)

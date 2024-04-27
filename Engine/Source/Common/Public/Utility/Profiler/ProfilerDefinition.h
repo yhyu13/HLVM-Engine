@@ -28,7 +28,7 @@
 /**
  * Global var to turn tracy code on/off in runtime
  */
-HLVM_INLINE_VAR bool GbTracyEnabled = false;
+HLVM_INLINE_VAR bool GbTracyEnabled = true;
 #endif
 
 // TODO : integrate minitrace with profiler interface
@@ -46,7 +46,7 @@ HLVM_INLINE_VAR bool GbTracyEnabled = false;
 /**
  * Global var to turn minitrace code on/off in runtime
  */
-HLVM_INLINE_VAR bool GbMiniTracEnabled = false;
+HLVM_INLINE_VAR bool GbMiniTracEnabled = true;
 #endif
 
 #if HLVM_PROFILER_USE_MINITRACE + HLVM_PROFILER_USE_TRACY > 1

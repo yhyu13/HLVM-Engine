@@ -60,9 +60,15 @@ void FVMHeap::Destroy()
 {
 	if (mHeap)
 	{
-		VMArena->FreeOSPage(mHeap);
+		if (bManaged)
+		{
+			VMArena->FreeOSPage(mHeap);
+		}
+		else
+		{
+			VMArena->FreeLowLevel(mHeap);
+		}
 		mHeap = nullptr;
-		bManaged = false;
 	}
 }
 

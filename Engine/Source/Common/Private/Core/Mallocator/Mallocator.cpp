@@ -70,7 +70,7 @@ void InitMallocator() // Extern
 
 void FnalMallocator() // Extern
 {
-	HLVM_LOG(LogMiMallocator, trace, TXT("Mallocator finalize:\nCumulative time spent on malloc {} micro sec\nCumulative number of malloc {}\nPer malloc time {} micro sec\nCumulative time spent on free {} micro sec\nCumulative number of free {}\nPer free time {} micro sec"),
+	HLVM_LOG(LogMiMallocator, info, TXT("Mallocator finalize:\nCumulative time spent on malloc {} micro sec\nCumulative number of malloc {}\nPer malloc time {} micro sec\nCumulative time spent on free {} micro sec\nCumulative number of free {}\nPer free time {} micro sec"),
 		GMallocDurationCounter.load(),
 		GMallocCounter.load(),
 		GMallocDurationCounter.load() / static_cast<double>(GMallocCounter.load()),
@@ -150,7 +150,7 @@ void SwapMallocator(IMallocator* Mallocator) // Extern
 				PROFILE_MALLOC_CUMU();   \
 				expr                     \
 			}                            \
-			HLVM_TRACK_CPU_MALLOC(p, n); \
+			HLVM_PROFILER_CPU_ON_MALLOC(p, n); \
 			return p
 
 		#define TRY_CATCH_NEW(expr_try) \
@@ -177,7 +177,7 @@ void SwapMallocator(IMallocator* Mallocator) // Extern
 				PROFILE_FREE_CUMU();   \
 				TRY_CATCH_DELETE(expr) \
 			}                          \
-			HLVM_TRACK_CPU_FREE(p)
+			HLVM_PROFILER_CPU_ON_FREE(p)
 
 void operator delete(void* p) noexcept
 {

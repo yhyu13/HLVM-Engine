@@ -5,12 +5,6 @@
 #include "Common.h"
 #include "Core/Log.h"
 
-
-
-
-
-
-
 #if HLVM_SPDLOG_USE_ASYNC
 // Initialize the thread pool for asynchronous logging
 // Had to use global variable to avoid thread pool being released before program finishing
@@ -20,7 +14,7 @@ HLVM_STATIC_VAR std::shared_ptr<spdlog::details::thread_pool>* SpglogThreadPool 
 
 FSpdlogConsoleDevice::FSpdlogConsoleDevice()
 {
-	auto pattern = "%^[%Y-%m-%d %H:%M:%S.%e] %l: %v%$";
+	constexpr auto pattern = "%^[%Y-%m-%d %H:%M:%S.%e] %l: %v%$";
 	// Create the console sink
 	auto						  stdout_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
 	std::vector<spdlog::sink_ptr> sinks{ stdout_sink };

@@ -4,8 +4,11 @@
  */
 
 #pragma once
+
 #include "ParallelDefinition.h"
 #include "Platform/GenericPlatformAtomicPointer.h"
+#include "Core/Mallocator/PMR.h"
+
 #include "Core/Assert.h"
 #include "Template/ReferenceTemplate.tpp"
 
@@ -19,22 +22,46 @@ enum class EConcurrentQueueMode : TUINT8
 	Mpmc, // Multiple Producer Multiple Consumer
 };
 
-/**
- * Lock-free concurrent queue, inspired by Unreal Engine's TQueue
- */
-template <typename T,
-	EConcurrentQueueMode Mode = EConcurrentQueueMode::Mpmc,
-	bool				 bCountSize = false>
-class TConcurrentQueue
+namespace hlvm_private
 {
-#define IS_MP (Mode == EConcurrentQueueMode::Mpsc || Mode == EConcurrentQueueMode::Mpmc)
-#define IS_SC (Mode == EConcurrentQueueMode::Mpsc || Mode == EConcurrentQueueMode::Spsc)
 	/**
 	 * Actually use atomic pointer is significantly faster (2x) than using raw ptr,
 	 * Try turn this on/off and compare TestParallel benchmark
 	 */
 #define QUEUE_NODE_USE_ATOMIC_PTR 1
 
+	/**
+	 * Structure for the internal linked list.
+	 */
+	template <typename T>
+	struct MS_ALIGN(HLVM_MALLOC_ALIGNMENT) TQueueNode
+	{
+		TQueueNode() = default;
+		explicit TQueueNode(T&& InItem) noexcept
+			: mItem(FwdTemp<T>(InItem))
+		{
+		}
+#if QUEUE_NODE_USE_ATOMIC_PTR
+		TAtomicPointer<TQueueNode*> mNextNode;
+#else
+		TQueueNode* mNextNode{ nullptr };
+#endif
+		T mItem;
+	} GCC_ALIGN(HLVM_MALLOC_ALIGNMENT);
+} // namespace hlvm_private
+
+/**
+ * Lock-free concurrent queue, inspired by Unreal Engine's TQueue
+ */
+template <typename T,
+	EConcurrentQueueMode Mode = EConcurrentQueueMode::Mpmc,
+	bool				 bCountSize = false,
+	// Default to std::allocator to use new/delete
+	PMRMallocator<hlvm_private::TQueueNode<T>> AllocatorType = TPMRStdMallocator<hlvm_private::TQueueNode<T>>>
+class TConcurrentQueue
+{
+#define IS_MP (Mode == EConcurrentQueueMode::Mpsc || Mode == EConcurrentQueueMode::Mpmc)
+#define IS_SC (Mode == EConcurrentQueueMode::Mpsc || Mode == EConcurrentQueueMode::Spsc)
 	/*
 	 *  Concurrent Queue : Emulation
 	 *  mHead = mTail
@@ -64,33 +91,15 @@ class TConcurrentQueue
 		Push 1 Interlock step2
 		OldHead1->Next = NewNode2->Next = mTail->Next = NewNode1
 	 */
-private:
-	/**
-	 * Structure for the internal linked list.
-	 */
-	struct QueueNode
-	{
-		QueueNode() = default;
-		explicit QueueNode(T&& InItem) noexcept
-			: mItem(FwdTemp<T>(InItem))
-		{
-		}
-#if QUEUE_NODE_USE_ATOMIC_PTR
-		TAtomicPointer<QueueNode*> mNextNode;
-#else
-		QueueNode* mNextNode{ nullptr };
-#endif
-		T mItem;
-	};
 
 public:
 	using ValueType = T;
+	using QueueNode = hlvm_private::TQueueNode<T>;
 
 	NOCOPYMOVE(TConcurrentQueue)
-
 	TConcurrentQueue()
 	{
-		mHead = mTail = new QueueNode();
+		mHead = mTail = std::construct_at(R_C(QueueNode*, Mallocator.allocate()));
 		HLVM_ASSERT(mHead.IsLockFree(), TXT("TAtomicPointer is not lock free"));
 	}
 
@@ -100,7 +109,8 @@ public:
 		{
 			mTail = mTail->mNextNode;
 			HLVM_ATOMIC_THREAD_FENCE();
-			delete temp;
+			std::destroy_at(temp);
+			Mallocator.deallocate(temp);
 		}
 	}
 
@@ -119,7 +129,8 @@ public:
 		else
 			HLVM_LIKELY
 			{
-				PushInternal(new QueueNode(CopyTemp(item)));
+				auto NewNode = std::construct_at(R_C(QueueNode*, Mallocator.allocate()), CopyTemp(item));
+				PushInternal(NewNode);
 				return true;
 			}
 	}
@@ -139,7 +150,8 @@ public:
 		else
 			HLVM_LIKELY
 			{
-				PushInternal(new QueueNode(MoveTemp(item)));
+				auto NewNode = std::construct_at(R_C(QueueNode*, Mallocator.allocate()), MoveTemp(item));
+				PushInternal(NewNode);
 				return true;
 			}
 	}
@@ -205,7 +217,8 @@ public:
 				}
 
 				// Step3 delete old tail
-				delete old_tail;
+				std::destroy_at(old_tail);
+				Mallocator.deallocate(old_tail);
 
 				if constexpr (bCountSize)
 				{
@@ -235,7 +248,8 @@ public:
 					}
 
 					// Step3 delete old tail
-					delete old_tail;
+					std::destroy_at(old_tail);
+					Mallocator.deallocate(old_tail);
 
 					if constexpr (bCountSize)
 					{
@@ -335,6 +349,8 @@ private:
 
 	/** Size of the queue. */
 	std::atomic_uint_fast32_t mCount{ 0 };
+
+	AllocatorType Mallocator;
 
 #undef IS_MP
 #undef IS_SC

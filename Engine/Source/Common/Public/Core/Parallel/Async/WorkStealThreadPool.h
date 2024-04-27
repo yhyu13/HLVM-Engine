@@ -12,7 +12,7 @@ class FWorkStealThreadPool
 {
 public:
 	NOCOPYMOVE(FWorkStealThreadPool)
-	explicit FWorkStealThreadPool(const FThreadAffinityMode& AffinityMode = BgTwoPhysicalCores);
+	explicit FWorkStealThreadPool(const FThreadAffinityMode& AffinityMode = FThreadAffinityMode::BgTwoPhysicalCores());
 	~FWorkStealThreadPool();
 
 	static FWorkStealThreadPool* Get();

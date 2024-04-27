@@ -157,7 +157,7 @@ size_t FProfilerCPU::BeginEvent(const TCHAR* name)
 		if (thread == nullptr)
 		{
 			auto threadName = FString::Format(TXT("{}"),
-				*R_C(const TUINT64*, &GCurrentThreadID));
+				*R_C(const TUINT64*, &GCurrentTID));
 			thread = CurrentThread.Set(std::make_shared<FTrackedThread>(*threadName));
 		}
 		return thread->BeginEvent(name);
@@ -197,6 +197,10 @@ void FProfilerCPU::Dispose()
 
 void FProfilerCPU::OnMemMalloc(void* ptr, size_t size)
 {
+	if (!Enabled)
+	{
+		return;
+	}
 	if (!ptr || size == 0)
 	{
 		// bad alloc? Ignore it
@@ -205,7 +209,10 @@ void FProfilerCPU::OnMemMalloc(void* ptr, size_t size)
 
 	#if HLVM_PROFILER_USE_TRACY
 	// Track memory allocation in Tracy
-	TracySecureAlloc(ptr, size);
+	if (GbTracyEnabled)
+	{
+		TracySecureAlloc(ptr, size);
+	}
 	#endif
 
 	// Register allocation during the current CPU event
@@ -217,6 +224,10 @@ void FProfilerCPU::OnMemMalloc(void* ptr, size_t size)
 
 void FProfilerCPU::OnMemFree(void* ptr)
 {
+	if (!Enabled)
+	{
+		return;
+	}
 	if (!ptr)
 	{
 		// bad free? Ignore it
@@ -225,7 +236,10 @@ void FProfilerCPU::OnMemFree(void* ptr)
 
 	#if HLVM_PROFILER_USE_TRACY
 	// Track memory allocation in Tracy
-	TracySecureFree(ptr);
+	if (GbTracyEnabled)
+	{
+		TracySecureFree(ptr);
+	}
 	#endif
 }
 

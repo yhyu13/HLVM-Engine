@@ -145,7 +145,7 @@ void FAtomicFlag::Unlock() const noexcept
 void FRecursiveAtomicFlag::Lock() const noexcept(!HLVM_DEADLOCK_TIMER)
 {
 	// Test if the same thread already is held
-	if (mOwner == GCurrentThreadID)
+	if (mOwner == GCurrentTID)
 	{
 		mCount.fetch_add(1, std::memory_order_relaxed);
 		return;
@@ -155,7 +155,7 @@ void FRecursiveAtomicFlag::Lock() const noexcept(!HLVM_DEADLOCK_TIMER)
 	LOCK_BODY(&mFlag);
 
 	// Set the owner
-	mOwner = GCurrentThreadID;
+	mOwner = GCurrentTID;
 	mCount = 1;
 }
 

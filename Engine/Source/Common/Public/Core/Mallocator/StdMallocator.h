@@ -75,3 +75,8 @@ public:
 	}
 };
 HLVM_INLINE_VAR FStdMallocator GStdMallocator{};
+
+#if !HLVM_MALLOC_USE_MIMALLOC_OVER_STD
+	#undef HLVM_LOWLVL_GMALLOCATOR
+	#define HLVM_LOWLVL_GMALLOCATOR GStdMallocator
+#endif
