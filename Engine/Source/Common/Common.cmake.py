@@ -19,6 +19,8 @@ vcpkg_cxt = VcpkgContenxt(vcpkg_root_path='../Dependency/vcpkg',
                                                             # "catch2"
                                                             "gperftools",  # linux cpu sampling
                                                             "minitrace",  # chrome format tracing
+                                                            VcpkgPackage(name="luajit", features=["buildvm-64"],
+                                                                         default_features=True),
                                                         ],
                                                         builtin_baseline='53bef8994c541b6561884a8395ea35715ece75db'))
 
@@ -120,6 +122,13 @@ minitrace = FindPackage(name='minitrace',
                         dependant_target_link_libs=[
                             DomainValueModel(domain=DomainEnum.PUBLIC, values=['minitrace::minitrace'])])
 
+# Find the luajit package with the specified options
+luajit = FindPackage(name='luajit',
+                     config=False,
+                     required=True,
+                     dependant_target_link_libs=[
+                         DomainValueModel(domain=DomainEnum.PUBLIC, values=['luajit::luajit'])])
+
 ##########################################################
 
 # Fetch the Yalantinglibs package from GitHub with the specified options
@@ -152,10 +161,10 @@ ctre = FetchContent(name='ctre',
                                                                  values=['ctre::ctre'])]
                     )
 
-# Find the minitrace package with the specified options
+# Fetch the Tracy package from GitHub with the specified options
 tracy = FetchContent(name='Tracy',
                      git_repo_url='https://github.com/yhyu13/tracy.git',
-                     git_tag= 'a9920c8672c95591576cc20222e004e7a4db2f69', #'719d85536ec88490f11dd9045daee4907e235470', #'b5b985d1d09e2c757338a51f8a82115626bf81ab',
+                     git_tag='a9920c8672c95591576cc20222e004e7a4db2f69',
                      target_compile_options=[TargetDomainValueModel(target='TracyClient', domain=DomainEnum.INTERFACE,
                                                                     values=['-DTRACY_ONLY_LOCALHOST=ON',
                                                                             '-DTRACY_NO_FRAME_IMAGE=ON',
@@ -165,6 +174,17 @@ tracy = FetchContent(name='Tracy',
                      dependant_target_link_libs=[
                          DomainValueModel(domain=DomainEnum.PUBLIC, values=['Tracy::TracyClient'])]
                      )
+
+# # Fetch the luajit package from GitHub with the specified options
+# luajit = FetchContent(name='luajit',
+#                                 git_repo_url='https://github.com/yhyu13/tarantool-luajit.git',
+#                                 git_tag='2e36c35427c949a0a678db8f611ff78fd5fd30f7',
+#                                 dependant_target_include_dirs=[
+#                                     DomainValueModel(domain=DomainEnum.PUBLIC,
+#                                                      values=['${LUAJIT_INCLUDEDIR}'])],
+#                                 dependant_target_link_libs=[
+#                                     DomainValueModel(domain=DomainEnum.PUBLIC, values=['${LUAJIT_LIB_NAME}'])]
+#                                 )
 
 bThreadSanitizer = False
 # Create a CommonModule object with the specified options
@@ -182,6 +202,7 @@ class CommonModule(BaseModule):
                                          ctre,
                                          # cpptrace
                                          tracy,
+                                         #luajit,
                                          ],
                          find_packages=[spdlog,
                                         mimalloc,
@@ -198,6 +219,7 @@ class CommonModule(BaseModule):
                                         # catch2
                                         gperftools,
                                         minitrace,
+                                        luajit,
                                         ]
                          )
         self.target_interface.add_compile_options(domain=DomainEnum.PUBLIC, values=[

@@ -34,3 +34,5 @@ find_package_handle_standard_args(
         Botan
         REQUIRED_VARS Botan_LIBRARIES Botan_INCLUDE_DIRS
 )
+message("Botan_LIBRARIES ${Botan_LIBRARIES}")
+message("Botan_INCLUDE_DIRS ${Botan_INCLUDE_DIRS}")

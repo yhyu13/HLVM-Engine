@@ -12,8 +12,6 @@
 #include <spdlog/async.h>
 #include <magic_enum_all.hpp>
 
-#include <tracy/Tracy.hpp>
-
 DECLARE_LOG_CATEGORY(LogTest)
 
 /*
@@ -21,7 +19,7 @@ DECLARE_LOG_CATEGORY(LogTest)
 */
 RECORD(spdlog_test)
 {
-	ZoneScopedN("spdlog_test");
+	HLVM_PROFILE_CPU_NAMED("spdlog_test");
 
 	spdlog::init_thread_pool(8192, 1);
 	spdlog::set_pattern("%^[%Y-%m-%d %H:%M:%S.%e] %l: %v%$");
@@ -65,7 +63,7 @@ REFLECTION(json_person, name, age);
 
 RECORD(yalantinlibs_test)
 {
-	ZoneScopedN("Yalantin_test");
+	HLVM_PROFILE_CPU_NAMED("Yalantin_test");
 
 	HLVM_LOG(LogTest, info, TXT("Yalantin test"));
 	{
@@ -133,7 +131,7 @@ RECORD(yalantinlibs_test)
 
 RECORD(magic_enum_test)
 {
-	ZoneScopedN("magic_enum_test");
+	HLVM_PROFILE_CPU_NAMED("magic_enum_test");
 
 	enum class Color : int
 	{
@@ -190,7 +188,7 @@ RECORD(magic_enum_test)
 
 RECORD(phmap_test)
 {
-	ZoneScopedN("phmap_test");
+	HLVM_PROFILE_CPU_NAMED("phmap_test");
 
 	HLVM_LOG(LogTest, info, TXT("phmap test"));
 	{
@@ -273,7 +271,7 @@ constexpr auto match_assignment(std::string_view sv) noexcept
 
 RECORD(test_ctre)
 {
-	ZoneScopedN("test_ctre");
+	HLVM_PROFILE_CPU_NAMED("test_ctre");
 
 	HLVM_ENSURE(match("h.h.cpp"), TXT("Failed"));
 	HLVM_ENSURE(match_functionCall("a()"), TXT("Failed"));
@@ -294,7 +292,7 @@ RECORD(test_ctre)
 
 RECORD(test_botan)
 {
-	ZoneScopedN("test_botan");
+	HLVM_PROFILE_CPU_NAMED("test_botan");
 
 	std::string plaintext(
 		"Your great-grandfather gave this watch to your granddad for good luck. "
@@ -381,7 +379,7 @@ RECORD(test_botan)
 
 RECORD(test_zstd)
 {
-	ZoneScopedN("test_zstd");
+	HLVM_PROFILE_CPU_NAMED("test_zstd");
 
 	std::string		  input = "This is a test string to compress.";
 	std::vector<char> compressed(ZSTD_compressBound(input.size()));
@@ -423,7 +421,7 @@ RECORD(test_zstd)
 
 RECORD(test_rapidjson)
 {
-	ZoneScopedN("test_rapidjson");
+	HLVM_PROFILE_CPU_NAMED("test_rapidjson");
 
 	HLVM_LOG(LogTest, trace, TXT("Test FName!"));
 	using namespace std;
@@ -580,7 +578,7 @@ RECORD(test_rapidjson)
 
 RECORD(boost_stacktrace_test)
 {
-	ZoneScopedN("boost_stacktrace_test");
+	HLVM_PROFILE_CPU_NAMED("boost_stacktrace_test");
 
 	HLVM_LOG(LogTest, info, TXT("Test boost_stacktrace!"));
 	{
