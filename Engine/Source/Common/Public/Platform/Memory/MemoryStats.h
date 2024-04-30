@@ -9,8 +9,7 @@
 /**
  * Contains information about current memory usage and capacity.
  */
-struct FMemoryStats
-{
+PACK(struct FMemoryStatsCPU {
 	/**
 	 * Total amount of physical memory in bytes.
 	 */
@@ -30,20 +29,19 @@ struct FMemoryStats
 	 * Amount of used virtual memory in bytes.
 	 */
 	TUINT64 UsedVirtualMemory;
-};
+});
 
 /**
- * Contains information about current memory usage by the process.
+ * The GPU memory stats.
  */
-struct FProcessMemoryStats
-{
+PACK(struct FMemoryStatsGPU {
 	/**
-	 * Amount of used physical memory in bytes.
+	 * The total amount of memory in bytes (as reported by the driver).
 	 */
-	TUINT64 UsedPhysicalMemory;
+	TUINT64 Total;
 
 	/**
-	 * Amount of used virtual memory in bytes.
+	 * The used by the game amount of memory in bytes (estimated).
 	 */
-	TUINT64 UsedVirtualMemory;
-};
+	TUINT64 Used;
+});

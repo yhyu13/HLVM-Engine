@@ -20,27 +20,27 @@ struct FRenderStatsData
 	/**
 	 * The draw calls count.
 	 */
-	std::atomic_int_fast64_t DrawCalls;
+	std::atomic_uint32_t DrawCalls;
 
 	/**
 	 * The compute shader dispatch calls count.
 	 */
-	std::atomic_int_fast64_t DispatchCalls;
-
-	/**
-	 * The vertices drawn count.
-	 */
-	std::atomic_int_fast64_t Vertices;
-
-	/**
-	 * The triangles drawn count.
-	 */
-	std::atomic_int_fast64_t Triangles;
+	std::atomic_uint32_t DispatchCalls;
 
 	/**
 	 * The pipeline state changes count.
 	 */
-	std::atomic_int_fast64_t PipelineStateChanges;
+	std::atomic_uint32_t PipelineStateChanges;
+
+	/**
+	 * The vertices drawn count.
+	 */
+	std::atomic_uint32_t Vertices;
+
+	/**
+	 * The triangles drawn count.
+	 */
+	std::atomic_uint32_t Triangles;
 
 	/**
 	 * Initializes a new instance of the FRenderStatsData struct.
@@ -48,9 +48,9 @@ struct FRenderStatsData
 	FRenderStatsData()
 		: DrawCalls(0)
 		, DispatchCalls(0)
+		, PipelineStateChanges(0)
 		, Vertices(0)
 		, Triangles(0)
-		, PipelineStateChanges(0)
 	{
 	}
 
@@ -63,9 +63,9 @@ struct FRenderStatsData
 	{
 		DrawCalls = currentState.DrawCalls - DrawCalls;
 		DispatchCalls = currentState.DispatchCalls - DispatchCalls;
+		PipelineStateChanges = currentState.PipelineStateChanges - PipelineStateChanges;
 		Vertices = currentState.Vertices - Vertices;
 		Triangles = currentState.Triangles - Triangles;
-		PipelineStateChanges = currentState.PipelineStateChanges - PipelineStateChanges;
 	}
 };
 

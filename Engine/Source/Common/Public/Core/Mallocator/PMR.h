@@ -95,8 +95,8 @@ struct TPMRStdMallocator
 
 	void deallocate(T* _p, std::size_t n = 1) noexcept
 	{
-		void*  p = R_C(void*, _p);
-		size_t realSize = n * sizeof(T);
+		void*					p = R_C(void*, _p);
+		[[maybe_unused]] size_t realSize = n * sizeof(T);
 		{
 			if constexpr (bForceAlignedAlloc)
 			{
@@ -275,11 +275,11 @@ struct TPMRGMallocator
 		// Using static_cast instead of reinterpret_cast because malloc might return nullptr or NULL
 		if constexpr (bForceAlignedAlloc)
 		{
-			p = HLVM_LOWLVL_GMALLOCATOR.MallocAligned(realSize, alignof(T));
+			p = HLVM_LOWLEVEL_GMALLOCATOR.MallocAligned(realSize, alignof(T));
 		}
 		else
 		{
-			p = HLVM_LOWLVL_GMALLOCATOR.Malloc(realSize);
+			p = HLVM_LOWLEVEL_GMALLOCATOR.Malloc(realSize);
 		}
 		if (!p)
 			HLVM_UNLIKELY
@@ -301,12 +301,12 @@ struct TPMRGMallocator
 		size_t realSize = n * sizeof(T);
 		if constexpr (bForceAlignedAlloc)
 		{
-			HLVM_ENSURE(HLVM_LOWLVL_GMALLOCATOR.FreeSizeAligned(p, realSize, alignof(T)) == EFreeRetType::Success,
+			HLVM_ENSURE(HLVM_LOWLEVEL_GMALLOCATOR.FreeSizeAligned(p, realSize, alignof(T)) == EFreeRetType::Success,
 				TXT("deallocate failed {}"), p);
 		}
 		else
 		{
-			HLVM_ENSURE(HLVM_LOWLVL_GMALLOCATOR.FreeSize(p, realSize) == EFreeRetType::Success,
+			HLVM_ENSURE(HLVM_LOWLEVEL_GMALLOCATOR.FreeSize(p, realSize) == EFreeRetType::Success,
 				TXT("deallocate failed {}"), p);
 		}
 #if HVLM_MALLOCATOR_DEATIL_TRACE

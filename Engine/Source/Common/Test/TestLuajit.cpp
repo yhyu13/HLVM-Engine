@@ -8,6 +8,35 @@
 
 DECLARE_LOG_CATEGORY(LogTest)
 
+namespace hlvm_lua
+{
+	static void* l_alloc(void* ud, void* ptr, size_t osize, size_t nsize)
+	{
+		(void)ud;
+		(void)osize;
+		if (nsize == 0)
+		{
+			free(ptr);
+			return nullptr;
+		}
+		else
+			return realloc(ptr, nsize);
+	}
+
+	static lua_State* lua_newstate_alloc(lua_Alloc alloc = l_alloc)
+	{
+		auto L = lua_newstate(alloc, nullptr);
+		if (L)
+		{
+			lua_atpanic(L, [](lua_State* _L) -> int {
+				HLVM_LOG(LogTest, err, TXT("Lua panic at {}!"), TO_TCHAR_STR(lua_tostring(_L, -1)));
+				return 0;
+			});
+		}
+		return L;
+	}
+} // namespace hlvm_lua
+
 static const char* lua_sciprt1 = R"(
 -- script.lua
 -- Receives a table, returns the sum of its components.
@@ -35,7 +64,7 @@ RECORD(luajit_test)
 		 * All Lua contexts are held in this structure. We work with it almost
 		 * all the time.
 		 */
-		L = luaL_newstate();
+		L = hlvm_lua::lua_newstate_alloc();
 
 		luaL_openlibs(L); /* Load Lua libraries */
 

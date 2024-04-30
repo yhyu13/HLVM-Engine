@@ -262,11 +262,11 @@ void FVMArena::FreeOSPage(void* p)
 
 void* FVMArena::MallocLowLevel(size_t size)
 {
-	return HLVM_LOWLVL_GMALLOCATOR.Malloc(size);
+	return HLVM_LOWLEVEL_GMALLOCATOR.Malloc(size);
 }
 
 void FVMArena::FreeLowLevel(void* p)
 {
-	HLVM_ENSURE(HLVM_LOWLVL_GMALLOCATOR.Free(p) == EFreeRetType::Success,
+	HLVM_ENSURE(HLVM_LOWLEVEL_GMALLOCATOR.Free(p) == EFreeRetType::Success,
 		TXT("FreeLowLevel failed {}"), R_C(void*, p));
 }

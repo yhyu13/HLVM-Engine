@@ -24,6 +24,10 @@ for config in "${buildConfigs[@]}"; do
     ${CMAKE_BIN} \
       -Wno-dev \
       --debug-output \
+      -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER} \
+      -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER} \
+      -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} \
+      -DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}\
       -G Ninja \
       -S ${CMAKE_SRC_DIR} \
       -B ${CMAKE_BUILD_DIR} \
@@ -33,9 +37,10 @@ for config in "${buildConfigs[@]}"; do
     cd "${CMAKE_BUILD_DIR}" || exit 1
 
     cbuild_param="-j 32 --verbose"
-    ctest_param="-j 4 --output-on-failure --stop-on-failure"
+    ctest_param="-j 8 --output-on-failure --stop-on-failure"
     # 构建项目
-    ((${CMAKE_BIN} --build . ${cbuild_param} && ${CTEST_BIN} . ${ctest_param}) || exit 1) | tee "${ROOT_DIR}/build_${config}.log"
+    (${CMAKE_BIN} --build . ${cbuild_param} && ${CTEST_BIN} . ${ctest_param}) || exit 1 \
+      | tee "${ROOT_DIR}/build_${config}.log"
 done
 
 echo "Finished building all targets"

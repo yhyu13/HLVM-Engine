@@ -25,33 +25,13 @@ class FProfilerStats
 
 public:
 	/**
-	 * The GPU memory stats.
-	 */
-	PACK(struct FMemoryStatsGPU {
-		/**
-		 * The total amount of memory in bytes (as reported by the driver).
-		 */
-		TUINT64 Total;
-
-		/**
-		 * The used by the game amount of memory in bytes (estimated).
-		 */
-		TUINT64 Used;
-	});
-
-	/**
 	 * Engine profiling data header. Contains main info and stats.
 	 */
 	PACK(struct FMainStats {
 		/**
-		 *  The process memory stats.
-		 */
-		FProcessMemoryStats ProcessMemory;
-
-		/**
 		 * The CPU memory stats.
 		 */
-		FMemoryStats MemoryCPU;
+		FMemoryStatsCPU MemoryCPU;
 
 		/**
 		 * The GPU memory stats.
@@ -64,29 +44,29 @@ public:
 		TUINT16 FPS;
 
 		/**
-		 *  The update time on CPU (in milliseconds).
+		 *  The update time on CPU (in microseconds).
 		 */
-		TFP32 GameCPUTimeMs;
+		TUINT16 GameCPUTimeMicros;
 
 		/**
-		 * The update time on CPU (in milliseconds).
+		 * The update time on CPU (in microseconds).
 		 */
-		TFP32 PhysicsCPUTimeMs;
+		TUINT16 PhysicsCPUTimeMicros;
 
 		/**
-		 * The abstract render command generation time on CPU (in milliseconds).
+		 * The abstract render command generation time on CPU (in microseconds).
 		 */
-		TFP32 DrawCmdCPUTimeMs;
+		TUINT16 DrawCmdCPUTimeMicros;
 
 		/**
-		 * The RHI time on CPU (in milliseconds).
+		 * The RHI time on CPU (in microseconds).
 		 */
-		TFP32 DrawHardwareInterfaceCPUTimeMs;
+		TUINT16 DrawHardwareInterfaceCPUTimeMicros;
 
 		/**
-		 * The RHI time on GPU (in milliseconds).
+		 * The RHI time on GPU (in microseconds).
 		 */
-		TFP32 DrawHardwareInterfaceGPUTimeMs;
+		TUINT16 DrawHardwareInterfaceGPUTimeMicros;
 
 		/**
 		 * The last rendered frame stats.

@@ -11,11 +11,12 @@ if (NOT TARGET luajit::luajit)
 endif ()
 
 if (NOT TARGET luajit::luajit)
-    find_path(luajit_INCLUDE_DIRS NAMES luajit-2.1/lua.hpp
-            PATH_SUFFIXES luajit
+    find_path(luajit_INCLUDE_DIRS NAMES luajit-2.1/luajit.h
             DOC "The luajit include directory")
+    # Include subdirectory so that we can directly #include <lua.hpp>
+    set(luajit_INCLUDE_DIRS "${luajit_INCLUDE_DIRS}/luajit-2.1")
 
-    find_library(luajit_LIBRARIES NAMES libluajit libluajit-5.1
+    find_library(luajit_LIBRARIES NAMES luajit-5.1
             DOC "The luajit library")
 
     mark_as_advanced(luajit_INCLUDE_DIRS luajit_LIBRARIES)
@@ -29,10 +30,11 @@ if (NOT TARGET luajit::luajit)
     )
 endif ()
 
+message("luajit_LIBRARIES ${luajit_LIBRARIES}")
+message("luajit_INCLUDE_DIRS ${luajit_INCLUDE_DIRS}")
+
 include(FindPackageHandleStandardArgs)
 find_package_handle_standard_args(
         luajit
         REQUIRED_VARS luajit_LIBRARIES luajit_INCLUDE_DIRS
 )
-message("luajit_LIBRARIES ${luajit_LIBRARIES}")
-message("luajit_INCLUDE_DIRS ${luajit_INCLUDE_DIRS}")

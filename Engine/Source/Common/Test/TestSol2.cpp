@@ -1,0 +1,480 @@
+/**
+ * Copyright (c) 2024. MIT License. All rights reserved.
+ */
+
+#include "Test.h"
+
+#define SOL_ALL_SAFETIES_ON 1
+#include <sol/sol.hpp>
+
+DECLARE_LOG_CATEGORY(LogTest)
+
+namespace hlvm_lua
+{
+	static void* lua_alloc(void* ud, void* ptr, size_t osize, size_t nsize)
+	{
+		(void)ud;
+		(void)osize;
+		if (nsize == 0)
+		{
+			free(ptr);
+			return nullptr;
+		}
+		else
+			return realloc(ptr, nsize);
+	}
+
+	static int lua_panic(lua_State* L)
+	{
+		HLVM_LOG(LogTest, err, TXT("Lua panic at {}!"), TO_TCHAR_STR(lua_tostring(L, -1)));
+		return 0;
+	}
+
+	static lua_State* lua_newstate_alloc(lua_Alloc alloc = lua_alloc)
+	{
+		auto L = lua_newstate(alloc, nullptr);
+		if (L)
+		{
+			lua_atpanic(L, lua_panic);
+		}
+		return L;
+	}
+} // namespace hlvm_lua
+
+template <typename A, typename B>
+auto my_add(A a, B b)
+{
+	return a + b;
+}
+
+// https://github.com/ThePhD/sol2/blob/develop/examples/source/tutorials/writing_template_functions.cpp
+RECORD(sol2_writing_template_functions_test)
+{
+	sol::state lua(hlvm_lua::lua_panic, hlvm_lua::lua_alloc);
+
+	// adds 2 integers
+	auto int_function_pointer = &my_add<int, int>;
+	lua["my_int_add"] = int_function_pointer;
+
+	// concatenates 2 strings
+	auto string_function_pointer = &my_add<std::string, std::string>;
+	lua["my_string_combine"] = string_function_pointer;
+
+	lua.script("my_num = my_int_add(1, 2)");
+	int my_num = lua["my_num"];
+	HLVM_ENSURE(my_num == 3, TXT("my_num should be 3"));
+
+	lua.script(
+		"my_str = my_string_combine('bark bark', ' woof "
+		"woof')");
+	std::string my_str = lua["my_str"];
+	HLVM_ENSURE(my_str == "bark bark woof woof", TXT("my_str should be bark bark woof woof"));
+}
+
+// https://github.com/ThePhD/sol2/blob/develop/examples/source/tutorials/writing_overloaded_template_functions.cpp
+RECORD(sol2_writing_overloaded_template_functions_test)
+{
+	sol::state lua(hlvm_lua::lua_panic, hlvm_lua::lua_alloc);
+
+	auto int_function_pointer = &my_add<int, int>;
+	auto string_function_pointer = &my_add<std::string, std::string>;
+	// adds 2 integers, or "adds" (concatenates) two strings
+	lua["my_combine"] = sol::overload(
+		int_function_pointer, string_function_pointer);
+
+	lua.script("my_num = my_combine(1, 2)");
+	lua.script(
+		"my_str = my_combine('bark bark', ' woof woof')");
+	int			my_num = lua["my_num"];
+	std::string my_str = lua["my_str"];
+	HLVM_ENSURE(my_num == 3, TXT("my_num should be 3"));
+	HLVM_ENSURE(my_str == "bark bark woof woof", TXT("my_str should be bark bark woof woof"));
+}
+
+struct my_class
+{
+	int a = 0;
+
+	my_class(int x)
+		: a(x)
+	{
+	}
+
+	int func()
+	{
+		++a; // increment a by 1
+		return a;
+	}
+};
+
+// https://github.com/ThePhD/sol2/blob/develop/examples/source/tutorials/writing_member_functions.cpp
+RECORD(sol2_writing_member_functions_test)
+{
+	sol::state lua(hlvm_lua::lua_panic, hlvm_lua::lua_alloc);
+	lua.open_libraries(sol::lib::base);
+
+	// Here, we are binding the member function and a class
+	// instance: it will call the function on the given class
+	// instance
+	lua.set_function(
+		"my_class_func", &my_class::func, my_class(0));
+
+	// We do not pass a class instance here:
+	// the function will need you to pass an instance of
+	// "my_class" to it in lua to work, as shown below
+	lua.set_function("my_class_func_2", &my_class::func);
+
+	// With a pre-bound instance:
+	lua.script(R"(
+			first_value = my_class_func()
+			second_value = my_class_func()
+			assert(first_value == 1)
+			assert(second_value == 2)
+		)");
+
+	// With no bound instance:
+	lua.set("obj", my_class(24));
+	// Calls "func" on the class instance
+	// referenced by "obj" in Lua
+	lua.script(R"(
+			third_value = my_class_func_2(obj)
+			fourth_value = my_class_func_2(obj)
+			assert(third_value == 25)
+			assert(fourth_value == 26)
+		)");
+}
+
+static std::string my_function(size_t D_count, std::string original)
+{
+	// Create a string with the letter 'D' "D_count" times,
+	// append it to 'original'
+	return original + std::string(D_count, 'D');
+}
+
+// https://github.com/ThePhD/sol2/blob/develop/examples/source/tutorials/writing_functions.cpp
+RECORD(sol2_writing_functions_test)
+{
+	sol::state lua(hlvm_lua::lua_panic, hlvm_lua::lua_alloc);
+
+	lua["my_func"] = my_function;			  // way 1
+	lua.set("my_func", my_function);		  // way 2
+	lua.set_function("my_func", my_function); // way 3
+
+	// This function is now accessible as 'my_func' in
+	// lua scripts / code run on this state:
+	lua.script("some_str = my_func(1, 'Da')");
+
+	// Read out the global variable we stored in 'some_str' in
+	// the quick lua code we just executed
+	std::string some_str = lua["some_str"];
+	HLVM_ENSURE(some_str == "DaD", TXT("some_str should be DaD"));
+}
+
+// https://github.com/ThePhD/sol2/blob/develop/examples/source/tutorials/write_variables_demo.cpp
+RECORD(sol2_write_variables_demo_test)
+{
+	sol::state lua(hlvm_lua::lua_panic, hlvm_lua::lua_alloc);
+
+	// open those basic lua libraries
+	// again, for print() and other basic utilities
+	lua.open_libraries(sol::lib::base);
+
+	// value in the global table
+	lua["bark"] = 50;
+
+	// a table being created in the global table
+	lua["some_table"] = lua.create_table_with("key0",
+		24,
+		"key1",
+		25,
+		lua["bark"],
+		"the key is 50 and this string is its value!");
+
+	// Run a plain ol' string of lua code
+	// Note you can interact with things set through sol in C++
+	// with lua! Using a "Raw String Literal" to have multi-line
+	// goodness:
+	// http://en.cppreference.com/w/cpp/language/string_literal
+	lua.script(R"(
+
+	print(some_table[50])
+	print(some_table["key0"])
+	print(some_table["key1"])
+
+	-- a lua comment: access a global in a lua script with the _G table
+	print(_G["bark"])
+
+	)");
+}
+
+// https://github.com/ThePhD/sol2/blob/develop/examples/source/tutorials/variables_demo.cpp
+RECORD(sol2_variables_demo_test)
+{
+	sol::state lua(hlvm_lua::lua_panic, hlvm_lua::lua_alloc);
+	/*
+	lua.script_file("variables.lua");
+	*/
+	lua.script(R"(
+config = {
+	fullscreen = false,
+	resolution = { x = 1024, y = 768 }
+}
+	)");
+	// the type "sol::state" behaves
+	// exactly like a table!
+	bool isfullscreen = lua["config"]
+						   ["fullscreen"]; // can get nested variables
+	sol::table config = lua["config"];
+	HLVM_ENSURE(!isfullscreen, TXT("isfullscreen should be false"));
+
+	// can also get it using the "get" member function
+	// auto replaces the unqualified type name
+	auto resolution = config.get<sol::table>("resolution");
+
+	// table and state can have multiple things pulled out of it
+	// too
+	std::tuple<int, int> xyresolutiontuple = resolution.get<int, int>("x", "y");
+	HLVM_ENSURE(std::get<0>(xyresolutiontuple) == 1024, TXT("xyresolutiontuple[0] should be 1024"));
+	HLVM_ENSURE(std::get<1>(xyresolutiontuple) == 768, TXT("xyresolutiontuple[1] should be 768"));
+
+	// test variable
+	auto bark = lua["config"]["bark"];
+	if (bark.valid())
+	{
+		// branch not taken: config and/or bark are not
+		// variables
+	}
+	else
+	{
+		// Branch taken: config and bark are existing variables
+	}
+
+	// can also use optional
+	sol::optional<int> not_an_integer = lua["config"]["fullscreen"];
+	if (not_an_integer)
+	{
+		// Branch not taken: value is not an integer
+	}
+
+	sol::optional<bool> is_a_boolean = lua["config"]["fullscreen"];
+	if (is_a_boolean)
+	{
+		// Branch taken: the value is a boolean
+	}
+
+	sol::optional<double> does_not_exist = lua["not_a_variable"];
+	if (does_not_exist)
+	{
+		// Branch not taken: that variable is not present
+	}
+
+	// this will result in a value of '24'
+	// (it tries to get a number, and fullscreen is
+	// not a number
+	int is_defaulted = lua["config"]["fullscreen"].get_or(24);
+	HLVM_ENSURE(is_defaulted == 24, TXT("is_defaulted should be 24"));
+
+	// This will result in the value of the config, which is
+	// 'false'
+	bool is_not_defaulted = lua["config"]["fullscreen"];
+	HLVM_ENSURE(!is_not_defaulted, TXT("is_not_defaulted should be false"));
+}
+
+// https://github.com/ThePhD/sol2/blob/develop/examples/source/tutorials/reading_functions.cpp
+RECORD(sol2_reading_functions_test)
+{
+	sol::state lua(hlvm_lua::lua_panic, hlvm_lua::lua_alloc);
+
+	lua.script(R"(
+			function f (a)
+				return a + 5
+			end
+		)");
+
+	// Get and immediately call
+	int x = lua["f"](30);
+	HLVM_ENSURE(x == 35, TXT("x should be 35"));
+
+	// Store it into a variable first, then call
+	sol::unsafe_function f = lua["f"];
+	int					 y = f(20);
+	HLVM_ENSURE(y == 25, TXT("y should be 25"));
+
+	// Store it into a variable first, then call
+	sol::protected_function safe_f = lua["f"];
+	int						z = safe_f(45);
+	HLVM_ENSURE(z == 50, TXT("z should be 50"));
+}
+
+struct my_type
+{
+	void stuff()
+	{
+	}
+};
+
+// https://github.com/ThePhD/sol2/blob/develop/examples/source/tutorials/pointer_lifetime.cpp
+RECORD(sol2_pointer_lifetime_test)
+{
+	sol::state lua(hlvm_lua::lua_panic, hlvm_lua::lua_alloc);
+
+	/*
+	// AAAHHH BAD
+	// dangling pointer!
+	lua["my_func"] = []() -> my_type* { return new my_type(); };
+
+	// AAAHHH!
+	lua.set("something", new my_type());
+
+	// AAAAAAHHH!!!
+	lua["something_else"] = new my_type();
+	*/
+
+	// :ok:
+	lua["my_func0"] = []() -> std::unique_ptr<my_type> {
+		return std::make_unique<my_type>();
+	};
+
+	// :ok:
+	lua["my_func1"] = []() -> std::shared_ptr<my_type> {
+		return std::make_shared<my_type>();
+	};
+
+	// :ok:
+	lua["my_func2"] = []() -> my_type { return my_type(); };
+
+	// :ok:
+	lua.set(
+		"something", std::unique_ptr<my_type>(new my_type()));
+
+	std::shared_ptr<my_type> my_shared = std::make_shared<my_type>();
+	// :ok:
+	lua.set("something_else", my_shared);
+
+	// :ok:
+	auto my_unique = std::make_unique<my_type>();
+	lua["other_thing"] = std::move(my_unique);
+
+	// :ok:
+	lua["my_func5"] = []() -> my_type* {
+		static my_type mt;
+		return &mt;
+	};
+
+	// THIS IS STILL BAD DON'T DO IT AAAHHH BAD
+	// return a unique_ptr that's empty instead
+	// or be explicit!
+	lua["my_func6"] = []() -> my_type* { return nullptr; };
+
+	// :ok:
+	lua["my_func7"] = []() -> std::nullptr_t { return nullptr; };
+
+	// :ok:
+	lua["my_func8"] = []() -> std::unique_ptr<my_type> {
+		// default-constructs as a nullptr,
+		// gets pushed as nil to Lua
+		return std::unique_ptr<my_type>();
+		// same happens for std::shared_ptr
+	};
+
+	// Acceptable, it will set 'something' to nil
+	// (and delete it on next GC if there's no more references)
+	lua.set("something", nullptr);
+
+	// Also fine
+	lua["something_else"] = nullptr;
+}
+
+// https://github.com/ThePhD/sol2/blob/develop/examples/source/tutorials/open_multiple_libraries.cpp
+RECORD(sol2_open_multiple_libraries_test)
+{
+	sol::state lua(hlvm_lua::lua_panic, hlvm_lua::lua_alloc);
+	lua.open_libraries(sol::lib::base,
+		sol::lib::coroutine,
+		sol::lib::string,
+		sol::lib::io);
+
+	lua.script("print('bark bark bark!')");
+}
+
+// https://github.com/ThePhD/sol2/blob/develop/examples/source/tutorials/object_lifetime.cpp
+RECORD(sol2_object_lifetime_test)
+{
+	sol::state lua(hlvm_lua::lua_panic, hlvm_lua::lua_alloc);
+	lua.open_libraries(sol::lib::base);
+
+	lua.script(R"(
+	obj = "please don't let me die";
+	)");
+
+	sol::object keep_alive = lua["obj"];
+	lua.script(R"(
+	obj = nil;
+	function say(msg)
+		print(msg)
+	end
+	)");
+
+	lua.collect_garbage();
+
+	lua["say"](lua["obj"]);
+	// still accessible here and still alive in Lua
+	// even though the name was cleared
+	std::string message = keep_alive.as<std::string>();
+	std::cout << message << std::endl;
+
+	// Can be pushed back into Lua as an argument
+	// or set to a new name,
+	// whatever you like!
+	lua["say"](keep_alive);
+}
+
+// https://github.com/ThePhD/sol2/blob/develop/examples/source/tutorials/multiple_return.cpp
+RECORD(sol2_multiple_return_test)
+{
+	sol::state lua(hlvm_lua::lua_panic, hlvm_lua::lua_alloc);
+
+	lua.script("function f (a, b, c) return a, b, c end");
+
+	std::tuple<int, int, int> result;
+	result = lua["f"](1, 2, 3);
+	HLVM_ENSURE(result == std::make_tuple(1, 2, 3), TXT("result should be 1, 2, 3"));
+	int			a, b;
+	std::string c;
+	// NOTE: sol::tie, NOT std::tie
+	// (ESS OH ELL prefix, not ESS TEE DEE prefix)
+	sol::tie(a, b, c) = lua["f"](1, 2, "bark");
+	HLVM_ENSURE(a == 1, TXT("a should be 1"));
+	HLVM_ENSURE(b == 2, TXT("b should be 2"));
+	HLVM_ENSURE(c == "bark", TXT("c should be 'bark'"));
+}
+
+// https://github.com/ThePhD/sol2/blob/develop/examples/source/tutorials/lazy_demo.cpp
+RECORD(sol2_lazy_demo_test)
+{
+	sol::state lua(hlvm_lua::lua_panic, hlvm_lua::lua_alloc);
+
+	auto barkkey = lua["bark"];
+	HLVM_ENSURE(!barkkey.valid(), TXT("barkkey should not be valid"));
+
+	barkkey = 50;
+	HLVM_ENSURE(barkkey.valid(), TXT("barkkey should be valid"));
+
+	auto barkkey2 = lua["bark"];
+	HLVM_ENSURE(barkkey.valid(), TXT("barkkey2 should be valid"));
+}
+
+// https://github.com/ThePhD/sol2/blob/develop/examples/source/tutorials/erase_demo.cpp
+RECORD(sol2_erase_demo_test)
+{
+	sol::state lua(hlvm_lua::lua_panic, hlvm_lua::lua_alloc);
+	lua["bark"] = 50;
+	sol::optional<int> x = lua["bark"];
+	// x will have a value
+	HLVM_ENSURE(x, TXT("x should have a value"));
+
+	lua["bark"] = sol::lua_nil;
+	sol::optional<int> y = lua["bark"];
+	// y will not have a value
+	HLVM_ENSURE(!y, TXT("y should not have a value"));
+}

@@ -21,6 +21,7 @@ vcpkg_cxt = VcpkgContenxt(vcpkg_root_path='../Dependency/vcpkg',
                                                             "minitrace",  # chrome format tracing
                                                             VcpkgPackage(name="luajit", features=["buildvm-64"],
                                                                          default_features=True),
+                                                            "sol2"
                                                         ],
                                                         builtin_baseline='53bef8994c541b6561884a8395ea35715ece75db'))
 
@@ -129,6 +130,13 @@ luajit = FindPackage(name='luajit',
                      dependant_target_link_libs=[
                          DomainValueModel(domain=DomainEnum.PUBLIC, values=['luajit::luajit'])])
 
+# Find the sol2 package with the specified options
+sol2 = FindPackage(name='sol2',
+                     config=True,
+                     required=True,
+                     dependant_target_link_libs=[
+                         DomainValueModel(domain=DomainEnum.PUBLIC, values=['sol2'])])
+
 ##########################################################
 
 # Fetch the Yalantinglibs package from GitHub with the specified options
@@ -175,17 +183,6 @@ tracy = FetchContent(name='Tracy',
                          DomainValueModel(domain=DomainEnum.PUBLIC, values=['Tracy::TracyClient'])]
                      )
 
-# # Fetch the luajit package from GitHub with the specified options
-# luajit = FetchContent(name='luajit',
-#                                 git_repo_url='https://github.com/yhyu13/tarantool-luajit.git',
-#                                 git_tag='2e36c35427c949a0a678db8f611ff78fd5fd30f7',
-#                                 dependant_target_include_dirs=[
-#                                     DomainValueModel(domain=DomainEnum.PUBLIC,
-#                                                      values=['${LUAJIT_INCLUDEDIR}'])],
-#                                 dependant_target_link_libs=[
-#                                     DomainValueModel(domain=DomainEnum.PUBLIC, values=['${LUAJIT_LIB_NAME}'])]
-#                                 )
-
 bThreadSanitizer = False
 # Create a CommonModule object with the specified options
 class CommonModule(BaseModule):
@@ -197,12 +194,9 @@ class CommonModule(BaseModule):
                                                                                  ]),
                                                   unity_build=True),
                          fetch_packages=[yalantinlibs,
-                                         # backward,
                                          parallel_hashmap,
                                          ctre,
-                                         # cpptrace
                                          tracy,
-                                         #luajit,
                                          ],
                          find_packages=[spdlog,
                                         mimalloc,
@@ -220,6 +214,7 @@ class CommonModule(BaseModule):
                                         gperftools,
                                         minitrace,
                                         luajit,
+                                        sol2,
                                         ]
                          )
         self.target_interface.add_compile_options(domain=DomainEnum.PUBLIC, values=[

@@ -81,7 +81,7 @@ public:
 	{
 		if constexpr (bUseHeapForAlignedAlloc)
 		{
-			return HLVM_LOWLVL_GMALLOCATOR.MallocAligned(size, align);
+			return HLVM_LOWLEVEL_GMALLOCATOR.MallocAligned(size, align);
 		}
 		else
 		{
@@ -92,7 +92,7 @@ public:
 	{
 		if constexpr (bUseHeapForAlignedAlloc)
 		{
-			return HLVM_LOWLVL_GMALLOCATOR.MallocAligned2(size, align);
+			return HLVM_LOWLEVEL_GMALLOCATOR.MallocAligned2(size, align);
 		}
 		else
 		{
@@ -111,7 +111,7 @@ public:
 	{
 		if constexpr (bUseHeapForAlignedAlloc)
 		{
-			return HLVM_LOWLVL_GMALLOCATOR.FreeAligned(ptr, align);
+			return HLVM_LOWLEVEL_GMALLOCATOR.FreeAligned(ptr, align);
 		}
 		else
 		{
@@ -122,7 +122,7 @@ public:
 	{
 		if constexpr (bUseHeapForAlignedAlloc)
 		{
-			return HLVM_LOWLVL_GMALLOCATOR.FreeSizeAligned(ptr, size, align);
+			return HLVM_LOWLEVEL_GMALLOCATOR.FreeSizeAligned(ptr, size, align);
 		}
 		else
 		{
@@ -250,7 +250,7 @@ private:
 		// Running out of free blocks in stack, try heap
 		if constexpr (bAllowOverflowToHeap)
 		{
-			return HLVM_LOWLVL_GMALLOCATOR.Malloc(_size);
+			return HLVM_LOWLEVEL_GMALLOCATOR.Malloc(_size);
 		}
 		else
 		{
@@ -424,7 +424,7 @@ private:
 		{
 			if constexpr (bAllowOverflowToHeap)
 			{
-				return HLVM_LOWLVL_GMALLOCATOR.Free(ptr);
+				return HLVM_LOWLEVEL_GMALLOCATOR.Free(ptr);
 			}
 		}
 		return EFreeRetType::NotOwned;
