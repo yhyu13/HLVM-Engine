@@ -24,7 +24,7 @@ namespace hlvm_private
 
 // Define the PMRMAllocator concept
 template <typename T, typename U>
-concept PMRMallocator = requires(T&& t, std::size_t n) {
+concept CPMRMallocator = requires(T&& t, std::size_t n) {
 	{
 		t.allocate(n)
 	} -> std::convertible_to<U*>;
@@ -96,7 +96,7 @@ struct TPMRStdMallocator
 	void deallocate(T* _p, std::size_t n = 1) noexcept
 	{
 		void*					p = R_C(void*, _p);
-		[[maybe_unused]] size_t realSize = n * sizeof(T);
+		HLVM_MAYBEUNUSED size_t realSize = n * sizeof(T);
 		{
 			if constexpr (bForceAlignedAlloc)
 			{

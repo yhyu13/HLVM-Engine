@@ -10,9 +10,9 @@
 
 // Concept https://en.cppreference.com/w/cpp/language/constraints
 template <class T>
-concept TPointer = std::is_pointer<T>::value;
+concept CPointer = std::is_pointer<T>::value;
 
-template <TPointer T>
+template <CPointer T>
 class TAtomicPointer;
 
 class FGenericPlatformAtomicPointer
@@ -25,7 +25,7 @@ public:
 	 * @param desired the value to be exchanged
 	 * @return old obj value
 	 */
-	template <TPointer T>
+	template <CPointer T>
 	static T AtomicExchange(TAtomicPointer<T>* obj, typename TAtomicPointer<T>::ValueType desired) noexcept;
 
 	/**
@@ -36,7 +36,7 @@ public:
 	 * @param desired the value to be exchanged
 	 * @return true if exchange was successful
 	 */
-	template <TPointer T>
+	template <CPointer T>
 	static bool AtomicCompareExchange(TAtomicPointer<T>* obj, typename TAtomicPointer<T>::ValueType* expected,
 		typename TAtomicPointer<T>::ValueType desired) noexcept;
 };

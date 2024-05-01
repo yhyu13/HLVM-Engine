@@ -14,7 +14,7 @@
  *  @details On construction, the TRefCountPtr increment the reference counting.
  *          On destruction, the TRefCountPtr tries to decrement the reference counting.
  */
-template <ReferenceCountable T>
+template <CRefCountable T>
 class TRefCountPtr
 {
 public:

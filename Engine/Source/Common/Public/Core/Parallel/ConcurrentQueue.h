@@ -57,7 +57,7 @@ template <typename T,
 	EConcurrentQueueMode Mode = EConcurrentQueueMode::Mpmc,
 	bool				 bCountSize = false,
 	// Default to std::allocator to use new/delete
-	PMRMallocator<hlvm_private::TQueueNode<T>> AllocatorType = TPMRStdMallocator<hlvm_private::TQueueNode<T>>>
+	CPMRMallocator<hlvm_private::TQueueNode<T>> AllocatorType = TPMRStdMallocator<hlvm_private::TQueueNode<T>>>
 class TConcurrentQueue
 {
 #define IS_MP (Mode == EConcurrentQueueMode::Mpsc || Mode == EConcurrentQueueMode::Mpmc)

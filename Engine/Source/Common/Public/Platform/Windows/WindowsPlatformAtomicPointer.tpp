@@ -8,7 +8,7 @@
 /**
  * For windows we use volatile
  */
-template <TPointer T>
+template <CPointer T>
 class TAtomicPointer
 {
 	using AtomicType = T volatile;
@@ -93,7 +93,7 @@ private:
 	AtomicType Ptr;
 };
 
-template <TPointer T>
+template <CPointer T>
 T FGenericPlatformAtomicPointer::AtomicExchange(TAtomicPointer<T>* obj, typename TAtomicPointer<T>::ValueType desired) noexcept
 {
 	auto Destination = (void**)&obj->Ptr;
@@ -101,7 +101,7 @@ T FGenericPlatformAtomicPointer::AtomicExchange(TAtomicPointer<T>* obj, typename
 	return (T)InterlockedExchangePointer(Destination, Exchange);
 }
 
-template <TPointer T>
+template <CPointer T>
 bool FGenericPlatformAtomicPointer::AtomicCompareExchange(TAtomicPointer<T>* obj, typename TAtomicPointer<T>::ValueType* expected,
 	typename TAtomicPointer<T>::ValueType desired) noexcept
 {

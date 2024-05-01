@@ -132,10 +132,10 @@ luajit = FindPackage(name='luajit',
 
 # Find the sol2 package with the specified options
 sol2 = FindPackage(name='sol2',
-                     config=True,
-                     required=True,
-                     dependant_target_link_libs=[
-                         DomainValueModel(domain=DomainEnum.PUBLIC, values=['sol2'])])
+                   config=True,
+                   required=True,
+                   dependant_target_link_libs=[
+                       DomainValueModel(domain=DomainEnum.PUBLIC, values=['sol2'])])
 
 ##########################################################
 
@@ -172,18 +172,22 @@ ctre = FetchContent(name='ctre',
 # Fetch the Tracy package from GitHub with the specified options
 tracy = FetchContent(name='Tracy',
                      git_repo_url='https://github.com/yhyu13/tracy.git',
-                     git_tag='a9920c8672c95591576cc20222e004e7a4db2f69',
+                     git_tag='b48216cc6fbd0f36764c6d36bd71dd8f8e3d3830',
                      target_compile_options=[TargetDomainValueModel(target='TracyClient', domain=DomainEnum.INTERFACE,
                                                                     values=['-DTRACY_ONLY_LOCALHOST=ON',
                                                                             '-DTRACY_NO_FRAME_IMAGE=ON',
                                                                             '-DTRACY_ONLY_IPV4=ON',
-                                                                            '-DTRACY_NO_CALLSTACK=OFF',
-                                                                            '-DTRACY_USE_RPMALLOC=ON'])],
+                                                                            '-DTRACY_CALLSTACK=8',
+                                                                            '-DTRACY_USE_RPMALLOC=ON',
+                                                                            '-DTRACY_NO_EXIT=ON',
+                                                                            '-DTRACY_LIBBACKTRACE_ELF_DYNLOAD_SUPPORT=ON'])],
                      dependant_target_link_libs=[
                          DomainValueModel(domain=DomainEnum.PUBLIC, values=['Tracy::TracyClient'])]
                      )
 
 bThreadSanitizer = False
+
+
 # Create a CommonModule object with the specified options
 class CommonModule(BaseModule):
     def __init__(self):

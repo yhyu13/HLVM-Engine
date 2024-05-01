@@ -8,7 +8,7 @@
  * Concept template T is integral or pointer
  */
 template <typename T>
-concept TAlignable = std::is_integral<T>::value || std::is_pointer<T>::value;
+concept CAlignable = std::is_integral<T>::value || std::is_pointer<T>::value;
 
 /**
  * Aligns a value to the next multiplier specified power of 2 alignment.
@@ -17,7 +17,7 @@ concept TAlignable = std::is_integral<T>::value || std::is_pointer<T>::value;
  * @param Alignment The alignment to align to.
  * @return The aligned value.
  */
-template <TAlignable T>
+template <CAlignable T>
 constexpr T AlignUp(T Value, size_t Alignment)
 {
 	return S_C(T, (S_C(size_t, Value) + Alignment - 1) & ~(Alignment - 1));
@@ -30,7 +30,7 @@ constexpr T AlignUp(T Value, size_t Alignment)
  * @param Alignment The alignment to align to.
  * @return The aligned value.
  */
-template <TAlignable T>
+template <CAlignable T>
 constexpr T AlignDown(T Value, size_t Alignment)
 {
 	return S_C(T, S_C(size_t, Value) & ~(Alignment - 1));
@@ -43,7 +43,7 @@ constexpr T AlignDown(T Value, size_t Alignment)
  * @param Alignment The alignment to check against.
  * @return True if the value is aligned, false otherwise.
  */
-template <TAlignable T>
+template <CAlignable T>
 constexpr bool IsAligned(T Value, size_t Alignment)
 {
 	return (S_C(size_t, Value) & (Alignment - 1)) == 0;

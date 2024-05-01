@@ -12,7 +12,7 @@
 /**
  * For linux we use std::atomic
  */
-template <TPointer T>
+template <CPointer T>
 class TAtomicPointer
 {
 	using AtomicType = std::atomic<T>;
@@ -99,13 +99,13 @@ private:
 	AtomicType Ptr;
 };
 
-template <TPointer T>
+template <CPointer T>
 T FGenericPlatformAtomicPointer::AtomicExchange(TAtomicPointer<T>* obj, typename TAtomicPointer<T>::ValueType desired) noexcept
 {
 	return std::atomic_exchange_explicit(&obj->Ptr, desired, std::memory_order_acquire);
 }
 
-template <TPointer T>
+template <CPointer T>
 bool FGenericPlatformAtomicPointer::AtomicCompareExchange(TAtomicPointer<T>* obj, typename TAtomicPointer<T>::ValueType* expected,
 	typename TAtomicPointer<T>::ValueType desired) noexcept
 {

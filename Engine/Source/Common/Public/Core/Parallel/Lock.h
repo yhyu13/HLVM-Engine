@@ -39,7 +39,7 @@ private:
 	HLVM_ATOMIC_THREAD_FENCE()
 
 template <typename T>
-concept Lockable = requires(T t) {
+concept CLockable = requires(T t) {
 	{
 		t.Lock()
 	} -> std::same_as<void>;
@@ -48,7 +48,7 @@ concept Lockable = requires(T t) {
 	} -> std::same_as<void>;
 };
 
-template <Lockable T>
+template <CLockable T>
 class TAtomicLockGuard
 {
 public:

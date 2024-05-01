@@ -30,7 +30,7 @@ namespace hlvm_lua
 		return 0;
 	}
 
-	static lua_State* lua_newstate_alloc(lua_Alloc alloc = lua_alloc)
+	HLVM_MAYBEUNUSED static lua_State* lua_newstate_alloc(lua_Alloc alloc = lua_alloc)
 	{
 		auto L = lua_newstate(alloc, nullptr);
 		if (L)
@@ -461,7 +461,7 @@ RECORD(sol2_lazy_demo_test)
 	HLVM_ENSURE(barkkey.valid(), TXT("barkkey should be valid"));
 
 	auto barkkey2 = lua["bark"];
-	HLVM_ENSURE(barkkey.valid(), TXT("barkkey2 should be valid"));
+	HLVM_ENSURE(barkkey2.valid(), TXT("barkkey2 should be valid"));
 }
 
 // https://github.com/ThePhD/sol2/blob/develop/examples/source/tutorials/erase_demo.cpp
@@ -477,4 +477,219 @@ RECORD(sol2_erase_demo_test)
 	sol::optional<int> y = lua["bark"];
 	// y will not have a value
 	HLVM_ENSURE(!y, TXT("y should not have a value"));
+}
+
+struct Doge
+{
+	int tailwag = 50;
+
+	Doge()
+	{
+	}
+
+	Doge(int wags)
+		: tailwag(wags)
+	{
+	}
+
+	// Copy constructor
+	Doge(const Doge& other)
+	{
+		std::cout << "Doge copy constructor called" << std::endl;
+		tailwag = other.tailwag;
+	}
+
+	~Doge()
+	{
+		std::cout << "Doge at " << this
+				  << " is being destroyed..." << std::endl;
+	}
+};
+
+// https://github.com/ThePhD/sol2/blob/develop/examples/source/tutorials/quick_n_dirty/userdata.cpp
+RECORD(sol2_userdata_test)
+{
+	std::cout << "=== userdata ===" << std::endl;
+
+	sol::state lua(hlvm_lua::lua_panic, hlvm_lua::lua_alloc);
+
+	Doge dog{ 30 };
+
+	// fresh one put into Lua
+	lua["dog"] = Doge{};
+	// Copy into lua: destroyed by Lua VM during garbage
+	// collection
+	lua["dog_copy"] = dog;
+	// OR: move semantics - will call move constructor if
+	// present instead Again, owned by Lua
+	lua["dog_move"] = std::move(dog);
+	lua["dog_unique_ptr"] = std::make_unique<Doge>(25);
+	lua["dog_shared_ptr"] = std::make_shared<Doge>(31);
+
+	// Identical to above
+	Doge dog2{ 30 };
+	lua.set("dog2", Doge{});
+	lua.set("dog2_copy", dog2);
+	lua.set("dog2_move", std::move(dog2));
+	lua.set("dog2_unique_ptr",
+		std::unique_ptr<Doge>(new Doge(25)));
+	lua.set("dog2_shared_ptr",
+		std::shared_ptr<Doge>(new Doge(31)));
+
+	// Note all of them can be retrieved the same way:
+	Doge& lua_dog = lua["dog"];
+	Doge& lua_dog_copy = lua["dog_copy"];
+	Doge& lua_dog_move = lua["dog_move"];
+	Doge& lua_dog_unique_ptr = lua["dog_unique_ptr"];
+	Doge& lua_dog_shared_ptr = lua["dog_shared_ptr"];
+	HLVM_ENSURE(lua_dog.tailwag == 50, TXT("lua_dog should have 50 tailwags"));
+	HLVM_ENSURE(lua_dog_copy.tailwag == 30, TXT("lua_dog_copy should have 30 tailwags"));
+	HLVM_ENSURE(lua_dog_move.tailwag == 30, TXT("lua_dog_move should have 30 tailwags"));
+	HLVM_ENSURE(lua_dog_unique_ptr.tailwag == 25, TXT("lua_dog_unique_ptr should have 25 tailwags"));
+	HLVM_ENSURE(lua_dog_shared_ptr.tailwag == 31, TXT("lua_dog_shared_ptr should have 31 tailwags"));
+
+	// lua will treat these types as opaque, and you will be
+	// able to pass them around to C++ functions and Lua
+	// functions alike
+
+	// Use a C++ reference to handle memory directly
+	// otherwise take by value, without '&'
+	lua["f"] = [](Doge& _dog) {
+		std::cout << "dog wags its tail " << _dog.tailwag
+				  << " times!" << std::endl;
+	};
+
+	// if you bind a function using a pointer,
+	// you can handle when `nil` is passed
+	lua["handling_f"] = [](Doge* _dog) {
+		if (_dog == nullptr)
+		{
+			std::cout << "dog was nil!" << std::endl;
+			return;
+		}
+		std::cout << "dog wags its tail " << _dog->tailwag
+				  << " times!" << std::endl;
+	};
+
+	lua.script(R"(
+		f(dog)
+		f(dog_copy)
+		f(dog_move)
+		f(dog_unique_ptr)
+		f(dog_shared_ptr)
+
+		-- C++ arguments that are pointers can handle nil
+		handling_f(dog)
+		handling_f(dog_copy)
+		handling_f(dog_move)
+		handling_f(dog_unique_ptr)
+		handling_f(dog_shared_ptr)
+		handling_f(nil)
+
+		-- never do this
+		-- f(nil)
+	)");
+
+	std::cout << std::endl;
+}
+
+// https://github.com/ThePhD/sol2/blob/develop/examples/source/tutorials/quick_n_dirty/userdata_memory_reference.cpp
+RECORD(sol2_userdata_memory_reference_test)
+{
+	std::cout << "=== userdata memory reference ==="
+			  << std::endl;
+
+	sol::state lua(hlvm_lua::lua_panic, hlvm_lua::lua_alloc);
+	lua.open_libraries(sol::lib::base);
+
+	Doge dog{}; // Kept alive somehow
+
+	// Later...
+	// The following stores a reference, and does not copy/move
+	// lifetime is same as dog in C++
+	// (access after it is destroyed is bad)
+	lua["dog"] = &dog;
+	// Same as above: respects std::reference_wrapper
+	lua["dog"] = std::ref(dog);
+	// These two are identical to above
+	lua.set("dog", &dog);
+	lua.set("dog", std::ref(dog));
+
+	Doge& dog_ref = lua["dog"];		// References Lua memory
+	Doge* dog_pointer = lua["dog"]; // References Lua memory
+	Doge  dog_copy = lua["dog"];	// Copies, will not affect lua
+
+	sol::constructors<Doge(), Doge(int), Doge(const Doge&)> DogeCtr{};
+	lua.new_usertype<Doge>("Doge",
+		DogeCtr,
+		"tailwag",
+		&Doge::tailwag);
+
+	dog_copy.tailwag = 525;
+	// Still 50
+	lua.script("assert(dog.tailwag == 50)");
+
+	dog_ref.tailwag = 100;
+	// Now 100
+	lua.script("assert(dog.tailwag == 100)");
+
+	dog_pointer->tailwag = 345;
+	// Now 345
+	lua.script("assert(dog.tailwag == 345)");
+
+	std::cout << std::endl;
+}
+
+#include "Core/Name.h"
+
+RECORD(sol2_hlvm_refcount_test)
+{
+	sol::state lua(hlvm_lua::lua_panic, hlvm_lua::lua_alloc);
+	lua.open_libraries(sol::lib::base);
+
+	//	sol::constructors<FName(),
+	//		FName(const FString&),
+	//		FName(FString&&),
+	//		FName(const FName&),
+	//		FName(FName&&)>
+	//		FNameCtr{};
+	//	lua.new_usertype<FName>("FName",
+	//		FNameCtr,
+	//		"NumRef",
+	//		&FName::NumRef,
+	//		"ToString",
+	//		&FName::ToString);
+
+	lua.new_usertype<FName>("FName",
+		"NumRef",
+		&FName::NumRef);
+
+	FName name("test");
+	HLVM_ENSURE(name.NumRef() == 1, TXT("name should have 1 reference"));
+
+	// Later...
+	// The following stores a reference, and does not copy/move
+	// lifetime is same as dog in C++
+	// (access after it is destroyed is bad)
+	lua["name"] = &name;
+	lua.script(R"(
+        print(name:NumRef() == 1)
+        print(name:NumRef())
+    )");
+
+	lua["name2"] = &name;
+	lua.script(R"(
+        print(name2:NumRef() == 1)
+        print(name2:NumRef())
+    )");
+
+	FName name2 = name;
+	lua.script(R"(
+        print(name:NumRef() == 2)
+        print(name:NumRef())
+    )");
+	lua.script(R"(
+        print(name2:NumRef() == 2)
+        print(name2:NumRef())
+    )");
 }

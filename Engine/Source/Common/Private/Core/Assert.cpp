@@ -8,6 +8,10 @@
 #include "Platform/GenericPlatformDebuggerUtil.h"
 #include "Core/Mallocator/StackMallocator.h"
 
+#ifndef HLVM_STACK_TRACE_DEPTH
+	#define HLVM_STACK_TRACE_DEPTH 8
+#endif
+
 namespace hlvm_private
 {
 	/**
@@ -30,12 +34,14 @@ namespace hlvm_private
 		{
 #if HLVM_BUILD_DEBUG
 			// In Debug mode we skip 1 frames to get proper stack trace
+			// Adjust these values to get proper stack trace
 			constexpr size_t SkipStackNum = 1;
-			constexpr size_t MaxStackDepth = 10;
+			constexpr size_t MaxStackDepth = HLVM_STACK_TRACE_DEPTH;
 #else
 			// In RelWithDebInfo mode we skip 1 frame to get proper stack trace
+			// Adjust these values to get proper stack trace
 			constexpr size_t SkipStackNum = 1;
-			constexpr size_t MaxStackDepth = 10;
+			constexpr size_t MaxStackDepth = HLVM_STACK_TRACE_DEPTH;
 #endif
 			// Deliberate use *new* here manually control lifetime
 			auto Stack = new FStdString{ FGenericPlatformStackTrace::GetStackTrace(

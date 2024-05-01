@@ -9,7 +9,7 @@
 
 class FName
 {
-	struct FNameInternal : public FBaseRefCountable
+	struct FNameInternal : public FRefCountable
 	{
 		FNameInternal() = default;
 		explicit FNameInternal(const FString& Other)
