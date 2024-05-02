@@ -10,7 +10,7 @@
 #include "Core/Mallocator/IMallocator.h"
 #include "Platform/GenericPlatformCrashDump.h"
 
-#include "Utility/Timer.h"
+#include "Utility/ScopedTimer.h"
 #include "Utility/Profiler/ProfilerCPU.h"
 
 #include <iostream>

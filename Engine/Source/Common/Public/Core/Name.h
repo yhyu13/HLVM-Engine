@@ -28,6 +28,11 @@ public:
 	FName() = default;
 	~FName() = default;
 
+	FName(const char* str)
+		: mInternal(new FNameInternal{ str })
+	{
+	}
+
 	FName(const FString& str)
 		: mInternal(new FNameInternal{ CopyTemp(str) })
 	{
@@ -68,6 +73,15 @@ public:
 			return mInternal->Name;
 		}
 		return FString{};
+	}
+
+	const char* ToCharStr() const
+	{
+		if (mInternal.Valid())
+		{
+			return mInternal->Name.ToCharStr();
+		}
+		return "";
 	}
 
 	size_t NumRef() const

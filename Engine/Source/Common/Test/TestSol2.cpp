@@ -4,42 +4,9 @@
 
 #include "Test.h"
 
-#define SOL_ALL_SAFETIES_ON 1
-#include <sol/sol.hpp>
+#include "Core/Scripting/Lua.h"
 
 DECLARE_LOG_CATEGORY(LogTest)
-
-namespace hlvm_lua
-{
-	static void* lua_alloc(void* ud, void* ptr, size_t osize, size_t nsize)
-	{
-		(void)ud;
-		(void)osize;
-		if (nsize == 0)
-		{
-			free(ptr);
-			return nullptr;
-		}
-		else
-			return realloc(ptr, nsize);
-	}
-
-	static int lua_panic(lua_State* L)
-	{
-		HLVM_LOG(LogTest, err, TXT("Lua panic at {}!"), TO_TCHAR_STR(lua_tostring(L, -1)));
-		return 0;
-	}
-
-	HLVM_MAYBEUNUSED static lua_State* lua_newstate_alloc(lua_Alloc alloc = lua_alloc)
-	{
-		auto L = lua_newstate(alloc, nullptr);
-		if (L)
-		{
-			lua_atpanic(L, lua_panic);
-		}
-		return L;
-	}
-} // namespace hlvm_lua
 
 template <typename A, typename B>
 auto my_add(A a, B b)
@@ -50,7 +17,7 @@ auto my_add(A a, B b)
 // https://github.com/ThePhD/sol2/blob/develop/examples/source/tutorials/writing_template_functions.cpp
 RECORD(sol2_writing_template_functions_test)
 {
-	sol::state lua(hlvm_lua::lua_panic, hlvm_lua::lua_alloc);
+	HLVM_SOL_STATE(lua);
 
 	// adds 2 integers
 	auto int_function_pointer = &my_add<int, int>;
@@ -74,7 +41,7 @@ RECORD(sol2_writing_template_functions_test)
 // https://github.com/ThePhD/sol2/blob/develop/examples/source/tutorials/writing_overloaded_template_functions.cpp
 RECORD(sol2_writing_overloaded_template_functions_test)
 {
-	sol::state lua(hlvm_lua::lua_panic, hlvm_lua::lua_alloc);
+	HLVM_SOL_STATE(lua);
 
 	auto int_function_pointer = &my_add<int, int>;
 	auto string_function_pointer = &my_add<std::string, std::string>;
@@ -110,7 +77,7 @@ struct my_class
 // https://github.com/ThePhD/sol2/blob/develop/examples/source/tutorials/writing_member_functions.cpp
 RECORD(sol2_writing_member_functions_test)
 {
-	sol::state lua(hlvm_lua::lua_panic, hlvm_lua::lua_alloc);
+	HLVM_SOL_STATE(lua);
 	lua.open_libraries(sol::lib::base);
 
 	// Here, we are binding the member function and a class
@@ -154,7 +121,7 @@ static std::string my_function(size_t D_count, std::string original)
 // https://github.com/ThePhD/sol2/blob/develop/examples/source/tutorials/writing_functions.cpp
 RECORD(sol2_writing_functions_test)
 {
-	sol::state lua(hlvm_lua::lua_panic, hlvm_lua::lua_alloc);
+	HLVM_SOL_STATE(lua);
 
 	lua["my_func"] = my_function;			  // way 1
 	lua.set("my_func", my_function);		  // way 2
@@ -173,7 +140,7 @@ RECORD(sol2_writing_functions_test)
 // https://github.com/ThePhD/sol2/blob/develop/examples/source/tutorials/write_variables_demo.cpp
 RECORD(sol2_write_variables_demo_test)
 {
-	sol::state lua(hlvm_lua::lua_panic, hlvm_lua::lua_alloc);
+	HLVM_SOL_STATE(lua);
 
 	// open those basic lua libraries
 	// again, for print() and other basic utilities
@@ -210,7 +177,7 @@ RECORD(sol2_write_variables_demo_test)
 // https://github.com/ThePhD/sol2/blob/develop/examples/source/tutorials/variables_demo.cpp
 RECORD(sol2_variables_demo_test)
 {
-	sol::state lua(hlvm_lua::lua_panic, hlvm_lua::lua_alloc);
+	HLVM_SOL_STATE(lua);
 	/*
 	lua.script_file("variables.lua");
 	*/
@@ -283,7 +250,7 @@ config = {
 // https://github.com/ThePhD/sol2/blob/develop/examples/source/tutorials/reading_functions.cpp
 RECORD(sol2_reading_functions_test)
 {
-	sol::state lua(hlvm_lua::lua_panic, hlvm_lua::lua_alloc);
+	HLVM_SOL_STATE(lua);
 
 	lua.script(R"(
 			function f (a)
@@ -316,7 +283,7 @@ struct my_type
 // https://github.com/ThePhD/sol2/blob/develop/examples/source/tutorials/pointer_lifetime.cpp
 RECORD(sol2_pointer_lifetime_test)
 {
-	sol::state lua(hlvm_lua::lua_panic, hlvm_lua::lua_alloc);
+	HLVM_SOL_STATE(lua);
 
 	/*
 	// AAAHHH BAD
@@ -388,7 +355,7 @@ RECORD(sol2_pointer_lifetime_test)
 // https://github.com/ThePhD/sol2/blob/develop/examples/source/tutorials/open_multiple_libraries.cpp
 RECORD(sol2_open_multiple_libraries_test)
 {
-	sol::state lua(hlvm_lua::lua_panic, hlvm_lua::lua_alloc);
+	HLVM_SOL_STATE(lua);
 	lua.open_libraries(sol::lib::base,
 		sol::lib::coroutine,
 		sol::lib::string,
@@ -400,7 +367,7 @@ RECORD(sol2_open_multiple_libraries_test)
 // https://github.com/ThePhD/sol2/blob/develop/examples/source/tutorials/object_lifetime.cpp
 RECORD(sol2_object_lifetime_test)
 {
-	sol::state lua(hlvm_lua::lua_panic, hlvm_lua::lua_alloc);
+	HLVM_SOL_STATE(lua);
 	lua.open_libraries(sol::lib::base);
 
 	lua.script(R"(
@@ -432,7 +399,7 @@ RECORD(sol2_object_lifetime_test)
 // https://github.com/ThePhD/sol2/blob/develop/examples/source/tutorials/multiple_return.cpp
 RECORD(sol2_multiple_return_test)
 {
-	sol::state lua(hlvm_lua::lua_panic, hlvm_lua::lua_alloc);
+	HLVM_SOL_STATE(lua);
 
 	lua.script("function f (a, b, c) return a, b, c end");
 
@@ -452,7 +419,7 @@ RECORD(sol2_multiple_return_test)
 // https://github.com/ThePhD/sol2/blob/develop/examples/source/tutorials/lazy_demo.cpp
 RECORD(sol2_lazy_demo_test)
 {
-	sol::state lua(hlvm_lua::lua_panic, hlvm_lua::lua_alloc);
+	HLVM_SOL_STATE(lua);
 
 	auto barkkey = lua["bark"];
 	HLVM_ENSURE(!barkkey.valid(), TXT("barkkey should not be valid"));
@@ -467,7 +434,7 @@ RECORD(sol2_lazy_demo_test)
 // https://github.com/ThePhD/sol2/blob/develop/examples/source/tutorials/erase_demo.cpp
 RECORD(sol2_erase_demo_test)
 {
-	sol::state lua(hlvm_lua::lua_panic, hlvm_lua::lua_alloc);
+	HLVM_SOL_STATE(lua);
 	lua["bark"] = 50;
 	sol::optional<int> x = lua["bark"];
 	// x will have a value
@@ -511,7 +478,7 @@ RECORD(sol2_userdata_test)
 {
 	std::cout << "=== userdata ===" << std::endl;
 
-	sol::state lua(hlvm_lua::lua_panic, hlvm_lua::lua_alloc);
+	HLVM_SOL_STATE(lua);
 
 	Doge dog{ 30 };
 
@@ -599,7 +566,7 @@ RECORD(sol2_userdata_memory_reference_test)
 	std::cout << "=== userdata memory reference ==="
 			  << std::endl;
 
-	sol::state lua(hlvm_lua::lua_panic, hlvm_lua::lua_alloc);
+	HLVM_SOL_STATE(lua);
 	lua.open_libraries(sol::lib::base);
 
 	Doge dog{}; // Kept alive somehow
@@ -644,52 +611,58 @@ RECORD(sol2_userdata_memory_reference_test)
 
 RECORD(sol2_hlvm_refcount_test)
 {
-	sol::state lua(hlvm_lua::lua_panic, hlvm_lua::lua_alloc);
+	HLVM_SOL_STATE(lua);
 	lua.open_libraries(sol::lib::base);
 
-	//	sol::constructors<FName(),
-	//		FName(const FString&),
-	//		FName(FString&&),
-	//		FName(const FName&),
-	//		FName(FName&&)>
-	//		FNameCtr{};
-	//	lua.new_usertype<FName>("FName",
-	//		FNameCtr,
-	//		"NumRef",
-	//		&FName::NumRef,
-	//		"ToString",
-	//		&FName::ToString);
-
+	sol::constructors<FName(),
+		FName(const char*)>
+		FNameCtr{};
 	lua.new_usertype<FName>("FName",
+		FNameCtr,
 		"NumRef",
-		&FName::NumRef);
+		&FName::NumRef,
+		"ToCharStr",
+		&FName::ToCharStr);
 
 	FName name("test");
 	HLVM_ENSURE(name.NumRef() == 1, TXT("name should have 1 reference"));
 
-	// Later...
-	// The following stores a reference, and does not copy/move
-	// lifetime is same as dog in C++
-	// (access after it is destroyed is bad)
-	lua["name"] = &name;
+	// Lua Only store rc-obj as a raw pointer, so rc remain 1
+	lua["name0"] = &(name);
 	lua.script(R"(
-        print(name:NumRef() == 1)
+        assert(name0:NumRef() == 1)
+        print(name0:NumRef())
+    )");
+
+	// Lua Store a copy of rc-obj, so rc increase to 2 because now lua_state owns it too
+	lua["name"] = CopyTemp(name);
+	lua.script(R"(
+        assert(name:NumRef() == 2)
         print(name:NumRef())
     )");
 
-	lua["name2"] = &name;
+	// Lua Store a second copy of rc-obj, so rc increase to 3 because now lua_state owns it too
+	lua["name2"] = CopyTemp(name);
 	lua.script(R"(
-        print(name2:NumRef() == 1)
+        assert(name2:NumRef() == 3)
         print(name2:NumRef())
     )");
 
-	FName name2 = name;
+	// cpp create a third copy of rc-obj, so rc increase to 4 because now cpp owns it too
+	FName name2 = CopyTemp(name);
 	lua.script(R"(
-        print(name:NumRef() == 2)
+        assert(name:NumRef() == 4)
         print(name:NumRef())
     )");
 	lua.script(R"(
-        print(name2:NumRef() == 2)
+        assert(name2:NumRef() == 4)
         print(name2:NumRef())
+    )");
+
+	// lua create a new rc-obj which should has rc 1
+	lua.script(R"(
+        local name3 = FName.new("test2")
+        assert(name3:NumRef() == 1)
+        print(name3:NumRef())
     )");
 }

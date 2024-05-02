@@ -4,51 +4,9 @@
 
 #include "Test.h"
 
-#include <lua.hpp>
+#include "Core/Scripting/Lua.h"
 
 DECLARE_LOG_CATEGORY(LogTest)
-
-namespace hlvm_lua
-{
-	static void* l_alloc(void* ud, void* ptr, size_t osize, size_t nsize)
-	{
-		(void)ud;
-		(void)osize;
-		if (nsize == 0)
-		{
-			free(ptr);
-			return nullptr;
-		}
-		else
-			return realloc(ptr, nsize);
-	}
-
-	static lua_State* lua_newstate_alloc(lua_Alloc alloc = l_alloc)
-	{
-		auto L = lua_newstate(alloc, nullptr);
-		if (L)
-		{
-			lua_atpanic(L, [](lua_State* _L) -> int {
-				HLVM_LOG(LogTest, err, TXT("Lua panic at {}!"), TO_TCHAR_STR(lua_tostring(_L, -1)));
-				return 0;
-			});
-		}
-		return L;
-	}
-} // namespace hlvm_lua
-
-static const char* lua_sciprt1 = R"(
--- script.lua
--- Receives a table, returns the sum of its components.
-io.write("The table the script received has:\n");
-x = 0
-for i = 1, #foo do
-  print(i, foo[i])
-  x = x + foo[i]
-end
-io.write("Returning data back to C\n");
-return x
-)";
 
 RECORD(luajit_test)
 {
@@ -67,6 +25,19 @@ RECORD(luajit_test)
 		L = hlvm_lua::lua_newstate_alloc();
 
 		luaL_openlibs(L); /* Load Lua libraries */
+
+		static const char* lua_sciprt1 = R"(
+-- script.lua
+-- Receives a table, returns the sum of its components.
+io.write("The table the script received has:\n");
+x = 0
+for i = 1, #foo do
+  print(i, foo[i])
+  x = x + foo[i]
+end
+io.write("Returning data back to C\n");
+return x
+)";
 
 		/* Load the file containing the script we are going to run */
 		status = luaL_loadstring(L, lua_sciprt1);
@@ -125,5 +96,176 @@ RECORD(luajit_test)
 
 		lua_pop(L, 1); /* Take the returned value out of the stack */
 		lua_close(L);  /* Cya, Lua */
+	}
+}
+
+#define SOL2_USE_LUAL 0
+
+RECORD(luajit_sol2_perf_test)
+{
+	HLVM_PROFILE_CPU_NAMED("luajit_test2");
+
+	HLVM_LOG(LogTest, info, TXT("Test luajit_test2!"));
+	{
+		{
+			static const char* lua_sciprt = R"(
+local loop_count = 1000
+local fun_pair = pairs
+
+local t = {}
+for i=1,100 do
+    t[i] = i
+end
+
+for i=1,loop_count do
+    for j=1,1000 do
+        for k,v in fun_pair(t) do
+            --
+        end
+    end
+end
+)";
+			{
+				int		   status, result;
+				lua_State* L;
+				L = hlvm_lua::lua_newstate_alloc();
+
+				luaL_openlibs(L); /* Load Lua libraries */
+
+				/* Load the file containing the script we are going to run */
+				status = luaL_loadstring(L, lua_sciprt);
+				if (status)
+				{
+					/* If something went wrong, error message is at the top of */
+					/* the stack */
+					fprintf(stderr, "Couldn't load file: %s\n", lua_tostring(L, -1));
+					exit(1);
+				}
+
+				{
+					FScopedTimerLog timer(TXT("LuaJIT pairs loop test"));
+					/* Ask Lua to run our little script */
+					result = lua_pcall(L, 0, LUA_MULTRET, 0);
+					if (result)
+					{
+						fprintf(stderr, "Failed to run script: %s\n", lua_tostring(L, -1));
+						exit(1);
+					}
+				}
+				lua_close(L); /* Cya, Lua */
+			}
+
+			{
+				HLVM_SOL_STATE(lua);
+				lua.open_libraries(sol::lib::base, sol::lib::ffi, sol::lib::jit);
+
+#if SOL2_USE_LUAL
+				/* Load the file containing the script we are going to run */
+				int status = luaL_loadstring(lua.lua_state(), lua_sciprt);
+				if (status)
+				{
+					/* If something went wrong, error message is at the top of */
+					/* the stack */
+					fprintf(stderr, "Couldn't load file: %s\n", lua_tostring(lua.lua_state(), -1));
+					exit(1);
+				}
+				{
+					FScopedTimerLog timer(TXT("Sol2 pairs loop test"));
+					/* Ask Lua to run our little script */
+					int result = lua_pcall(lua.lua_state(), 0, LUA_MULTRET, 0);
+					if (result)
+					{
+						fprintf(stderr, "Failed to run script: %s\n", lua_tostring(lua.lua_state(), -1));
+						exit(1);
+					}
+				}
+#else
+				{
+					FScopedTimerLog timer(TXT("Sol2 pairs loop test"));
+					lua.unsafe_script(lua_sciprt);
+				}
+#endif
+			}
+		}
+
+		{
+			static const char* lua_sciprt = R"(
+local loop_count = 1000
+local fun_pair = ipairs
+
+local t = {}
+for i=1,100 do
+    t[i] = i
+end
+
+for i=1,loop_count do
+    for j=1,1000 do
+        for k,v in fun_pair(t) do
+            --
+        end
+    end
+end
+)";
+			{
+				int		   status, result;
+				lua_State* L;
+				L = hlvm_lua::lua_newstate_alloc();
+
+				luaL_openlibs(L); /* Load Lua libraries */
+
+				/* Load the file containing the script we are going to run */
+				status = luaL_loadstring(L, lua_sciprt);
+				if (status)
+				{
+					/* If something went wrong, error message is at the top of */
+					/* the stack */
+					fprintf(stderr, "Couldn't load file: %s\n", lua_tostring(L, -1));
+					exit(1);
+				}
+
+				{
+					FScopedTimerLog timer(TXT("LuaJIT ipairs loop test"));
+					/* Ask Lua to run our little script */
+					result = lua_pcall(L, 0, LUA_MULTRET, 0);
+					if (result)
+					{
+						fprintf(stderr, "Failed to run script: %s\n", lua_tostring(L, -1));
+						exit(1);
+					}
+				}
+				lua_close(L); /* Cya, Lua */
+			}
+
+			{
+				HLVM_SOL_STATE(lua);
+				lua.open_libraries(sol::lib::base, sol::lib::ffi, sol::lib::jit);
+#if SOL2_USE_LUAL
+				/* Load the file containing the script we are going to run */
+				int status = luaL_loadstring(lua.lua_state(), lua_sciprt);
+				if (status)
+				{
+					/* If something went wrong, error message is at the top of */
+					/* the stack */
+					fprintf(stderr, "Couldn't load file: %s\n", lua_tostring(lua.lua_state(), -1));
+					exit(1);
+				}
+				{
+					FScopedTimerLog timer(TXT("Sol2 ipairs loop test"));
+					/* Ask Lua to run our little script */
+					int result = lua_pcall(lua.lua_state(), 0, LUA_MULTRET, 0);
+					if (result)
+					{
+						fprintf(stderr, "Failed to run script: %s\n", lua_tostring(lua.lua_state(), -1));
+						exit(1);
+					}
+				}
+#else
+				{
+					FScopedTimerLog timer(TXT("Sol2 pairs loop test"));
+					lua.unsafe_script(lua_sciprt);
+				}
+#endif
+			}
+		}
 	}
 }
