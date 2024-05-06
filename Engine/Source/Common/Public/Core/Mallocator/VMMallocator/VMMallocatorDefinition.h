@@ -6,6 +6,10 @@
 
 #include "Core/Mallocator/MallocatorDefinition.h"
 
+#ifndef HLVM_ENABLE_GLOBAL_VMMALLOCATOR
+	#define HLVM_ENABLE_GLOBAL_VMMALLOCATOR 1 // We should not use vm mallocator golbally until it is stable
+#endif
+
 #ifndef HLVM_VMA_SMALL_ALLOC_ALIGNMENT
 	#define HLVM_VMA_SMALL_ALLOC_ALIGNMENT (16) // Every binned allocator manage a multiplier of alignment
 #endif

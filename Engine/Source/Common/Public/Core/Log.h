@@ -130,7 +130,7 @@ public:
 			fmt,
 			Context.FileName,
 			Context.Line,
-			*R_C(const TUINT64*, &GCurrentTID));
+			GCurrentTID64);
 #else
 		FString Message = FString::Format(TXT("{0}:[{2}:{3}] {1}"), Context.Category->Name, fmt, Context.FileName, Context.Line);
 #endif

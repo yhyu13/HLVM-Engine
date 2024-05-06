@@ -1,3 +1,5 @@
+// HLVM has modified code under this folder from the original project with its license here.
+
 // Copyright (c) 2010-2017, Sebastien Andrivet
 // All rights reserved.
 //

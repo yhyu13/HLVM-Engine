@@ -48,4 +48,4 @@ namespace hlvm_lua
 	}
 } // namespace hlvm_lua
 
-#define HLVM_SOL_STATE(var) sol::state var(hlvm_lua::lua_panic, hlvm_lua::lua_alloc)
+#define HLVM_SOL_STATE(state_name) sol::state state_name(hlvm_lua::lua_panic, hlvm_lua::lua_alloc)

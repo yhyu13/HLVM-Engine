@@ -6,7 +6,6 @@
 
 #include "MiMallocator.h"
 #include "StdMallocator.h"
-#include "StackMallocator.h"
 #include "Core/Log.h"
 
 DECLARE_LOG_CATEGORY(LogPMR)

@@ -62,7 +62,8 @@ public:
 		BlockHead->Pos = S_C(TUINT8, freeIndex);
 		BlockHead->Alignment = Alignment;
 		// Return actual pointer address
-		return R_C(TBYTE*, BlockHead) + sizeof(FSmallBinnedBlockHead);
+		auto RetPtr = R_C(TBYTE*, BlockHead) + sizeof(FSmallBinnedBlockHead);
+		return RetPtr;
 	}
 
 	virtual void Free(void* p) noexcept final override

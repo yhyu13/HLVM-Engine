@@ -31,7 +31,7 @@ FVMArena::FVMArena()
 				_Heap->Next = Heap;
 				_Heap = Heap;
 			}
-			HLVM_LOG(LogVMArena, debug, TXT("VMArena: Initialized %d large heaps"), i + 1);
+			// HLVM_LOG(LogVMArena, debug, TXT("VMArena: Initialized {} large heaps"), i + 1);
 		}
 	}
 
@@ -43,7 +43,7 @@ FVMArena::FVMArena()
 		using BinnedMallocatorType = FSmallBinnedMallocator<(i.value + 1) * HLVM_VMA_SMALL_ALLOC_ALIGNMENT>;
 		mSmallBinnedMallocators[i] = std::construct_at(R_C(BinnedMallocatorType*, mOSPageMallocator.MallocSmall(sizeof(BinnedMallocatorType))));
 		mSmallBinnedMallocators[i]->Init(this);
-		HLVM_LOG(LogVMArena, debug, TXT("VMArena: Initialized %d SmallBinnedMallocator"), i + 1);
+		// HLVM_LOG(LogVMArena, debug, TXT("VMArena: Initialized {} SmallBinnedMallocator"), i + 1);
 	});
 }
 
@@ -55,23 +55,17 @@ FVMArena::~FVMArena()
 	while (mPendingFressLists.GenericFreeList.size())
 	{
 		auto LastGenericPtr = mPendingFressLists.GenericFreeList.back();
-		if (mOSPageMallocator.Owned(LastGenericPtr))
+		if (!Owned(LastGenericPtr))
 		{
-			/**
-			 * Ignore freeing of memory owned by current VM that is about to be destructed
-			 */
-			continue;
-		}
-		else
-		{
-			while (mPendingFressLists.NonLocalFreeList.size())
-			{
-				auto LastNonLocalPtr = mPendingFressLists.NonLocalFreeList.back();
-				sGlobalPendingFreeList.Push({ .ptrToBeFree = LastNonLocalPtr, .tidNotOwned = GCurrentTID });
-				mPendingFressLists.NonLocalFreeList.pop_back();
-			}
+			sGlobalPendingFreeList.Push({ .ptrToBeFree = LastGenericPtr, .tidNotOwned = GCurrentTID64 });
 		}
 		mPendingFressLists.GenericFreeList.pop_back();
+	}
+	while (mPendingFressLists.NonLocalFreeList.size())
+	{
+		auto LastNonLocalPtr = mPendingFressLists.NonLocalFreeList.back();
+		sGlobalPendingFreeList.Push({ .ptrToBeFree = LastNonLocalPtr, .tidNotOwned = GCurrentTID64 });
+		mPendingFressLists.NonLocalFreeList.pop_back();
 	}
 
 	/**
@@ -97,9 +91,14 @@ FVMArena::~FVMArena()
 	}
 }
 
+bool FVMArena::Owned(void* p)
+{
+	return mOSPageMallocator.Owned(p);
+}
+
 void* FVMArena::Malloc(size_t size)
 {
-	return size <= HLVM_VMA_SMALL_ALLOC_THRESHOLD ? MallocBinned(size) : MallocHeap(size);
+	return size <= HLVM_VMA_SMALL_ALLOC_THRESHOLD ? MallocSmallBinned(size) : MallocHeap(size);
 }
 
 void FVMArena::Free(void* p)
@@ -109,16 +108,20 @@ void FVMArena::Free(void* p)
 		while (mPendingFressLists.GenericFreeList.size())
 		{
 			auto LastGenericPtr = mPendingFressLists.GenericFreeList.back();
-			if (mOSPageMallocator.Owned(LastGenericPtr))
+			if (Owned(LastGenericPtr))
 			{
 				if (mPendingFressLists.LocalFreeList.size() == mPendingFressLists.LocalFreeList.max_size())
 				{
 					while (mPendingFressLists.LocalFreeList.size())
 					{
+						/**
+						 * Free local free list, a local pointer is either from bin or heap
+						 */
 						auto LastLocalPtr = mPendingFressLists.LocalFreeList.back();
-						if (auto alignment = FSmallBinnedBlockHead::IsSmallAlloc(LastLocalPtr))
+						if (auto alignment = FSmallBinnedBlockHead::IsSmallAlloc(LastLocalPtr);
+							alignment != 0)
 						{
-							FreeBinned(LastLocalPtr, alignment);
+							FreeSmallBinned(LastLocalPtr, alignment);
 						}
 						else
 						{
@@ -127,10 +130,7 @@ void FVMArena::Free(void* p)
 						mPendingFressLists.LocalFreeList.pop_back();
 					}
 				}
-				else
-				{
-					mPendingFressLists.LocalFreeList.push_back(LastGenericPtr);
-				}
+				mPendingFressLists.LocalFreeList.push_back(LastGenericPtr);
 			}
 			else
 			{
@@ -139,27 +139,24 @@ void FVMArena::Free(void* p)
 					while (mPendingFressLists.NonLocalFreeList.size())
 					{
 						auto LastNonLocalPtr = mPendingFressLists.NonLocalFreeList.back();
-						sGlobalPendingFreeList.Push({ .ptrToBeFree = LastNonLocalPtr, .tidNotOwned = GCurrentTID });
+						sGlobalPendingFreeList.Push({ .ptrToBeFree = LastNonLocalPtr, .tidNotOwned = GCurrentTID64 });
 						mPendingFressLists.NonLocalFreeList.pop_back();
 					}
 				}
-				else
-				{
-					mPendingFressLists.NonLocalFreeList.push_back(LastGenericPtr);
-				}
+				mPendingFressLists.NonLocalFreeList.push_back(LastGenericPtr);
 			}
 			mPendingFressLists.GenericFreeList.pop_back();
 		}
 	}
-	else
-	{
-		mPendingFressLists.GenericFreeList.push_back(p);
-	}
+	mPendingFressLists.GenericFreeList.push_back(p);
 
+	/**
+	 * Try to pop from local pending free list to pending local free list
+	 */
 	while (mPendingFressLists.LocalFreeList.size() < mPendingFressLists.LocalFreeList.max_size())
 	{
 		FLocalPendingFree PendingFree;
-		if (mLocalPendingFreeListReceiver.PopFront(PendingFree))
+		if (mThisThreadPendingFreeList.PopFront(PendingFree))
 		{
 			mPendingFressLists.LocalFreeList.push_back(PendingFree.ptrToBeFree);
 		}
@@ -216,8 +213,35 @@ void* FVMArena::MallocHeap(size_t size)
 
 void FVMArena::FreeHeap(void* p)
 {
-	// TODO : use 32MB alignment to quickly find heap allocation instead of traversal
 	// Use 32MB mask to find head pointer of 32MB page which holds some pointers that point to allocator
+#if 1
+	auto	 HeapHeadBlock = R_C(FVMHeap::FHeapHeadBlock*, AlignDown(p, HLVM_VMA_LARGE_HEAP_SIZE));
+	FVMHeap* OwnerHeap = HeapHeadBlock->OwnerHeap;
+	if constexpr (bValidate)
+	{
+		auto Heap = mHeapChainHead;
+		while (Heap)
+		{
+			auto& HeapMallocator = Heap->HeapAllocator;
+			if (&HeapMallocator == OwnerHeap)
+			{
+				HLVM_ENSURE(HeapMallocator.Owned(p), TXT("FVMArena::FreeHeap : Heap {} not own pointer {}"),
+					R_C(void*, OwnerHeap), R_C(void*, p));
+				HeapMallocator.Free(p);
+				return;
+			}
+			Heap = Heap->Next;
+		}
+	}
+	else
+	{
+		auto& HeapMallocator = *OwnerHeap;
+		HLVM_ENSURE(HeapMallocator.Owned(p), TXT("FVMArena::FreeHeap : Heap {} not own pointer {}"),
+			R_C(void*, OwnerHeap), R_C(void*, p));
+		HeapMallocator.Free(p);
+		return;
+	}
+#else // No use 32MB heap alignment trick, just traverse all heaps
 	auto Heap = mHeapChainHead;
 	while (Heap)
 	{
@@ -230,22 +254,23 @@ void FVMArena::FreeHeap(void* p)
 		}
 		Heap = Heap->Next;
 	}
-	HLVM_ENSURE(false, TXT("FVMArena::FreeHeap : Failed to free heap allocation"));
+#endif
+	HLVM_ENSURE(false, TXT("FVMArena::FreeHeap : Failed to free {} from heap"), R_C(void*, p));
 }
 
-void* FVMArena::MallocBinned(size_t _size)
+void* FVMArena::MallocSmallBinned(size_t _size)
 {
 	HLVM_CONSTEXPR_ASSERT(bValidate, _size <= HLVM_VMA_SMALL_ALLOC_THRESHOLD);
 	TUINT8 size = FSmallBinnedBlockHead::GoodSize(_size);
-	auto   p = mSmallBinnedMallocators[size / HLVM_VMA_SMALL_ALLOC_ALIGNMENT]->Malloc();
+	auto   p = mSmallBinnedMallocators[size / HLVM_VMA_SMALL_ALLOC_ALIGNMENT - 1]->Malloc();
 	HLVM_CONSTEXPR_ASSERT(bValidate, p != nullptr);
 	return p;
 }
 
-void FVMArena::FreeBinned(void* p, TUINT8 size)
+void FVMArena::FreeSmallBinned(void* p, TUINT8 size)
 {
 	HLVM_CONSTEXPR_ASSERT(bValidate, size <= HLVM_VMA_SMALL_ALLOC_THRESHOLD);
-	mSmallBinnedMallocators[size / HLVM_VMA_SMALL_ALLOC_ALIGNMENT]->Free(p);
+	mSmallBinnedMallocators[size / HLVM_VMA_SMALL_ALLOC_ALIGNMENT - 1]->Free(p);
 }
 
 void* FVMArena::MallocOSPage(size_t N)
@@ -262,11 +287,11 @@ void FVMArena::FreeOSPage(void* p)
 
 void* FVMArena::MallocLowLevel(size_t size)
 {
-	return HLVM_LOWLEVEL_GMALLOCATOR.Malloc(size);
+	return mOSPageMallocator.MallocAlign(size);
 }
 
 void FVMArena::FreeLowLevel(void* p)
 {
-	HLVM_ENSURE(HLVM_LOWLEVEL_GMALLOCATOR.Free(p) == EFreeRetType::Success,
+	HLVM_ENSURE(mOSPageMallocator.FreeAlign(p) == EFreeRetType::Success,
 		TXT("FreeLowLevel failed {}"), R_C(void*, p));
 }

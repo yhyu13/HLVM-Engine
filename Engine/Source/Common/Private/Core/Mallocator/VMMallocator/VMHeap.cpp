@@ -45,7 +45,8 @@ void FVMHeap::Init(FVMArena* _VMArena, size_t _size, bool bForceUnManaged)
 		mFreeBlockHead->nextFreeBlock = mTail;
 
 		// Cache the lower bound memory address for allocatable heap pointers
-		mLowerBound = mFreeBlockHead + FBlock_Size;
+		// And the upperbound is simply mTail
+		mLowerBound = R_C(TBYTE*, mFreeBlockHead) + FBlock_Size;
 	}
 	else
 	{
@@ -75,103 +76,96 @@ void FVMHeap::Destroy()
 void* FVMHeap::Malloc(size_t _size)
 {
 	if (!bManaged)
-	{
-		HLVM_CONSTEXPR_ASSERT(bValidate, mHeap != nullptr);
-		return mHeap + sizeof(FHeapHeadBlock);
-	}
+		HLVM_UNLIKELY
+		{
+			HLVM_CONSTEXPR_ASSERT(bValidate, mHeap != nullptr);
+			auto RetPtr = mHeap + sizeof(FHeapHeadBlock);
+			return RetPtr;
+		}
 	else
-	{
-		void*	 RetPtr{ nullptr };
-		SizeType size = S_C(SizeType, _size);
-		HLVM_CONSTEXPR_ASSERT(bValidate, size > 0 && S_C(size_t, size) <= GetManagedSize());
-		HLVM_CONSTEXPR_ASSERT(bValidate, mFreeBlockHead->prevFreeBlock == nullptr);
-		/**
-		 * Unlike StackAllocator, where we stop looping when there is a fit free block,
-		 * Here we loop all free blocks all the fime to calcualte the correct free block size upper bound
-		 */
-		if (size <= mFreeSizeUpperBound)
+		HLVM_LIKELY
 		{
-			HLVM_CONSTEXPR_ASSERT(bValidate, mFreeSizeUpperBound >= 0);
-			mFreeSizeUpperBound = -1;
-			FBlock* FreeBlock = mFreeBlockHead;
-			while (FreeBlock->nextFreeBlock != nullptr)
+			void*	 RetPtr{ nullptr };
+			SizeType size = S_C(SizeType, _size);
+			HLVM_CONSTEXPR_ASSERT(bValidate, size > 0 && S_C(size_t, size) <= GetManagedSize());
+			HLVM_CONSTEXPR_ASSERT(bValidate, mFreeBlockHead->prevFreeBlock == nullptr);
+			/**
+			 * Unlike StackAllocator, where we stop looping when there is a fit free block,
+			 * Here we loop all free blocks all the fime to calcualte the correct free block size upper bound
+			 */
+			if (size <= mFreeSizeUpperBound)
 			{
-				HLVM_CONSTEXPR_ASSERT(bValidate, FreeBlock->GetFree());
-				if (!RetPtr && FreeBlock->size >= size)
+				HLVM_CONSTEXPR_ASSERT(bValidate, mFreeSizeUpperBound >= 0);
+				mFreeSizeUpperBound = -1;
+				FBlock* FreeBlock = mFreeBlockHead;
+				while (FreeBlock->nextFreeBlock != nullptr)
 				{
-					FBlock* NextFreeBlock = FreeBlock->nextFreeBlock;
-					HLVM_CONSTEXPR_ASSERT(bValidate, NextFreeBlock && NextFreeBlock->prevFreeBlock == FreeBlock && (NextFreeBlock == mTail || NextFreeBlock->size > 0));
-					FBlock* PrevFreeBlock = FreeBlock->prevFreeBlock;
-
-					SizeType NewFreeBlockSize = (FreeBlock->size - FBlock_Size - size);
-					if (NewFreeBlockSize <= Minimal_Block_Size)
+					HLVM_CONSTEXPR_ASSERT(bValidate, FreeBlock->GetFree());
+					if (!RetPtr && FreeBlock->size >= size)
 					{
-						// New free block is trivial
-						// Mark current free block not free anymore
-						FreeBlock->size = (-FreeBlock->size);
-						NextFreeBlock->prevFreeBlock = PrevFreeBlock;
-						//						if (PrevFreeBlock)
-						//						{
-						//							HLVM_CONSTEXPR_ASSERT(bValidate,
-						//								PrevFreeBlock && PrevFreeBlock->nextFreeBlock == FreeBlock && PrevFreeBlock->size > 0);
-						//							PrevFreeBlock->nextFreeBlock = NextFreeBlock;
-						//						}
-						//						else
-						{
-							HLVM_CONSTEXPR_ASSERT(bValidate, PrevFreeBlock == nullptr);
-							HLVM_CONSTEXPR_ASSERT(bValidate, mFreeBlockHead == FreeBlock);
-							mFreeBlockHead = NextFreeBlock;
-						}
+						FBlock* NextFreeBlock = FreeBlock->nextFreeBlock;
+						HLVM_CONSTEXPR_ASSERT(bValidate, NextFreeBlock && NextFreeBlock->prevFreeBlock == FreeBlock && (NextFreeBlock == mTail || NextFreeBlock->size > 0));
+						FBlock* PrevFreeBlock = FreeBlock->prevFreeBlock;
+
+						SizeType NewFreeBlockSize = (FreeBlock->size - FBlock_Size - size);
+						if (NewFreeBlockSize <= Minimal_Block_Size)
+							HLVM_UNLIKELY
+							{
+								// New free block is trivial
+								// Mark current free block not free anymore
+								FreeBlock->size = (-FreeBlock->size);
+								NextFreeBlock->prevFreeBlock = PrevFreeBlock;
+
+								{
+									HLVM_CONSTEXPR_ASSERT(bValidate, PrevFreeBlock == nullptr);
+									HLVM_CONSTEXPR_ASSERT(bValidate, mFreeBlockHead == FreeBlock);
+									mFreeBlockHead = NextFreeBlock;
+								}
+							}
+						else
+							HLVM_LIKELY
+							{
+								// Otherwise, connect next and prev to new free block
+								FBlock* NewFreeBlock = R_C(FBlock*, R_C(TBYTE*, FreeBlock) + FBlock_Size + size);
+								NewFreeBlock->size = NewFreeBlockSize;
+								// Mark current free block not free anymore and update to malloced size
+								FreeBlock->size = (-size);
+								// Assign NewFreeBlock to FreeBlock so that we can iterate to new free block later
+								FreeBlock->nextFreeBlock = NewFreeBlock;
+
+								NewFreeBlock->nextFreeBlock = NextFreeBlock;
+								NewFreeBlock->prevFreeBlock = PrevFreeBlock;
+								NextFreeBlock->prevFreeBlock = NewFreeBlock;
+
+								{
+									HLVM_CONSTEXPR_ASSERT(bValidate, PrevFreeBlock == nullptr);
+									HLVM_CONSTEXPR_ASSERT(bValidate, mFreeBlockHead == FreeBlock);
+									// Otherwise, assign head to new free block
+									mFreeBlockHead = NewFreeBlock;
+								}
+							}
+						HLVM_CONSTEXPR_ASSERT(bValidate, mFreeBlockHead->prevFreeBlock == nullptr);
+						HLVM_CONSTEXPR_ASSERT(bValidate, mFreeBlockHead != FreeBlock);
+
+						// Return actual pointer address
+						TBYTE* ptr = R_C(TBYTE*, FreeBlock) + FBlock_Size;
+						RetPtr = ptr;
 					}
-					else
+					// Iterate to next free block
+					if (mFreeSizeUpperBound < FreeBlock->size)
 					{
-						// Otherwise, connect next and prev to new free block
-						FBlock* NewFreeBlock = R_C(FBlock*, R_C(TBYTE*, FreeBlock) + FBlock_Size + size);
-						NewFreeBlock->size = NewFreeBlockSize;
-						// Mark current free block not free anymore and update to malloced size
-						FreeBlock->size = (-size);
-						// Assign NewFreeBlock to FreeBlock so that we can iterate to new free block later
-						FreeBlock->nextFreeBlock = NewFreeBlock;
-
-						NewFreeBlock->nextFreeBlock = NextFreeBlock;
-						NewFreeBlock->prevFreeBlock = PrevFreeBlock;
-						NextFreeBlock->prevFreeBlock = NewFreeBlock;
-						//						if (PrevFreeBlock)
-						//						{
-						//							HLVM_CONSTEXPR_ASSERT(bValidate,
-						//								PrevFreeBlock && PrevFreeBlock->nextFreeBlock == FreeBlock && PrevFreeBlock->size > 0);
-						//							PrevFreeBlock->nextFreeBlock = NewFreeBlock;
-						//						}
-						//						else
-						{
-							HLVM_CONSTEXPR_ASSERT(bValidate, PrevFreeBlock == nullptr);
-							HLVM_CONSTEXPR_ASSERT(bValidate, mFreeBlockHead == FreeBlock);
-							// Otherwise, assign head to new free block
-							mFreeBlockHead = NewFreeBlock;
-						}
+						mFreeSizeUpperBound = FreeBlock->size;
 					}
-					HLVM_CONSTEXPR_ASSERT(bValidate, mFreeBlockHead->prevFreeBlock == nullptr);
-					HLVM_CONSTEXPR_ASSERT(bValidate, mFreeBlockHead != FreeBlock);
-
-					// Return actual pointer address
-					TBYTE* ptr = R_C(TBYTE*, FreeBlock) + FBlock_Size;
-					RetPtr = ptr;
+					FreeBlock = FreeBlock->nextFreeBlock;
 				}
-				// Iterate to next free block
-				if (mFreeSizeUpperBound < FreeBlock->size)
-				{
-					mFreeSizeUpperBound = FreeBlock->size;
-				}
-				FreeBlock = FreeBlock->nextFreeBlock;
+				HLVM_CONSTEXPR_ASSERT(bValidate, FreeBlock == mTail);
 			}
-			HLVM_CONSTEXPR_ASSERT(bValidate, FreeBlock == mTail);
+			if (!RetPtr)
+			{
+				HLVM_LOG(LogHeapMallocator, debug, TXT("Failed to allocate memory from heap allocator size {}, free block upper bound {}"), size, mFreeSizeUpperBound);
+			}
+			return RetPtr;
 		}
-		if (!RetPtr)
-		{
-			HLVM_LOG(LogHeapMallocator, debug, TXT("Failed to allocate memory from heap allocator size {}, free block upper bound {}"), size, mFreeSizeUpperBound);
-		}
-		return RetPtr;
-	}
 }
 
 void FVMHeap::Free(void* p)
@@ -179,136 +173,138 @@ void FVMHeap::Free(void* p)
 	HLVM_CONSTEXPR_ASSERT(bValidate, Owned(p));
 	HLVM_ENSURE(mHeap, TXT("calling free on nullptr heap with pointer {} to be free"), p);
 	if (!bManaged)
-	{
-		Destroy();
-	}
-	else
-	{
-		// Reset new block to free
-		FBlock* FreeBlock = R_C(FBlock*, R_C(TBYTE*, p) - FBlock_Size);
-		HLVM_CONSTEXPR_ASSERT(bValidate, FreeBlock->size < 0);
-		HLVM_CONSTEXPR_ASSERT(bValidate, !FreeBlock->GetFree());
-		HLVM_CONSTEXPR_ASSERT(bValidate, mFreeBlockHead->GetFree());
-		HLVM_CONSTEXPR_ASSERT(bValidate, mFreeBlockHead->prevFreeBlock == nullptr);
-
-		// Set free block to free again
-		FreeBlock->size = (-FreeBlock->size);
-		HLVM_CONSTEXPR_ASSERT(bValidate, FreeBlock->size > 0 && S_C(size_t, FreeBlock->size) <= GetManagedSize());
-
-		// Exchange new free block with free head
-		FreeBlock->prevFreeBlock = nullptr;
-		FreeBlock->nextFreeBlock = mFreeBlockHead;
-		mFreeBlockHead->prevFreeBlock = FreeBlock;
-		mFreeBlockHead = FreeBlock;
-
-		// Defragmentation next physical block if it is free
+		HLVM_UNLIKELY
 		{
-			FBlock* CurrBlock = mFreeBlockHead;
-			FBlock* NextBlock = R_C(FBlock*, R_C(TBYTE*, CurrBlock) + FBlock_Size + std::abs(CurrBlock->size));
-			// While not reach the tail
-			while (NextBlock != mTail)
+			Destroy();
+		}
+	else
+		HLVM_LIKELY
+		{
+			// Reset new block to free
+			FBlock* FreeBlock = R_C(FBlock*, R_C(TBYTE*, p) - FBlock_Size);
+			HLVM_CONSTEXPR_ASSERT(bValidate, FreeBlock->size < 0);
+			HLVM_CONSTEXPR_ASSERT(bValidate, !FreeBlock->GetFree());
+			HLVM_CONSTEXPR_ASSERT(bValidate, mFreeBlockHead->GetFree());
+			HLVM_CONSTEXPR_ASSERT(bValidate, mFreeBlockHead->prevFreeBlock == nullptr);
+
+			// Set free block to free again
+			FreeBlock->size = (-FreeBlock->size);
+			HLVM_CONSTEXPR_ASSERT(bValidate, FreeBlock->size > 0 && S_C(size_t, FreeBlock->size) <= GetManagedSize());
+
+			// Exchange new free block with free head
+			FreeBlock->prevFreeBlock = nullptr;
+			FreeBlock->nextFreeBlock = mFreeBlockHead;
+			mFreeBlockHead->prevFreeBlock = FreeBlock;
+			mFreeBlockHead = FreeBlock;
+
+			// Defragmentation next physical block if it is free
 			{
-				HLVM_CONSTEXPR_ASSERT(bValidate, CurrBlock->size != 0 && NextBlock->size != 0);
-				if (CurrBlock->size < 0 || NextBlock->size < 0)
+				FBlock* CurrBlock = mFreeBlockHead;
+				FBlock* NextBlock = R_C(FBlock*, R_C(TBYTE*, CurrBlock) + FBlock_Size + std::abs(CurrBlock->size));
+				// While not reach the tail
+				while (NextBlock != mTail)
 				{
-					// If not both blocks are free, continue
-					break;
+					HLVM_CONSTEXPR_ASSERT(bValidate, CurrBlock->size != 0 && NextBlock->size != 0);
+					if (CurrBlock->size < 0 || NextBlock->size < 0)
+					{
+						// If not both blocks are free, continue
+						break;
+					}
+					else
+					{
+						// Sanity checks
+						FBlock* NextBlockPrevFreeBlock = NextBlock->prevFreeBlock;
+						HLVM_CONSTEXPR_ASSERT(bValidate, NextBlockPrevFreeBlock);
+
+						HLVM_CONSTEXPR_ASSERT(bValidate, CurrBlock->size > 0 && NextBlock->size > 0);
+						HLVM_CONSTEXPR_ASSERT(bValidate, (NextBlockPrevFreeBlock && NextBlockPrevFreeBlock != NextBlock && NextBlockPrevFreeBlock->nextFreeBlock == NextBlock));
+						FBlock* NextBlockNextFreeBlock = NextBlock->nextFreeBlock;
+						HLVM_CONSTEXPR_ASSERT(bValidate, NextBlockNextFreeBlock && NextBlockNextFreeBlock != NextBlock && NextBlockNextFreeBlock->prevFreeBlock == NextBlock && (NextBlockNextFreeBlock == mTail || NextBlockNextFreeBlock->size > 0));
+
+						// Eliminate Next block by connect prev and next
+						HLVM_CONSTEXPR_ASSERT(bValidate, NextBlockPrevFreeBlock != NextBlockNextFreeBlock);
+						NextBlockPrevFreeBlock->nextFreeBlock = NextBlockNextFreeBlock;
+						NextBlockNextFreeBlock->prevFreeBlock = NextBlockPrevFreeBlock;
+
+						// Defragment CurrBlock and move on to next block once more
+						CurrBlock->size += NextBlock->size + FBlock_Size;
+						HLVM_CONSTEXPR_ASSERT(bValidate, CurrBlock->size > 0 && S_C(size_t, CurrBlock->size) <= GetManagedSize());
+
+						// Update upper bound if necessary
+						if (mFreeSizeUpperBound < CurrBlock->size)
+						{
+							mFreeSizeUpperBound = CurrBlock->size;
+						}
+
+						NextBlock = R_C(FBlock*, R_C(TBYTE*, NextBlock) + FBlock_Size + NextBlock->size);
+						HLVM_CONSTEXPR_ASSERT(bValidate, NextBlock == R_C(FBlock*, R_C(TBYTE*, CurrBlock) + FBlock_Size + CurrBlock->size));
+					}
 				}
-				else
+			}
+
+			{
+				// Swap next block if it is bigger than current free head,
+				// so to keep free head a larger block size for easier allocation next time
+				FBlock* CurrBlock = mFreeBlockHead;
+				FBlock* NextBlock = CurrBlock->nextFreeBlock;
+				bool	bFirst = true;
+				while (NextBlock->size > CurrBlock->size)
 				{
 					// Sanity checks
-					FBlock* NextBlockPrevFreeBlock = NextBlock->prevFreeBlock;
-					HLVM_CONSTEXPR_ASSERT(bValidate, NextBlockPrevFreeBlock);
+					HLVM_CONSTEXPR_ASSERT(bValidate, NextBlock->prevFreeBlock == CurrBlock);
+					FBlock* NextBlockNext = NextBlock->nextFreeBlock;
+					HLVM_CONSTEXPR_ASSERT(bValidate, NextBlockNext && NextBlockNext != NextBlock && NextBlockNext->prevFreeBlock == NextBlock);
 
-					HLVM_CONSTEXPR_ASSERT(bValidate, CurrBlock->size > 0 && NextBlock->size > 0);
-					HLVM_CONSTEXPR_ASSERT(bValidate, (NextBlockPrevFreeBlock && NextBlockPrevFreeBlock != NextBlock && NextBlockPrevFreeBlock->nextFreeBlock == NextBlock));
-					FBlock* NextBlockNextFreeBlock = NextBlock->nextFreeBlock;
-					HLVM_CONSTEXPR_ASSERT(bValidate, NextBlockNextFreeBlock && NextBlockNextFreeBlock != NextBlock && NextBlockNextFreeBlock->prevFreeBlock == NextBlock && (NextBlockNextFreeBlock == mTail || NextBlockNextFreeBlock->size > 0));
+					// Skip next and connect current with next block's next
+					HLVM_CONSTEXPR_ASSERT(bValidate, NextBlockNext != CurrBlock);
+					CurrBlock->nextFreeBlock = NextBlockNext;
+					NextBlockNext->prevFreeBlock = CurrBlock;
 
-					// Eliminate Next block by connect prev and next
-					HLVM_CONSTEXPR_ASSERT(bValidate, NextBlockPrevFreeBlock != NextBlockNextFreeBlock);
-					NextBlockPrevFreeBlock->nextFreeBlock = NextBlockNextFreeBlock;
-					NextBlockNextFreeBlock->prevFreeBlock = NextBlockPrevFreeBlock;
-
-					// Defragment CurrBlock and move on to next block once more
-					CurrBlock->size += NextBlock->size + FBlock_Size;
-					HLVM_CONSTEXPR_ASSERT(bValidate, CurrBlock->size > 0 && S_C(size_t, CurrBlock->size) <= GetManagedSize());
-
-					// Update upper bound if necessary
-					if (mFreeSizeUpperBound < CurrBlock->size)
+					// Skip current and connect current block's prev with next
+					FBlock* CurrPrevBlock = CurrBlock->prevFreeBlock;
+					NextBlock->prevFreeBlock = CurrPrevBlock;
+					if (CurrPrevBlock)
 					{
-						mFreeSizeUpperBound = CurrBlock->size;
+						CurrPrevBlock->nextFreeBlock = NextBlock;
 					}
 
-					NextBlock = R_C(FBlock*, R_C(TBYTE*, NextBlock) + FBlock_Size + NextBlock->size);
-					HLVM_CONSTEXPR_ASSERT(bValidate, NextBlock == R_C(FBlock*, R_C(TBYTE*, CurrBlock) + FBlock_Size + CurrBlock->size));
+					// Swap next block with free head
+					NextBlock->nextFreeBlock = CurrBlock;
+					CurrBlock->prevFreeBlock = NextBlock;
+
+					// Only update mFreeBlockHead once!
+					if (bFirst)
+					{
+						bFirst = false;
+						mFreeBlockHead = NextBlock;
+					}
+
+					// Iterate to next block
+					NextBlock = NextBlockNext;
 				}
 			}
-		}
 
-		{
-			// Swap next block if it is bigger than current free head,
-			// so to keep free head a larger block size for easier allocation next time
-			FBlock* CurrBlock = mFreeBlockHead;
-			FBlock* NextBlock = CurrBlock->nextFreeBlock;
-			bool	bFirst = true;
-			while (NextBlock->size > CurrBlock->size)
+			/**
+			 * Check free block validity
+			 */
+			if constexpr (bValidate)
 			{
-				// Sanity checks
-				HLVM_CONSTEXPR_ASSERT(bValidate, NextBlock->prevFreeBlock == CurrBlock);
-				FBlock* NextBlockNext = NextBlock->nextFreeBlock;
-				HLVM_CONSTEXPR_ASSERT(bValidate, NextBlockNext && NextBlockNext != NextBlock && NextBlockNext->prevFreeBlock == NextBlock);
-
-				// Skip next and connect current with next block's next
-				HLVM_CONSTEXPR_ASSERT(bValidate, NextBlockNext != CurrBlock);
-				CurrBlock->nextFreeBlock = NextBlockNext;
-				NextBlockNext->prevFreeBlock = CurrBlock;
-
-				// Skip current and connect current block's prev with next
-				FBlock* CurrPrevBlock = CurrBlock->prevFreeBlock;
-				NextBlock->prevFreeBlock = CurrPrevBlock;
-				if (CurrPrevBlock)
-				{
-					CurrPrevBlock->nextFreeBlock = NextBlock;
-				}
-
-				// Swap next block with free head
-				NextBlock->nextFreeBlock = CurrBlock;
-				CurrBlock->prevFreeBlock = NextBlock;
-
-				// Only update mFreeBlockHead once!
-				if (bFirst)
-				{
-					bFirst = false;
-					mFreeBlockHead = NextBlock;
-				}
-
-				// Iterate to next block
-				NextBlock = NextBlockNext;
-			}
-		}
-
-		/**
-		 * Check free block validity
-		 */
-		if constexpr (bValidate)
-		{
-			assert(mFreeBlockHead->prevFreeBlock == nullptr
-				&& mFreeBlockHead->nextFreeBlock
-				&& mFreeBlockHead->nextFreeBlock != mFreeBlockHead
-				&& FreeBlock->size > 0);
-			FreeBlock = mFreeBlockHead->nextFreeBlock;
-			while (FreeBlock->nextFreeBlock)
-			{
-				assert(FreeBlock->prevFreeBlock != nullptr
-					&& FreeBlock->prevFreeBlock != FreeBlock->nextFreeBlock
-					&& FreeBlock->prevFreeBlock != FreeBlock
-					&& FreeBlock->nextFreeBlock != FreeBlock
-					&& FreeBlock != mFreeBlockHead
+				assert(mFreeBlockHead->prevFreeBlock == nullptr
+					&& mFreeBlockHead->nextFreeBlock
+					&& mFreeBlockHead->nextFreeBlock != mFreeBlockHead
 					&& FreeBlock->size > 0);
-				FreeBlock = FreeBlock->nextFreeBlock;
+				FreeBlock = mFreeBlockHead->nextFreeBlock;
+				while (FreeBlock->nextFreeBlock)
+				{
+					assert(FreeBlock->prevFreeBlock != nullptr
+						&& FreeBlock->prevFreeBlock != FreeBlock->nextFreeBlock
+						&& FreeBlock->prevFreeBlock != FreeBlock
+						&& FreeBlock->nextFreeBlock != FreeBlock
+						&& FreeBlock != mFreeBlockHead
+						&& FreeBlock->size > 0);
+					FreeBlock = FreeBlock->nextFreeBlock;
+				}
+				assert(FreeBlock == mTail);
 			}
-			assert(FreeBlock == mTail);
 		}
-	}
 }

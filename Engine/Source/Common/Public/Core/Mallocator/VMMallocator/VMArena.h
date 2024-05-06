@@ -25,14 +25,19 @@ public:
 	FVMArena();
 	~FVMArena();
 
+	bool Owned(void* p);
+
 	void* Malloc(size_t size);
 	void  Free(void* p);
 
 	void* MallocHeap(size_t size);
 	void  FreeHeap(void* p);
 
-	void* MallocBinned(size_t size);
-	void  FreeBinned(void* p, TUINT8 size);
+	void* MallocSmallBinned(size_t size);
+	void  FreeSmallBinned(void* p, TUINT8 size);
+
+private:
+	friend FVMHeap;
 
 	void* MallocOSPage(size_t size);
 	void  FreeOSPage(void* p);
@@ -40,11 +45,10 @@ public:
 	void* MallocLowLevel(size_t size);
 	void  FreeLowLevel(void* p);
 
-private:
 	struct FNonLocalPendingFree
 	{
-		void*			ptrToBeFree;
-		std::thread::id tidNotOwned; // Helper data which we already known a tid that ptr does not belong to
+		void*	ptrToBeFree;
+		TUINT64 tidNotOwned; // Helper data which we already known a tid that ptr does not belong to
 	};
 	/**
 	 * Global pending free list, accepting pending free pointer from non-local frees,
@@ -89,5 +93,5 @@ private:
 	TConcurrentQueue<FLocalPendingFree,
 		EConcurrentQueueMode::Spsc, false,
 		TPMRGMallocator<hlvm_private::TQueueNode<FLocalPendingFree>>>
-		mLocalPendingFreeListReceiver;
+		mThisThreadPendingFreeList;
 };

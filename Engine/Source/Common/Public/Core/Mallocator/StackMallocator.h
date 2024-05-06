@@ -69,15 +69,15 @@ public:
 			return false;
 		}
 	}
-	HLVM_NODISCARD HLVM_INLINE_FUNC virtual void* Malloc(std::size_t size) noexcept(false) final override
+	HLVM_NODISCARD HLVM_INLINE_FUNC virtual void* Malloc(size_t size) noexcept(false) final override
 	{
 		return InternalMalloc(size);
 	}
-	HLVM_NODISCARD HLVM_INLINE_FUNC virtual void* Malloc2(std::size_t size) noexcept final override
+	HLVM_NODISCARD HLVM_INLINE_FUNC virtual void* Malloc2(size_t size) noexcept final override
 	{
 		return InternalMalloc(size);
 	}
-	HLVM_NODISCARD HLVM_INLINE_FUNC virtual void* MallocAligned(std::size_t size, std::size_t align) noexcept(false) final override
+	HLVM_NODISCARD HLVM_INLINE_FUNC virtual void* MallocAligned(size_t size, size_t align) noexcept(false) final override
 	{
 		if constexpr (bUseHeapForAlignedAlloc)
 		{
@@ -88,7 +88,7 @@ public:
 			return InternalMalloc(size);
 		}
 	}
-	HLVM_NODISCARD HLVM_INLINE_FUNC virtual void* MallocAligned2(std::size_t size, std::size_t align) noexcept final override
+	HLVM_NODISCARD HLVM_INLINE_FUNC virtual void* MallocAligned2(size_t size, size_t align) noexcept final override
 	{
 		if constexpr (bUseHeapForAlignedAlloc)
 		{
@@ -103,11 +103,11 @@ public:
 	{
 		return InternalFree(ptr);
 	}
-	HLVM_NODISCARD HLVM_INLINE_FUNC virtual EFreeRetType FreeSize(void* ptr, std::size_t) noexcept final override
+	HLVM_NODISCARD HLVM_INLINE_FUNC virtual EFreeRetType FreeSize(void* ptr, size_t) noexcept final override
 	{
 		return InternalFree(ptr);
 	}
-	HLVM_NODISCARD HLVM_INLINE_FUNC virtual EFreeRetType FreeAligned(void* ptr, std::size_t align) noexcept final override
+	HLVM_NODISCARD HLVM_INLINE_FUNC virtual EFreeRetType FreeAligned(void* ptr, size_t align) noexcept final override
 	{
 		if constexpr (bUseHeapForAlignedAlloc)
 		{
@@ -118,7 +118,7 @@ public:
 			return InternalFree(ptr);
 		}
 	}
-	HLVM_NODISCARD HLVM_INLINE_FUNC virtual EFreeRetType FreeSizeAligned(void* ptr, std::size_t size, std::size_t align) noexcept final override
+	HLVM_NODISCARD HLVM_INLINE_FUNC virtual EFreeRetType FreeSizeAligned(void* ptr, size_t size, size_t align) noexcept final override
 	{
 		if constexpr (bUseHeapForAlignedAlloc)
 		{
@@ -131,19 +131,6 @@ public:
 	}
 
 private:
-#if 0
-	PACK(struct FBlock {
-		FBlock*	 prevFreeBlock{ nullptr };
-		FBlock*	 nextFreeBlock{ nullptr };
-		SizeType size{ 0 };
-
-		HLVM_INLINE_FUNC bool GetFree() const
-		{
-			return size >= 0;
-		}
-	});
-	static_assert(sizeof(FBlock) == 20, "FBlock size must be 20 bytes");
-#else
 	struct FBlock
 	{
 		NOCOPYMOVE(FBlock)
@@ -158,13 +145,13 @@ private:
 		}
 	};
 	static_assert(sizeof(FBlock) == 12, "FBlock size must be 12 bytes");
-#endif
+
 	HLVM_INLINE_VAR HLVM_STATIC_VAR constexpr SizeType FBlock_Size = S_C(SizeType, sizeof(FBlock));
 	static_assert(N - 2 * FBlock_Size > 0);
 	HLVM_INLINE_VAR HLVM_STATIC_VAR constexpr SizeType Minimal_Block_Size = 24;
 
 	// TODO : Maybe consider implement aligned address looking up for stack allocator
-	void* InternalMalloc(std::size_t _size) noexcept(bValidate)
+	void* InternalMalloc(size_t _size) noexcept(bValidate)
 	{
 		SizeType size = S_C(SizeType, _size);
 		HLVM_CONSTEXPR_ASSERT(bValidate, size > 0 && size <= N - 2 * FBlock_Size);
@@ -186,47 +173,49 @@ private:
 
 					SizeType NewFreeBlockSize = (FreeBlock->size - FBlock_Size - size);
 					if (NewFreeBlockSize <= Minimal_Block_Size)
-					{
-						// New free block is trivial
-						// Mark current free block not free anymore
-						FreeBlock->size = (-FreeBlock->size);
-						NextFreeBlock->prevFreeBlock = PrevFreeBlock;
-						if (PrevFreeBlock)
+						HLVM_UNLIKELY
 						{
-							HLVM_CONSTEXPR_ASSERT(bValidate,
-								PrevFreeBlock && PrevFreeBlock->nextFreeBlock == FreeBlock && PrevFreeBlock->size > 0);
-							PrevFreeBlock->nextFreeBlock = NextFreeBlock;
+							// New free block is trivial
+							// Mark current free block not free anymore
+							FreeBlock->size = (-FreeBlock->size);
+							NextFreeBlock->prevFreeBlock = PrevFreeBlock;
+							if (PrevFreeBlock)
+							{
+								HLVM_CONSTEXPR_ASSERT(bValidate,
+									PrevFreeBlock && PrevFreeBlock->nextFreeBlock == FreeBlock && PrevFreeBlock->size > 0);
+								PrevFreeBlock->nextFreeBlock = NextFreeBlock;
+							}
+							else
+							{
+								HLVM_CONSTEXPR_ASSERT(bValidate, mFreeBlockHead == FreeBlock);
+								mFreeBlockHead = NextFreeBlock;
+							}
 						}
-						else
-						{
-							HLVM_CONSTEXPR_ASSERT(bValidate, mFreeBlockHead == FreeBlock);
-							mFreeBlockHead = NextFreeBlock;
-						}
-					}
 					else
-					{
-						// Otherwise, connect next and prev to new free block
-						FBlock* NewFreeBlock = R_C(FBlock*, R_C(TBYTE*, FreeBlock) + FBlock_Size + size);
-						NewFreeBlock->size = NewFreeBlockSize;
-						// Mark current free block not free anymore and update to malloced size
-						FreeBlock->size = (-size);
+						HLVM_LIKELY
+						{
+							// Otherwise, connect next and prev to new free block
+							FBlock* NewFreeBlock = R_C(FBlock*, R_C(TBYTE*, FreeBlock) + FBlock_Size + size);
+							NewFreeBlock->size = NewFreeBlockSize;
+							// Mark current free block not free anymore and update to malloced size
+							FreeBlock->size = (-size);
 
-						NewFreeBlock->nextFreeBlock = NextFreeBlock;
-						NewFreeBlock->prevFreeBlock = PrevFreeBlock;
-						NextFreeBlock->prevFreeBlock = NewFreeBlock;
-						if (PrevFreeBlock)
-						{
-							HLVM_CONSTEXPR_ASSERT(bValidate,
-								PrevFreeBlock && PrevFreeBlock->nextFreeBlock == FreeBlock && PrevFreeBlock->size > 0);
-							PrevFreeBlock->nextFreeBlock = NewFreeBlock;
+							NewFreeBlock->nextFreeBlock = NextFreeBlock;
+							NewFreeBlock->prevFreeBlock = PrevFreeBlock;
+							NextFreeBlock->prevFreeBlock = NewFreeBlock;
+							if (PrevFreeBlock)
+							{
+								HLVM_CONSTEXPR_ASSERT(bValidate,
+									PrevFreeBlock && PrevFreeBlock->nextFreeBlock == FreeBlock && PrevFreeBlock->size > 0);
+								PrevFreeBlock->nextFreeBlock = NewFreeBlock;
+							}
+							else
+							{
+								HLVM_CONSTEXPR_ASSERT(bValidate, mFreeBlockHead == FreeBlock);
+								// Otherwise, assign head to new free block
+								mFreeBlockHead = NewFreeBlock;
+							}
 						}
-						else
-						{
-							HLVM_CONSTEXPR_ASSERT(bValidate, mFreeBlockHead == FreeBlock);
-							// Otherwise, assign head to new free block
-							mFreeBlockHead = NewFreeBlock;
-						}
-					}
 					HLVM_CONSTEXPR_ASSERT(bValidate, mFreeBlockHead->prevFreeBlock == nullptr);
 					HLVM_CONSTEXPR_ASSERT(bValidate, mFreeBlockHead != FreeBlock);
 

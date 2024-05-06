@@ -61,13 +61,14 @@ public:
 	void* Malloc(size_t size);
 	void  Free(void* p);
 
-private:
+public:
 	struct FHeapHeadBlock
 	{
 		FVMHeap* OwnerHeap{ nullptr };
 	};
 	static_assert(sizeof(FHeapHeadBlock) == 8, "FHeapHeadBlock size must be 16 bytes");
 
+private:
 	PACK(struct FBlock {
 		NOCOPYMOVE(FBlock)
 		FBlock() = default;
@@ -89,10 +90,10 @@ private:
 	FVMArena* VMArena{ nullptr };
 	size_t	  N{ 0 };
 	BIT_FLAG(bManaged){ true };
-	TBYTE* mHeap{ nullptr }; // TODO Allocate pointer to HeapAllocator in the beginning of Heap so that we can get the size of Heap
 
+	TBYTE*	 mHeap{ nullptr }; // TODO Allocate pointer to HeapAllocator in the beginning of Heap so that we can get the size of Heap
 	FBlock*	 mFreeBlockHead{ nullptr };
 	FBlock*	 mTail{ nullptr };
-	void*	 mLowerBound{ nullptr };
+	TBYTE*	 mLowerBound{ nullptr };
 	SizeType mFreeSizeUpperBound{ 0 };
 };

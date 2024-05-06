@@ -13,6 +13,7 @@ HLVM_ENUM(EMallocator, TUINT8,
 	Std,
 	Mimalloc,
 	Stack,
+	VMArena,
 	Unkown);
 
 HLVM_ENUM(EFreeRetType, TUINT8,
@@ -31,14 +32,14 @@ public:
 	IMallocator() noexcept = default;
 	virtual ~IMallocator() noexcept = default;
 	HLVM_NODISCARD virtual bool			Owned(void* ptr) noexcept = 0;
-	HLVM_NODISCARD virtual void*		Malloc(std::size_t size) noexcept(false) = 0;
-	HLVM_NODISCARD virtual void*		Malloc2(std::size_t size) noexcept = 0;
-	HLVM_NODISCARD virtual void*		MallocAligned(std::size_t size, std::size_t alignment) noexcept(false) = 0;
-	HLVM_NODISCARD virtual void*		MallocAligned2(std::size_t size, std::size_t alignment) noexcept = 0;
+	HLVM_NODISCARD virtual void*		Malloc(size_t size) noexcept(false) = 0;
+	HLVM_NODISCARD virtual void*		Malloc2(size_t size) noexcept = 0;
+	HLVM_NODISCARD virtual void*		MallocAligned(size_t size, size_t alignment) noexcept(false) = 0;
+	HLVM_NODISCARD virtual void*		MallocAligned2(size_t size, size_t alignment) noexcept = 0;
 	HLVM_NODISCARD virtual EFreeRetType Free(void* ptr) noexcept = 0;
-	HLVM_NODISCARD virtual EFreeRetType FreeSize(void* ptr, std::size_t size) noexcept = 0;
-	HLVM_NODISCARD virtual EFreeRetType FreeAligned(void* ptr, std::size_t alignment) noexcept = 0;
-	HLVM_NODISCARD virtual EFreeRetType FreeSizeAligned(void* ptr, std::size_t size, std::size_t alignment) noexcept = 0;
+	HLVM_NODISCARD virtual EFreeRetType FreeSize(void* ptr, size_t size) noexcept = 0;
+	HLVM_NODISCARD virtual EFreeRetType FreeAligned(void* ptr, size_t alignment) noexcept = 0;
+	HLVM_NODISCARD virtual EFreeRetType FreeSizeAligned(void* ptr, size_t size, size_t alignment) noexcept = 0;
 
 public:
 	EMallocator Type = EMallocator::Unkown;

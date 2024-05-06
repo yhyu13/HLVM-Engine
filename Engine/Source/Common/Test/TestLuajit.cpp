@@ -4,7 +4,7 @@
 
 #include "Test.h"
 
-#include "Core/Scripting/Lua.h"
+#include "Core/Scripting/Lua/Sol.h"
 
 DECLARE_LOG_CATEGORY(LogTest)
 
@@ -108,10 +108,33 @@ RECORD(luajit_sol2_perf_test)
 	HLVM_LOG(LogTest, info, TXT("Test luajit_test2!"));
 	{
 		{
+			FScopedTimerLog	   timer(TXT("LuaJIT cpp loop test"));
+			int				   cumu = 0;
+			int				   loop_count = 1000;
+			std::map<int, int> t;
+			for (int i = 0; i < 100; ++i)
+			{
+				t[i] = i;
+			}
+			for (int i = 0; i < loop_count; ++i)
+			{
+				for (int j = 0; j < 1000; ++j)
+				{
+					for (auto& pair : t)
+					{
+						cumu += pair.second;
+					}
+				}
+			}
+			HLVM_LOG(LogTest, info, TXT("LuaJIT cpp loop test: {}"), cumu);
+		}
+
+		{
 			static const char* lua_sciprt = R"(
 local loop_count = 1000
 local fun_pair = pairs
 
+local cumu = 0
 local t = {}
 for i=1,100 do
     t[i] = i
@@ -120,7 +143,7 @@ end
 for i=1,loop_count do
     for j=1,1000 do
         for k,v in fun_pair(t) do
-            --
+            cumu = cumu + v
         end
     end
 end
@@ -193,6 +216,7 @@ end
 local loop_count = 1000
 local fun_pair = ipairs
 
+local cumu = 0
 local t = {}
 for i=1,100 do
     t[i] = i
@@ -201,7 +225,7 @@ end
 for i=1,loop_count do
     for j=1,1000 do
         for k,v in fun_pair(t) do
-            --
+            cumu = cumu + v
         end
     end
 end
@@ -261,7 +285,7 @@ end
 				}
 #else
 				{
-					FScopedTimerLog timer(TXT("Sol2 pairs loop test"));
+					FScopedTimerLog timer(TXT("Sol2 ipairs loop test"));
 					lua.unsafe_script(lua_sciprt);
 				}
 #endif

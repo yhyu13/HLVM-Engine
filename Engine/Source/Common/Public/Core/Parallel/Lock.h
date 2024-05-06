@@ -260,7 +260,7 @@ public:
 
 protected:
 	mutable std::atomic_flag		  mFlag{ 0 };
-	mutable std::thread::id			  mOwner;
+	mutable TUINT64					  mOwnerTid{ 0 };
 	mutable std::atomic_uint_fast32_t mCount = 0;
 
 private:

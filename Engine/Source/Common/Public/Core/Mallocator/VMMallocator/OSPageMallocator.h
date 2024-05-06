@@ -5,7 +5,7 @@
 #pragma once
 
 #include "Core/Mallocator/PMR.h"
-#include "Core/Parallel/Lock.h"
+#include "Core/Mallocator/StackMallocator.h"
 
 #include "VMMallocatorDefinition.h"
 
@@ -14,6 +14,8 @@ class FOSPageMallocator
 	HLVM_INLINE_VAR HLVM_STATIC_VAR constexpr bool bValidate = HLVM_MALLOC_VALIDATION;
 
 public:
+	HLVM_INLINE_VAR HLVM_STATIC_VAR constexpr size_t sLargeHeapPageSize = HLVM_VMA_LARGE_HEAP_SIZE;
+
 	NOCOPYMOVE(FOSPageMallocator)
 
 	FOSPageMallocator() noexcept
@@ -62,7 +64,6 @@ public:
 
 	bool Owned(void* ptr) const noexcept
 	{
-		LOCK_GUARD_RIVAL(mRWLock, 0);
 		{
 			auto Large = mLargeHeapChainHead;
 			while (Large)
@@ -102,7 +103,6 @@ public:
 			{
 				if (!Small->Next)
 				{
-					LOCK_GUARD_RIVAL(mRWLock, 1);
 					/**
 					 *  Allocate new small heap, and ensure we can allocate enough memory right away
 					 */
@@ -147,7 +147,6 @@ public:
 			{
 				if (!Large->Next)
 				{
-					LOCK_GUARD_RIVAL(mRWLock, 1);
 					Large->Next = std::construct_at(R_C(FLargeHeapChain*, HLVM_LOWLEVEL_GMALLOCATOR.Malloc(sizeof(FLargeHeapChain))));
 				}
 				Large = Large->Next;
@@ -173,6 +172,19 @@ public:
 			Large = Large->Next;
 		}
 		HLVM_CONSTEXPR_ASSERT(bValidate, bFound);
+	}
+
+	void* MallocAlign(size_t N)
+	{
+		void* p = nullptr;
+		p = HLVM_LOWLEVEL_GMALLOCATOR.MallocAligned(N, sizeof(FLargeHeap));
+		HLVM_CONSTEXPR_ASSERT(bValidate, p != nullptr);
+		return p;
+	}
+
+	EFreeRetType FreeAlign(void* p)
+	{
+		return HLVM_LOWLEVEL_GMALLOCATOR.FreeAligned(p, sizeof(FLargeHeap));
 	}
 
 private:
@@ -213,9 +225,4 @@ private:
 	 * Large heap chain
 	 */
 	FLargeHeapChain* mLargeHeapChainHead{ nullptr };
-
-	/**
-	 * Read write mutex lock
-	 */
-	mutable FRWRivalLock mRWLock;
 };

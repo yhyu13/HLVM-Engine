@@ -5,12 +5,7 @@
 #pragma once
 
 #include "GenericPlatform.h"
-
-#include <concepts>
-
-// Concept https://en.cppreference.com/w/cpp/language/constraints
-template <class T>
-concept CPointer = std::is_pointer<T>::value;
+#include "Template/ConceptTemplate.tpp"
 
 template <CPointer T>
 class TAtomicPointer;

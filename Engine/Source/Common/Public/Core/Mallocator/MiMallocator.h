@@ -48,19 +48,19 @@ public:
 			}
 	}
 	HLVM_NODISCARD HLVM_NOINLINE_FUNC virtual bool Owned(void* ptr) noexcept final override;
-	HLVM_NODISCARD HLVM_INLINE_FUNC virtual void*  Malloc(std::size_t size) noexcept(false) final override
+	HLVM_NODISCARD HLVM_INLINE_FUNC virtual void*  Malloc(size_t size) noexcept(false) final override
 	{
 		return mi_heap_malloc(mHeap, size);
 	}
-	HLVM_NODISCARD HLVM_INLINE_FUNC virtual void* Malloc2(std::size_t size) noexcept final override
+	HLVM_NODISCARD HLVM_INLINE_FUNC virtual void* Malloc2(size_t size) noexcept final override
 	{
 		return mi_heap_malloc(mHeap, size);
 	}
-	HLVM_NODISCARD HLVM_INLINE_FUNC virtual void* MallocAligned(std::size_t size, std::size_t alignment) noexcept(false) final override
+	HLVM_NODISCARD HLVM_INLINE_FUNC virtual void* MallocAligned(size_t size, size_t alignment) noexcept(false) final override
 	{
 		return mi_heap_malloc_aligned(mHeap, size, alignment);
 	}
-	HLVM_NODISCARD HLVM_INLINE_FUNC virtual void* MallocAligned2(std::size_t size, std::size_t alignment) noexcept final override
+	HLVM_NODISCARD HLVM_INLINE_FUNC virtual void* MallocAligned2(size_t size, size_t alignment) noexcept final override
 	{
 		return mi_heap_malloc_aligned(mHeap, size, alignment);
 	}
@@ -69,17 +69,17 @@ public:
 		mi_free(ptr);
 		return EFreeRetType::Success;
 	}
-	HLVM_NODISCARD HLVM_INLINE_FUNC virtual EFreeRetType FreeSize(void* ptr, std::size_t size) noexcept final override
+	HLVM_NODISCARD HLVM_INLINE_FUNC virtual EFreeRetType FreeSize(void* ptr, size_t size) noexcept final override
 	{
 		mi_free_size(ptr, size);
 		return EFreeRetType::Success;
 	}
-	HLVM_NODISCARD HLVM_INLINE_FUNC virtual EFreeRetType FreeAligned(void* ptr, std::size_t alignment) noexcept final override
+	HLVM_NODISCARD HLVM_INLINE_FUNC virtual EFreeRetType FreeAligned(void* ptr, size_t alignment) noexcept final override
 	{
 		mi_free_aligned(ptr, alignment);
 		return EFreeRetType::Success;
 	}
-	HLVM_NODISCARD HLVM_INLINE_FUNC virtual EFreeRetType FreeSizeAligned(void* ptr, std::size_t size, std::size_t alignment) noexcept final override
+	HLVM_NODISCARD HLVM_INLINE_FUNC virtual EFreeRetType FreeSizeAligned(void* ptr, size_t size, size_t alignment) noexcept final override
 	{
 		mi_free_size_aligned(ptr, size, alignment);
 		return EFreeRetType::Success;

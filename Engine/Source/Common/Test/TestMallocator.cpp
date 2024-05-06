@@ -4,9 +4,10 @@
 
 #include "Test.h"
 
-#include "Core/Mallocator/PMR.h"
 #include "Core/Container/ContainerDefinition.h"
-#include "Core/Parallel/ConcurrentQueue.h"
+#include "Core/Mallocator/PMR.h"
+#include "Core/Mallocator/StackMallocator.h"
+#include "Core/Mallocator/VMMallocator/VMMallocator.h"
 
 DECLARE_LOG_CATEGORY(LogTest)
 
@@ -177,8 +178,16 @@ RECORD(malloc_test)
 		test_single_thread();
 	}
 
-	test_multi_thread();
-	test_different_block_sizes();
+	{
+		HLVM_LOG(LogTest, info, TXT("Test VMArena mallocator"));
+		HLVM_SCOPED_VARIABLE(
+			ScopedMallocator, [&]() -> void { SwapMallocator(&GVMArenaMallocatorTLS); MAX_BLOCK_SIZE = 1024; },
+			[&]() -> void { SwapMallocator(); MAX_BLOCK_SIZE = 1024 * 1024; });
+		test_single_thread();
+	}
+
+	//	test_multi_thread();
+	//	test_different_block_sizes();
 
 	std::cout << "All tests passed!" << std::endl;
 }

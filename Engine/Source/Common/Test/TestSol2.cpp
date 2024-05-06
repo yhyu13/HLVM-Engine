@@ -4,7 +4,7 @@
 
 #include "Test.h"
 
-#include "Core/Scripting/Lua.h"
+#include "Core/Scripting/Lua/Sol.h"
 
 DECLARE_LOG_CATEGORY(LogTest)
 

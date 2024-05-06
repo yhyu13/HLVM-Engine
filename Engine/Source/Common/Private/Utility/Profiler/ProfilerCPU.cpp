@@ -156,8 +156,7 @@ size_t FProfilerCPU::BeginEvent(const TCHAR* name)
 		FTrackedThread* thread = CurrentThread.Get();
 		if (thread == nullptr)
 		{
-			auto threadName = FString::Format(TXT("{}"),
-				*R_C(const TUINT64*, &GCurrentTID));
+			auto threadName = FString::Format(TXT("{:#x}"), GCurrentTID64);
 			thread = CurrentThread.Set(std::make_shared<FTrackedThread>(*threadName));
 		}
 		return thread->BeginEvent(name);
