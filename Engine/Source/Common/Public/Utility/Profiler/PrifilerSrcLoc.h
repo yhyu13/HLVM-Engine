@@ -24,6 +24,9 @@ struct FProfilerSrcLoc
 	TUINT32		 Line;
 
 #if HLVM_PROFILER_USE_TRACY
+	/**
+	 * Convert to tracy::SourceLocationData when tracy is used
+	 */
 	operator tracy::SourceLocationData()
 	{
 		return tracy::SourceLocationData{

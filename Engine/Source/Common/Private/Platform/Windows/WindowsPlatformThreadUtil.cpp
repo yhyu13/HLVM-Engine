@@ -14,8 +14,8 @@ protected:
 	{
 		bool bNoError = true;
 		// TODO : support other thread affinity mode
+		if (auto Config2 = S_C(const FThreadAffinityMode2*, AffinityMode))
 		{
-			auto Config2 = S_C(const FThreadAffinityMode2*, AffinityMode);
 			bNoError = Threads.size() == Config2->NumThreads && Config2->IsValid();
 			if (!bNoError)
 			{

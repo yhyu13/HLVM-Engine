@@ -14,6 +14,7 @@
 
 #if HLVM_COMPILE_WITH_PROFILER
 
+	#include <tracy/Tracy.hpp>
 	#include "Utility/Profiler/PrifilerSrcLoc.h"
 
 	#if HLVM_PROFILER_USE_TRACY

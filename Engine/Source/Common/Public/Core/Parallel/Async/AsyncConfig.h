@@ -20,9 +20,9 @@ HLVM_ENUM(ETaskPriority, TUINT8,
 );
 
 HLVM_ENUM(EThreadPriority, TUINT8,
-	Background, // Background priority thread
-	Normal,		// Normal priority thread
-	Prioritized // Prioritized thread
+	Low,	// Low priority thread
+	Normal, // Normal priority thread
+	High	// High thread
 );
 
 // https://man7.org/linux/man-pages/man3/pthread_setaffinity_np.3.html
@@ -80,7 +80,7 @@ struct FCoreDescription
 
 /**
  * One to One thread affinity mask
- * i.e. each thread is assigned to a corresponding targeted core
+ * i.e. each thread is assigned to a single corresponding core
  * e.g. Number of threads is 4, and 4 cores are targeted, each thread is assigned to a corresponding targeted core
  */
 struct FThreadAffinityMode1
@@ -169,7 +169,7 @@ namespace hlvm_private
 		.TargetedCores = FCoreDescription::NPhysicalCores(std::thread::hardware_concurrency() / HLVM_PLATFORM_SIMT_MULTIPLIER)
 	};
 	HLVM_INLINE_VAR FThreadAffinityMode2 BgTwoPhysicalCores{
-		.Priority = EThreadPriority::Background,
+		.Priority = EThreadPriority::Low,
 		.NumThreads = 2u,
 		.TargetedCores = FCoreDescription::NPhysicalCores(2u)
 	};
