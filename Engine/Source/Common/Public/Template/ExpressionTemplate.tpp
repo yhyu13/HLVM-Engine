@@ -48,5 +48,4 @@ constexpr size_t ct_GetArgsCount(TArgs&&...)
 	return sizeof...(TArgs);
 }
 
-#define HLVM_GET_ARGS_COUNT(...) \
-	ct_GetArgsCount(__VA_ARGS__)
+#define HLVM_GET_ARGS_COUNT(...) ct_GetArgsCount(__VA_ARGS__)

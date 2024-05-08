@@ -103,10 +103,14 @@ struct TPointerRemoved<T**>
 };
 
 /**
- * Use int32 offset to this pointer to represent another pointer, approximately 1%~3% slower than using raw pointer
+ * Use int32 offset to this pointer to represent another pointer,
+ * approximately 1%~3% slower than using raw pointer
+ * @CAUTION we strictly assume that TOffsetPtr32 represent some pointer range smaller than 2GB
  */
 template <typename T>
 PACK(struct TOffsetPtr32 {
+	// Initial value must be Largest positive integer int32 can represent
+	// We will use this number to represent nullptr
 	int32_t offset{ 0x7FFFFFFF };
 	operator T*()
 	{

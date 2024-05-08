@@ -40,7 +40,7 @@ public:
 
 	size_t GetFreeBlockSizeUpperBound() const
 	{
-		return S_C(size_t, mFreeSizeUpperBound);
+		return S_C(size_t, mFreeBlockHead->size);
 	}
 
 	size_t GetHeapSize() const
@@ -69,6 +69,9 @@ public:
 	static_assert(sizeof(FHeapHeadBlock) == 8, "FHeapHeadBlock size must be 16 bytes");
 
 private:
+	void SortFreeBlockList();
+
+private:
 	PACK(struct FBlock {
 		NOCOPYMOVE(FBlock)
 		FBlock() = default;
@@ -86,14 +89,13 @@ private:
 	HLVM_INLINE_VAR HLVM_STATIC_VAR constexpr SizeType FBlock_Size = S_C(SizeType, sizeof(FBlock));
 	HLVM_INLINE_VAR HLVM_STATIC_VAR constexpr SizeType Minimal_Block_Size = HLVM_VMA_SMALL_ALLOC_THRESHOLD;
 
-private:
 	FVMArena* VMArena{ nullptr };
 	size_t	  N{ 0 };
 	BIT_FLAG(bManaged){ true };
 
-	TBYTE*	 mHeap{ nullptr }; // TODO Allocate pointer to HeapAllocator in the beginning of Heap so that we can get the size of Heap
-	FBlock*	 mFreeBlockHead{ nullptr };
-	FBlock*	 mTail{ nullptr };
-	TBYTE*	 mLowerBound{ nullptr };
-	SizeType mFreeSizeUpperBound{ 0 };
+	TBYTE*	mHeap{ nullptr }; // TODO Allocate pointer to HeapAllocator in the beginning of Heap so that we can get the size of Heap
+	TBYTE*	mLowerBound{ nullptr };
+	FBlock* mTail{ nullptr };
+	FBlock* mFreeBlockHead{ nullptr };
+	FBlock* mMid{ nullptr };
 };

@@ -190,8 +190,8 @@ public:
 private:
 	struct FSmallAllocator
 	{
-		TStackMallocator<HLVM_VMA_SMALL_HEAP_SIZE - 48, false, true, false, false> StackMallocator;
-		FSmallAllocator*														   Next{ nullptr };
+		TStackMallocator<HLVM_VMA_SMALL_HEAP_SIZE - 48, true, false, false, true> StackMallocator;
+		FSmallAllocator*														  Next{ nullptr };
 	};
 	static_assert(sizeof(FSmallAllocator) == HLVM_VMA_SMALL_HEAP_SIZE, "SmallHeap size must be HLVM_VMA_SMALL_HEAP_SIZE");
 	/**

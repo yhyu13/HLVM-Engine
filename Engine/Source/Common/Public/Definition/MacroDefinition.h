@@ -19,6 +19,9 @@
 	}                          \
 	while (0)
 
+/**
+ * Simply Trigger segfault on reaching unimplemented code
+ */
 #define HLVM_NOT_IMPLEMENTED() HLVM_SEGFAULT_INLINE()
 
 #define HLVM_DELETE(ptr)    \

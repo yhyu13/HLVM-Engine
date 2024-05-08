@@ -156,9 +156,15 @@ private:
 		SizeType size = S_C(SizeType, _size);
 		HLVM_CONSTEXPR_ASSERT(bValidate, size > 0 && size <= N - 2 * FBlock_Size);
 		HLVM_CONSTEXPR_ASSERT(bValidate, mFreeBlockHead->prevFreeBlock == nullptr);
+		/**
+		 * Only allocate from stack if the size is smaller than the upper bound
+		 */
 		if (mFreeSizeUpperBound < 0 || size <= mFreeSizeUpperBound)
 		{
 			FBlock* FreeBlock = mFreeBlockHead;
+			/**
+			 * Find the first free block which is large enough
+			 */
 			while (FreeBlock->nextFreeBlock != nullptr)
 			{
 				HLVM_CONSTEXPR_ASSERT(bValidate, FreeBlock->GetFree());
@@ -278,12 +284,12 @@ private:
 				if constexpr (bDefragment)
 				{
 					FBlock* CurrBlock = mFreeBlockHead;
-					FBlock* NextBlock = R_C(FBlock*, R_C(TBYTE*, CurrBlock) + FBlock_Size + std::abs(CurrBlock->size));
+					FBlock* NextBlock = R_C(FBlock*, R_C(TBYTE*, CurrBlock) + FBlock_Size + CurrBlock->size);
 					// While not reach the tail
 					while (NextBlock != mTail)
 					{
 						HLVM_CONSTEXPR_ASSERT(bValidate, CurrBlock->size != 0 && NextBlock->size != 0);
-						if (CurrBlock->size < 0 || NextBlock->size < 0)
+						if (NextBlock->size < 0)
 						{
 							break;
 						}
@@ -323,8 +329,7 @@ private:
 				{
 					// Swap next block if it is bigger than current free head,
 					// so to keep free head a larger block size for easier allocation next time
-#if 1
-					// Fast path
+#if 1 // Fast path: only swap at most once
 					if (FBlock* NextBlock = mFreeBlockHead->nextFreeBlock;
 						NextBlock->size > mFreeBlockHead->size)
 					{
@@ -332,54 +337,51 @@ private:
 						HLVM_CONSTEXPR_ASSERT(bValidate, NextBlock->prevFreeBlock == mFreeBlockHead);
 						FBlock* NextBlockNext = NextBlock->nextFreeBlock;
 						HLVM_CONSTEXPR_ASSERT(bValidate, NextBlockNext && NextBlockNext != NextBlock && NextBlockNext->prevFreeBlock == NextBlock);
+
 						// Skip next and connect free head with next block's next
 						HLVM_CONSTEXPR_ASSERT(bValidate, NextBlockNext != mFreeBlockHead);
 						mFreeBlockHead->nextFreeBlock = NextBlockNext;
 						NextBlockNext->prevFreeBlock = mFreeBlockHead;
+
 						// Swap next block with free head
-						NextBlock->prevFreeBlock = nullptr;
 						NextBlock->nextFreeBlock = mFreeBlockHead;
 						mFreeBlockHead->prevFreeBlock = NextBlock;
+
 						mFreeBlockHead = NextBlock;
+						mFreeBlockHead->prevFreeBlock = nullptr;
 					}
-#else
-					// Slow path, swap free block until it is no longer smaller than next block
+#else // Slow path: swap free block until it is no longer smaller than its next block
 					FBlock* CurrBlock = mFreeBlockHead;
 					FBlock* NextBlock = CurrBlock->nextFreeBlock;
-					bool	bFirst = true;
-					while (NextBlock->size > CurrBlock->size)
+					FBlock* InsertBlock = NextBlock;
+					HLVM_CONSTEXPR_ASSERT(bValidate, InsertBlock);
+					HLVM_CONSTEXPR_ASSERT(bValidate, InsertBlock->size >= 0);
+					/**
+					 * Find a insert block that is smaller than or equal current block
+					 * and insert current block before it
+					 * TODO : Optimize this insert search phase as it cost most time
+					 */
+					while (InsertBlock->size > CurrBlock->size)
 					{
-						// Sanity checks
-						HLVM_CONSTEXPR_ASSERT(bValidate, NextBlock->prevFreeBlock == CurrBlock);
-						FBlock* NextBlockNext = NextBlock->nextFreeBlock;
-						HLVM_CONSTEXPR_ASSERT(bValidate, NextBlockNext && NextBlockNext != NextBlock && NextBlockNext->prevFreeBlock == NextBlock);
+						++Iter;
+						InsertBlock = InsertBlock->nextFreeBlock;
+					}
 
-						// Skip next and connect current with next block's next
-						HLVM_CONSTEXPR_ASSERT(bValidate, NextBlockNext != CurrBlock);
-						CurrBlock->nextFreeBlock = NextBlockNext;
-						NextBlockNext->prevFreeBlock = CurrBlock;
+					// We need to insert curr block as the prev block of insert block
+					if (InsertBlock != NextBlock)
+					{
+						// Make nextblock now the free head block
+						mFreeBlockHead = NextBlock;
+						mFreeBlockHead->prevFreeBlock = nullptr;
 
-						// Skip current and connect current block's prev with next
-						FBlock* CurrPrevBlock = CurrBlock->prevFreeBlock;
-						NextBlock->prevFreeBlock = CurrPrevBlock;
-						if (CurrPrevBlock)
-						{
-							CurrPrevBlock->nextFreeBlock = NextBlock;
-						}
-
-						// Swap next block with free head
-						NextBlock->nextFreeBlock = CurrBlock;
-						CurrBlock->prevFreeBlock = NextBlock;
-
-						// Only update mFreeBlockHead once!
-						if (bFirst)
-						{
-							bFirst = false;
-							mFreeBlockHead = NextBlock;
-						}
-
-						// Iterate to next block
-						NextBlock = NextBlockNext;
+						// Insert curr block and connect prev and next
+						FBlock* InsertBlockPrev = InsertBlock->prevFreeBlock;
+						HLVM_CONSTEXPR_ASSERT(bValidate, InsertBlockPrev && InsertBlockPrev != InsertBlock && InsertBlockPrev->nextFreeBlock == InsertBlock);
+						InsertBlockPrev->nextFreeBlock = CurrBlock;
+						CurrBlock->prevFreeBlock = InsertBlockPrev;
+						CurrBlock->nextFreeBlock = InsertBlock;
+						InsertBlock->prevFreeBlock = CurrBlock;
+						HLVM_CONSTEXPR_ASSERT(bValidate, InsertBlockPrev->size > CurrBlock->size && CurrBlock->size >= InsertBlock->size);
 					}
 #endif
 				}

@@ -5,15 +5,17 @@
 #pragma once
 #include <iostream>
 
+template <typename T, typename... Args>
+const char* StreamPrintf(T* ostream, const char* format, Args... args);
+
 namespace hlvm_private
 {
 	/**
 	 * Templated printf that require now memory allocation, format only accept %% or %s for simplicity
 	 */
-	template <typename T, typename U>
-	const char* StreamPrintfInner(T* ostream, const char* format, U value)
+	template <typename T>
+	const char* StreamPrintfInner(T* ostream, const char* format)
 	{
-		*ostream << value;
 		return format;
 	}
 

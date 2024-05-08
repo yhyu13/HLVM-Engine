@@ -7,6 +7,11 @@
 #include "Core/Parallel/ParallelDefinition.h"
 #include "Core/Log.h"
 
+/**
+ * Reference to boost thread
+ * https://www.boost.org/doc/libs/1_84_0/doc/html/thread/thread_management.html#thread.thread_management.tutorial
+ */
+
 HLVM_ENUM(ETaskPriority, TUINT8,
 	Normal, // Normal priority task
 	Default = Normal,

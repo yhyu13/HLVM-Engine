@@ -60,6 +60,28 @@ RECORD(mallocator_test)
 			}
 		}
 	}
+	{
+		// Try use VMMallocator and you will have lifetime object crash on free
+		HLVM_SCOPED_VARIABLE(
+			ScopedMallocator, [&]() -> void { SwapMallocator(&GVMArenaMallocatorTLS); },
+			[&]() -> void { SwapMallocator(); });
+
+		// sample new and free
+		{
+			char* p1 = new char[100];
+			char* p2 = new char[100];
+			delete[] p1;
+			delete[] p2;
+		}
+		{
+			TVector<int, TPMRIMallocator<int>> vec{ TPMRIMallocator<int>(&GVMArenaMallocatorTLS) };
+			vec.reserve(1000);
+			for (size_t i = 0; i < 1000; i++)
+			{
+				vec.push_back(1);
+			}
+		}
+	}
 }
 
 RECORD(malloc_test)

@@ -574,14 +574,14 @@ RECORD(test_rapidjson)
 //	}
 // };
 
-#include <boost/stacktrace.hpp>
-
-RECORD(boost_stacktrace_test)
-{
-	HLVM_PROFILE_CPU_NAMED("boost_stacktrace_test");
-
-	HLVM_LOG(LogTest, info, TXT("Test boost_stacktrace!"));
-	{
-		std::cout << boost::stacktrace::stacktrace();
-	}
-}
+// #include <boost/stacktrace.hpp>
+//
+// RECORD(boost_stacktrace_test)
+//{
+//	HLVM_PROFILE_CPU_NAMED("boost_stacktrace_test");
+//
+//	HLVM_LOG(LogTest, info, TXT("Test boost_stacktrace!"));
+//	{
+//		std::cout << boost::stacktrace::stacktrace();
+//	}
+// }

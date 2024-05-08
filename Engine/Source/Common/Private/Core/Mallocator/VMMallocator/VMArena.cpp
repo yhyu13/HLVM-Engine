@@ -31,7 +31,6 @@ FVMArena::FVMArena()
 				_Heap->Next = Heap;
 				_Heap = Heap;
 			}
-			// HLVM_LOG(LogVMArena, debug, TXT("VMArena: Initialized {} large heaps"), i + 1);
 		}
 	}
 
@@ -40,10 +39,9 @@ FVMArena::FVMArena()
 	 */
 	ct_for<0, HLVM_VMA_SMALL_ALLOC_THRESHOLD / HLVM_VMA_SMALL_ALLOC_ALIGNMENT, 1, TUINT8>([&](auto i) {
 		// Initialize binned allocator
-		using BinnedMallocatorType = FSmallBinnedMallocator<(i.value + 1) * HLVM_VMA_SMALL_ALLOC_ALIGNMENT>;
+		using BinnedMallocatorType = FSmallBinnedMallocator<(i + 1) * HLVM_VMA_SMALL_ALLOC_ALIGNMENT>;
 		mSmallBinnedMallocators[i] = std::construct_at(R_C(BinnedMallocatorType*, mOSPageMallocator.MallocSmall(sizeof(BinnedMallocatorType))));
 		mSmallBinnedMallocators[i]->Init(this);
-		// HLVM_LOG(LogVMArena, debug, TXT("VMArena: Initialized {} SmallBinnedMallocator"), i + 1);
 	});
 }
 

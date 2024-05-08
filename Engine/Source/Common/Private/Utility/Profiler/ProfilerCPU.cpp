@@ -119,10 +119,14 @@ TVector<FProfilerCPU::FTrackedEvent> FProfilerCPU::FTrackedThread::ExtractEvents
 {
 	TVector<FProfilerCPU::FTrackedEvent> Ret;
 	Ret.reserve(mEventBuffer.size());
-	auto FirstHalf = mEventBuffer.array_one();
-	auto SecondHalf = mEventBuffer.array_two();
+	/**
+	 * The circular buffer is separated into two arrays, so we need to copy both
+	 */
+	const auto FirstHalf = mEventBuffer.array_one();
+	const auto SecondHalf = mEventBuffer.array_two();
 	std::copy(FirstHalf.first, FirstHalf.first + FirstHalf.second, std::back_inserter(Ret));
 	std::copy(SecondHalf.first, SecondHalf.first + SecondHalf.second, std::back_inserter(Ret));
+	// Clear the circular buffer after copy
 	mEventBuffer.clear();
 	return Ret;
 }
