@@ -56,7 +56,7 @@ private:
 	 */
 	HLVM_INLINE_VAR HLVM_STATIC_VAR TConcurrentQueue<FNonLocalPendingFree,
 		EConcurrentQueueMode::Mpsc, false,
-		TPMRGMallocator<hlvm_private::TQueueNode<FNonLocalPendingFree>>>
+		TPMRLowLvl<hlvm_private::TQueueNode<FNonLocalPendingFree>>>
 									sGlobalPendingFreeList;
 
 private:
@@ -92,6 +92,6 @@ private:
 	};
 	TConcurrentQueue<FLocalPendingFree,
 		EConcurrentQueueMode::Spsc, false,
-		TPMRGMallocator<hlvm_private::TQueueNode<FLocalPendingFree>>>
+		TPMRLowLvl<hlvm_private::TQueueNode<FLocalPendingFree>>>
 		mThisThreadPendingFreeList;
 };

@@ -13,11 +13,9 @@
 #include "Utility/Profiler/ProfilerDefinition.h"
 
 #if HLVM_COMPILE_WITH_PROFILER
-
-	#include <tracy/Tracy.hpp>
-	#include "Utility/Profiler/PrifilerSrcLoc.h"
-
 	#if HLVM_PROFILER_USE_TRACY
+
+		#include "Utility/Profiler/PrifilerSrcLoc.h"
 
 		// Undef empty macros for disabled profiler
 		#undef HLVM_PROFILE_CPU
@@ -26,8 +24,6 @@
 		#undef HLVM_PROFILE_CPU_NO_TRACK_EVENT
 		#undef HLVM_PROFILE_CPU_NAMED_NO_TRACK_EVENT
 		#undef HLVM_PROFILE_CPU_SRC_LOC_NO_TRACK_EVENT
-
-		#include <tracy/Tracy.hpp>
 
 		#if HLVM_PROFILER_USE_TRANSIENT_SOURCE_LOCATION
 			#define HLVM_PROFILE_CPU_NO_TRACK_EVENT() \
@@ -55,5 +51,4 @@
 			FScopeEventCPU ProfileBlockCPU((srcLoc).name)
 
 	#endif
-
 #endif

@@ -4,6 +4,7 @@
 
 #pragma once
 #include "GlobalDefinition.h"
+#include "Platform/PlatformDefinition.h"
 #include "Template/ReferenceTemplate.tpp"
 
 #include <string>
@@ -107,6 +108,12 @@ class FStdString final : public std::basic_string<char>
 {
 public:
 	FStdString() = delete;
+	// Big Five
+	FStdString(const FStdString& str)
+		: std::basic_string<char>(str)
+	{
+	}
+
 	// Move constructor
 	explicit FStdString(std::basic_string<char>&& other) noexcept
 		: std::basic_string<char>(other)

@@ -12,10 +12,6 @@
 
 #include "Utility/Profiler/ProfilerDefinition.h"
 
-#if HLVM_PROFILER_USE_TRACY
-	#include <common/TracySystem.hpp>
-#endif
-
 struct FProfilerSrcLoc
 {
 	const TCHAR* Name;

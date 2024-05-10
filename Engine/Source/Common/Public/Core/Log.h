@@ -6,8 +6,10 @@
 #include "Common.h"
 #include "String.h"
 #include "Core/Parallel/ParallelDefinition.h"
+#include "Template/ExpressionTemplate.tpp"
 
 #include <fmt/xchar.h>
+
 #ifdef SPDLOG_ACTIVE_LEVEL
 	// Undefine spdlog default SPDLOG_ACTIVE_LEVEL
 	#undef SPDLOG_ACTIVE_LEVEL

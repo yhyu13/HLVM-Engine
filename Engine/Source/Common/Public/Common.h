@@ -5,19 +5,30 @@
 #pragma once
 
 /**
- * Defintion
+ * Global Defintion
  */
 #include "GlobalDefinition.h"
+/**
+ * Templates
+ */
+#include "Template/GlobalTemplate.tpp"
+
+/**
+ * Module Definition
+ */
 #include "Platform/PlatformDefinition.h"
 #include "Core/Container/ContainerDefinition.h"
 #include "Core/Parallel/ParallelDefinition.h"
+#include "Core/Scripting/Lua/Sol.h"
+#include "Utility/Profiler/ProfilerDefinition.h"
 
-#include "Template/GlobalTemplate.tpp"
-
+/**
+ * Global
+ */
 #include "Global.h"
 
 /**
- * 3rd party includes
+ * 3rd party includes for Common
  */
 #include <ylt/struct_pack.hpp>
 #include <ylt/struct_json/json_reader.h>
@@ -33,13 +44,3 @@
 #define BOOST_STACKTRACE_USE_BACKTRACE
 #include <boost/stacktrace.hpp>
 #include <boost/filesystem.hpp>
-
-#if !HLVM_SHIPPING
-	#if defined(__clang__) || defined(__GNUC__)
-		#define TracyFunction __PRETTY_FUNCTION__
-	#elif defined(_MSC_VER)
-		#define TracyFunction __FUNCSIG__
-	#endif
-	#include <tracy/Tracy.hpp>
-	#include <tracy/TracyC.h>
-#endif

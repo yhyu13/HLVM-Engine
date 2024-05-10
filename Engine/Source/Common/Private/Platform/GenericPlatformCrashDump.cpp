@@ -31,29 +31,26 @@ HLVM_NORETURN void FGenericPlatformCrashDump::Terminate(bool DumpStackStrace)
 
 void FGenericPlatformCrashDump::ReportDump(bool DeleteDumpAfterReport)
 {
-	boost::system::error_code ec;
-	if (boost::filesystem::exists(CrashDumpFilePath, ec))
+	if (boost::filesystem::exists(CrashDumpFilePath))
 	{
-		std::ifstream file(CrashDumpFilePath);
+		{
+			std::ifstream file(CrashDumpFilePath);
 
-		auto			   st = boost::stacktrace::stacktrace::from_dump(file);
-		std::ostringstream backtraceStream;
-		backtraceStream << st << std::endl;
+			auto			   st = boost::stacktrace::stacktrace::from_dump(file);
+			std::ostringstream backtraceStream;
+			backtraceStream << st << std::endl;
 
-		// TODO Implement cerr log device (belong to warn and above verbosity)
-		std::cerr << backtraceStream.str();
+			// TODO Implement cerr log device (belong to warn and above verbosity)
+			std::cerr << CrashDumpFilePath.ToCharStr() << "\n";
+			std::cerr << backtraceStream.str();
 
-		// sending the code from st
+			// sending the code from st
 
-		file.close();
+			file.close();
+		}
 		if (DeleteDumpAfterReport)
 		{
 			boost::filesystem::remove(CrashDumpFilePath);
 		}
-	}
-	else if (ec)
-	{
-		// TODO Implement cout log device (belong to info and below verbosity)
-		std::cout << "Error: " << ec.message() << std::endl;
 	}
 }

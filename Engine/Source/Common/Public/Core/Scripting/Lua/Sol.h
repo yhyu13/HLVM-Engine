@@ -6,8 +6,12 @@
 
 #include "GlobalDefinition.h"
 
+#define SOL_LUAJIT 1
+#define SOL_NO_MEMORY_ALIGNMENT 1
 #define SOL_ALL_SAFETIES_ON HLVM_BUILD_DEBUG
 #include <sol/sol.hpp>
+static_assert(LUA_VERSION_NUM == 501, "hlvm_lua only support lua 5.1");
+static_assert(SOL_LUA_VERSION == 501, "hlvm_lua only support lua 5.1");
 
 #include "Core/Log.h"
 

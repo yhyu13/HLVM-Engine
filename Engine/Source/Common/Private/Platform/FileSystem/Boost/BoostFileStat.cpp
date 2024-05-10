@@ -7,9 +7,7 @@
 
 FBoostFileStat::FBoostFileStat(const FPath& Path)
 {
-	boost::system::error_code ec;
-	mFs = boost::filesystem::status(Path.ToCharStr(), ec);
-	HLVM_ENSURE(!ec, TXT("File {} stat failed"), *Path);
+	mFs = boost::filesystem::status(Path.ToCharStr());
 }
 
 bool FBoostFileStat::IsDirectory() const

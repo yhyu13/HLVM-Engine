@@ -29,7 +29,7 @@ RECORD(mallocator_test)
 			delete[] p2;
 		}
 		{
-			TVector<int, TPMRIMallocator<int>> vec{ TPMRIMallocator<int>(&MiMallocator) };
+			TVector<int, TPMRCustom<int>> vec{ TPMRCustom<int>(&MiMallocator) };
 			vec.reserve(1000);
 			for (size_t i = 0; i < 1000; i++)
 			{
@@ -52,7 +52,7 @@ RECORD(mallocator_test)
 			delete[] p2;
 		}
 		{
-			TVector<int, TPMRIMallocator<int>> vec{ TPMRIMallocator<int>(&StackMallocator) };
+			TVector<int, TPMRCustom<int>> vec{ TPMRCustom<int>(&StackMallocator) };
 			vec.reserve(1000);
 			for (size_t i = 0; i < 1000; i++)
 			{
@@ -74,7 +74,7 @@ RECORD(mallocator_test)
 			delete[] p2;
 		}
 		{
-			TVector<int, TPMRIMallocator<int>> vec{ TPMRIMallocator<int>(&GVMArenaMallocatorTLS) };
+			TVector<int, TPMRCustom<int>> vec{ TPMRCustom<int>(&GVMArenaMallocatorTLS) };
 			vec.reserve(1000);
 			for (size_t i = 0; i < 1000; i++)
 			{
@@ -208,8 +208,8 @@ RECORD(malloc_test)
 		test_single_thread();
 	}
 
-	//	test_multi_thread();
-	//	test_different_block_sizes();
+	test_multi_thread();
+	test_different_block_sizes();
 
 	std::cout << "All tests passed!" << std::endl;
 }

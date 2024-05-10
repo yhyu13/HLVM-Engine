@@ -7,8 +7,9 @@
 #include "Core/Log.h"
 #include "Core/String.h"
 #include "Core/Assert.h"
-#include "Core/Mallocator/IMallocator.h"
+#include "Core/Mallocator/PMR.h"
 #include "Platform/GenericPlatformCrashDump.h"
+#include "Platform/GenericPlatformFile.h"
 
 #include "Utility/ScopedTimer.h"
 #include "Utility/Profiler/ProfilerCPU.h"

@@ -37,7 +37,7 @@ concept CPMRMallocator = requires(T&& t, std::size_t n) {
 	Reference https://en.cppreference.com/w/cpp/named_req/Allocator
 */
 template <class T, bool bForceAlignedAlloc = false>
-struct TPMRStdMallocator
+struct TPMRStd
 {
 #if HVLM_MALLOCATOR_DEATIL_TRACE
 	HLVM_INLINE_VAR HLVM_STATIC_VAR FString sTypeName{ typeid(T).name() };
@@ -53,14 +53,14 @@ struct TPMRStdMallocator
 	template <class U>
 	struct rebind
 	{
-		using other = TPMRStdMallocator<U, bForceAlignedAlloc>;
+		using other = TPMRStd<U, bForceAlignedAlloc>;
 	};
 
-	TPMRStdMallocator() noexcept = default;
-	TPMRStdMallocator(const TPMRStdMallocator&) noexcept = default;
+	TPMRStd() noexcept = default;
+	TPMRStd(const TPMRStd&) noexcept = default;
 
 	template <class U>
-	TPMRStdMallocator(const TPMRStdMallocator<U>&) noexcept
+	TPMRStd(const TPMRStd<U>&) noexcept
 	{
 	}
 
@@ -117,13 +117,13 @@ struct TPMRStdMallocator
 };
 
 template <class W, class U>
-inline bool operator==(const TPMRStdMallocator<W>&, const TPMRStdMallocator<U>&)
+inline bool operator==(const TPMRStd<W>&, const TPMRStd<U>&)
 {
 	return true;
 }
 
 template <class W, class U>
-inline bool operator!=(const TPMRStdMallocator<W>&, const TPMRStdMallocator<U>&)
+inline bool operator!=(const TPMRStd<W>&, const TPMRStd<U>&)
 {
 	return false;
 }
@@ -132,7 +132,7 @@ inline bool operator!=(const TPMRStdMallocator<W>&, const TPMRStdMallocator<U>&)
 	Reference https://en.cppreference.com/w/cpp/named_req/Allocator
 */
 template <class T, bool bForceAlignedAlloc = false>
-struct TPMRIMallocator
+struct TPMRCustom
 {
 #if HVLM_MALLOCATOR_DEATIL_TRACE
 	HLVM_INLINE_VAR HLVM_STATIC_VAR FString sTypeName{ typeid(T).name() };
@@ -148,22 +148,22 @@ struct TPMRIMallocator
 	template <class U>
 	struct rebind
 	{
-		using other = TPMRIMallocator<U, bForceAlignedAlloc>;
+		using other = TPMRCustom<U, bForceAlignedAlloc>;
 	};
 
-	TPMRIMallocator() noexcept = delete;
-	TPMRIMallocator(const TPMRIMallocator&) noexcept = default;
+	TPMRCustom() noexcept = delete;
+	TPMRCustom(const TPMRCustom&) noexcept = default;
 
 	/**
 	 * @param _Mallocator External mallocator, mimallocator or stack allocator
 	 */
-	explicit TPMRIMallocator(IMallocator* _Mallocator) noexcept
+	explicit TPMRCustom(IMallocator* _Mallocator) noexcept
 		: Mallocator(_Mallocator)
 	{
 	}
 
 	template <class U>
-	TPMRIMallocator(const TPMRIMallocator<U>&) noexcept
+	TPMRCustom(const TPMRCustom<U>&) noexcept
 	{
 	}
 
@@ -225,13 +225,13 @@ private:
 };
 
 template <class W, class U>
-inline bool operator==(const TPMRIMallocator<W>&, const TPMRIMallocator<U>&)
+inline bool operator==(const TPMRCustom<W>&, const TPMRCustom<U>&)
 {
 	return true;
 }
 
 template <class W, class U>
-inline bool operator!=(const TPMRIMallocator<W>&, const TPMRIMallocator<U>&)
+inline bool operator!=(const TPMRCustom<W>&, const TPMRCustom<U>&)
 {
 	return false;
 }
@@ -240,7 +240,7 @@ inline bool operator!=(const TPMRIMallocator<W>&, const TPMRIMallocator<U>&)
 	Reference https://en.cppreference.com/w/cpp/named_req/Allocator
 */
 template <class T, bool bForceAlignedAlloc = false>
-struct TPMRGMallocator
+struct TPMRLowLvl
 {
 #if HVLM_MALLOCATOR_DEATIL_TRACE
 	HLVM_INLINE_VAR HLVM_STATIC_VAR FString sTypeName{ typeid(T).name() };
@@ -256,14 +256,14 @@ struct TPMRGMallocator
 	template <class U>
 	struct rebind
 	{
-		using other = TPMRGMallocator<U>;
+		using other = TPMRLowLvl<U>;
 	};
 
-	TPMRGMallocator() noexcept = default;
-	TPMRGMallocator(const TPMRGMallocator&) noexcept = default;
+	TPMRLowLvl() noexcept = default;
+	TPMRLowLvl(const TPMRLowLvl&) noexcept = default;
 
 	template <class U>
-	TPMRGMallocator(const TPMRGMallocator<U>&) noexcept
+	TPMRLowLvl(const TPMRLowLvl<U>&) noexcept
 	{
 	}
 
@@ -318,13 +318,13 @@ struct TPMRGMallocator
 };
 
 template <class W, class U>
-inline bool operator==(const TPMRGMallocator<W>&, const TPMRGMallocator<U>&)
+inline bool operator==(const TPMRLowLvl<W>&, const TPMRLowLvl<U>&)
 {
 	return true;
 }
 
 template <class W, class U>
-inline bool operator!=(const TPMRGMallocator<W>&, const TPMRGMallocator<U>&)
+inline bool operator!=(const TPMRLowLvl<W>&, const TPMRLowLvl<U>&)
 {
 	return false;
 }

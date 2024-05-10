@@ -177,7 +177,6 @@ tracy = FetchContent(name='Tracy',
                                                                     values=['-DTRACY_ONLY_LOCALHOST=ON',
                                                                             '-DTRACY_NO_FRAME_IMAGE=ON',
                                                                             '-DTRACY_ONLY_IPV4=ON',
-                                                                            '-DTRACY_CALLSTACK=8',
                                                                             '-DTRACY_USE_RPMALLOC=ON',
                                                                             '-DTRACY_NO_EXIT=ON',
                                                                             '-DTRACY_LIBBACKTRACE_ELF_DYNLOAD_SUPPORT=ON'])],
@@ -276,6 +275,10 @@ class CommonProject(BaseProject):
                                                               "$<$<CONFIG:RelWithDebInfo>:HLVM_BUILD_DEVELOPMENT=1>",
                                                               "$<$<CONFIG:Release>:HLVM_BUILD_RELEASE=1>",
                                                               "$<$<CONFIG:MinSizeRel>:HLVM_BUILD_RELEASE=1>"])
+
+        # self.global_interface.add_compile_options(domain= DomainEnum.GLOBAL,
+        #                                           values=["-DSOL_LUAJIT=1",
+        #                                                   ])
 
         self.modules.append(CommonModule())
         self.modules.extend([TestCommonModule(path) for path in glob.glob("./Test/*.cpp")])

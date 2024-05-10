@@ -10,7 +10,6 @@
 
 DECLARE_LOG_CATEGORY(LogBoostPlatformFile)
 
-
 static FBoostPlatformFile SBoostPlatformFile{};
 
 void FBoostPlatformFile::_Init()
@@ -56,8 +55,8 @@ TSmallVector32<FPath> FBoostPlatformFile::Glob(const FPath& root_dir, const FStr
 			if (Result.size() > RECURSIVE_ALERT)
 			{
 				RECURSIVE_ALERT += RECURSIVE_ALERT;
-				HLVM_LOG(LogBoostPlatformFile, debug,
-					TXT("FBoostPlatformFile::Find() - Recursive search exceed {} for {}?"), RECURSIVE_ALERT, *root_dir);
+				HLVM_LOG(LogBoostPlatformFile, trace,
+					TXT("FBoostPlatformFile::Glob : Recursive search exceed {} under path {}"), RECURSIVE_ALERT, *root_dir);
 			}
 		}
 	}

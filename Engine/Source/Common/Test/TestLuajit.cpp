@@ -100,7 +100,9 @@ return x
 }
 
 #define SOL2_USE_LUAL 0
-
+/**
+ * Test sol2 integration of luajit, see if there is any performance descrenpancy
+ */
 RECORD(luajit_sol2_perf_test)
 {
 	HLVM_PROFILE_CPU_NAMED("luajit_test2");
@@ -130,7 +132,7 @@ RECORD(luajit_sol2_perf_test)
 		}
 
 		{
-			static const char* lua_sciprt = R"(
+			static const char* lua_script = R"(
 local loop_count = 1000
 local fun_pair = pairs
 
@@ -156,7 +158,7 @@ end
 				luaL_openlibs(L); /* Load Lua libraries */
 
 				/* Load the file containing the script we are going to run */
-				status = luaL_loadstring(L, lua_sciprt);
+				status = luaL_loadstring(L, lua_script);
 				if (status)
 				{
 					/* If something went wrong, error message is at the top of */
@@ -184,7 +186,7 @@ end
 
 #if SOL2_USE_LUAL
 				/* Load the file containing the script we are going to run */
-				int status = luaL_loadstring(lua.lua_state(), lua_sciprt);
+				int status = luaL_loadstring(lua.lua_state(), lua_script);
 				if (status)
 				{
 					/* If something went wrong, error message is at the top of */
@@ -205,14 +207,14 @@ end
 #else
 				{
 					FScopedTimerLog timer(TXT("Sol2 pairs loop test"));
-					lua.unsafe_script(lua_sciprt);
+					lua.unsafe_script(lua_script);
 				}
 #endif
 			}
 		}
 
 		{
-			static const char* lua_sciprt = R"(
+			static const char* lua_script = R"(
 local loop_count = 1000
 local fun_pair = ipairs
 
@@ -238,7 +240,7 @@ end
 				luaL_openlibs(L); /* Load Lua libraries */
 
 				/* Load the file containing the script we are going to run */
-				status = luaL_loadstring(L, lua_sciprt);
+				status = luaL_loadstring(L, lua_script);
 				if (status)
 				{
 					/* If something went wrong, error message is at the top of */
@@ -265,7 +267,7 @@ end
 				lua.open_libraries(sol::lib::base, sol::lib::ffi, sol::lib::jit);
 #if SOL2_USE_LUAL
 				/* Load the file containing the script we are going to run */
-				int status = luaL_loadstring(lua.lua_state(), lua_sciprt);
+				int status = luaL_loadstring(lua.lua_state(), lua_script);
 				if (status)
 				{
 					/* If something went wrong, error message is at the top of */
@@ -286,10 +288,45 @@ end
 #else
 				{
 					FScopedTimerLog timer(TXT("Sol2 ipairs loop test"));
-					lua.unsafe_script(lua_sciprt);
+					lua.unsafe_script(lua_script);
 				}
 #endif
 			}
+		}
+	}
+}
+#undef SOL2_USE_LUAL
+
+RECORD(luajit_openresty_testsuit_test)
+{
+	HLVM_PROFILE_CPU_NAMED("luajit_openresty_testsuite_test");
+	{
+		const auto DataDir = FString::Format(TXT("{}_Data"), *GExecutableName);
+		const bool bDataDirExist = FGenericPlatformFile::Get(EPlatformFileType::Local)->Exists(DataDir);
+		if (bDataDirExist)
+		{
+			auto AllLuaFiles = FGenericPlatformFile::Get(EPlatformFileType::Local)->Glob(DataDir, TXT(R"(.*\.lua$)"), true);
+			for (auto& LuaFile : AllLuaFiles)
+			{
+				HLVM_LOG(LogTest, info, TXT("Test lua file: {}"), *LuaFile);
+				HLVM_SOL_STATE(lua);
+				lua.open_libraries(sol::lib::base, sol::lib::package, sol::lib::ffi, sol::lib::jit);
+				const std::string package_cpath = lua["package"]["cpath"];
+				lua["package"]["cpath"] = package_cpath + (!package_cpath.empty() ? ";" : "") + std::string{ FString::Format(TXT("{}/test/clib/?;;"), *DataDir).ToCharStr() };
+				{
+					FScopedTimerLog timer(FString::Format(TXT("Test lua file: {}"), *LuaFile));
+					auto			Result = lua.unsafe_script_file(LuaFile.ToCharStr());
+					if (!Result.valid())
+					{
+						sol::error err = Result;
+						HLVM_LOG(LogTest, err, TXT("Test lua file: {} failed: {}"), *LuaFile, TO_TCHAR_STR(err.what()));
+					}
+				}
+			}
+		}
+		else
+		{
+			HLVM_LOG(LogTest, warn, TXT("Data dir not exist: {}"), *DataDir);
 		}
 	}
 }
