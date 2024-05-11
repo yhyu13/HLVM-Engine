@@ -99,11 +99,11 @@ return x
 	}
 }
 
-#define SOL2_USE_LUAL 0
 /**
  * Test sol2 integration of luajit, see if there is any performance descrenpancy
  */
-RECORD(luajit_sol2_perf_test)
+#define SOL2_USE_LUAL 0
+RECORD(luajit_sol2_perf_test, false)
 {
 	HLVM_PROFILE_CPU_NAMED("luajit_test2");
 
@@ -297,30 +297,80 @@ end
 }
 #undef SOL2_USE_LUAL
 
+#define SOL2_USE_MODULE_FROM_SRC 0
+#if SOL2_USE_MODULE_FROM_SRC
+	#pragma clang diagnostic push
+	#pragma clang diagnostic ignored "-Wmissing-prototypes"
+	#pragma clang diagnostic ignored "-Wdisabled-macro-expansion"
+	#pragma clang diagnostic ignored "-Wunreachable-code-return"
+	#pragma clang diagnostic ignored "-Wzero-as-null-pointer-constant"
+	#pragma clang diagnostic ignored "-Wold-style-cast"
+namespace cpptest
+{
+	#include "TestLuajit_Data/test/clib/cpptest.cpp"
+}
+	#pragma clang diagnostic pop
+
+//	#pragma clang diagnostic push
+//	#pragma clang diagnostic ignored "-Wmissing-prototypes"
+//	#pragma clang diagnostic ignored "-Wzero-as-null-pointer-constant"
+//	#pragma clang diagnostic ignored "-Wimplicit-int-float-conversion"
+//	#pragma clang diagnostic ignored "-Wdouble-promotion"
+//	#pragma clang diagnostic ignored "-Wold-style-cast"
+//	#pragma clang diagnostic ignored "-Wc99-extensions"
+//	#pragma clang diagnostic ignored "-Wgnu-imaginary-constant"
+//	#pragma clang diagnostic ignored "-Wused-but-marked-unused"
+// namespace ctest
+//{
+//	extern "C"
+//	{
+//	#include "TestLuajit_Data/test/clib/ctest.c"
+//	}
+//} // namespace ctest
+//	#pragma clang diagnostic pop
+#endif
+
 RECORD(luajit_openresty_testsuit_test)
 {
 	HLVM_PROFILE_CPU_NAMED("luajit_openresty_testsuite_test");
 	{
-		const auto DataDir = FString::Format(TXT("{}_Data"), *GExecutableName);
+		auto	   CWD = boost::filesystem::current_path();
+		const auto DataDir = FString::Format(TXT("{}/{}_Data"), *GExecutablePath, *GExecutableName);
 		const bool bDataDirExist = FGenericPlatformFile::Get(EPlatformFileType::Local)->Exists(DataDir);
 		if (bDataDirExist)
 		{
 			auto AllLuaFiles = FGenericPlatformFile::Get(EPlatformFileType::Local)->Glob(DataDir, TXT(R"(.*\.lua$)"), true);
-			for (auto& LuaFile : AllLuaFiles)
+			for (auto LuaFile : AllLuaFiles)
 			{
 				HLVM_LOG(LogTest, info, TXT("Test lua file: {}"), *LuaFile);
+				/**
+				 * Setting the current path to the lua file's parent path
+				 */
+				boost::filesystem::current_path(LuaFile.parent_path());
+
 				HLVM_SOL_STATE(lua);
-				lua.open_libraries(sol::lib::base, sol::lib::package, sol::lib::ffi, sol::lib::jit);
-				const std::string package_cpath = lua["package"]["cpath"];
-				lua["package"]["cpath"] = package_cpath + (!package_cpath.empty() ? ";" : "") + std::string{ FString::Format(TXT("{}/test/clib/?;;"), *DataDir).ToCharStr() };
+				lua.open_libraries();
+#if SOL2_USE_MODULE_FROM_SRC
+				cpptest::luaopen_cpptest(lua);
+				// ctest::luaopen_ctest(lua);
+#else
+				{
+					const std::string package_cpath = lua["package"]["cpath"];
+					lua["package"]["cpath"] = package_cpath + (!package_cpath.empty() ? ";" : "") + std::string{ FString::Format(TXT("{}/test/clib/?;;"), *DataDir).ToCharStr() };
+				}
+#endif
+				try
 				{
 					FScopedTimerLog timer(FString::Format(TXT("Test lua file: {}"), *LuaFile));
-					auto			Result = lua.unsafe_script_file(LuaFile.ToCharStr());
+					auto			Result = lua.safe_script_file(LuaFile.ToCharStr());
 					if (!Result.valid())
 					{
 						sol::error err = Result;
 						HLVM_LOG(LogTest, err, TXT("Test lua file: {} failed: {}"), *LuaFile, TO_TCHAR_STR(err.what()));
 					}
+				}
+				catch (...)
+				{
 				}
 			}
 		}
@@ -328,5 +378,7 @@ RECORD(luajit_openresty_testsuit_test)
 		{
 			HLVM_LOG(LogTest, warn, TXT("Data dir not exist: {}"), *DataDir);
 		}
+		boost::filesystem::current_path(CWD);
 	}
 }
+#undef SOL2_USE_MODULE_FROM_SRC

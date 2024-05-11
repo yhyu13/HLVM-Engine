@@ -6,6 +6,7 @@
 
 #include "GlobalDefinition.h"
 #include "Platform/PlatformDefinition.h"
+#include "Platform/FileSystem/Path.h"
 
 #include "Utility/Timer.h"
 /**
@@ -17,6 +18,7 @@ HLVM_EXTERN_VAR FTimer GlobalTimerFromStart;
  * Executable name
  */
 HLVM_EXTERN_VAR FString GExecutableName;
+HLVM_EXTERN_VAR FPath	GExecutablePath;
 
 #ifdef PLATFORM_LINUXGNU
 	#ifndef HLVM_ALLOW_GPERF

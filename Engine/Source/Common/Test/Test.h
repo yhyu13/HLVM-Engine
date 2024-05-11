@@ -139,9 +139,9 @@ inline double RunTestAndCalculateAvg(const TestFuncType& func, int num_iteration
 
 int main(int ac, char* av[])
 {
-	FrameMarkNamed("main");
 	{
-		GExecutableName = TO_TCHAR_STR(av[0]);
+		GExecutableName = boost::filesystem::path(TO_CHAR_STR(av[0])).filename().c_str();
+		GExecutablePath = boost::filesystem::current_path();
 	}
 	{
 		FGenericPlatformCrashDump::Init();

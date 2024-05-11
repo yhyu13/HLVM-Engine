@@ -13,6 +13,7 @@ FTimer GlobalTimerFromStart{ true };
  * Default to empty string
  */
 FString GExecutableName{};
+FPath	GExecutablePath{};
 
 #if HLVM_ALLOW_GPERF
 /**

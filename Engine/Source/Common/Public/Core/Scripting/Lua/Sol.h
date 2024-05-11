@@ -6,11 +6,13 @@
 
 #include "GlobalDefinition.h"
 
+#include "lua.hpp"
+static_assert(LUA_VERSION_NUM == 501, "hlvm_lua only support lua 5.1");
 #define SOL_LUAJIT 1
 #define SOL_NO_MEMORY_ALIGNMENT 1
-#define SOL_ALL_SAFETIES_ON HLVM_BUILD_DEBUG
+#define SOL_ALL_SAFETIES_ON 1
+#define SOL_PRINT_ERRORS 1
 #include <sol/sol.hpp>
-static_assert(LUA_VERSION_NUM == 501, "hlvm_lua only support lua 5.1");
 static_assert(SOL_LUA_VERSION == 501, "hlvm_lua only support lua 5.1");
 
 #include "Core/Log.h"
@@ -19,6 +21,7 @@ DECLARE_LOG_CATEGORY(LogLua)
 
 namespace hlvm_lua
 {
+	// TODO : use a lua specific memory allocator?
 	HLVM_INLINE_FUNC void* lua_alloc(void* ud, void* ptr, size_t osize, size_t nsize)
 	{
 		(void)ud;
