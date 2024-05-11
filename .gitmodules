@@ -1,6 +1,7 @@
 [submodule "Engine/Source/Dependency/vcpkg"]
 	path = Engine/Source/Dependency/vcpkg
 	url = https://github.com/yhyu13/vcpkg.git
+	branch = hlvm
 [submodule "Engine/Scripts/pyarg"]
 	path = Engine/Scripts/pyarg
 	url = https://gitee.com/yhyu13/pyarg.git

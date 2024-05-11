@@ -14,7 +14,7 @@ git submodule update --init --recursive
 
 # vcpkg
 cd ./Engine/Source/Dependency/vcpkg || exit
-./bootstrap-vcpkg.sh
+./bootstrap-vcpkg.sh -disableMetrics
 cd "$ROOT_DIR" || exit
 
 # Execute all setup scripts

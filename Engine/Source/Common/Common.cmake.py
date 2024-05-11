@@ -22,8 +22,7 @@ vcpkg_cxt = VcpkgContenxt(vcpkg_root_path='../Dependency/vcpkg',
                                                             VcpkgPackage(name="luajit", features=["buildvm-64"],
                                                                          default_features=True),
                                                             "sol2"
-                                                        ],
-                                                        builtin_baseline='53bef8994c541b6561884a8395ea35715ece75db'))
+                                                        ]))
 
 # Find the spdlog package with the specified options
 spdlog = FindPackage(name='spdlog',
@@ -184,11 +183,13 @@ tracy = FetchContent(name='Tracy',
                          DomainValueModel(domain=DomainEnum.PUBLIC, values=['Tracy::TracyClient'])]
                      )
 
-bThreadSanitizer = False
-
-
 # Create a CommonModule object with the specified options
 class CommonModule(BaseModule):
+    """
+    Global Config :
+    """
+    bThreadSanitizer = False
+
     def __init__(self):
         super().__init__(module=ModuleTargetModel(target='Common',
                                                   type=ModuleEnum.STATIC,
@@ -232,7 +233,7 @@ class CommonModule(BaseModule):
         self.target_interface.add_pch_files(domain=DomainEnum.PUBLIC,
                                             values=['./Public/Common.shared.pch'])
 
-        if bThreadSanitizer:
+        if self.bThreadSanitizer:
             self.target_interface.add_compile_options(domain=DomainEnum.PUBLIC, values=['${CMAKE_CXX_FLAGS_TSAN}'])
             self.target_interface.add_link_libs(domain=DomainEnum.PUBLIC, values=['tsan'])
 
@@ -295,6 +296,6 @@ if __name__ == '__main__':
     os.chdir(_dir)
 
     # write cmake file
-    write_cmake_file_to_current_dir([
+    dump_to_cmake_list([
         CommonProject()
-    ])
+    ],'./')
