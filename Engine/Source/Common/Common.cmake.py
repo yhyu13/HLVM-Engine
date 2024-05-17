@@ -21,7 +21,8 @@ vcpkg_cxt = VcpkgContenxt(vcpkg_root_path='../Dependency/vcpkg',
                                                             "minitrace",  # chrome format tracing
                                                             VcpkgPackage(name="luajit", features=["buildvm-64"],
                                                                          default_features=True),
-                                                            "sol2"
+                                                            "sol2",
+                                                            "pybind11"
                                                         ]))
 
 # Find the spdlog package with the specified options
@@ -261,6 +262,8 @@ class CommonProject(BaseProject):
                          vcpkg_context=vcpkg_cxt, **kwargs)
         vcpkg_cxt.dump('./vcpkg.json')
 
+        self.global_interface.add_global_set('CMAKE_POLICY_DEFAULT_CMP0069', ['NEW'])
+        self.global_interface.add_global_set('CMAKE_INTERPROCEDURAL_OPTIMIZATION', ['TRUE'])
         self.global_interface.add_global_set('CMAKE_EXPORT_COMPILE_COMMANDS', ['ON'])
         self.global_interface.add_global_set('CMAKE_C_STANDARD', ['23'])
         self.global_interface.add_global_set('CMAKE_CXX_STANDARD', ['23'])

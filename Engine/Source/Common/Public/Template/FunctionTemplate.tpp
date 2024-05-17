@@ -19,6 +19,30 @@ auto TApplyFunc(Func func, std::tuple<Args...>&& values)
 	return std::apply(func, std::forward<Args...>(values));
 }
 
+template <typename T, typename Count, typename Func>
+auto TLowerBound(T&& value, Count count, Func&& func)
+{
+	T*	  first = &value;
+	Count step;
+	while (count > 0)
+	{
+		auto it = first;
+		step = count / 2;
+		std::advance(*it, step);
+
+		if (func(*it))
+		{
+			first = std::advance(*it, 1);
+			count -= step + 1;
+		}
+		else
+		{
+			count = step;
+		}
+	}
+	return first;
+}
+
 template <typename FuncConstruct, typename FuncDestruct>
 class TScopedVariable
 {
@@ -66,40 +90,3 @@ private:
 #define HLVM_SCOPED_VARIABLE2(var, FuncType1, FuncConstruct, FuncType2, FuncDestruct)                                        \
 	TScopedVariable<std::function<FuncType1>, std::function<FuncType2>> TOKENPASTE2LINE(var){ FuncConstruct, FuncDestruct }; \
 	HLVM_ATOMIC_THREAD_FENCE()
-
-// template <typename FuncConstruct, typename FuncDestruct, typename... Args>
-// class TScopedVariable2
-//{
-// public:
-//	TScopedVariable2() = delete;
-//	explicit TScopedVariable2(FuncConstruct&& _Func1, FuncDestruct&& _Func2, Args... _Args)
-//		: Values(_Args...), Func2(_Func2)
-//	{
-//		if constexpr (std::is_convertible_v<decltype(TCallFunc(_Func1, _Args...)), bool>)
-//		{
-//			HLVM_ENSURE(TCallFunc(_Func1, _Args...), TXT("TScopedVariable2 constructor failed"));
-//		}
-//		else
-//		{
-//			TCallFunc(_Func1, _Args...);
-//		}
-//		HLVM_ATOMIC_THREAD_FENCE();
-//	}
-//
-//	~TScopedVariable2()
-//	{
-//		HLVM_ATOMIC_THREAD_FENCE();
-//		if constexpr (std::is_convertible_v<decltype(TApplyFunc(Func2, Values)), bool>)
-//		{
-//			HLVM_ENSURE(TApplyFunc(Func2, Values), TXT("TScopedVariable2 constructor failed"));
-//		}
-//		else
-//		{
-//			TApplyFunc(Func2, Values);
-//		}
-//	}
-//
-// private:
-//	FuncDestruct		Func2;
-//	std::tuple<Args...> Values;
-// };

@@ -42,6 +42,12 @@ constexpr void ct_for(F&& f)
 	}
 }
 
+template <typename T>
+constexpr size_t ct_GetArraySize(T Array[])
+{
+	return sizeof(Array) / sizeof(T);
+}
+
 template <typename... TArgs>
 constexpr size_t ct_GetArgsCount(TArgs&&...)
 {

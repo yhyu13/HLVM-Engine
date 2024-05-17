@@ -8,6 +8,11 @@
 
 #include "lua.hpp"
 static_assert(LUA_VERSION_NUM == 501, "hlvm_lua only support lua 5.1");
+
+/**
+ * Sol config and safety:
+ * https://sol2.readthedocs.io/en/latest/safety.html
+ */
 #define SOL_LUAJIT 1
 #define SOL_NO_MEMORY_ALIGNMENT 1
 #define SOL_ALL_SAFETIES_ON 1

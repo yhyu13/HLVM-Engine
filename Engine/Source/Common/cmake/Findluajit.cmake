@@ -18,7 +18,6 @@ if (NOT TARGET luajit::luajit)
 
     find_library(luajit_LIBRARIES NAMES luajit-5.1
             DOC "The luajit library")
-    #set(luajit_LIBRARIES "/home/hangyu5/Documents/Gitrepo-My/vcpkg/installed/x64-linux-dynamic/lib/libluajit-5.1.so")
 
     mark_as_advanced(luajit_INCLUDE_DIRS luajit_LIBRARIES)
 
