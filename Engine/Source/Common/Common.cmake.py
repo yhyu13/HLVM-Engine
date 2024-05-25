@@ -266,16 +266,24 @@ class CommonProject(BaseProject):
         super().__init__(name='Common',
                          version='3.14',
                          vcpkg_context=vcpkg_cxt, **kwargs)
+
+        # Vcpkg Dependencies
         vcpkg_cxt.dump('./vcpkg.json')
 
+        # Linker
         if bBuildShared:
             self.global_interface.add_global_set('CMAKE_POSITION_INDEPENDENT_CODE', ['ON'])
         else:
             self.global_interface.add_global_set('CMAKE_POLICY_DEFAULT_CMP0069', ['NEW'])
             self.global_interface.add_global_set('CMAKE_INTERPROCEDURAL_OPTIMIZATION', ['ON'])
+        self.global_interface.add_global_set('CMAKE_LINKER_TYPE', ['GOLD'])
+
+        # Compiler
         self.global_interface.add_global_set('CMAKE_EXPORT_COMPILE_COMMANDS', ['ON'])
         self.global_interface.add_global_set('CMAKE_C_STANDARD', ['23'])
         self.global_interface.add_global_set('CMAKE_CXX_STANDARD', ['23'])
+
+        # Output
         self.global_interface.add_global_set('CMAKE_DEBUG_POSTFIX', ['d'])
         bin_output_dir = '${PROJECT_SOURCE_DIR}/Binary/${CMAKE_BUILD_TYPE}'
         self.global_interface.add_global_set('CMAKE_RUNTIME_OUTPUT_DIRECTORY', [bin_output_dir])
@@ -283,6 +291,7 @@ class CommonProject(BaseProject):
         self.global_interface.add_global_set('CMAKE_ARCHIVE_OUTPUT_DIRECTORY', [bin_output_dir])
         self.global_interface.add_global_set('HLVM_CMAKE_CXX_FLAGS_TSAN', ['-fsanitize=thread'])
 
+        # Definitions
         self.global_interface.add_compile_definitions(domain=DomainEnum.GLOBAL,
                                                       values=["$<$<CONFIG:Debug>:HLVM_BUILD_DEBUG=1>",
                                                               "$<$<CONFIG:RelWithDebInfo>:HLVM_BUILD_DEVELOPMENT=1>",
