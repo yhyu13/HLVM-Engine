@@ -6,6 +6,11 @@
 
 #include "Core/Assert.h"
 
+/**
+ * Template for non-null pointers
+ * Useful for hold pointers that do not have ownership
+ * @tparam T class type
+ */
 template <typename T>
 struct TNoNullPointer
 {
@@ -108,9 +113,9 @@ struct TPointerRemoved<T**>
 };
 
 /**
- * Use int32 offset to this pointer to represent another pointer,
- * approximately 1%~3% slower than using raw pointer
- * @CAUTION we strictly assume that TOffsetPtr32 represent some pointer range smaller than 2GB
+ * Use int32 offset to this pointer to represent another pointer
+ * in order to achieve 4 bytes wide pointer approximately 1%~3% slower than using raw pointer
+ * @CAUTION we assume that TOffsetPtr32 represent pointer range strictly smaller than 2GB
  */
 template <typename T>
 PACK(struct TOffsetPtr32 {
