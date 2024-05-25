@@ -61,4 +61,4 @@ namespace hlvm_private
  * Global mallocator for low level mallocation, defined at compile time
  * which is different from GmallocatorTLS which can be swapped during runtime
  */
-#define HLVM_LOWLEVEL_GMALLOCATOR ((void)0)
+#define HLVM_LOW_GMALLOC_TLS ((void)0)

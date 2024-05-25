@@ -222,9 +222,11 @@ void FVMHeap::Free(void* p)
 				while (NextBlock != mTail)
 				{
 					HLVM_CONSTEXPR_ASSERT(bValidate, CurrBlock->size != 0 && NextBlock->size != 0);
+					// TODO : if next block is mid block , we can either choose to defragment mid block
+					// and assign mid block back to nullptr, or ignore defragmenting mid block
 					if (NextBlock->size < 0 || !NextBlock->CanDefragment())
 					{
-						// If not both blocks are free, continue
+						// If next block shall not be defragmented, continue
 						break;
 					}
 					else
@@ -262,13 +264,14 @@ void FVMHeap::Free(void* p)
 
 				if (CurrBlock->size < NextBlock->size)
 				{
+					// If we can should use cached free blocks, add free blokc to cache blocks
 					if (mCachedFreeBlocks.ShouldTryCachFreeBlock())
 					{
-
-						// Reassign head
+						// Swap free head to next block so that we can put CurrBlock into cache block
 						mFreeBlockHead = NextBlock;
 						mFreeBlockHead->prevFreeBlock = nullptr;
 
+						// Cache the first free block
 						if (mCachedFreeBlocks.Num() == 0)
 							HLVM_UNLIKELY
 							{
@@ -332,7 +335,7 @@ void FVMHeap::Free(void* p)
 		}
 }
 
-#define DEBUG_SORT_FREE_LIST 1
+#define DEBUG_SORT_FREE_LIST !HLVM_BUILD_RELEASE
 #if DEBUG_SORT_FREE_LIST
 	#include "Template/PrintTemplate.tpp"
 #endif
@@ -381,6 +384,7 @@ void FVMHeap::SortFreeBlockList()
 	}
 
 	// We need to insert curr block as the prev block of insert block
+	// It is trivial to insert if the insert block is the next block as it is already in right place
 	if (InsertBlock != NextBlock)
 	{
 		// Make nextblock now the free head block
@@ -416,7 +420,7 @@ void FVMHeap::SortFreeBlockList()
 			}
 	}
 
-#if !HLVM_BUILD_RELEASE && DEBUG_SORT_FREE_LIST
+#if DEBUG_SORT_FREE_LIST
 	if (MaxIter < Iter)
 	{
 		MaxIter = Iter;

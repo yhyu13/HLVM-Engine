@@ -44,6 +44,11 @@ struct TNoNullPointer
 		return pFileHandle != nullptr;
 	}
 
+	T* Get() const
+	{
+		return pFileHandle;
+	}
+
 	friend T& operator*(const TNoNullPointer& handle)
 	{
 		return *(handle.pFileHandle);

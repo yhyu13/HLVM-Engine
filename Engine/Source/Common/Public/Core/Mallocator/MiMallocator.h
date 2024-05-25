@@ -23,7 +23,12 @@ public:
 		: mCtx(_Ctx)
 	{
 		Type = EMallocator::Mimalloc;
+		// If common lib is dynamically linked, we can't use a new heap
+#if !HLVM_COMMON_DYNAMIC_LINKED
 		mHeap = (mCtx.bNewHeap ? mi_heap_new() : mi_heap_get_default());
+#else
+		mHeap = mi_heap_get_default();
+#endif
 	}
 	virtual ~FMiMallocator() noexcept final override
 	{
@@ -89,9 +94,9 @@ private:
 	mi_heap_t*			 mHeap;
 	FMiMallocatorContext mCtx;
 };
-HLVM_THREAD_LOCAL_VAR HLVM_INLINE_VAR FMiMallocator GMiMallocatorTLS{};
 
 #if HLVM_MALLOC_USE_MIMALLOC_OVER_STD
-	#undef HLVM_LOWLEVEL_GMALLOCATOR
-	#define HLVM_LOWLEVEL_GMALLOCATOR GMiMallocatorTLS
+HLVM_THREAD_LOCAL_VAR HLVM_INLINE_VAR FMiMallocator GMiMallocatorTLS{};
+	#undef HLVM_LOW_GMALLOC_TLS
+	#define HLVM_LOW_GMALLOC_TLS GMiMallocatorTLS
 #endif

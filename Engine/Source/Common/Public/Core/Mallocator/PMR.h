@@ -274,11 +274,11 @@ struct TPMRLowLvl
 		// Using static_cast instead of reinterpret_cast because malloc might return nullptr or NULL
 		if constexpr (bForceAlignedAlloc)
 		{
-			p = HLVM_LOWLEVEL_GMALLOCATOR.MallocAligned(realSize, alignof(T));
+			p = HLVM_LOW_GMALLOC_TLS.MallocAligned(realSize, alignof(T));
 		}
 		else
 		{
-			p = HLVM_LOWLEVEL_GMALLOCATOR.Malloc(realSize);
+			p = HLVM_LOW_GMALLOC_TLS.Malloc(realSize);
 		}
 		if (!p)
 			HLVM_UNLIKELY
@@ -300,12 +300,12 @@ struct TPMRLowLvl
 		size_t realSize = n * sizeof(T);
 		if constexpr (bForceAlignedAlloc)
 		{
-			HLVM_ENSURE(HLVM_LOWLEVEL_GMALLOCATOR.FreeSizeAligned(p, realSize, alignof(T)) == EFreeRetType::Success,
+			HLVM_ENSURE(HLVM_LOW_GMALLOC_TLS.FreeSizeAligned(p, realSize, alignof(T)) == EFreeRetType::Success,
 				TXT("deallocate failed {}"), p);
 		}
 		else
 		{
-			HLVM_ENSURE(HLVM_LOWLEVEL_GMALLOCATOR.FreeSize(p, realSize) == EFreeRetType::Success,
+			HLVM_ENSURE(HLVM_LOW_GMALLOC_TLS.FreeSize(p, realSize) == EFreeRetType::Success,
 				TXT("deallocate failed {}"), p);
 		}
 #if HVLM_MALLOCATOR_DEATIL_TRACE

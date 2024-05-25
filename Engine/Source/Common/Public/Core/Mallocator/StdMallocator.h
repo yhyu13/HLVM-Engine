@@ -74,9 +74,9 @@ public:
 		return EFreeRetType::Success;
 	}
 };
-HLVM_INLINE_VAR FStdMallocator GStdMallocator{};
 
 #if !HLVM_MALLOC_USE_MIMALLOC_OVER_STD
-	#undef HLVM_LOWLEVEL_GMALLOCATOR
-	#define HLVM_LOWLEVEL_GMALLOCATOR GStdMallocator
+HLVM_THREAD_LOCAL_VAR HLVM_INLINE_VAR FStdMallocator GStdMallocatorTLS{};
+	#undef HLVM_LOW_GMALLOC_TLS
+	#define HLVM_LOW_GMALLOC_TLS GStdMallocatorTLS
 #endif

@@ -5,6 +5,7 @@
 #include "Core/Mallocator/MiMallocator.h"
 #include "Core/Mallocator/StdMallocator.h"
 #include "Core/Mallocator/StackMallocator.h"
+#include "Core/Mallocator/VMMallocator/VMMallocator.h"
 #include "Core/Log.h"
 #include "Template/PrintTemplate.tpp"
 #include "Template/AlignmentTemplate.tpp"
@@ -94,8 +95,22 @@ bool FMiMallocator::Owned(void* ptr) noexcept
 
 #if HLVM_MALLOC_OVERRIDE
 
+/**
+ * Overriding new/delete in static/shared lib:
+ * https://stackoverflow.com/questions/47372194/integrating-c-custom-memory-allocators-across-shared-static-libraries
+ */
+	#if !HLVM_ENABLE_GLOBAL_VMMALLOCATOR
+		#if HLVM_MALLOC_USE_MIMALLOC_OVER_STD
 HLVM_THREAD_LOCAL_VAR IMallocator* GMallocatorTLS = &GMiMallocatorTLS;			// Extern
 HLVM_THREAD_LOCAL_VAR IMallocator* GFallBacllMallocatorTLS = &GMiMallocatorTLS; // Extern
+		#else
+HLVM_THREAD_LOCAL_VAR IMallocator* GMallocatorTLS = &GStdMallocatorTLS;			 // Extern
+HLVM_THREAD_LOCAL_VAR IMallocator* GFallBacllMallocatorTLS = &GStdMallocatorTLS; // Extern
+		#endif
+	#else
+HLVM_THREAD_LOCAL_VAR IMallocator* GMallocatorTLS = &GVMArenaMallocatorTLS;			 // Extern
+HLVM_THREAD_LOCAL_VAR IMallocator* GFallBacllMallocatorTLS = &GVMArenaMallocatorTLS; // Extern
+	#endif
 
 void SwapMallocator(IMallocator* Mallocator) // Extern
 {
@@ -144,12 +159,12 @@ void SwapMallocator(IMallocator* Mallocator) // Extern
 			#define mi_decl_new_nothrow(n) mi_decl_nodiscard mi_decl_restrict
 		#endif
 
-		#define NEW_WRAPPER(expr)        \
-			void* p = nullptr;           \
-			{                            \
-				PROFILE_MALLOC_CUMU();   \
-				expr                     \
-			}                            \
+		#define NEW_WRAPPER(expr)              \
+			void* p = nullptr;                 \
+			{                                  \
+				PROFILE_MALLOC_CUMU();         \
+				expr                           \
+			}                                  \
 			HLVM_PROFILER_CPU_ON_MALLOC(p, n); \
 			return p
 

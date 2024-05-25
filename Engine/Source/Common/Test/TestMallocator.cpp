@@ -16,7 +16,7 @@ RECORD(mallocator_test)
 	HLVM_PROFILE_CPU_NAMED("mallocator_test");
 
 	{
-		FMiMallocator MiMallocator{ { .bNewHeap = true } };
+		FMiMallocator MiMallocator{ { .bNewHeap = false } };
 		HLVM_SCOPED_VARIABLE(
 			ScopedMallocator, [&]() -> void { SwapMallocator(&MiMallocator); },
 			[&]() -> void { SwapMallocator(); });
@@ -61,9 +61,10 @@ RECORD(mallocator_test)
 		}
 	}
 	{
+		FVMArenaMallocator VMArenaMallocatorTLS{};
 		// Try use VMMallocator and you will have lifetime object crash on free
 		HLVM_SCOPED_VARIABLE(
-			ScopedMallocator, [&]() -> void { SwapMallocator(&GVMArenaMallocatorTLS); },
+			ScopedMallocator, [&]() -> void { SwapMallocator(&VMArenaMallocatorTLS); },
 			[&]() -> void { SwapMallocator(); });
 
 		// sample new and free
@@ -74,7 +75,7 @@ RECORD(mallocator_test)
 			delete[] p2;
 		}
 		{
-			TVector<int, TPMRCustom<int>> vec{ TPMRCustom<int>(&GVMArenaMallocatorTLS) };
+			TVector<int, TPMRCustom<int>> vec{ TPMRCustom<int>(&VMArenaMallocatorTLS) };
 			vec.reserve(1000);
 			for (size_t i = 0; i < 1000; i++)
 			{
@@ -184,7 +185,7 @@ RECORD(malloc_test)
 
 	{
 		HLVM_LOG(LogTest, info, TXT("Test mimallocator"));
-		FMiMallocator MiMallocator{ { .bNewHeap = true, .bDestory = true } };
+		FMiMallocator MiMallocator{ { .bNewHeap = false, .bDestory = true } };
 		HLVM_SCOPED_VARIABLE(
 			ScopedMallocator, [&]() -> void { SwapMallocator(&MiMallocator); MAX_BLOCK_SIZE = 1024; },
 			[&]() -> void { SwapMallocator(); MAX_BLOCK_SIZE = 1024 * 1024; });
@@ -201,9 +202,10 @@ RECORD(malloc_test)
 	}
 
 	{
+		FVMArenaMallocator VMArenaMallocatorTLS{};
 		HLVM_LOG(LogTest, info, TXT("Test VMArena mallocator"));
 		HLVM_SCOPED_VARIABLE(
-			ScopedMallocator, [&]() -> void { SwapMallocator(&GVMArenaMallocatorTLS); MAX_BLOCK_SIZE = 1024; },
+			ScopedMallocator, [&]() -> void { SwapMallocator(&VMArenaMallocatorTLS); MAX_BLOCK_SIZE = 1024; },
 			[&]() -> void { SwapMallocator(); MAX_BLOCK_SIZE = 1024 * 1024; });
 		test_single_thread();
 	}

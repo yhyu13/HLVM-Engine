@@ -184,16 +184,18 @@ tracy = FetchContent(name='Tracy',
                          DomainValueModel(domain=DomainEnum.PUBLIC, values=['Tracy::TracyClient'])]
                      )
 
+"""
+Global Config :
+"""
+bThreadSanitizer = False
+bBuildShared = False
+
+
 # Create a CommonModule object with the specified options
 class CommonModule(BaseModule):
-    """
-    Global Config :
-    """
-    bThreadSanitizer = False
-
     def __init__(self):
         super().__init__(module=ModuleTargetModel(target='Common',
-                                                  type=ModuleEnum.STATIC,
+                                                  type=ModuleEnum.SHARED if bBuildShared else ModuleEnum.STATIC,
                                                   source_files=glob_cmake_paths([GlobModel(path='./Private/**/*.cpp',
                                                                                            recursive=True)
                                                                                  ]),
@@ -234,8 +236,8 @@ class CommonModule(BaseModule):
         self.target_interface.add_pch_files(domain=DomainEnum.PUBLIC,
                                             values=['./Public/Common.shared.pch'])
 
-        if self.bThreadSanitizer:
-            self.target_interface.add_compile_options(domain=DomainEnum.PUBLIC, values=['${CMAKE_CXX_FLAGS_TSAN}'])
+        if bThreadSanitizer:
+            self.target_interface.add_compile_options(domain=DomainEnum.PUBLIC, values=['${HLVM_CMAKE_CXX_FLAGS_TSAN}'])
             self.target_interface.add_link_libs(domain=DomainEnum.PUBLIC, values=['tsan'])
 
 
@@ -252,6 +254,10 @@ class TestCommonModule(BaseModule):
         self.target_interface.add_pch_files(domain=DomainEnum.REUSE_FROM,
                                             values=['Common'])
         self.target_interface.add_link_libs(domain=DomainEnum.PRIVATE, values=['Common'])
+        if bBuildShared:
+            # TODO : windows platform compatibility check!
+            # https://gitlab.kitware.com/cmake/cmake/-/issues/20289
+            self.target_interface.add_compile_options(domain=DomainEnum.PRIVATE, values=['-fPIC'])
 
 
 # Create a CommonProject object with the specified options
@@ -262,8 +268,11 @@ class CommonProject(BaseProject):
                          vcpkg_context=vcpkg_cxt, **kwargs)
         vcpkg_cxt.dump('./vcpkg.json')
 
-        self.global_interface.add_global_set('CMAKE_POLICY_DEFAULT_CMP0069', ['NEW'])
-        self.global_interface.add_global_set('CMAKE_INTERPROCEDURAL_OPTIMIZATION', ['TRUE'])
+        if bBuildShared:
+            self.global_interface.add_global_set('CMAKE_POSITION_INDEPENDENT_CODE', ['ON'])
+        else:
+            self.global_interface.add_global_set('CMAKE_POLICY_DEFAULT_CMP0069', ['NEW'])
+            self.global_interface.add_global_set('CMAKE_INTERPROCEDURAL_OPTIMIZATION', ['ON'])
         self.global_interface.add_global_set('CMAKE_EXPORT_COMPILE_COMMANDS', ['ON'])
         self.global_interface.add_global_set('CMAKE_C_STANDARD', ['23'])
         self.global_interface.add_global_set('CMAKE_CXX_STANDARD', ['23'])
@@ -272,19 +281,18 @@ class CommonProject(BaseProject):
         self.global_interface.add_global_set('CMAKE_RUNTIME_OUTPUT_DIRECTORY', [bin_output_dir])
         self.global_interface.add_global_set('CMAKE_LIBRARY_OUTPUT_DIRECTORY', [bin_output_dir])
         self.global_interface.add_global_set('CMAKE_ARCHIVE_OUTPUT_DIRECTORY', [bin_output_dir])
-        self.global_interface.add_global_set('CMAKE_CXX_FLAGS_TSAN', ['-fsanitize=thread'])
+        self.global_interface.add_global_set('HLVM_CMAKE_CXX_FLAGS_TSAN', ['-fsanitize=thread'])
 
         self.global_interface.add_compile_definitions(domain=DomainEnum.GLOBAL,
                                                       values=["$<$<CONFIG:Debug>:HLVM_BUILD_DEBUG=1>",
                                                               "$<$<CONFIG:RelWithDebInfo>:HLVM_BUILD_DEVELOPMENT=1>",
                                                               "$<$<CONFIG:Release>:HLVM_BUILD_RELEASE=1>",
-                                                              "$<$<CONFIG:MinSizeRel>:HLVM_BUILD_RELEASE=1>"])
+                                                              "$<$<CONFIG:MinSizeRel>:HLVM_BUILD_RELEASE=1>",
+                                                              f"HLVM_COMMON_DYNAMIC_LINKED={bBuildShared * 1}"])
 
-        # self.global_interface.add_compile_options(domain= DomainEnum.GLOBAL,
-        #                                           values=["-DSOL_LUAJIT=1",
-        #                                                   ])
-
+        # Create a CommonModule object for the main project
         self.modules.append(CommonModule())
+        # Create TestCommonModule objects for all tests
         self.modules.extend([TestCommonModule(path) for path in glob.glob("./Test/*.cpp")])
 
 
@@ -301,4 +309,4 @@ if __name__ == '__main__':
     # write cmake file
     dump_to_cmake_list([
         CommonProject()
-    ],'./')
+    ], './')
