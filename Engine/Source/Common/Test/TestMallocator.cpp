@@ -15,28 +15,31 @@ RECORD(mallocator_test)
 {
 	HLVM_PROFILE_CPU_NAMED("mallocator_test");
 
-	{
-		FMiMallocator MiMallocator{ { .bNewHeap = false } };
-		HLVM_SCOPED_VARIABLE(
-			ScopedMallocator, [&]() -> void { SwapMallocator(&MiMallocator); },
-			[&]() -> void { SwapMallocator(); });
+	SECTION(MiMallocatorTest, true, 10,
+		{
+			HLVM_LOG(LogTest, info, TXT("Section MiMallocatorTest"));
+			FMiMallocator MiMallocator{ { .bNewHeap = false } };
+			HLVM_SCOPED_VARIABLE(
+				ScopedMallocator, [&]() -> void { SwapMallocator(&MiMallocator); },
+				[&]() -> void { SwapMallocator(); });
 
-		// sample new and free
-		{
-			char* p1 = new char[100];
-			char* p2 = new char[100];
-			delete[] p1;
-			delete[] p2;
-		}
-		{
-			TVector<int, TPMRCustom<int>> vec{ TPMRCustom<int>(&MiMallocator) };
-			vec.reserve(1000);
-			for (size_t i = 0; i < 1000; i++)
+			// sample new and free
 			{
-				vec.push_back(1);
+				char* p1 = new char[100];
+				char* p2 = new char[100];
+				delete[] p1;
+				delete[] p2;
 			}
-		}
-	}
+			{
+				TVector<int, TPMRCustom<int>> vec{ TPMRCustom<int>(&MiMallocator) };
+				vec.reserve(1000);
+				for (size_t i = 0; i < 1000; i++)
+				{
+					vec.push_back(1);
+				}
+			}
+		});
+
 	{
 		// Try use StackMallocator and you will have lifetime object crash on free
 		TStackMallocator<16 * 1024> StackMallocator{};

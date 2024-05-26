@@ -24,52 +24,69 @@ namespace hlvm_private
 	HLVM_INLINE_VAR std::vector<std::function<void()>> recorded_test_functions{};
 }
 
+/**
+ * TestContext
+ */
+struct TestContext
+{
+	bool	 bEnabled = true;
+	uint32_t randomSeed = 0;
+	uint32_t repeat = 1;
+};
+
 // Helper function to create a lambda that runs the test and prints the info
 template <typename Func>
-std::function<void()> make_test_wrapper(const FString& name, Func test_function)
+std::function<void()> _make_test_wrapper(const FString& name, Func test_function, const TestContext& ctx)
 {
-	return [name, test_function]() {
-		HLVM_LOG(LogTemp, info, TXT("Running {}"), *name);
-		FTimer Timer{ true };
-		// check if test_function has return type bool
-		if constexpr (std::is_same_v<decltype(test_function()), bool>)
+	return [name, test_function, ctx]() {
+		if (!ctx.bEnabled)
 		{
-			HLVM_ENSURE(test_function(), TXT("Test failed {}"), *name); // Run the actual test function
+			HLVM_LOG(LogTemp, info, TXT("Skipping {} bc it is disabled"), *name);
+			return;
 		}
-		else
+
+		for (uint32_t _i = 0u; _i < ctx.repeat; ++_i)
 		{
-			test_function();
+			FTimer Timer{ true };
+			// Seed the random number generator
+			std::srand(ctx.randomSeed);
+			HLVM_LOG(LogTemp, info, TXT("Running {} (#{})"), *name, _i + 1);
+			// Run the actual test function
+			// check if test_function has return type bool
+			if constexpr (std::is_same_v<decltype(test_function()), bool>)
+			{
+				HLVM_ENSURE(test_function(), TXT("Test failed {}, return false"), *name);
+			}
+			if constexpr (std::is_same_v<decltype(test_function()), int>)
+			{
+				int ret = test_function();
+				HLVM_ENSURE(ret == 0, TXT("Test failed {}, return {}"), *name, ret);
+			}
+			else
+			{
+				test_function();
+			}
+			HLVM_LOG(LogTemp, info, TXT("Completed {} (#{}) in {} seconds"), *name, _i + 1, Timer.MarkSec());
 		}
-		HLVM_LOG(LogTemp, info, TXT("Completed {} in {} seconds"), *name, Timer.MarkSec());
 	};
 }
 
-/**
- * AutoRegisterContext
- *  bEnabled is used to enable/disable the auto registration of test functions.
- */
-struct AutoRegisterContext
-{
-	bool bEnabled = true;
-};
-
-#define RECORD_TEST_FUNC_BODY(test_function)                                                                              \
-	struct AutoRegister                                                                                                   \
-	{                                                                                                                     \
-		AutoRegister()                                                                                                    \
-		{                                                                                                                 \
-			if (_AutoRegisterContext.bEnabled)                                                                            \
-				hlvm_private::recorded_test_functions.push_back(make_test_wrapper(#test_function, test_##test_function)); \
-		}                                                                                                                 \
-	};                                                                                                                    \
+#define RECORD_TEST_FUNC_BODY(test_function)                                                                                                 \
+	struct AutoRegister                                                                                                                      \
+	{                                                                                                                                        \
+		AutoRegister()                                                                                                                       \
+		{                                                                                                                                    \
+			hlvm_private::recorded_test_functions.push_back(_make_test_wrapper(#test_function, test_##test_function, _AutoRegisterContext)); \
+		}                                                                                                                                    \
+	};                                                                                                                                       \
 	static AutoRegister _AutoRegister
 
-#define RECORD_TEST_FUNC1(test_function, ...)                         \
-	HLVM_STATIC_VAR AutoRegisterContext _AutoRegisterContext{ true }; \
+#define RECORD_TEST_FUNC1(test_function, ...)                 \
+	HLVM_STATIC_VAR TestContext _AutoRegisterContext{ true }; \
 	RECORD_TEST_FUNC_BODY(test_function);
 
-#define RECORD_TEST_FUNC2(test_function, ...)                                \
-	HLVM_STATIC_VAR AutoRegisterContext _AutoRegisterContext{ __VA_ARGS__ }; \
+#define RECORD_TEST_FUNC2(test_function, ...)                        \
+	HLVM_STATIC_VAR TestContext _AutoRegisterContext{ __VA_ARGS__ }; \
 	RECORD_TEST_FUNC_BODY(test_function);
 
 #define RECORD_TEST_FUNC(test_function, ...)                                          \
@@ -84,7 +101,7 @@ struct AutoRegisterContext
 				{                                                                     \
 					RECORD_TEST_FUNC1(test_function, ##__VA_ARGS__);                  \
 				}                                                                     \
-				if constexpr (ArgCount == 2)                                          \
+				else                                                                  \
 				{                                                                     \
 					RECORD_TEST_FUNC2(test_function, ##__VA_ARGS__);                  \
 				}                                                                     \
@@ -94,11 +111,12 @@ struct AutoRegisterContext
 	}
 
 /**
- * Macro to record a test function (easier version)
- * Example :
- * RECORD(hash_test, true)
+ * Macro to record a test function
+ * Example : name, enable, seed, repeat
+ * RECORD(test_func, true, 0, 1)
  * {
  *    ...
+ *    return;
  * }
  */
 #define RECORD(test_function, ...)                  \
@@ -106,13 +124,61 @@ struct AutoRegisterContext
 	RECORD_TEST_FUNC(test_function, ##__VA_ARGS__); \
 	void test_##test_function()
 
+/**
+ * Macro to record a test function
+ * Example : name, enable, seed, repeat
+ * RECORD_BOOL(test_func, true, 0, 1)
+ * {
+ *    ...
+ *    return true;  // succeed
+ * }
+ */
+#define RECORD_BOOL(test_function, ...)             \
+	bool test_##test_function();                    \
+	RECORD_TEST_FUNC(test_function, ##__VA_ARGS__); \
+	bool test_##test_function()
+
+/**
+ * Macro to record a test function
+ * Example : name, enable, seed, repeat
+ * RECORD_INT(test_func, true, 0, 1)
+ * {
+ *    ...
+ *    return 0; // succeed
+ * }
+ */
+#define RECORD_INT(test_function, ...)              \
+	int test_##test_function();                     \
+	RECORD_TEST_FUNC(test_function, ##__VA_ARGS__); \
+	int test_##test_function()
+
+#define SECTION(section_name, enabled, repeat, ...)             \
+	do                                                          \
+	{                                                           \
+		if (enabled)                                            \
+		{                                                       \
+			std::function<void()> func_##section_name = [=]() { \
+				do                                              \
+				{                                               \
+					__VA_ARGS__                                 \
+				}                                               \
+				while (0);                                      \
+			};                                                  \
+			for (uint32_t _i = 0u; _i < repeat; ++_i)           \
+			{                                                   \
+				func_##section_name();                          \
+			}                                                   \
+		}                                                       \
+	}                                                           \
+	while (0)
+
 // Implement smoothed average time measurement
 // i.e. run test case multiple times with timer and calculate average by removing max and min
 using TestFuncType = std::function<bool(double&)>;
-inline double RunTestAndCalculateAvg(const TestFuncType& func, int num_iterations)
+inline double RunTestAndCalculateAvg(const TestFuncType& func, uint32_t num_iterations)
 {
 	std::vector<double> times;
-	for (int i = 0; i < num_iterations; ++i)
+	for (uint32_t _i = 0u; _i < num_iterations; ++_i)
 	{
 		double duration;
 		HLVM_ENSURE(func(duration), TXT("Test case failed"));
@@ -126,9 +192,9 @@ inline double RunTestAndCalculateAvg(const TestFuncType& func, int num_iteration
 	}
 	// mCount average on the rest of data
 	double avg = 0.0;
-	for (int i = 0; i < num_iterations - 2; ++i)
+	for (uint32_t _i = 0u; _i < num_iterations - 2; ++_i)
 	{
-		avg += times[static_cast<unsigned long>(i)];
+		avg += times[_i];
 	}
 	return avg / (num_iterations - 2);
 }
@@ -236,9 +302,9 @@ int main(int ac, char* av[])
 			test_function();
 		}
 	}
-
+	// Finalize mallocator
 	{
-		FnalMallocator();
+		FinlMallocator();
 	}
 	return 0;
 }

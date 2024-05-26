@@ -48,7 +48,7 @@ public:
  * Global mallocator
  */
 HLVM_EXTERN_FUNC void							   InitMallocator();
-HLVM_EXTERN_FUNC void							   FnalMallocator();
+HLVM_EXTERN_FUNC void							   FinlMallocator();
 HLVM_EXTERN_FUNC void							   SwapMallocator(IMallocator* Mallocator = nullptr);
 HLVM_THREAD_LOCAL_VAR HLVM_EXTERN_VAR IMallocator* GMallocatorTLS;
 HLVM_THREAD_LOCAL_VAR HLVM_EXTERN_VAR IMallocator* GFallBacllMallocatorTLS;

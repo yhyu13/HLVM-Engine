@@ -21,7 +21,7 @@ DECLARE_LOG_CATEGORY(LogTest)
 /*
 	<test method>
 */
-static void test_boostfile_test()
+RECORD(boostfile_test, true, 1, 1)
 {
 #if TEST_STACK_ALLOCATOR
 	//  Try use StackMallocator and you will have lifetime object crash on free
@@ -69,7 +69,6 @@ static void test_boostfile_test()
 		HLVM_LOG(LogTest, info, TXT("Test FPath::Find result:\n{}"), *FPath::DumpJson(all_matches));
 	}
 }
-RECORD_TEST_FUNC(boostfile_test)
 
 RECORD(packed_test)
 {

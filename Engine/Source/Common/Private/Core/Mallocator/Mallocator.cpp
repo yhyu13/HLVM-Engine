@@ -69,7 +69,7 @@ void InitMallocator() // Extern
 #endif
 }
 
-void FnalMallocator() // Extern
+void FinlMallocator() // Extern
 {
 	HLVM_LOG(LogMiMallocator, info, TXT("Mallocator finalize:\nCumulative time spent on malloc {} micro sec\nCumulative number of malloc {}\nPer malloc time {} micro sec\nCumulative time spent on free {} micro sec\nCumulative number of free {}\nPer free time {} micro sec"),
 		GMallocDurationCounter.load(),
