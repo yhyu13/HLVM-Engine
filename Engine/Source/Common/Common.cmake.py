@@ -22,7 +22,8 @@ vcpkg_cxt = VcpkgContenxt(vcpkg_root_path='../Dependency/vcpkg',
                                                             VcpkgPackage(name="luajit", features=["buildvm-64"],
                                                                          default_features=True),
                                                             "sol2",
-                                                            "pybind11"
+                                                            "pybind11",
+                                                            "taskflow"
                                                         ]))
 
 # Find the spdlog package with the specified options
@@ -137,6 +138,13 @@ sol2 = FindPackage(name='sol2',
                    dependant_target_link_libs=[
                        DomainValueModel(domain=DomainEnum.PUBLIC, values=['sol2'])])
 
+# Find the sol2 package with the specified options
+taskflow = FindPackage(name='Taskflow',
+                   config=True,
+                   required=True,
+                   dependant_target_link_libs=[
+                       DomainValueModel(domain=DomainEnum.PUBLIC, values=['Taskflow::Taskflow'])])
+
 ##########################################################
 
 # Fetch the Yalantinglibs package from GitHub with the specified options
@@ -222,6 +230,7 @@ class CommonModule(BaseModule):
                                         minitrace,
                                         luajit,
                                         sol2,
+                                        taskflow
                                         ]
                          )
         self.target_interface.add_compile_options(domain=DomainEnum.PUBLIC, values=[
