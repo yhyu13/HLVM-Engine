@@ -28,6 +28,7 @@ RunRebuild=0
 Verbose=0
 BuildGraphViz=0
 RunGPerf=0
+ParallelThreads=$(nproc)
 
 # Step 2: Loop through each argument
 for arg in "$@"; do
@@ -70,6 +71,11 @@ for arg in "$@"; do
     if [[ $arg == --GPerf ]]; then
         RunGPerf=1
     fi
+
+    # Step 11: Check for --ParallelThreads=value
+    if [[ $arg == --ParallelThreads=* ]]; then
+        ParallelThreads=${arg#*=}
+    fi
 done
 
 # echo all arguments
@@ -81,6 +87,7 @@ echo_color 32 "Receive RunRebuild: ${RunRebuild}"
 echo_color 32 "Receive Verbose: ${Verbose}"
 echo_color 32 "Receive BuildGraphViz: ${BuildGraphViz}"
 echo_color 32 "Receive RunGPerf: ${RunGPerf}"
+echo_color 32 "Receive ParallelThreads: ${ParallelThreads}"
 #------------------------------------------------------------------
 time {
 
@@ -154,7 +161,7 @@ for config in "${buildConfigs[@]}"; do
     fi
 
     # 构建参数s
-    cbuild_param="-j 32"
+    cbuild_param="-j ${ParallelThreads}"
     if [ ${Verbose} -eq 1 ]; then
         cbuild_param="--verbose"
     fi
@@ -176,7 +183,7 @@ for config in "${buildConfigs[@]}"; do
 
     # 测试项目
     if [ ${RunTest} -eq 1 ]; then
-      ctest_param="-j 8 --output-on-failure --stop-on-failure"
+      ctest_param="-j ${ParallelThreads} --output-on-failure --stop-on-failure"
       if [ -n "${BuildTarget}" ]; then
           # ctest run only one target
           # https://stackoverflow.com/questions/54160415/running-only-one-single-test-with-cmake-make

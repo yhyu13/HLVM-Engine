@@ -15,7 +15,7 @@ RECORD_INT(taskflow_async_test)
 
 	HLVM_LOG(LogTest, info, TXT("Test taskflow_async_test!"));
 	{
-		tf::Executor executor;
+		tf::Executor executor{ 4 };
 
 		// create asynchronous tasks from the executor
 		// (using executor as a thread pool)
@@ -67,7 +67,7 @@ RECORD_INT(taskflow_data_test)
 
 	HLVM_LOG(LogTest, info, TXT("Test taskflow_data_test!"));
 	{
-		tf::Executor executor;
+		tf::Executor executor{ 4 };
 		tf::Taskflow taskflow("attach data to a task");
 
 		int data;
@@ -96,7 +96,7 @@ RECORD_INT(taskflow_cancel_test)
 
 	HLVM_LOG(LogTest, info, TXT("Test taskflow_cancel_test!"));
 	{
-		tf::Executor executor;
+		tf::Executor executor{ 4 };
 		tf::Taskflow taskflow("cancel");
 
 		// We create a taskflow graph of 1000 tasks each of 1 second.
@@ -135,7 +135,7 @@ static void composition_example_1()
 
 	std::cout << "Composition example 1\n";
 
-	tf::Executor executor;
+	tf::Executor executor{ 4 };
 
 	// f1 has three independent tasks
 	tf::Taskflow f1("F1");
@@ -179,7 +179,7 @@ static void composition_example_2()
 
 	std::cout << "Composition example 2\n";
 
-	tf::Executor executor;
+	tf::Executor executor{ 4 };
 
 	// f1 has two independent tasks
 	tf::Taskflow f1("F1");
@@ -256,7 +256,7 @@ RECORD_INT(taskflow_condition_test)
 
 	HLVM_LOG(LogTest, info, TXT("Test taskflow_condition_test!"));
 	{
-		tf::Executor executor;
+		tf::Executor executor{ 4 };
 		tf::Taskflow taskflow("Conditional Tasking Demo");
 
 		int counter;
@@ -350,7 +350,7 @@ RECORD_INT(taskflow_dependent_async_test)
 
 	HLVM_LOG(LogTest, info, TXT("Test taskflow_dependent_async_test!"));
 	{
-		tf::Executor executor;
+		tf::Executor executor{ 4 };
 
 		// demonstration of dependent async (with future)
 		printf("Dependent Async\n");
@@ -387,7 +387,7 @@ RECORD_INT(taskflow_dependent_async_algorithm_test)
 	{
 		const size_t N = 65536;
 
-		tf::Executor executor;
+		tf::Executor executor{ 4 };
 
 		int				 sum{ 1 };
 		std::vector<int> data(N);
@@ -430,7 +430,7 @@ RECORD_INT(taskflow_do_while_loop_test)
 
 	HLVM_LOG(LogTest, info, TXT("Test taskflow_do_while_loop_test!"));
 	{
-		tf::Executor executor;
+		tf::Executor executor{ 4 };
 		tf::Taskflow taskflow;
 
 		int i;
@@ -465,7 +465,7 @@ RECORD_INT(taskflow_exception_test)
 
 	HLVM_LOG(LogTest, info, TXT("Test taskflow_exception_test!"));
 	{
-		tf::Executor executor;
+		tf::Executor executor{ 4 };
 		tf::Taskflow taskflow("exception");
 
 		auto [A, B, C, D] = taskflow.emplace(
@@ -504,7 +504,7 @@ RECORD_INT(taskflow_if_else_test)
 
 	HLVM_LOG(LogTest, info, TXT("Test taskflow_if_else_test!"));
 	{
-		tf::Executor executor;
+		tf::Executor executor{ 4 };
 		tf::Taskflow taskflow;
 
 		// create three static tasks and one condition task
@@ -542,7 +542,7 @@ RECORD_INT(taskflow_multi_condition_test)
 
 	HLVM_LOG(LogTest, info, TXT("Test taskflow_multi_condition_test!"));
 	{
-		tf::Executor executor;
+		tf::Executor executor{ 4 };
 		tf::Taskflow taskflow("Multi-Conditional Tasking Demo");
 
 		auto A = taskflow.emplace([&]() -> tf::SmallVector<int> {
@@ -573,7 +573,7 @@ RECORD_INT(taskflow_nested_if_else_test)
 
 	HLVM_LOG(LogTest, info, TXT("Test taskflow_nested_if_else_test!"));
 	{
-		tf::Executor executor;
+		tf::Executor executor{ 4 };
 		tf::Taskflow taskflow;
 
 		int i;
@@ -607,14 +607,14 @@ RECORD_INT(taskflow_nested_if_else_test)
 static void for_each(size_t N)
 {
 
-	tf::Executor executor;
+	tf::Executor executor{ 4 };
 	tf::Taskflow taskflow;
 
 	std::vector<size_t> range(N);
 	std::iota(range.begin(), range.end(), 0);
 
-	taskflow.for_each(range.begin(), range.end(), [&](size_t i) {
-		printf("for_each on container item: %zu\n", i);
+	taskflow.for_each(range.begin(), range.end(), [&](size_t) {
+		// printf("for_each on container item: %zu\n", i);
 	});
 
 	executor.run(taskflow).get();
@@ -626,12 +626,12 @@ static void for_each(size_t N)
 static void for_each_index(size_t N)
 {
 
-	tf::Executor executor;
+	tf::Executor executor{ 4 };
 	tf::Taskflow taskflow;
 
 	// [0, N) with step size 2
-	taskflow.for_each_index(S_C(size_t, 0), N, S_C(size_t, 2), [](size_t i) {
-		printf("for_each_index on index: %zu\n", i);
+	taskflow.for_each_index(S_C(size_t, 0), N, S_C(size_t, 2), [](size_t) {
+		// printf("for_each_index on index: %zu\n", i);
 	});
 
 	executor.run(taskflow).get();
@@ -645,8 +645,8 @@ RECORD_INT(taskflow_parallel_for_test)
 
 	HLVM_LOG(LogTest, info, TXT("Test taskflow_parallel_for_test!"));
 	{
-		for_each(100);
-		for_each_index(100);
+		for_each(10000);
+		for_each_index(10000);
 
 		return 0;
 	}
@@ -680,12 +680,20 @@ static std::string random_string(size_t len)
 // generate a vector of random strings
 static std::vector<std::string> random_strings()
 {
-	std::vector<std::string> strings(1000000);
+	std::vector<std::string> strings(100000);
 	std::cout << "generating random strings ...\n";
-	for (auto& str : strings)
-	{
+	// Task flow use 10 threads to gen random string
+	tf::Executor executor;
+	tf::Taskflow taskflow;
+	taskflow.for_each(strings.begin(), strings.end(), [&](std::string& str) {
 		str = random_string(32);
-	}
+	});
+	executor.run(taskflow).get();
+
+	//	for (auto& str : strings)
+	//	{
+	//		str = random_string(32);
+	//	}
 	return strings;
 }
 
@@ -695,30 +703,31 @@ RECORD_INT(taskflow_parallel_sort_test)
 
 	HLVM_LOG(LogTest, info, TXT("Test taskflow_parallel_sort_test!"));
 	{
+		auto _strings = random_strings();
 		// sequential sort
 		{
-			auto strings = random_strings();
+			auto strings = CopyTemp(_strings);
 			std::cout << "std::sort ... ";
 			auto beg = std::chrono::steady_clock::now();
 			std::sort(strings.begin(), strings.end());
 			auto end = std::chrono::steady_clock::now();
 			std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end - beg).count()
-					  << " ms\n";
+					  << " ms" << std::endl;
 		}
 		// parallel sort
 		{
-			auto strings = random_strings();
+			auto strings = CopyTemp(_strings);
 			std::cout << "Taskflow Parallel Sort ... ";
 			auto beg = std::chrono::steady_clock::now();
 			{
 				tf::Taskflow taskflow;
-				tf::Executor executor;
+				tf::Executor executor{ 4 };
 				taskflow.sort(strings.begin(), strings.end());
 				executor.run(taskflow).wait();
 			}
 			auto end = std::chrono::steady_clock::now();
 			std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end - beg).count()
-					  << " ms\n";
+					  << " ms" << std::endl;
 		}
 
 		return 0;
@@ -817,7 +826,7 @@ static void reduce()
 	// taskflow
 	auto		 tbeg = std::chrono::steady_clock::now();
 	tf::Taskflow taskflow;
-	tf::Executor executor;
+	tf::Executor executor{ 4 };
 	auto		 tmin = std::numeric_limits<int>::max();
 	taskflow.reduce(
 		data.begin(),
@@ -907,7 +916,7 @@ RECORD_INT(taskflow_runtime_test)
 	HLVM_LOG(LogTest, info, TXT("Test taskflow_runtime_test!"));
 	{
 		tf::Taskflow taskflow("Runtime Tasking");
-		tf::Executor executor;
+		tf::Executor executor{ 4 };
 
 		tf::Task A, B, C, D;
 
@@ -946,7 +955,7 @@ RECORD_INT(taskflow_simple_test)
 
 	HLVM_LOG(LogTest, info, TXT("Test taskflow_simple_test!"));
 	{
-		tf::Executor executor;
+		tf::Executor executor{ 4 };
 		tf::Taskflow taskflow("simple");
 
 		auto [A, B, C, D] = taskflow.emplace(
@@ -1042,7 +1051,7 @@ RECORD_INT(taskflow_subflow_async_test)
 	HLVM_LOG(LogTest, info, TXT("Test taskflow_subflow_async_test!"));
 	{
 		tf::Taskflow taskflow("Subflow Async");
-		tf::Executor executor;
+		tf::Executor executor{ 4 };
 
 		std::atomic<int> counter{ 0 };
 
@@ -1115,7 +1124,7 @@ RECORD_INT(taskflow_visualization_test)
 
 		// in order to visualize subflow tasks, you need to run the taskflow
 		// to spawn the dynamic tasks first
-		tf::Executor executor;
+		tf::Executor executor{ 4 };
 		executor.run(taskflow).wait();
 
 		taskflow.dump(std::cout);
@@ -1131,7 +1140,7 @@ RECORD_INT(taskflow_while_loop_test)
 
 	HLVM_LOG(LogTest, info, TXT("Test taskflow_while_loop_test!"));
 	{
-		tf::Executor executor;
+		tf::Executor executor{ 4 };
 		tf::Taskflow taskflow;
 
 		int i;
