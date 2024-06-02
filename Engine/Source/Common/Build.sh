@@ -183,7 +183,7 @@ for config in "${buildConfigs[@]}"; do
 
     # 测试项目
     if [ ${RunTest} -eq 1 ]; then
-      ctest_param="-j ${ParallelThreads} --output-on-failure --stop-on-failure"
+      ctest_param="-j 4 --output-on-failure --stop-on-failure"
       if [ -n "${BuildTarget}" ]; then
           # ctest run only one target
           # https://stackoverflow.com/questions/54160415/running-only-one-single-test-with-cmake-make

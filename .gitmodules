@@ -8,3 +8,6 @@
 [submodule "Engine/Scripts/pycmake"]
 	path = Engine/Scripts/pycmake
 	url = https://gitee.com/yhyu13/pycmake.git
+[submodule "Document"]
+	path = Document
+	url = https://github.com/yhyu13/HLVM-Engine-Doc.git

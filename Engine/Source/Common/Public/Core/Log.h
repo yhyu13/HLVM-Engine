@@ -204,6 +204,35 @@ private:
 	}                                                                                                  \
 	while (0)
 
+#define HLVM_CLOG(_COND, _Category, _level, fmt, ...)                                                     \
+	do                                                                                                    \
+	{                                                                                                     \
+		if constexpr (static_cast<int>(spdlog::level::_level) >= static_cast<int>(_Category.LogLevel))    \
+			if (static_cast<bool>(_COND))                                                                 \
+				FLogRedirector::Get()                                                                     \
+					->Pump(FLogContext{                                                                   \
+							   .Category = &_Category,                                                    \
+							   .LogLevel = spdlog::level::_level,                                         \
+							   .FileName = TO_TCHAR_STR(&std::string_view(ct_strrchr(__FILE__, '/'))[1]), \
+							   .Line = __LINE__ },                                                        \
+						fmt, ##__VA_ARGS__);                                                              \
+	}                                                                                                     \
+	while (0)
+
+#define HLVM_CLOG_OR_FATAL(_COND, _Category, _level, fmt, ...)                                                       \
+	do                                                                                                               \
+	{                                                                                                                \
+		if constexpr (static_cast<int>(spdlog::level::_level) >= static_cast<int>(_Category.LogLevel))               \
+			FLogRedirector::Get()                                                                                    \
+				->Pump(FLogContext{                                                                                  \
+						   .Category = &_Category,                                                                   \
+						   .LogLevel = (static_cast<bool>(_COND)) ? spdlog::level::_level : spdlog::level::critical, \
+						   .FileName = TO_TCHAR_STR(&std::string_view(ct_strrchr(__FILE__, '/'))[1]),                \
+						   .Line = __LINE__ },                                                                       \
+					fmt, ##__VA_ARGS__);                                                                             \
+	}                                                                                                                \
+	while (0)
+
 /**
  * @brief FSpdlogConsoleDevice is a log device that logs to the console.
  *
