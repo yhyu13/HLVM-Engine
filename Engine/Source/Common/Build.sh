@@ -183,7 +183,7 @@ for config in "${buildConfigs[@]}"; do
 
     # 测试项目
     if [ ${RunTest} -eq 1 ]; then
-      ctest_param="-j 4 --output-on-failure --stop-on-failure"
+      ctest_param="-j ${ParallelThreads} --output-on-failure --stop-on-failure --test-timeout 30"
       if [ -n "${BuildTarget}" ]; then
           # ctest run only one target
           # https://stackoverflow.com/questions/54160415/running-only-one-single-test-with-cmake-make
@@ -227,5 +227,5 @@ for config in "${buildConfigs[@]}"; do
     fi
 done
 
-echo_color 32 "Finished building all targets"
+echo_color 34 "Finished building all targets...exiting"
 }

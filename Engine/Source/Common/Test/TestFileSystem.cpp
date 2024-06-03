@@ -89,8 +89,8 @@ RECORD(packed_test)
 
 	{
 		FPath PackedFileName = "./packed-test";
-		FPath PackedTokFile = PackedFileName.ChangeExtension(HLVM_PACKED_TOKEN_EXT);
-		FPath PackedCotFile = PackedFileName.ChangeExtension(HLVM_PACKED_CONTAINER_EXT);
+		FPath PackedTokFile = PackedFileName.ChangeExtension(HLVM_PACKED_TOKEN_FILE_EXT);
+		FPath PackedCotFile = PackedFileName.ChangeExtension(HLVM_PACKED_CONTAINER_FILE_EXT);
 		FPath PackedJsonlFile = PackedFileName.ChangeExtension(HLVM_JSONL_FILE_EXT);
 		HLVM_LOG(LogTest, info, TXT("Test PackedFileHandle write token file: {}"), *PackedTokFile);
 

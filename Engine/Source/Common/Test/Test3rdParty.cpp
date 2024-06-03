@@ -585,14 +585,3 @@ RECORD(test_rapidjson)
 //		std::cout << boost::stacktrace::stacktrace();
 //	}
 // }
-
-#include <taskflow/taskflow.hpp>
-
-RECORD(taskflow_test)
-{
-	HLVM_PROFILE_CPU_NAMED("taskflow_test");
-
-	HLVM_LOG(LogTest, info, TXT("Test taskflow_test!"));
-	{
-	}
-}

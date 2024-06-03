@@ -61,11 +61,11 @@ IFileHandle::OpRetType FPackedFileHandle::Open(const FPath& FilePath, const FFil
 	mFilePath = FilePath;
 	const bool _noExtension = !mFilePath.has_extension();
 	PFH_HANDLE_ASSERT(_noExtension, TXT("Packed file path input should not have extension"));
-	if (std::regex_search(mFilePath.ToCharStr(), HLVM_PACKED_PATCH_FILE_PATTERN))
+	if (std::regex_search(mFilePath.ToCharStr(), HLVM_PACKED_PATCH_FILE_MATCH_PATTERN))
 	{
 		mPackedFileType = EPackedFileType::Patch;
 		std::smatch matches;
-		std::regex_match(mFilePath.string(), matches, HLVM_PACKED_PATCH_FILE_PATTERN);
+		std::regex_match(mFilePath.string(), matches, HLVM_PACKED_PATCH_FILE_MATCH_PATTERN);
 		const bool bValid = matches.size() == 2;
 		PFH_HANDLE_ASSERT(bValid, TXT("Patch regex matching failed with wrong size {}"), matches.size());
 		try
@@ -78,7 +78,7 @@ IFileHandle::OpRetType FPackedFileHandle::Open(const FPath& FilePath, const FFil
 			PFH_HANDLE_ENSURE(false, TXT("Invalid input: {}"), TO_TCHAR_STR(e.what()));
 		}
 	}
-	else if (std::regex_search(mFilePath.ToCharStr(), HLVM_PACKED_FILE_PATTERN))
+	else if (std::regex_search(mFilePath.ToCharStr(), HLVM_PACKED_FILE_MATCH_PATTERN))
 	{
 		mPackedFileType = EPackedFileType::Base;
 	}
@@ -99,7 +99,7 @@ IFileHandle::OpRetType FPackedFileHandle::Open(const FPath& FilePath, const FFil
 					// Open container file with mmap
 					{
 						// Exist container file
-						auto	   ContainerFilePath = mFilePath.ChangeExtension(HLVM_PACKED_CONTAINER_EXT);
+						auto	   ContainerFilePath = mFilePath.ChangeExtension(HLVM_PACKED_CONTAINER_FILE_EXT);
 						const bool exist = FPath::Exists(ContainerFilePath);
 						PFH_HANDLE_ENSURE(exist, TXT("Packed container file does not exist"));
 
@@ -125,7 +125,7 @@ IFileHandle::OpRetType FPackedFileHandle::Open(const FPath& FilePath, const FFil
 			// Decompress and read and build all token entries
 			{
 				// Exists Token file path
-				FPath	   TokenFilePath = mFilePath.ChangeExtension(HLVM_PACKED_TOKEN_EXT);
+				FPath	   TokenFilePath = mFilePath.ChangeExtension(HLVM_PACKED_TOKEN_FILE_EXT);
 				const bool exist = FPath::Exists(TokenFilePath);
 				PFH_HANDLE_ENSURE(exist, TXT("Packed token file does not exist"));
 

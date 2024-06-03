@@ -4,7 +4,16 @@
 
 #include "Test.h"
 
-#include <taskflow/taskflow.hpp>
+#define USE_THIRD_PARTY_TF 0
+#if USE_THIRD_PARTY_TF
+	#include "ThirdParty/TaskFlow.h"
+#else
+	#include <taskflow/taskflow.hpp>
+	#include <taskflow/algorithm/for_each.hpp>
+	#include <taskflow/algorithm/transform.hpp>
+	#include <taskflow/algorithm/reduce.hpp>
+	#include <taskflow/algorithm/sort.hpp>
+#endif
 
 DECLARE_LOG_CATEGORY(LogTest)
 
@@ -375,9 +384,6 @@ RECORD_INT(taskflow_dependent_async_test)
 }
 
 // https://github.com/taskflow/taskflow/blob/master/examples/dependent_async_algorithm.cpp
-#include <taskflow/algorithm/for_each.hpp>
-#include <taskflow/algorithm/transform.hpp>
-#include <taskflow/algorithm/reduce.hpp>
 
 RECORD_INT(taskflow_dependent_async_algorithm_test)
 {
@@ -653,7 +659,7 @@ RECORD_INT(taskflow_parallel_for_test)
 }
 
 // https://github.com/taskflow/taskflow/blob/master/examples/parallel_sort.cpp
-#include <taskflow/algorithm/sort.hpp>
+
 // generate a random string
 static std::string random_string(size_t len)
 {
@@ -784,7 +790,6 @@ RECORD_INT(taskflow_priority_test)
 }
 
 // https://github.com/taskflow/taskflow/blob/master/examples/reduce.cpp
-#include <taskflow/algorithm/reduce.hpp>
 
 #define MAX_DATA_SIZE 40000000
 struct Data

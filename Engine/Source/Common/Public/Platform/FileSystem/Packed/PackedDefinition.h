@@ -7,20 +7,20 @@
 #include "GlobalDefinition.h"
 #include <regex>
 
-#ifndef HLVM_PACKED_TOKEN_EXT
-	#define HLVM_PACKED_TOKEN_EXT TXT(".tok")
+#ifndef HLVM_PACKED_TOKEN_FILE_EXT
+	#define HLVM_PACKED_TOKEN_FILE_EXT TXT(".toc")
 #endif
 
-#ifndef HLVM_PACKED_CONTAINER_EXT
-	#define HLVM_PACKED_CONTAINER_EXT TXT(".cot")
+#ifndef HLVM_PACKED_CONTAINER_FILE_EXT
+	#define HLVM_PACKED_CONTAINER_FILE_EXT TXT(".cas")
 #endif
 
-#ifndef HLVM_PACKED_FILE_PATTERN
-	#define HLVM_PACKED_FILE_PATTERN std::regex(R"(packed-\S*)")
+#ifndef HLVM_PACKED_FILE_MATCH_PATTERN
+	#define HLVM_PACKED_FILE_MATCH_PATTERN std::regex(R"(packed-\S*)")
 #endif
 
-#ifndef HLVM_PACKED_PATCH_FILE_PATTERN
-	#define HLVM_PACKED_PATCH_FILE_PATTERN std::regex(R"(packed-\S*-\d+-pat)")
+#ifndef HLVM_PACKED_PATCH_FILE_MATCH_PATTERN
+	#define HLVM_PACKED_PATCH_FILE_MATCH_PATTERN std::regex(R"(packed-\S*-\d+-pat)")
 #endif
 
 /**
