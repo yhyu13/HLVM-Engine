@@ -183,7 +183,8 @@ for config in "${buildConfigs[@]}"; do
 
     # 测试项目
     if [ ${RunTest} -eq 1 ]; then
-      ctest_param="-j ${ParallelThreads} --output-on-failure --stop-on-failure --test-timeout 30"
+      ctest_param="--parallel ${ParallelThreads} --force-new-ctest-process --output-on-failure --schedule-random"
+      ctest_param+=" --test_timeout 30  --repeat-until-fail 2"
       if [ -n "${BuildTarget}" ]; then
           # ctest run only one target
           # https://stackoverflow.com/questions/54160415/running-only-one-single-test-with-cmake-make
@@ -193,8 +194,7 @@ for config in "${buildConfigs[@]}"; do
       # 测试项目
       test_cmd="${CTEST_BIN} . ${ctest_param}"
       echo_color 34 "Test cmd: ${test_cmd}"
-      (${test_cmd}) || exit 1 \
-        | tee "${ROOT_DIR}/build_test_${config}.log"
+      (${test_cmd} || exit 1) | tee "${ROOT_DIR}/build_test_${config}.log"
     fi
 
     # 性能测试

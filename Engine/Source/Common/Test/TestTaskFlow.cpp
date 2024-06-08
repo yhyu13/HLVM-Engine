@@ -4,7 +4,7 @@
 
 #include "Test.h"
 
-#define USE_THIRD_PARTY_TF 0
+#define USE_THIRD_PARTY_TF 1
 #if USE_THIRD_PARTY_TF
 	#include "ThirdParty/TaskFlow.h"
 #else

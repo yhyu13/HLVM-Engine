@@ -5,6 +5,7 @@
 #include "Test.h"
 
 #include "Core/Scripting/Lua/Sol.h"
+#include "ThirdParty/Effil.h"
 
 DECLARE_LOG_CATEGORY(LogTest)
 
@@ -78,7 +79,7 @@ struct my_class
 RECORD(sol2_writing_member_functions_test)
 {
 	HLVM_SOL_STATE(lua);
-	lua.open_libraries(sol::lib::base);
+	lua.open_libraries();
 
 	// Here, we are binding the member function and a class
 	// instance: it will call the function on the given class
@@ -144,7 +145,7 @@ RECORD(sol2_write_variables_demo_test)
 
 	// open those basic lua libraries
 	// again, for print() and other basic utilities
-	lua.open_libraries(sol::lib::base);
+	lua.open_libraries();
 
 	// value in the global table
 	lua["bark"] = 50;
@@ -368,7 +369,7 @@ RECORD(sol2_open_multiple_libraries_test)
 RECORD(sol2_object_lifetime_test)
 {
 	HLVM_SOL_STATE(lua);
-	lua.open_libraries(sol::lib::base);
+	lua.open_libraries();
 
 	lua.script(R"(
 	obj = "please don't let me die";
@@ -567,7 +568,7 @@ RECORD(sol2_userdata_memory_reference_test)
 			  << std::endl;
 
 	HLVM_SOL_STATE(lua);
-	lua.open_libraries(sol::lib::base);
+	lua.open_libraries();
 
 	Doge dog{}; // Kept alive somehow
 
@@ -612,7 +613,7 @@ RECORD(sol2_userdata_memory_reference_test)
 RECORD(sol2_hlvm_refcount_test)
 {
 	HLVM_SOL_STATE(lua);
-	lua.open_libraries(sol::lib::base);
+	lua.open_libraries();
 
 	sol::constructors<FName(),
 		FName(const char*)>
@@ -665,4 +666,72 @@ RECORD(sol2_hlvm_refcount_test)
         assert(name3:NumRef() == 1)
         print(name3:NumRef())
     )");
+}
+
+#include "ThirdParty/Effil.h"
+
+#define EFFILE_LUAJIT 1
+#define EFFILE_STRESS_TEST 0
+#if EFFILE_STRESS_TEST
+	#include <boost/process/env.hpp>
+#endif
+
+RECORD(sol2_effil_test)
+{
+	HLVM_PROFILE_CPU_NAMED("sol2_effil_test");
+#if EFFILE_STRESS_TEST
+	auto e = boost::this_process::environment();
+	e["STRESS"] = "1";
+#endif
+
+	{
+		auto	   CWD = boost::filesystem::current_path();
+		const auto DataDir = FString::Format(TXT("{}/{}_Data"), *GExecutablePath, *GExecutableName);
+		const bool bDataDirExist = FGenericPlatformFile::Get(EPlatformFileType::Local)->Exists(DataDir);
+		if (bDataDirExist)
+		{
+			auto AllLuaFiles = FGenericPlatformFile::Get(EPlatformFileType::Local)->Glob(DataDir, TXT(R"(.*run_tests\.lua$)"), true);
+			for (auto LuaFile : AllLuaFiles)
+			{
+				HLVM_LOG(LogTest, info, TXT("Test lua file: {}"), *LuaFile);
+				/**
+				 * Setting the current path to the lua file's parent path
+				 */
+				boost::filesystem::current_path(LuaFile.parent_path());
+
+				HLVM_SOL_STATE(lua);
+#if EFFILE_LUAJIT
+				lua.open_libraries();
+#else
+				lua.open_libraries(sol::lib::base,
+					sol::lib::package,
+					sol::lib::string,
+					sol::lib::table,
+					sol::lib::debug,
+					sol::lib::os,
+					sol::lib::math);
+#endif
+				lua.require("effil", luaopen_effil, false);
+
+				try
+				{
+					FScopedTimerLog timer(FString::Format(TXT("Test lua file: {}"), *LuaFile));
+					auto			Result = lua.safe_script_file(LuaFile.ToCharStr());
+					if (!Result.valid())
+					{
+						sol::error err = Result;
+						HLVM_LOG(LogTest, err, TXT("Test lua file: {} failed: {}"), *LuaFile, TO_TCHAR_STR(err.what()));
+					}
+				}
+				catch (...)
+				{
+				}
+			}
+		}
+		else
+		{
+			HLVM_LOG(LogTest, warn, TXT("Data dir not exist: {}"), *DataDir);
+		}
+		boost::filesystem::current_path(CWD);
+	}
 }

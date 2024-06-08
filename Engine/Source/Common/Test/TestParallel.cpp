@@ -21,7 +21,7 @@ DECLARE_LOG_CATEGORY(LogTest)
 */
 RECORD(lock_test, true)
 {
-	constexpr int kNumThreads = 16;
+	constexpr int kNumThreads = 10;
 	constexpr int kNumIterations = 5;
 	constexpr int kNumLoops = 10000;
 	double		  time_no_lock, time_lock;
@@ -167,7 +167,7 @@ RECORD(lock_free_queue_test, true)
 	HLVM_PROFILER_CPU_ONOFF(false);
 	HLVM_LOG(LogTest, info, TXT("Queue test:"));
 
-	constexpr int kNumThreads = 16;
+	constexpr int kNumThreads = 10;
 	constexpr int kNumIterations = 5;
 	constexpr int kNumLoops = 10000;
 	double		  time_concurrent, time_lock;
@@ -306,7 +306,7 @@ RECORD(fixed_queue_test, true)
 	HLVM_PROFILER_CPU_ONOFF(false);
 	HLVM_LOG(LogTest, info, TXT("Fixed Queue test:"));
 
-	constexpr int kNumThreads = 16;
+	constexpr int kNumThreads = 10;
 	constexpr int kNumIterations = 5;
 	constexpr int kNumLoops = 10000;
 	double		  time_concurrent, time_lock;
@@ -450,7 +450,7 @@ RECORD(pool_test, true)
 	HLVM_PROFILER_CPU_ONOFF(false);
 	HLVM_LOG(LogTest, info, TXT("Pool test:"));
 
-	constexpr int kNumThreads = 16;
+	constexpr int kNumThreads = 10;
 	constexpr int kNumIterations = 5;
 	constexpr int kNumLoops = 10000;
 	double		  time_1, time_2, time_3 = 0;

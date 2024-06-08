@@ -115,7 +115,8 @@ public:
 	}
 
 	/**
-	 * ConcurrentQueue Push always success, so there is no different between TryPush or not
+	 * ConcurrentQueue Push always success, so there is no different between TryPush or not,
+	 * It is just compilance with other Queue interface
 	 */
 	template <bool bTryPush = false>
 	bool Push(const T& item) noexcept
@@ -137,6 +138,7 @@ public:
 
 	/**
 	 * ConcurrentQueue Push always success, so there is no different between TryPush or not
+	 * It is just compilance with other Queue interface
 	 */
 	template <bool bTryPush = false>
 	bool Push(T&& item) noexcept
@@ -344,8 +346,9 @@ private:
 	/** mMutex for blocking pop. */
 	std::mutex				mMutex;
 	std::condition_variable mCV;
+
 	/** Whether the queue is quit by user. */
-	BIT_FLAG(bStopFlagByUser){ false };
+	volatile bool bStopFlagByUser{ false };
 
 	/** Size of the queue. */
 	std::atomic_uint_fast32_t mCount{ 0 };
