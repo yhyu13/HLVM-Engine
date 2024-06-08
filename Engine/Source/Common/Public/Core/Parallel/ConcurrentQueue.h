@@ -22,33 +22,30 @@ enum class EConcurrentQueueMode : TUINT8
 	Mpmc, // Multiple Producer Multiple Consumer
 };
 
-namespace hlvm_private
-{
-	/**
-	 * Actually use atomic pointer is significantly faster (2x) than using raw ptr,
-	 * Try turn this on/off and compare TestParallel benchmark
-	 */
+/**
+ * Actually use atomic pointer is significantly faster (2x) than using raw ptr,
+ * Try turn this on/off and compare TestParallel benchmark
+ */
 #define QUEUE_NODE_USE_ATOMIC_PTR 1
 
-	/**
-	 * Structure for the internal linked list.
-	 */
-	template <typename T>
-	struct MS_ALIGN(HLVM_MALLOC_ALIGNMENT) TQueueNode
+/**
+ * Structure for the internal linked list.
+ */
+template <typename T>
+struct MS_ALIGN(HLVM_MALLOC_ALIGNMENT) TConcurrentQueueNode
+{
+	TConcurrentQueueNode() = default;
+	explicit TConcurrentQueueNode(T&& InItem) noexcept
+		: mItem(FwdTemp<T>(InItem))
 	{
-		TQueueNode() = default;
-		explicit TQueueNode(T&& InItem) noexcept
-			: mItem(FwdTemp<T>(InItem))
-		{
-		}
+	}
 #if QUEUE_NODE_USE_ATOMIC_PTR
-		TAtomicPointer<TQueueNode*> mNextNode;
+	TAtomicPointer<TConcurrentQueueNode*> mNextNode;
 #else
-		TQueueNode* mNextNode{ nullptr };
+	TConcurrentQueueNode* mNextNode{ nullptr };
 #endif
-		T mItem;
-	} GCC_ALIGN(HLVM_MALLOC_ALIGNMENT);
-} // namespace hlvm_private
+	T mItem;
+} GCC_ALIGN(HLVM_MALLOC_ALIGNMENT);
 
 /**
  * Lock-free concurrent queue, inspired by Unreal Engine's TQueue
@@ -57,7 +54,7 @@ template <typename T,
 	EConcurrentQueueMode Mode = EConcurrentQueueMode::Mpmc,
 	bool				 bCountSize = false,
 	// Default to std::allocator to use new/delete
-	CPMRMallocator<hlvm_private::TQueueNode<T>> AllocatorType = TPMRStd<hlvm_private::TQueueNode<T>>>
+	CPMRMallocator<TConcurrentQueueNode<T>> AllocatorType = TPMRStd<TConcurrentQueueNode<T>>>
 class TConcurrentQueue
 {
 #define IS_MP (Mode == EConcurrentQueueMode::Mpsc || Mode == EConcurrentQueueMode::Mpmc)
@@ -94,18 +91,18 @@ class TConcurrentQueue
 
 public:
 	using ValueType = T;
-	using QueueNode = hlvm_private::TQueueNode<T>;
+	using QueueNodeType = TConcurrentQueueNode<T>;
 
 	NOCOPYMOVE(TConcurrentQueue)
 	TConcurrentQueue()
 	{
-		mHead = mTail = std::construct_at(R_C(QueueNode*, Mallocator.allocate()));
+		mHead = mTail = std::construct_at(R_C(QueueNodeType*, Mallocator.allocate()));
 		HLVM_ASSERT(mHead.IsLockFree(), TXT("TAtomicPointer is not lock free"));
 	}
 
 	~TConcurrentQueue() noexcept
 	{
-		while (QueueNode* temp = mTail)
+		while (QueueNodeType* temp = mTail)
 		{
 			mTail = mTail->mNextNode;
 			HLVM_ATOMIC_THREAD_FENCE();
@@ -130,7 +127,7 @@ public:
 		else
 			HLVM_LIKELY
 			{
-				auto NewNode = std::construct_at(R_C(QueueNode*, Mallocator.allocate()), CopyTemp(item));
+				auto NewNode = std::construct_at(R_C(QueueNodeType*, Mallocator.allocate()), CopyTemp(item));
 				PushInternal(NewNode);
 				return true;
 			}
@@ -152,7 +149,7 @@ public:
 		else
 			HLVM_LIKELY
 			{
-				auto NewNode = std::construct_at(R_C(QueueNode*, Mallocator.allocate()), MoveTemp(item));
+				auto NewNode = std::construct_at(R_C(QueueNodeType*, Mallocator.allocate()), MoveTemp(item));
 				PushInternal(NewNode);
 				return true;
 			}
@@ -196,12 +193,12 @@ public:
 			}
 		}
 
-		if (QueueNode* PopedNode = mTail->mNextNode)
+		if (QueueNodeType* PopedNode = mTail->mNextNode)
 		{
 			if constexpr (IS_SC)
 			{
 				// Step1 swap tail pointer
-				QueueNode* old_tail = mTail;
+				QueueNodeType* old_tail = mTail;
 				mTail = PopedNode;
 
 				// Step2 assign value
@@ -230,7 +227,7 @@ public:
 			}
 			else
 			{
-				QueueNode* old_tail = mTail;
+				QueueNodeType* old_tail = mTail;
 				// Step1 swap tail pointer
 				if (old_tail->mNextNode == PopedNode
 					&& FGenericPlatformAtomicPointer::AtomicCompareExchange(&mTail, &old_tail, PopedNode))
@@ -302,9 +299,9 @@ public:
 	}
 
 private:
-	void PushInternal(QueueNode* NewNode) noexcept
+	void PushInternal(QueueNodeType* NewNode) noexcept
 	{
-		QueueNode* old_head;
+		QueueNodeType* old_head;
 		if constexpr (IS_MP)
 		{
 			// Step1, swap pointer
@@ -339,9 +336,9 @@ private:
 
 private:
 	/** Holds a pointer to the head (back) of the list. */
-	HLVM_CACHE_ALIGN TAtomicPointer<QueueNode*> mHead;
+	HLVM_CACHE_ALIGN TAtomicPointer<QueueNodeType*> mHead;
 	/** Holds a pointer to the tail (front) of the list. */
-	TAtomicPointer<QueueNode*> mTail;
+	TAtomicPointer<QueueNodeType*> mTail;
 
 	/** mMutex for blocking pop. */
 	std::mutex				mMutex;

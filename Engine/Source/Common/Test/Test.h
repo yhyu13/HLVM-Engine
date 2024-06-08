@@ -157,7 +157,7 @@ std::function<void()> _make_test_wrapper(const FString& name, Func test_function
 	{                                                           \
 		if (enabled)                                            \
 		{                                                       \
-			std::function<void()> func_##section_name = [=]() { \
+			std::function<void()> func_##section_name = [&]() { \
 				do                                              \
 				{                                               \
 					__VA_ARGS__                                 \

@@ -5,6 +5,7 @@
 #pragma once
 
 #include "Core/String.h"
+#include "Core/Parallel/Lock.h"
 #include "Template/ExpressionTemplate.tpp"
 #include "Platform/PlatformDefinition.h"
 
@@ -13,8 +14,9 @@
 
 namespace hlvm_private
 {
-	HLVM_EXTERN_VAR IMallocator* assert_stack_mallocator;
-	HLVM_EXTERN_FUNC void		 init_assert_stack_mallocator();
+	HLVM_EXTERN_VAR FAtomicFlagNC AssertionStackLock;
+	HLVM_EXTERN_VAR IMallocator*  AssertionStackMallocator;
+	HLVM_EXTERN_FUNC void		  InitAssertionStackMallocator();
 
 	HLVM_NORETURN HLVM_NOINLINE_FUNC void
 	hlvm_internal_assert(const TCHAR* Expression, const FString* Message, const TCHAR* File, int Line);
@@ -39,8 +41,9 @@ namespace hlvm_private
 		{                                                                                                                             \
 			if (static_cast<bool>((x)) == false)                                                                                      \
 			{                                                                                                                         \
-				hlvm_private::init_assert_stack_mallocator();                                                                         \
-				SwapMallocator(hlvm_private::assert_stack_mallocator);                                                                \
+				ATOMIC_LOCK_GUARD(hlvm_private::AssertionStackLock);                                                                  \
+				hlvm_private::InitAssertionStackMallocator();                                                                         \
+				SwapMallocator(hlvm_private::AssertionStackMallocator);                                                               \
 				hlvm_private::hlvm_internal_assert(STRTIFY(x), new FString{ FString::Format(__VA_ARGS__) }, TXT(__FILE__), __LINE__); \
 			}                                                                                                                         \
 		}                                                                                                                             \
@@ -76,8 +79,9 @@ namespace hlvm_private
 	{                                                                                                                             \
 		if (static_cast<bool>((x)) == false)                                                                                      \
 		{                                                                                                                         \
-			hlvm_private::init_assert_stack_mallocator();                                                                         \
-			SwapMallocator(hlvm_private::assert_stack_mallocator);                                                                \
+			ATOMIC_LOCK_GUARD(hlvm_private::AssertionStackLock);                                                                  \
+			hlvm_private::InitAssertionStackMallocator();                                                                         \
+			SwapMallocator(hlvm_private::AssertionStackMallocator);                                                               \
 			hlvm_private::hlvm_internal_assert(STRTIFY(x), new FString{ FString::Format(__VA_ARGS__) }, TXT(__FILE__), __LINE__); \
 		}                                                                                                                         \
 	}                                                                                                                             \

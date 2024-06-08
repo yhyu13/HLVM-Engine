@@ -44,7 +44,7 @@ public:
 	{
 		// Init stack and free block head which occupy the whole stack
 		mFreeBlockHead = std::construct_at(R_C(FBlock*, mStack));
-		mFreeBlockHead->size = (N - 2 * FBlock_Size); // Stack size minus head block and tail block
+		mFreeBlockHead->size = (Size_UpperBound); // Stack size minus head block and tail block
 		HLVM_CONSTEXPR_ASSERT(bValidate, mFreeBlockHead->size > 0);
 
 		// Init tail which is trivially free
@@ -147,19 +147,23 @@ private:
 	static_assert(sizeof(FBlock) == 12, "FBlock size must be 12 bytes");
 
 	HLVM_INLINE_VAR HLVM_STATIC_VAR constexpr SizeType FBlock_Size = S_C(SizeType, sizeof(FBlock));
-	static_assert(N - 2 * FBlock_Size > 0);
+	HLVM_INLINE_VAR HLVM_STATIC_VAR constexpr SizeType Size_UpperBound = S_C(SizeType, N - 2 * FBlock_Size);
+	static_assert(Size_UpperBound > 0);
 	HLVM_INLINE_VAR HLVM_STATIC_VAR constexpr SizeType Minimal_Block_Size = 24;
 
 	// TODO : Maybe consider implement aligned address looking up for stack allocator
 	void* InternalMalloc(size_t _size) noexcept(bValidate)
 	{
 		SizeType size = S_C(SizeType, _size);
-		HLVM_CONSTEXPR_ASSERT(bValidate, size > 0 && size <= N - 2 * FBlock_Size);
+		HLVM_CONSTEXPR_ASSERT(bValidate, size > 0);
 		HLVM_CONSTEXPR_ASSERT(bValidate, mFreeBlockHead->prevFreeBlock == nullptr);
 		/**
 		 * Only allocate from stack if the size is smaller than the upper bound
 		 */
-		if (mFreeSizeUpperBound < 0 || size <= mFreeSizeUpperBound)
+		const bool bSizeValid = size <= Size_UpperBound;
+		const bool bStackFreeSpace = (mFreeSizeUpperBound < 0 || size <= mFreeSizeUpperBound);
+		const bool bValidForStack = bSizeValid && bStackFreeSpace;
+		if (bValidForStack)
 		{
 			FBlock* FreeBlock = mFreeBlockHead;
 			/**
@@ -272,7 +276,7 @@ private:
 
 				// Set free block to free again
 				FreeBlock->size = (-FreeBlock->size);
-				HLVM_CONSTEXPR_ASSERT(bValidate, FreeBlock->size > 0 && FreeBlock->size <= N - 2 * FBlock_Size);
+				HLVM_CONSTEXPR_ASSERT(bValidate, FreeBlock->size > 0 && FreeBlock->size <= Size_UpperBound);
 
 				// Exchange new free block with free head
 				FreeBlock->prevFreeBlock = nullptr;
@@ -311,7 +315,7 @@ private:
 
 							// Defragment CurrBlock and move on to next block once more
 							CurrBlock->size += NextBlock->size + FBlock_Size;
-							HLVM_CONSTEXPR_ASSERT(bValidate, CurrBlock->size > 0 && CurrBlock->size <= N - 2 * FBlock_Size);
+							HLVM_CONSTEXPR_ASSERT(bValidate, CurrBlock->size > 0 && CurrBlock->size <= Size_UpperBound);
 
 							// Update upper bound if necessary
 							if (!(mFreeSizeUpperBound < 0) && mFreeSizeUpperBound < CurrBlock->size)

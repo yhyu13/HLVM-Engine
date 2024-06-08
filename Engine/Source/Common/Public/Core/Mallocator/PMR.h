@@ -6,19 +6,20 @@
 
 #include "MiMallocator.h"
 #include "StdMallocator.h"
-#include "Core/Log.h"
-
-DECLARE_LOG_CATEGORY(LogPMR)
 
 #ifndef HVLM_MALLOCATOR_DEATIL_TRACE
 	#define HVLM_MALLOCATOR_DEATIL_TRACE 0
 #endif
 
 #if HVLM_MALLOCATOR_DEATIL_TRACE
-namespace hlvm_private
-{
-	HLVM_INLINE_VAR std::atomic_size_t GPMRAllocatedSize;
-}
+	#include "Core/Log.h"
+
+    DECLARE_LOG_CATEGORY(LogPMR)
+
+    namespace hlvm_private
+    {
+        HLVM_INLINE_VAR std::atomic_size_t GPMRAllocatedSize;
+    }
 #endif
 
 // Define the PMRMAllocator concept

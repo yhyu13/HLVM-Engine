@@ -40,52 +40,55 @@ RECORD(mallocator_test)
 			}
 		});
 
-	{
-		// Try use StackMallocator and you will have lifetime object crash on free
-		TStackMallocator<16 * 1024> StackMallocator{};
-		HLVM_SCOPED_VARIABLE(
-			ScopedMallocator, [&]() -> void { SwapMallocator(&StackMallocator); },
-			[&]() -> void { SwapMallocator(); });
+	SECTION(StackMallocatorTest, true, 10,
+		{
+			HLVM_LOG(LogTest, info, TXT("Section StackMallocatorTest"));
+			TStackMallocator<16 * 1024> StackMallocator{};
+			HLVM_SCOPED_VARIABLE(
+				ScopedMallocator, [&]() -> void { SwapMallocator(&StackMallocator); },
+				[&]() -> void { SwapMallocator(); });
 
-		// sample new and free
-		{
-			char* p1 = new char[100];
-			char* p2 = new char[100];
-			delete[] p1;
-			delete[] p2;
-		}
-		{
-			TVector<int, TPMRCustom<int>> vec{ TPMRCustom<int>(&StackMallocator) };
-			vec.reserve(1000);
-			for (size_t i = 0; i < 1000; i++)
+			// sample new and free
 			{
-				vec.push_back(1);
+				char* p1 = new char[100];
+				char* p2 = new char[100];
+				delete[] p1;
+				delete[] p2;
 			}
-		}
-	}
-	{
-		FVMArenaMallocator VMArenaMallocatorTLS{};
-		// Try use VMMallocator and you will have lifetime object crash on free
-		HLVM_SCOPED_VARIABLE(
-			ScopedMallocator, [&]() -> void { SwapMallocator(&VMArenaMallocatorTLS); },
-			[&]() -> void { SwapMallocator(); });
+			{
+				TVector<int, TPMRCustom<int>> vec{ TPMRCustom<int>(&StackMallocator) };
+				vec.reserve(1000);
+				for (size_t i = 0; i < 1000; i++)
+				{
+					vec.push_back(1);
+				}
+			}
+		});
 
-		// sample new and free
+	SECTION(VMArenaMallocatorTLSTest, true, 10,
 		{
-			char* p1 = new char[100];
-			char* p2 = new char[100];
-			delete[] p1;
-			delete[] p2;
-		}
-		{
-			TVector<int, TPMRCustom<int>> vec{ TPMRCustom<int>(&VMArenaMallocatorTLS) };
-			vec.reserve(1000);
-			for (size_t i = 0; i < 1000; i++)
+			HLVM_LOG(LogTest, info, TXT("Section VMArenaMallocatorTLSTest"));
+			FVMArenaMallocator VMArenaMallocatorTLS{};
+			HLVM_SCOPED_VARIABLE(
+				ScopedMallocator, [&]() -> void { SwapMallocator(&VMArenaMallocatorTLS); },
+				[&]() -> void { SwapMallocator(); });
+
+			// sample new and free
 			{
-				vec.push_back(1);
+				char* p1 = new char[100];
+				char* p2 = new char[100];
+				delete[] p1;
+				delete[] p2;
 			}
-		}
-	}
+			{
+				TVector<int, TPMRCustom<int>> vec{ TPMRCustom<int>(&VMArenaMallocatorTLS) };
+				vec.reserve(1000);
+				for (size_t i = 0; i < 1000; i++)
+				{
+					vec.push_back(1);
+				}
+			}
+		});
 }
 
 RECORD(malloc_test)
@@ -94,10 +97,13 @@ RECORD(malloc_test)
 	const size_t MAX_THREADS = 10;
 	const size_t MAX_ITERATIONS = 10000;
 	size_t		 MAX_BLOCK_SIZE = 1024 * 1024; // 1 MB
+	uint32_t	 Seeds[10] = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
+	uint32_t	 SeedIndex = 0;
 
 	auto allocate_and_deallocate = [&](size_t thread_id) {
-		std::srand(1024);
-		std::mt19937						  gen(1024);
+		auto Seed = Seeds[SeedIndex++ % 10];
+		std::srand(Seed);
+		std::mt19937						  gen(Seed);
 		std::uniform_int_distribution<size_t> size_dist(1, MAX_BLOCK_SIZE);
 
 		TBYTE*			   ptr = nullptr;
@@ -186,35 +192,40 @@ RECORD(malloc_test)
 		std::cout << "Different block size tests passed!" << std::endl;
 	};
 
-	{
-		HLVM_LOG(LogTest, info, TXT("Test mimallocator"));
-		FMiMallocator MiMallocator{ { .bNewHeap = false, .bDestory = true } };
-		HLVM_SCOPED_VARIABLE(
-			ScopedMallocator, [&]() -> void { SwapMallocator(&MiMallocator); MAX_BLOCK_SIZE = 1024; },
-			[&]() -> void { SwapMallocator(); MAX_BLOCK_SIZE = 1024 * 1024; });
-		test_single_thread();
-	}
+	SECTION(MiMallocatorTLSTest, true, 10,
+		{
+			HLVM_LOG(LogTest, info, TXT("Test mimallocator"));
+			FMiMallocator MiMallocator{ { .bNewHeap = false, .bDestory = true } };
+			HLVM_SCOPED_VARIABLE(
+				ScopedMallocator, [&]() -> void { SwapMallocator(&MiMallocator); MAX_BLOCK_SIZE = 1024; },
+				[&]() -> void { SwapMallocator(); MAX_BLOCK_SIZE = 1024 * 1024; });
+			test_single_thread();
+			test_different_block_sizes();
+		});
 
-	{
-		HLVM_LOG(LogTest, info, TXT("Test stack mallocator"));
-		TStackMallocator<32 * 1024> StackMallocator{};
-		HLVM_SCOPED_VARIABLE(
-			ScopedMallocator, [&]() -> void { SwapMallocator(&StackMallocator); MAX_BLOCK_SIZE = 1024; },
-			[&]() -> void { SwapMallocator(); MAX_BLOCK_SIZE = 1024 * 1024; });
-		test_single_thread();
-	}
+	SECTION(StackMallocatorTLSTest, true, 10,
+		{
+			HLVM_LOG(LogTest, info, TXT("Test stack mallocator"));
+			TStackMallocator<32 * 1024> StackMallocator{};
+			HLVM_SCOPED_VARIABLE(
+				ScopedMallocator, [&]() -> void { SwapMallocator(&StackMallocator); MAX_BLOCK_SIZE = 1024; },
+				[&]() -> void { SwapMallocator(); MAX_BLOCK_SIZE = 1024 * 1024; });
+			test_single_thread();
+			test_different_block_sizes();
+		});
 
-	{
-		FVMArenaMallocator VMArenaMallocatorTLS{};
-		HLVM_LOG(LogTest, info, TXT("Test VMArena mallocator"));
-		HLVM_SCOPED_VARIABLE(
-			ScopedMallocator, [&]() -> void { SwapMallocator(&VMArenaMallocatorTLS); MAX_BLOCK_SIZE = 1024; },
-			[&]() -> void { SwapMallocator(); MAX_BLOCK_SIZE = 1024 * 1024; });
-		test_single_thread();
-	}
+	SECTION(VMMallocatorTLSTest, true, 10,
+		{
+			FVMArenaMallocator VMArenaMallocatorTLS{};
+			HLVM_LOG(LogTest, info, TXT("Test VMArena mallocator"));
+			HLVM_SCOPED_VARIABLE(
+				ScopedMallocator, [&]() -> void { SwapMallocator(&VMArenaMallocatorTLS); MAX_BLOCK_SIZE = 1024; },
+				[&]() -> void { SwapMallocator(); MAX_BLOCK_SIZE = 1024 * 1024; });
+			test_single_thread();
+			test_different_block_sizes();
+		});
 
 	test_multi_thread();
-	test_different_block_sizes();
 
 	std::cout << "All tests passed!" << std::endl;
 }

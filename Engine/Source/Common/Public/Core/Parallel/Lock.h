@@ -22,22 +22,28 @@
 	#define HLVM_DEADLOCK_TIMER 0
 #endif // !HLVM_BUILD_RELEASE
 
+#define HLVM_LOCK_METHOD_NOEXCEPT noexcept(!HLVM_DEADLOCK_TIMER)
+
 class FAtomicLockGuard
 {
 public:
 	NOCOPYMOVE(FAtomicLockGuard)
 	FAtomicLockGuard() = delete;
-	explicit FAtomicLockGuard(std::atomic_flag& flag) noexcept(!HLVM_DEADLOCK_TIMER);
+	explicit FAtomicLockGuard(std::atomic_flag& flag) HLVM_LOCK_METHOD_NOEXCEPT;
 	~FAtomicLockGuard() noexcept;
 
 private:
 	std::atomic_flag* mLock;
 };
 
+// @brief Lock/Unlock guard for std::atomic_flag
 #define LOCK_GUARD_FLAG(x)                                \
 	FAtomicLockGuard TOKENPASTE2LINE(__lock_guard_)((x)); \
 	HLVM_ATOMIC_THREAD_FENCE()
 
+/**
+ * @brief Type with Lock/Unlock methods
+ */
 template <typename T>
 concept CLockable = requires(T t) {
 	{
@@ -48,19 +54,21 @@ concept CLockable = requires(T t) {
 	} -> std::same_as<void>;
 };
 
+/**
+ * @brief Lock/Unlock guard
+ * @tparam T  Lockable type
+ */
 template <CLockable T>
 class TAtomicLockGuard
 {
 public:
 	NOCOPYMOVE(TAtomicLockGuard)
 	TAtomicLockGuard() = delete;
-	explicit TAtomicLockGuard(T& Flag) noexcept(!HLVM_DEADLOCK_TIMER)
-		: mLock(&Flag)
+	explicit TAtomicLockGuard(T& Flag) HLVM_LOCK_METHOD_NOEXCEPT : mLock(&Flag)
 	{
 		mLock->Lock();
 	}
-	explicit TAtomicLockGuard(std::optional<T>& Flag) noexcept(!HLVM_DEADLOCK_TIMER)
-		: mLock(Flag.has_value() ? &Flag.value() : nullptr)
+	explicit TAtomicLockGuard(std::optional<T>& Flag) HLVM_LOCK_METHOD_NOEXCEPT : mLock(Flag.has_value() ? &Flag.value() : nullptr)
 	{
 		if (mLock)
 		{
@@ -79,15 +87,24 @@ private:
 	T* mLock;
 };
 
+// @brief Lock/Unlock guard for lockable types
 #define ATOMIC_LOCK_GUARD(x)                                                                           \
 	TAtomicLockGuard<typename TOptionalRemoved<typename TReferenceRemoved<decltype((x))>::Type>::Type> \
 		__lock_guard((x));                                                                             \
 	HLVM_ATOMIC_THREAD_FENCE()
 
+namespace hlvm_private
+{
+	HLVM_EXTERN_FUNC void LockAtomic(std::atomic_flag* flag) HLVM_LOCK_METHOD_NOEXCEPT;
+	HLVM_EXTERN_FUNC void UnlockAtomic(std::atomic_flag* flag) noexcept;
+} // namespace hlvm_private
+
 /**
  * @class FAtomicFlagS
  * @brief 一个静态原子标志类
+ * @tparam T CRTP pattern in order to inherit static var
  */
+template <typename T>
 class FAtomicFlagS
 {
 public:
@@ -95,8 +112,14 @@ public:
 	FAtomicLockGuard TOKENPASTE2LINE(__lock_guard_s_)(sc_flag); \
 	HLVM_ATOMIC_THREAD_FENCE()
 
-	static void Lock() noexcept(!HLVM_DEADLOCK_TIMER);
-	static void Unlock() noexcept;
+	static void LockS() HLVM_LOCK_METHOD_NOEXCEPT
+	{
+		hlvm_private::LockAtomic(&sc_flag);
+	}
+	static void UnlockS() noexcept
+	{
+		hlvm_private::UnlockAtomic(&sc_flag);
+	}
 
 	static std::atomic_flag& GetAtomicFlagS() noexcept
 	{
@@ -110,7 +133,9 @@ protected:
 /**
  * @class FAtomicFlagNI
  * @brief 一个非实例原子标志类
+ * @tparam T CRTP pattern in order to inherit static var
  */
+template <typename T>
 class FAtomicFlagNI
 {
 public:
@@ -119,8 +144,14 @@ public:
 	FAtomicLockGuard TOKENPASTE2LINE(__lock_guard_ni_)(ni_flag); \
 	HLVM_ATOMIC_THREAD_FENCE()
 
-	static void Lock() noexcept(!HLVM_DEADLOCK_TIMER);
-	static void Unlock() noexcept;
+	static void LockNI() HLVM_LOCK_METHOD_NOEXCEPT
+	{
+		hlvm_private::LockAtomic(&ni_flag);
+	}
+	static void UnlockNI() noexcept
+	{
+		hlvm_private::UnlockAtomic(&ni_flag);
+	}
 
 	static std::atomic_flag& GetAtomicFlagNI() noexcept
 	{
@@ -133,7 +164,7 @@ protected:
 
 /**
  * @class FAtomicFlagNC
- * @brief 一个具有非复制的原子标志类
+ * @brief 一个具有非复制的原子标志类, can be used by macro ATOMIC_LOCK_GUARD
  */
 class FAtomicFlagNC
 {
@@ -146,7 +177,7 @@ public:
 
 	FAtomicFlagNC() = default;
 
-	void Lock() const noexcept(!HLVM_DEADLOCK_TIMER);
+	void Lock() const HLVM_LOCK_METHOD_NOEXCEPT;
 	void Unlock() const noexcept;
 
 	std::atomic_flag& GetAtomicFlagNC() noexcept
@@ -165,7 +196,7 @@ private:
 
 /**
  * @class FAtomicFlagNC
- * @brief 一个通常的的原子标志类
+ * @brief 一个通常的的原子标志类, can be used by macro ATOMIC_LOCK_GUARD
  */
 class FAtomicFlag
 {
@@ -201,7 +232,7 @@ public:
 		return *this;
 	}
 
-	void Lock() const noexcept(!HLVM_DEADLOCK_TIMER);
+	void Lock() const HLVM_LOCK_METHOD_NOEXCEPT;
 	void Unlock() const noexcept;
 
 	std::atomic_flag& GetAtomicFlag() noexcept
@@ -255,7 +286,7 @@ public:
 		return *this;
 	}
 
-	void Lock() const noexcept(!HLVM_DEADLOCK_TIMER);
+	void Lock() const HLVM_LOCK_METHOD_NOEXCEPT;
 	void Unlock() const noexcept;
 
 protected:
@@ -286,8 +317,8 @@ public:
 	NOCOPYMOVE(FRWRivalLock)
 	FRWRivalLock() = default;
 
-	void Lock(int group) const noexcept(!HLVM_DEADLOCK_TIMER);
-	void Unlock() const noexcept;
+	void LockRV(int group) const HLVM_LOCK_METHOD_NOEXCEPT;
+	void UnlockRV() const noexcept;
 
 private:
 	HLVM_CACHE_ALIGN mutable TAtomicPointer<Group*> mCurrentGroupPtr{ nullptr };
@@ -307,7 +338,7 @@ struct RivialLockGuardCond
 	{
 		if (mEnabled)
 		{
-			mLock->Lock(group);
+			mLock->LockRV(group);
 		}
 	}
 
@@ -315,7 +346,7 @@ struct RivialLockGuardCond
 	{
 		if (mEnabled)
 		{
-			mLock->Unlock();
+			mLock->UnlockRV();
 		}
 	}
 

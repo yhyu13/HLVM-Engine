@@ -21,7 +21,7 @@
 /**
  * Provides CPU performance measuring methods.
  */
-class FProfilerCPU : public FAtomicFlagS
+class FProfilerCPU : public FAtomicFlagS<FProfilerCPU>
 {
 public:
 	/**

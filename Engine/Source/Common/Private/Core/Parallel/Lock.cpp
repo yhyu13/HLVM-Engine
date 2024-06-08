@@ -91,58 +91,50 @@ static constexpr std::chrono::microseconds us0{ 0 };
 	HLVM_ATOMIC_THREAD_FENCE(); \
 	(lock)->clear(std::memory_order_release)
 
-FAtomicLockGuard::FAtomicLockGuard(std::atomic_flag& flag) noexcept(!HLVM_DEADLOCK_TIMER)
-	: mLock(&flag)
+namespace hlvm_private
 {
-	LOCK_BODY(mLock);
+	void LockAtomic(std::atomic_flag* flag) HLVM_LOCK_METHOD_NOEXCEPT // extern
+	{
+		LOCK_BODY(flag);
+	}
+
+	void UnlockAtomic(std::atomic_flag* flag) noexcept // extern
+	{
+		UNLOCK_BODY(flag);
+	}
+} // namespace hlvm_private
+
+FAtomicLockGuard::FAtomicLockGuard(std::atomic_flag& flag) HLVM_LOCK_METHOD_NOEXCEPT : mLock(&flag)
+{
+	hlvm_private::LockAtomic(mLock);
 }
 
 FAtomicLockGuard::~FAtomicLockGuard() noexcept
 {
-	UNLOCK_BODY(mLock);
+	hlvm_private::UnlockAtomic(mLock);
 }
 
-void FAtomicFlagS::Lock() noexcept(!HLVM_DEADLOCK_TIMER)
+void FAtomicFlagNC::Lock() const HLVM_LOCK_METHOD_NOEXCEPT
 {
-	LOCK_BODY(&sc_flag);
-}
-
-void FAtomicFlagS::Unlock() noexcept
-{
-	UNLOCK_BODY(&sc_flag);
-}
-
-void FAtomicFlagNI::Lock() noexcept(!HLVM_DEADLOCK_TIMER)
-{
-	LOCK_BODY(&ni_flag);
-}
-
-void FAtomicFlagNI::Unlock() noexcept
-{
-	UNLOCK_BODY(&ni_flag);
-}
-
-void FAtomicFlagNC::Lock() const noexcept(!HLVM_DEADLOCK_TIMER)
-{
-	LOCK_BODY(&nc_flag);
+	hlvm_private::LockAtomic(&nc_flag);
 }
 
 void FAtomicFlagNC::Unlock() const noexcept
 {
-	UNLOCK_BODY(&nc_flag);
+	hlvm_private::UnlockAtomic(&nc_flag);
 }
 
-void FAtomicFlag::Lock() const noexcept(!HLVM_DEADLOCK_TIMER)
+void FAtomicFlag::Lock() const HLVM_LOCK_METHOD_NOEXCEPT
 {
-	LOCK_BODY(&mFlag);
+	hlvm_private::LockAtomic(&mFlag);
 }
 
 void FAtomicFlag::Unlock() const noexcept
 {
-	UNLOCK_BODY(&mFlag);
+	hlvm_private::UnlockAtomic(&mFlag);
 }
 
-void FRecursiveAtomicFlag::Lock() const noexcept(!HLVM_DEADLOCK_TIMER)
+void FRecursiveAtomicFlag::Lock() const HLVM_LOCK_METHOD_NOEXCEPT
 {
 	// Test if the same thread already is held
 	if (mOwnerTid == GCurrentTID64)
@@ -152,7 +144,7 @@ void FRecursiveAtomicFlag::Lock() const noexcept(!HLVM_DEADLOCK_TIMER)
 	}
 
 	// Lock the flag
-	LOCK_BODY(&mFlag);
+	hlvm_private::LockAtomic(&mFlag);
 
 	// Set the owner
 	mOwnerTid = GCurrentTID64;
@@ -169,10 +161,10 @@ void FRecursiveAtomicFlag::Unlock() const noexcept
 
 	// Last held unlock, release owner
 	mOwnerTid = 0;
-	UNLOCK_BODY(&mFlag);
+	hlvm_private::UnlockAtomic(&mFlag);
 }
 
-void FRWRivalLock::Lock(int group) const noexcept(!HLVM_DEADLOCK_TIMER)
+void FRWRivalLock::LockRV(int group) const HLVM_LOCK_METHOD_NOEXCEPT
 {
 	Group* desiredGroupPtr = C_C(Group*, &mGroups[group]);
 
@@ -223,7 +215,7 @@ void FRWRivalLock::Lock(int group) const noexcept(!HLVM_DEADLOCK_TIMER)
 	mProgramCounter.fetch_add(1, std::memory_order_relaxed);
 }
 
-void FRWRivalLock::Unlock() const noexcept
+void FRWRivalLock::UnlockRV() const noexcept
 {
 	// If mProgramCounter == 0, it means that the lock is not held by any rival group, so we can reset mCurrentGroupPtr to nullptr
 	if (mProgramCounter.fetch_sub(1, std::memory_order_relaxed) == 1)

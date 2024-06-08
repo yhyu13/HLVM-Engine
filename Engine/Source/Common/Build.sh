@@ -91,18 +91,18 @@ echo_color 32 "Receive ParallelThreads: ${ParallelThreads}"
 #------------------------------------------------------------------
 time {
 
-ROOT_DIR=$(pwd)
-REPO_DIR=${ROOT_DIR}/../../..
+CWD_DIR=$(pwd)
+REPO_DIR=${CWD_DIR}/../../..
 
 # 获取环境变量
 cd ${REPO_DIR}/Binary/GNULinux-x64 || exit 1
 source .env
-cd ${ROOT_DIR} || exit 1
+cd ${CWD_DIR} || exit 1
 
 # Get Gperf directory under vcpkg
 if [ ${RunGPerf} -eq 1 ]; then
     # Get Gperf directory under vcpkg
-    GPERF_BIN=${ROOT_DIR}/../Dependency/vcpkg/packages/gperftools_x64-linux/tools/gperftools/bin/
+    GPERF_BIN=${CWD_DIR}/../Dependency/vcpkg/packages/gperftools_x64-linux/tools/gperftools/bin/
     if [ -d "${GPERF_BIN}" ]; then
         echo_color 34 "GPERF_BIN: ${GPERF_BIN}"
         export PATH=${GPERF_BIN}:$PATH
@@ -115,7 +115,7 @@ fi
 
 # 定义要构建的目标目录
 buildConfigs=("Debug" "RelWithDebInfo" "Release")
-CMAKE_SRC_DIR=${ROOT_DIR}
+CMAKE_SRC_DIR=${CWD_DIR}
 for config in "${buildConfigs[@]}"; do
 
     # if BuildConfig exist and config not equal BuildConfig, continue
@@ -125,7 +125,7 @@ for config in "${buildConfigs[@]}"; do
     fi
 
     CMAKE_BUILD_TYPE=${config}
-    CMAKE_BUILD_DIR=${ROOT_DIR}/Build/${CMAKE_BUILD_TYPE}
+    CMAKE_BUILD_DIR=${CWD_DIR}/Build/${CMAKE_BUILD_TYPE}
 
     if [ ${RunClean} -eq 1 ]; then
         rm -rf ${CMAKE_BUILD_DIR}
@@ -179,31 +179,61 @@ for config in "${buildConfigs[@]}"; do
     build_cmd="${CMAKE_BIN} --build . ${cbuild_param}"
     echo_color 34 "Build cmd: ${build_cmd}"
     (${build_cmd}) || exit 1 \
-      | tee "${ROOT_DIR}/build_${config}.log"
+      | tee "${CWD_DIR}/build_${config}.log"
 
     # 测试项目
     if [ ${RunTest} -eq 1 ]; then
-      ctest_param="--parallel ${ParallelThreads} --force-new-ctest-process --output-on-failure --schedule-random"
-      ctest_param+=" --test_timeout 30  --repeat-until-fail 2"
-      if [ -n "${BuildTarget}" ]; then
-          # ctest run only one target
-          # https://stackoverflow.com/questions/54160415/running-only-one-single-test-with-cmake-make
-          ctest_param="-R ${BuildTarget} ${ctest_param}"
-      fi
+      mkdir -p "${CWD_DIR}/Testing/"
+      CMAKE_BIN_DIR=${CWD_DIR}/Binary/${CMAKE_BUILD_TYPE}
+      # scan test dir and parallel execute ctest in each subprocess
+      for binary in ${CMAKE_BIN_DIR}/Test*; do
+        test_target=${binary#${CMAKE_BIN_DIR}/}
+        ctest_param="--output-on-failure"
+        ctest_param+=" --test_timeout 30  --repeat-until-fail 2"
+        if [ -n "${BuildTarget}" ]; then
+            if [[ ${test_target} != "${BuildTarget}" ]]; then
+              continue
+            fi
+        fi
+        # ctest run only one target
+        # https://stackoverflow.com/questions/54160415/running-only-one-single-test-with-cmake-make
+        ctest_param="-R ${test_target} ${ctest_param}"
 
-      # 测试项目
-      test_cmd="${CTEST_BIN} . ${ctest_param}"
-      echo_color 34 "Test cmd: ${test_cmd}"
-      (${test_cmd} || exit 1) | tee "${ROOT_DIR}/build_test_${config}.log"
+        # 测试项目
+        test_cmd="${CTEST_BIN} . ${ctest_param}"
+        echo_color 34 "Test cmd: ${test_cmd}"
+        cmd="(${test_cmd} || exit 1) | tee "${CWD_DIR}/Testing/build_test_${config}_${test_target}.log""
+        (
+          # Execute command in a subshell
+          bash -c "$cmd"
+        ) &
+      done
+      # Wait all tests finish
+      wait
+
+# Use ctest -j N (very buggy, generate strange errors for mallocator and parallel test that cannot reproduce)
+#      ctest_param="--parallel ${ParallelThreads} --output-on-failure --schedule-random"
+#      ctest_param+=" --test_timeout 30  --repeat-until-fail 2"
+#      if [ -n "${BuildTarget}" ]; then
+#          # ctest run only one target
+#          # https://stackoverflow.com/questions/54160415/running-only-one-single-test-with-cmake-make
+#          ctest_param="-R ${BuildTarget} ${ctest_param}"
+#      fi
+#
+#      # 测试项目
+#      test_cmd="${CTEST_BIN} . ${ctest_param}"
+#      echo_color 34 "Test cmd: ${test_cmd}"
+#      (${test_cmd} || exit 1) | tee "${CWD_DIR}/build_test_${config}.log"
     fi
 
     # 性能测试
     if [ ${RunGPerf} -eq 1 ]; then
-        CMAKE_BIN_DIR=${ROOT_DIR}/Binary/${CMAKE_BUILD_TYPE}
-        # 进入目标目录
+        mkdir -p "${CWD_DIR}/Testing/"
+        CMAKE_BIN_DIR=${CWD_DIR}/Binary/${CMAKE_BUILD_TYPE}
+        # 进入bin目录
         cd "${CMAKE_BIN_DIR}" || exit 1
 
-        TEST_LOG="${ROOT_DIR}/test_${config}.log"
+        TEST_LOG="${CWD_DIR}/Testing/perf_test_${config}.log"
         echo_color 32 "Start testing " | tee "${TEST_LOG}"
         for binary in ./Test*; do
             if [ -n "${BuildTarget}" ]; then

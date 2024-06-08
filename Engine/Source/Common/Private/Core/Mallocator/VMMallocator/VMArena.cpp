@@ -6,19 +6,79 @@
 #include "Core/Mallocator/VMMallocator/SmallBinnedMallocator.h"
 #include "Core/Assert.h"
 #include "Core/Log.h"
+#include "Core/Delegate.h"
 
 #include "Template/ExpressionTemplate.tpp"
 
 DECLARE_LOG_CATEGORY(LogVMArena)
 
+#define HLVM_VMA_INIT_LARGET_HEAP_NUM 1
+
+TConcurrentQueue<FVMArena::FNonLocalPendingFree,
+	EConcurrentQueueMode::Mpsc, false,
+	TPMRLowLvl<TConcurrentQueueNode<FVMArena::FNonLocalPendingFree>>>
+												 FVMArena::sNonLocalPendingFreeList{}; // static
+TSmallVector64<FVMArena*, TPMRLowLvl<FVMArena*>> FVMArena::sGlobalArenaList{};		   // static
+
 FVMArena::FVMArena()
 {
+	HLVM_ENSURE(GMallocatorTLS == &HLVM_LOW_GMALLOC_TLS, TXT("VMArena must be created from low level mallocator"));
+	// create a detached thread inside a do once region that handle non local free list
+	// and find correct arena that own pointer from free list and pump it
+	static std::once_flag _Flag;
+	std::call_once(_Flag, []() {
+		CoreDelegates::OnMallocatorShutdown.Add([](void*) {
+			sNonLocalPendingFreeList.SignalStop();
+		});
+
+		std::thread([]() {
+			while (true)
+			{
+
+				FNonLocalPendingFree NonLocalFree;
+				if (sNonLocalPendingFreeList.PopFront<false>(NonLocalFree))
+				{
+					LOCK_GUARD_S();
+					for (auto& Arena : sGlobalArenaList)
+					{
+						if (Arena == NonLocalFree.ArenaNotOwned)
+						{
+							continue;
+						}
+						if (Arena->Owned(NonLocalFree.ptrToBeFree))
+						{
+							Arena->mLocalPendingFreeList.Push<false>(
+								FLocalPendingFree{ .ptrToBeFree = NonLocalFree.ptrToBeFree });
+							break;
+						}
+					}
+				}
+				else if (sNonLocalPendingFreeList.ShouldStopPop())
+				{
+					return;
+				}
+				else
+				{
+					HLVM_ENSURE(false, TXT("Non local free list is empty but should stop is false"));
+				}
+			}
+		}).detach();
+	});
+
+	// Add to global arena list
 	{
-		auto _Heap = mHeapChainHead;
-		// Init at least one large heap
-		for (size_t i = 0; i < 1; ++i)
+		LOCK_GUARD_S();
+		sGlobalArenaList.push_back(this);
+	}
+
+	/**
+	 * Initialize large heap
+	 */
+	{
+		FVMHeapChain* _Heap = mHeapChainHead;
+		for (size_t i = 0; i < HLVM_VMA_INIT_LARGET_HEAP_NUM; ++i)
 		{
-			auto Heap = std::construct_at(R_C(FVMHeapChain*, mOSPageMallocator.MallocSmall(sizeof(FVMHeapChain))));
+			FVMHeapChain* Heap = std::construct_at(R_C(FVMHeapChain*, mOSPageMallocator.MallocSmall(sizeof(FVMHeapChain))));
 			Heap->HeapAllocator.Init(this, HLVM_VMA_LARGE_HEAP_SIZE);
 			if (!mHeapChainHead)
 			{
@@ -47,6 +107,7 @@ FVMArena::FVMArena()
 
 FVMArena::~FVMArena()
 {
+	HLVM_ENSURE(GMallocatorTLS == &HLVM_LOW_GMALLOC_TLS, TXT("VMArena must be destroyed from low level mallocator"));
 	/**
 	 * Handle cache free list
 	 */
@@ -55,14 +116,14 @@ FVMArena::~FVMArena()
 		auto LastGenericPtr = mPendingFressLists.GenericFreeList.back();
 		if (!Owned(LastGenericPtr))
 		{
-			sGlobalPendingFreeList.Push({ .ptrToBeFree = LastGenericPtr, .tidNotOwned = GCurrentTID64 });
+			sNonLocalPendingFreeList.Push({ .ptrToBeFree = LastGenericPtr, .ArenaNotOwned = this });
 		}
 		mPendingFressLists.GenericFreeList.pop_back();
 	}
 	while (mPendingFressLists.NonLocalFreeList.size())
 	{
 		auto LastNonLocalPtr = mPendingFressLists.NonLocalFreeList.back();
-		sGlobalPendingFreeList.Push({ .ptrToBeFree = LastNonLocalPtr, .tidNotOwned = GCurrentTID64 });
+		sNonLocalPendingFreeList.Push({ .ptrToBeFree = LastNonLocalPtr, .ArenaNotOwned = this });
 		mPendingFressLists.NonLocalFreeList.pop_back();
 	}
 
@@ -86,6 +147,15 @@ FVMArena::~FVMArena()
 		std::destroy_at(mHeapChainHead);
 		mOSPageMallocator.FreeSmall(mHeapChainHead);
 		mHeapChainHead = Next;
+	}
+
+	// Add to global arena list
+	{
+		LOCK_GUARD_S();
+		std::remove_if(sGlobalArenaList.begin(), sGlobalArenaList.end(),
+			[this](const auto& arena) {
+				return arena == this;
+			});
 	}
 }
 
@@ -137,7 +207,7 @@ void FVMArena::Free(void* p)
 					while (mPendingFressLists.NonLocalFreeList.size())
 					{
 						auto LastNonLocalPtr = mPendingFressLists.NonLocalFreeList.back();
-						sGlobalPendingFreeList.Push({ .ptrToBeFree = LastNonLocalPtr, .tidNotOwned = GCurrentTID64 });
+						sNonLocalPendingFreeList.Push<false>({ .ptrToBeFree = LastNonLocalPtr, .ArenaNotOwned = this });
 						mPendingFressLists.NonLocalFreeList.pop_back();
 					}
 				}
@@ -154,7 +224,7 @@ void FVMArena::Free(void* p)
 	while (mPendingFressLists.LocalFreeList.size() < mPendingFressLists.LocalFreeList.max_size())
 	{
 		FLocalPendingFree PendingFree;
-		if (mThisThreadPendingFreeList.PopFront(PendingFree))
+		if (mLocalPendingFreeList.PopFront<true>(PendingFree))
 		{
 			mPendingFressLists.LocalFreeList.push_back(PendingFree.ptrToBeFree);
 		}

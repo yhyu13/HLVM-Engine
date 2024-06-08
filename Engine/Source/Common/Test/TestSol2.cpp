@@ -9,6 +9,8 @@
 
 DECLARE_LOG_CATEGORY(LogTest)
 
+#define TEST_SOL_LUAJIT 1
+
 template <typename A, typename B>
 auto my_add(A a, B b)
 {
@@ -79,7 +81,11 @@ struct my_class
 RECORD(sol2_writing_member_functions_test)
 {
 	HLVM_SOL_STATE(lua);
+#if TEST_SOL_LUAJIT
 	lua.open_libraries();
+#else
+	lua.open_libraries(sol::lib::base);
+#endif
 
 	// Here, we are binding the member function and a class
 	// instance: it will call the function on the given class
@@ -143,10 +149,13 @@ RECORD(sol2_write_variables_demo_test)
 {
 	HLVM_SOL_STATE(lua);
 
-	// open those basic lua libraries
-	// again, for print() and other basic utilities
+// open those basic lua libraries
+// again, for print() and other basic utilities
+#if TEST_SOL_LUAJIT
 	lua.open_libraries();
-
+#else
+	lua.open_libraries(sol::lib::base);
+#endif
 	// value in the global table
 	lua["bark"] = 50;
 
@@ -369,8 +378,11 @@ RECORD(sol2_open_multiple_libraries_test)
 RECORD(sol2_object_lifetime_test)
 {
 	HLVM_SOL_STATE(lua);
+#if TEST_SOL_LUAJIT
 	lua.open_libraries();
-
+#else
+	lua.open_libraries(sol::lib::base);
+#endif
 	lua.script(R"(
 	obj = "please don't let me die";
 	)");
@@ -568,8 +580,11 @@ RECORD(sol2_userdata_memory_reference_test)
 			  << std::endl;
 
 	HLVM_SOL_STATE(lua);
+#if TEST_SOL_LUAJIT
 	lua.open_libraries();
-
+#else
+	lua.open_libraries(sol::lib::base);
+#endif
 	Doge dog{}; // Kept alive somehow
 
 	// Later...
@@ -613,8 +628,11 @@ RECORD(sol2_userdata_memory_reference_test)
 RECORD(sol2_hlvm_refcount_test)
 {
 	HLVM_SOL_STATE(lua);
+#if TEST_SOL_LUAJIT
 	lua.open_libraries();
-
+#else
+	lua.open_libraries(sol::lib::base);
+#endif
 	sol::constructors<FName(),
 		FName(const char*)>
 		FNameCtr{};
@@ -670,7 +688,6 @@ RECORD(sol2_hlvm_refcount_test)
 
 #include "ThirdParty/Effil.h"
 
-#define EFFILE_LUAJIT 1
 #define EFFILE_STRESS_TEST 0
 #if EFFILE_STRESS_TEST
 	#include <boost/process/env.hpp>
@@ -700,7 +717,7 @@ RECORD(sol2_effil_test)
 				boost::filesystem::current_path(LuaFile.parent_path());
 
 				HLVM_SOL_STATE(lua);
-#if EFFILE_LUAJIT
+#if TEST_SOL_LUAJIT
 				lua.open_libraries();
 #else
 				lua.open_libraries(sol::lib::base,

@@ -19,6 +19,7 @@
 #pragma clang diagnostic ignored "-Wshadow-uncaptured-local"
 #pragma clang diagnostic ignored "-Wimplicit-int-conversion"
 #pragma clang diagnostic ignored "-Wcast-align"
+#pragma clang diagnostic ignored "-Wunsafe-buffer-usage"
 #include "./../../ThirdParty/effil/channel.h"
 #include "./../../ThirdParty/effil/function.h"
 #include "./../../ThirdParty/effil/garbage-collector.h"

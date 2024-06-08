@@ -17,10 +17,11 @@ namespace hlvm_private
 	/**
 	 * Assert stack mallocator, adjust reserved memory size to your needs
 	 */
-	HLVM_STATIC_VAR auto stack_mallocator = TStackMallocator<64 * 1024, false, true, false, false, false>{};
-	IMallocator*		 assert_stack_mallocator = &stack_mallocator;
+	HLVM_STATIC_VAR TStackMallocator<64 * 1024, false, true, false, false, false> stack_mallocator{};
+	IMallocator*																  AssertionStackMallocator{ &stack_mallocator }; // extern	    // extern
+	FAtomicFlagNC																  AssertionStackLock{};
 
-	void init_assert_stack_mallocator()
+	void InitAssertionStackMallocator() // extern
 	{
 		// Reset stack mallocator each time init is called to wap out any previous allocations
 		// This is totally valid since allocation last time on assertion is already handled and gone obsolete
@@ -30,7 +31,7 @@ namespace hlvm_private
 	HLVM_NORETURN HLVM_NOINLINE_FUNC void hlvm_internal_assert(const TCHAR* Expression, const FString* Message, const TCHAR* File, int Line)
 	{
 		// Sanity check that we are using stack mallocator
-		assert(GMallocatorTLS == assert_stack_mallocator);
+		assert(GMallocatorTLS == AssertionStackMallocator);
 		{
 #if HLVM_BUILD_DEBUG
 			// In Debug mode we skip 1 frames to get proper stack trace

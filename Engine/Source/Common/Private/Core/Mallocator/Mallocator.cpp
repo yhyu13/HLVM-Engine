@@ -7,10 +7,12 @@
 #include "Core/Mallocator/StackMallocator.h"
 #include "Core/Mallocator/VMMallocator/VMMallocator.h"
 #include "Core/Log.h"
+#include "Core/Delegate.h"
 #include "Template/PrintTemplate.tpp"
 #include "Template/AlignmentTemplate.tpp"
 
 #include "Utility/Profiler/ProfilerCPU.h"
+#include "Utility/ScopedTimer.h"
 
 /**
  * Override new and delete operator
@@ -69,9 +71,17 @@ void InitMallocator() // Extern
 #endif
 }
 
+struct FMallocatorShutdownCtx
+{
+	// OPTIONAL : Fill in shutdown ctx
+};
+
 void FinlMallocator() // Extern
 {
-	HLVM_LOG(LogMiMallocator, info, TXT("Mallocator finalize:\nCumulative time spent on malloc {} micro sec\nCumulative number of malloc {}\nPer malloc time {} micro sec\nCumulative time spent on free {} micro sec\nCumulative number of free {}\nPer free time {} micro sec"),
+	FMallocatorShutdownCtx Ctx;
+	CoreDelegates::OnMallocatorShutdown.Invoke(&Ctx);
+
+	HLVM_LOG(LogMiMallocator, info, TXT("\nMallocator summary:\nCumulative time spent on malloc {} micro sec\nCumulative number of malloc {}\nPer malloc time {} micro sec\nCumulative time spent on free {} micro sec\nCumulative number of free {}\nPer free time {} micro sec"),
 		GMallocDurationCounter.load(),
 		GMallocCounter.load(),
 		GMallocDurationCounter.load() / static_cast<double>(GMallocCounter.load()),

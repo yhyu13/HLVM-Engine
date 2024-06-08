@@ -13,6 +13,8 @@
 #include <boost/algorithm/string/join.hpp>
 #include <boost/container/static_vector.hpp>
 
+#include "Core/Mallocator/PMR.h"
+
 /**
  * phmap has alot of unconventional warnings, pretty bad code though
  */
@@ -27,20 +29,20 @@
 #define HLVM_CONTAINER_SHRINK false
 
 // TODO : set all container growth factor to 1
-template <typename T, size_t N>
-using TSmallVector = boost::container::small_vector<T, N>;
+template <typename T, size_t N, typename Allocator = boost::container::new_allocator<T>>
+using TSmallVector = boost::container::small_vector<T, N, Allocator>;
 
-template <typename T>
-using TSmallVector32 = boost::container::small_vector<T, 32>;
+template <typename T, typename Allocator = boost::container::new_allocator<T>>
+using TSmallVector32 = boost::container::small_vector<T, 32, Allocator>;
 
-template <typename T>
-using TSmallVector64 = boost::container::small_vector<T, 32>;
+template <typename T, typename Allocator = boost::container::new_allocator<T>>
+using TSmallVector64 = boost::container::small_vector<T, 64, Allocator>;
 
 template <typename T, typename Allocator = boost::container::new_allocator<T>>
 using TVector = boost::container::vector<T, Allocator>;
 
-template <typename Key, typename Value>
-using TMap = phmap::flat_hash_map<Key, Value>;
+template <typename Key, typename Value, typename Allocator = std::allocator<std::pair<Key, Value>>>
+using TMap = phmap::flat_hash_map<Key, Value, std::hash<Key>, std::equal_to<Key>, Allocator>;
 
 template <typename Key, typename Value, typename Allocator = std::allocator<std::pair<Key, Value>>>
 using TStableMap = phmap::node_hash_map<Key, Value, std::hash<Key>, std::equal_to<Key>, Allocator>;

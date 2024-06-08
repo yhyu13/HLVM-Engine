@@ -48,6 +48,9 @@ namespace hlvm_private
 		{
 			mThread = thread.get();
 			{
+				/**
+				 * Add thread to tracked threads on tls creation
+				 */
 				LOCK_GUARD_FLAG(FProfilerCPU::GetAtomicFlagS());
 				FProfilerCPU::TrackedThreads.push_back(MoveTemp(thread));
 			}
@@ -131,7 +134,7 @@ TVector<FProfilerCPU::FTrackedEvent> FProfilerCPU::FTrackedThread::ExtractEvents
 	return Ret;
 }
 
-bool														  FProfilerCPU::Enabled = true;	  // Static
+bool														  FProfilerCPU::Enabled{ true };  // Static
 TSmallVector64<std::shared_ptr<FProfilerCPU::FTrackedThread>> FProfilerCPU::TrackedThreads{}; // Static
 
 bool FProfilerCPU::IsProfilingCurrentThread()

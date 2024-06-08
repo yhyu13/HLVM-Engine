@@ -4,65 +4,6 @@
 
 #pragma once
 
-#include "Core/Assert.h"
-
-/**
- * Template for non-null pointers
- * Useful for hold pointers that do not have ownership
- * @tparam T class type
- */
-template <typename T>
-struct TNoNullPointer
-{
-	using Type = T;
-	using ValueType = T*;
-
-	TNoNullPointer() = delete;
-	explicit TNoNullPointer(T* handle)
-		: pFileHandle(handle)
-	{
-		HLVM_ENSURE(pFileHandle != nullptr, TXT("Pointer is null"));
-	}
-
-	T* operator->()
-	{
-		return pFileHandle;
-	}
-
-	const T* operator->() const
-	{
-		return pFileHandle;
-	}
-
-	bool operator==(const TNoNullPointer& other) const
-	{
-		return pFileHandle == other.pFileHandle;
-	}
-
-	bool operator!=(const TNoNullPointer& other) const
-	{
-		return pFileHandle != other.pFileHandle;
-	}
-
-	operator bool() const
-	{
-		return pFileHandle != nullptr;
-	}
-
-	T* Get() const
-	{
-		return pFileHandle;
-	}
-
-	friend T& operator*(const TNoNullPointer& handle)
-	{
-		return *(handle.pFileHandle);
-	}
-
-private:
-	T* pFileHandle = nullptr;
-};
-
 // Function to check if two pointers overlap
 inline bool IsPointerOverlap(const void* ptr1, size_t size1, const void* ptr2)
 {
@@ -111,6 +52,8 @@ struct TPointerRemoved<T**>
 {
 	using Type = T;
 };
+
+#include "Platform/PlatformDefinition.h"
 
 /**
  * Use int32 offset to this pointer to represent another pointer
@@ -161,3 +104,63 @@ PACK(struct TOffsetPtr32 {
 		return S_C(const T*, *this) != rhs;
 	}
 });
+
+/**
+ * Template for non-null pointers
+ * Useful for hold pointers that do not have ownership
+ * @tparam T class type
+ */
+template <typename T>
+struct TNoNullPointer
+{
+	using Type = T;
+	using ValueType = T*;
+
+	TNoNullPointer() = delete;
+	explicit TNoNullPointer(T* handle)
+		: pFileHandle(handle)
+	{
+		if (pFileHandle == nullptr)
+		{
+			HLVM_SEGFAULT_INLINE();
+		}
+	}
+
+	T* operator->()
+	{
+		return pFileHandle;
+	}
+
+	const T* operator->() const
+	{
+		return pFileHandle;
+	}
+
+	bool operator==(const TNoNullPointer& other) const
+	{
+		return pFileHandle == other.pFileHandle;
+	}
+
+	bool operator!=(const TNoNullPointer& other) const
+	{
+		return pFileHandle != other.pFileHandle;
+	}
+
+	operator bool() const
+	{
+		return pFileHandle != nullptr;
+	}
+
+	T* Get() const
+	{
+		return pFileHandle;
+	}
+
+	friend T& operator*(const TNoNullPointer& handle)
+	{
+		return *(handle.pFileHandle);
+	}
+
+private:
+	T* pFileHandle = nullptr;
+};
