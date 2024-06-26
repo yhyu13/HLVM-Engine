@@ -20,6 +20,35 @@ TConcurrentQueue<FVMArena::FNonLocalPendingFree,
 												 FVMArena::sNonLocalPendingFreeList{}; // static
 TSmallVector64<FVMArena*, TPMRLowLvl<FVMArena*>> FVMArena::sGlobalArenaList{};		   // static
 
+void FVMArena::NonLocalFreeHandler()
+{
+	while (true)
+	{
+		FNonLocalPendingFree NonLocalFree;
+		if (sNonLocalPendingFreeList.PopFront<false>(NonLocalFree))
+		{
+			LOCK_GUARD_S();
+			for (auto& Arena : sGlobalArenaList)
+			{
+				if (Arena != NonLocalFree.ArenaNotOwned && Arena->Owned(NonLocalFree.ptrToBeFree))
+				{
+					Arena->mLocalPendingFreeList.Push<false>(
+						FLocalPendingFree{ .ptrToBeFree = NonLocalFree.ptrToBeFree });
+					break;
+				}
+			}
+		}
+		else if (sNonLocalPendingFreeList.ShouldStopPop())
+		{
+			return;
+		}
+		else
+		{
+			HLVM_ENSURE(false, TXT("Non local free list is empty but should stop is false"));
+		}
+	}
+}
+
 FVMArena::FVMArena()
 {
 	HLVM_ENSURE(GMallocatorTLS == &HLVM_LOW_GMALLOC_TLS, TXT("VMArena must be created from low level mallocator"));
@@ -30,39 +59,7 @@ FVMArena::FVMArena()
 		CoreDelegates::OnMallocatorShutdown.Add([](void*) {
 			sNonLocalPendingFreeList.SignalStop();
 		});
-
-		std::thread([]() {
-			while (true)
-			{
-
-				FNonLocalPendingFree NonLocalFree;
-				if (sNonLocalPendingFreeList.PopFront<false>(NonLocalFree))
-				{
-					LOCK_GUARD_S();
-					for (auto& Arena : sGlobalArenaList)
-					{
-						if (Arena == NonLocalFree.ArenaNotOwned)
-						{
-							continue;
-						}
-						if (Arena->Owned(NonLocalFree.ptrToBeFree))
-						{
-							Arena->mLocalPendingFreeList.Push<false>(
-								FLocalPendingFree{ .ptrToBeFree = NonLocalFree.ptrToBeFree });
-							break;
-						}
-					}
-				}
-				else if (sNonLocalPendingFreeList.ShouldStopPop())
-				{
-					return;
-				}
-				else
-				{
-					HLVM_ENSURE(false, TXT("Non local free list is empty but should stop is false"));
-				}
-			}
-		}).detach();
+		std::thread(NonLocalFreeHandler).detach();
 	});
 
 	// Add to global arena list

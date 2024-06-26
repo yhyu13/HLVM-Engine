@@ -46,6 +46,9 @@ private:
 	void* MallocLowLevel(size_t size);
 	void  FreeLowLevel(void* p);
 
+	static void NonLocalFreeHandler();
+
+private:
 	struct FNonLocalPendingFree
 	{
 		void*	  ptrToBeFree;

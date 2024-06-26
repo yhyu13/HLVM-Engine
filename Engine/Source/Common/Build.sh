@@ -185,11 +185,41 @@ for config in "${buildConfigs[@]}"; do
     if [ ${RunTest} -eq 1 ]; then
       mkdir -p "${CWD_DIR}/Testing/"
       CMAKE_BIN_DIR=${CWD_DIR}/Binary/${CMAKE_BUILD_TYPE}
+
+#      !!!Don't use Use ctest -j N (very buggy, generate strange errors for mallocator and parallel test that cannot reproduce)
+#      ctest_param="--parallel ${ParallelThreads} --output-on-failure --schedule-random"
+#      ctest_param+=" --test_timeout 30  --repeat-until-fail 2"
+#      if [ -n "${BuildTarget}" ]; then
+#          # ctest run only one target
+#          # https://stackoverflow.com/questions/54160415/running-only-one-single-test-with-cmake-make
+#          ctest_param="-R ${BuildTarget} ${ctest_param}"
+#      fi
+#
+#      # 测试项目
+#      test_cmd="${CTEST_BIN} . ${ctest_param}"
+#      echo_color 34 "Test cmd: ${test_cmd}"
+#      (${test_cmd} || exit 1) | tee "${CWD_DIR}/build_test_${config}.log"
+
+      # Maually run test in each bg job parallely
+      pids=()
+      # Function to kill all background jobs
+      kill_jobs() {
+          for pid in "${pids[@]}"; do
+              job=$pid
+              echo_color 31 "Killing job $job"
+              kill $job > /dev/null 2>&1 || (kill -9 $job > /dev/null 2>&1 &)
+          done
+          echo "All tests have been terminated."
+          exit 0
+      }
+      # Set a trap to call kill_jobs on termination signals
+      trap kill_jobs SIGINT SIGTERM
+
       # scan test dir and parallel execute ctest in each subprocess
       for binary in ${CMAKE_BIN_DIR}/Test*; do
         test_target=${binary#${CMAKE_BIN_DIR}/}
         ctest_param="--output-on-failure"
-        ctest_param+=" --test_timeout 30  --repeat-until-fail 2"
+        ctest_param+=" --repeat-until-fail 2"
         if [ -n "${BuildTarget}" ]; then
             if [[ ${test_target} != "${BuildTarget}" ]]; then
               continue
@@ -203,27 +233,15 @@ for config in "${buildConfigs[@]}"; do
         test_cmd="${CTEST_BIN} . ${ctest_param}"
         echo_color 34 "Test cmd: ${test_cmd}"
         cmd="(${test_cmd} || exit 1) | tee "${CWD_DIR}/Testing/build_test_${config}_${test_target}.log""
-        (
-          # Execute command in a subshell
-          bash -c "$cmd"
-        ) &
+        # execute command in background
+        timeout 30 bash -c "${cmd}" &
+        # Add PID to array
+        job=$!
+        echo_color 34 "Testing ${test_target} pid: ${job}"
+        pids+=(${job})
       done
       # Wait all tests finish
       wait
-
-# Use ctest -j N (very buggy, generate strange errors for mallocator and parallel test that cannot reproduce)
-#      ctest_param="--parallel ${ParallelThreads} --output-on-failure --schedule-random"
-#      ctest_param+=" --test_timeout 30  --repeat-until-fail 2"
-#      if [ -n "${BuildTarget}" ]; then
-#          # ctest run only one target
-#          # https://stackoverflow.com/questions/54160415/running-only-one-single-test-with-cmake-make
-#          ctest_param="-R ${BuildTarget} ${ctest_param}"
-#      fi
-#
-#      # 测试项目
-#      test_cmd="${CTEST_BIN} . ${ctest_param}"
-#      echo_color 34 "Test cmd: ${test_cmd}"
-#      (${test_cmd} || exit 1) | tee "${CWD_DIR}/build_test_${config}.log"
     fi
 
     # 性能测试
@@ -257,5 +275,5 @@ for config in "${buildConfigs[@]}"; do
     fi
 done
 
-echo_color 34 "Finished building all targets...exiting"
+echo_color 32 "\n\nFinished building all targets...exiting"
 }
