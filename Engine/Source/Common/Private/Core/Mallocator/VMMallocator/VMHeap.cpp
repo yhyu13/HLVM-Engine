@@ -222,11 +222,9 @@ void FVMHeap::Free(void* p)
 				while (NextBlock != mTail)
 				{
 					HLVM_CONSTEXPR_ASSERT(bValidate, CurrBlock->size != 0 && NextBlock->size != 0);
-					// TODO : if next block is mid block , we can either choose to defragment mid block
-					// and assign mid block back to nullptr, or ignore defragmenting mid block
 					if (NextBlock->size < 0 || !NextBlock->CanDefragment())
 					{
-						// If next block shall not be defragmented, continue
+						// If next block shall not be defragmented, break
 						break;
 					}
 					else
@@ -264,7 +262,7 @@ void FVMHeap::Free(void* p)
 
 				if (CurrBlock->size < NextBlock->size)
 				{
-					// If we can should use cached free blocks, add free blokc to cache blocks
+					// If we can should use cached free blocks, and add free block to cache blocks
 					if (mCachedFreeBlocks.ShouldTryCachFreeBlock())
 					{
 						// Swap free head to next block so that we can put CurrBlock into cache block
@@ -362,6 +360,7 @@ void FVMHeap::SortFreeBlockList()
 	{
 		HLVM_CONSTEXPR_ASSERT(bValidate, mMid != CurrBlock);
 		HLVM_CONSTEXPR_ASSERT(bValidate, mMid->size > 0);
+		// if mid block is greater than or equal to the current block, use mid block to acclerate search
 		if (mMid->size >= CurrBlock->size)
 		{
 			bUsedMid = true;
@@ -375,7 +374,7 @@ void FVMHeap::SortFreeBlockList()
 	 * Find a insert block that is smaller than or equal current block
 	 * and insert current block before it
 	 */
-	while (InsertBlock->size >= CurrBlock->size)
+	while (InsertBlock->size > CurrBlock->size)
 	{
 #if DEBUG_SORT_FREE_LIST
 		++Iter;
@@ -384,7 +383,6 @@ void FVMHeap::SortFreeBlockList()
 	}
 
 	// We need to insert curr block as the prev block of insert block
-	// It is trivial to insert if the insert block is the next block as it is already in right place
 	if (InsertBlock != NextBlock)
 	{
 		// Make nextblock now the free head block
@@ -413,11 +411,17 @@ void FVMHeap::SortFreeBlockList()
 		else
 			HLVM_LIKELY
 			{
+				// Remove old mid block
 				mMid->bMid = false;
+				// Assign new mid block
 				mMid = (bUsedMid) ? mMid->nextFreeBlock : mMid->prevFreeBlock;
 				mMid->bMid = true;
 				HLVM_CONSTEXPR_ASSERT(bValidate, mMid->size > 0);
 			}
+	}
+	else
+	{
+		// It is trivial to insert if the insert block is the next block as it is already in right place
 	}
 
 #if DEBUG_SORT_FREE_LIST
@@ -428,7 +432,7 @@ void FVMHeap::SortFreeBlockList()
 	}
 	if (Iter > 100)
 	{
-		StreamPrintf(&std::cout, "Iter: %s %s\n", Iter, ++LongIterCount);
+		StreamPrintf(&std::cout, "Long Iter: %s %s\n", Iter, ++LongIterCount);
 	}
 #endif
 }

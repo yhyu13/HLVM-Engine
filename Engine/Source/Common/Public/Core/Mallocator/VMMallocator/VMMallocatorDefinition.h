@@ -33,7 +33,7 @@ static_assert((HLVM_VMA_SMALL_HEAP_SIZE & (HLVM_VMA_SMALL_HEAP_SIZE - 1)) == 0, 
 static_assert((HLVM_VMA_LARGE_HEAP_SIZE & (HLVM_VMA_LARGE_HEAP_SIZE - 1)) == 0, "Default heap size must be power of 2");
 
 #ifndef HLVM_VMA_GENERIC_PENDING_FREE_LIST_SIZE
-	#define HLVM_VMA_GENERIC_PENDING_FREE_LIST_SIZE 64 // Set to 1 to disable pending free list
+	#define HLVM_VMA_GENERIC_PENDING_FREE_LIST_SIZE 1 // Set to 1 to disable pending free list
 #endif
 static_assert(HLVM_VMA_GENERIC_PENDING_FREE_LIST_SIZE < 255, "Generic pending free list size better be < 255 to avoid gc panic");
 

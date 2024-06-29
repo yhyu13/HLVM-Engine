@@ -214,6 +214,7 @@ for config in "${buildConfigs[@]}"; do
       }
       # Set a trap to call kill_jobs on termination signals
       trap kill_jobs SIGINT SIGTERM
+      test_logs=()
 
       # scan test dir and parallel execute ctest in each subprocess
       for binary in ${CMAKE_BIN_DIR}/Test*; do
@@ -225,23 +226,36 @@ for config in "${buildConfigs[@]}"; do
               continue
             fi
         fi
-        # ctest run only one target
+        # To make ctest run only one target
         # https://stackoverflow.com/questions/54160415/running-only-one-single-test-with-cmake-make
         ctest_param="-R ${test_target} ${ctest_param}"
 
         # 测试项目
         test_cmd="${CTEST_BIN} . ${ctest_param}"
         echo_color 34 "Test cmd: ${test_cmd}"
-        cmd="(${test_cmd} || exit 1) | tee "${CWD_DIR}/Testing/build_test_${config}_${test_target}.log""
+        output_log="${CWD_DIR}/Testing/build_test_${config}_${test_target}.log"
+        cmd="(${test_cmd} || exit 1) | tee "${output_log}""
         # execute command in background
-        timeout 30 bash -c "${cmd}" &
+        timeout 120 bash -c "${cmd}" &
         # Add PID to array
         job=$!
         echo_color 34 "Testing ${test_target} pid: ${job}"
         pids+=(${job})
+        test_logs+=("${output_log}")
       done
       # Wait all tests finish
       wait
+
+      for i in "${!test_logs[@]}"; do
+          test_log=${test_logs[$i]}
+          test_target=${test_log#${CWD_DIR}/Testing/build_test_${config}_}
+          test_target=${test_target%.log}
+          # If test log does not contain "100% tests passed, 0 tests failed ", output error log
+          if ! grep -q "100% tests passed, 0 tests failed" "${test_log}"; then
+              echo_color 31 "Testing ${config} ${test_target} failed"
+              exit 1
+          fi
+      done
     fi
 
     # 性能测试

@@ -62,7 +62,7 @@ FVMArena::FVMArena()
 		std::thread(NonLocalFreeHandler).detach();
 	});
 
-	// Add to global arena list
+	// Add to global vmarena list
 	{
 		LOCK_GUARD_S();
 		sGlobalArenaList.push_back(this);
@@ -106,7 +106,7 @@ FVMArena::~FVMArena()
 {
 	HLVM_ENSURE(GMallocatorTLS == &HLVM_LOW_GMALLOC_TLS, TXT("VMArena must be destroyed from low level mallocator"));
 	/**
-	 * Handle cache free list
+	 * Handle cache free list that are not yet free, especially non local free
 	 */
 	while (mPendingFressLists.GenericFreeList.size())
 	{
@@ -136,7 +136,7 @@ FVMArena::~FVMArena()
 		}
 	}
 	/**
-	 * Free all heaps
+	 * Free all heaps of this vmarena
 	 */
 	while (mHeapChainHead)
 	{
@@ -146,7 +146,7 @@ FVMArena::~FVMArena()
 		mHeapChainHead = Next;
 	}
 
-	// Add to global arena list
+	// Remove from global vmarena list
 	{
 		LOCK_GUARD_S();
 		std::remove_if(sGlobalArenaList.begin(), sGlobalArenaList.end(),
@@ -261,14 +261,17 @@ void* FVMArena::MallocHeap(size_t size)
 	/**
 	 * Initialize heap with the size of the allocation
 	 */
-	if (FVMHeap::EstimateHeapCapacityBySize(size) <= HLVM_VMA_LARGE_HEAP_SIZE)
+	if (auto estiamtedSize = FVMHeap::EstimateHeapCapacityBySize(size);
+		estiamtedSize <= HLVM_VMA_LARGE_HEAP_SIZE)
 	{
 		HeapMallocator.Init(this, HLVM_VMA_LARGE_HEAP_SIZE);
+		StreamPrintf(&std::cout, "VMArena::MallocHeap : heap managed %s\n", estiamtedSize);
 	}
 	else
 	{
 		// Init heap with unmanged setting if the size is too large
 		HeapMallocator.Init(this, size, true);
+		StreamPrintf(&std::cout, "VMArena::MallocHeap : heap unmanaged %s\n", size);
 	}
 	HLVM_CONSTEXPR_ASSERT(bValidate, HeapMallocator.GetHeapSize() >= size);
 	auto p = HeapMallocator.Malloc(size);

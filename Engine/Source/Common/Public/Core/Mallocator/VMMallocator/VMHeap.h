@@ -97,7 +97,7 @@ private:
 
 	/**
 	 * Cached free blocks, used to reduce the number of internal malloc/free calls
-	 * (because we have sort free list to find the best fit for internal malloc/free)
+	 * (because we have to sort free list to find the best fit for internal malloc/free which cost time)
 	 */
 	struct CachedFreeBlocks
 	{

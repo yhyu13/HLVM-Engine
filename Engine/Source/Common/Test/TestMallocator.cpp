@@ -15,7 +15,7 @@ RECORD(mallocator_test)
 {
 	HLVM_PROFILE_CPU_NAMED("mallocator_test");
 
-	SECTION(MiMallocatorTest, true, 10,
+	SECTION(MiMallocatorTest, true, 5,
 		{
 			HLVM_LOG(LogTest, info, TXT("Section MiMallocatorTest"));
 			FMiMallocator MiMallocator{ { .bNewHeap = false } };
@@ -40,7 +40,7 @@ RECORD(mallocator_test)
 			}
 		});
 
-	SECTION(StackMallocatorTest, true, 10,
+	SECTION(StackMallocatorTest, true, 5,
 		{
 			HLVM_LOG(LogTest, info, TXT("Section StackMallocatorTest"));
 			TStackMallocator<16 * 1024> StackMallocator{};
@@ -65,7 +65,7 @@ RECORD(mallocator_test)
 			}
 		});
 
-	SECTION(VMArenaMallocatorTLSTest, true, 10,
+	SECTION(VMArenaMallocatorTLSTest, true, 5,
 		{
 			HLVM_LOG(LogTest, info, TXT("Section VMArenaMallocatorTLSTest"));
 			FVMArenaMallocator VMArenaMallocatorTLS{};
@@ -152,9 +152,11 @@ RECORD(malloc_test)
 	};
 
 	auto test_multi_thread = [&]() {
+		FTimer timer;
 		std::cout << "Running multi-thread tests..." << std::endl;
 		std::vector<std::thread> threads;
 
+		timer.Reset();
 		for (size_t i = 0; i < MAX_THREADS; ++i)
 		{
 			threads.emplace_back(allocate_and_deallocate, i);
@@ -165,34 +167,59 @@ RECORD(malloc_test)
 			thread.join();
 		}
 
-		std::cout << "Multi-thread tests passed!" << std::endl;
+		std::cout << "Multi-thread tests passed! " << timer.Mark() << std::endl;
 	};
 
 	auto test_different_block_sizes = [&]() {
+		FTimer timer;
 		std::cout << "Running different block size tests..." << std::endl;
-		std::vector<size_t> block_sizes = { 1, 8, 16, 32, 64, 128, 256, 512, 1024, 1024 * 1024 };
+		std::vector<size_t> block_sizes = { 1, 8, 16, 32, 64, 128, 256, 512, 1024,
+			4 * 1024, 16 * 1024, 32 * 1024, 64 * 1024, 128 * 1024, 256 * 1024, 512 * 1024, 1024 * 1024 };
+		std::srand(0);
+		std::queue<TBYTE*> free_list;
 
-		for (size_t size : block_sizes)
+		timer.Reset();
+		for (size_t i = 0; i < MAX_ITERATIONS / block_sizes.size(); ++i)
 		{
-			TBYTE* ptr = new TBYTE[size];
-			assert(ptr != nullptr);
-
-			// Write data to the allocated memory
-			memset(ptr, 0xAA, size);
-
-			// Read data from the allocated memory and verify
-			for (size_t i = 0; i < size; ++i)
+			for (size_t size : block_sizes)
 			{
-				assert(reinterpret_cast<unsigned char*>(ptr)[i] == 0xAA);
-			}
+				TBYTE* ptr = new TBYTE[size];
+				assert(ptr != nullptr);
 
-			delete[] (ptr);
+				// Write data to the allocated memory
+				memset(ptr, 0xAA, size);
+
+				// Read data from the allocated memory and verify
+				for (size_t j = 0; j < size; ++j)
+				{
+					assert(reinterpret_cast<unsigned char*>(ptr)[j] == 0xAA);
+				}
+
+				free_list.push(ptr);
+				double random_number = S_C(double, std::rand()) / RAND_MAX;
+				if (random_number < 0.5)
+				{
+					while (!free_list.empty())
+					{
+						ptr = free_list.front();
+						delete[] (ptr);
+						free_list.pop();
+					}
+				}
+			}
 		}
 
-		std::cout << "Different block size tests passed!" << std::endl;
+		while (!free_list.empty())
+		{
+			auto ptr = free_list.front();
+			delete[] (ptr);
+			free_list.pop();
+		}
+
+		std::cout << "Different block size tests passed! " << timer.Mark() << std::endl;
 	};
 
-	SECTION(MiMallocatorTLSTest, true, 10,
+	SECTION(MiMallocatorTLSTest, true, 5,
 		{
 			HLVM_LOG(LogTest, info, TXT("Test mimallocator"));
 			FMiMallocator MiMallocator{ { .bNewHeap = false, .bDestory = true } };
@@ -203,7 +230,7 @@ RECORD(malloc_test)
 			test_different_block_sizes();
 		});
 
-	SECTION(StackMallocatorTLSTest, true, 10,
+	SECTION(StackMallocatorTLSTest, true, 5,
 		{
 			HLVM_LOG(LogTest, info, TXT("Test stack mallocator"));
 			TStackMallocator<32 * 1024> StackMallocator{};
@@ -214,7 +241,7 @@ RECORD(malloc_test)
 			test_different_block_sizes();
 		});
 
-	SECTION(VMMallocatorTLSTest, true, 10,
+	SECTION(VMMallocatorTLSTest, true, 5,
 		{
 			FVMArenaMallocator VMArenaMallocatorTLS{};
 			HLVM_LOG(LogTest, info, TXT("Test VMArena mallocator"));

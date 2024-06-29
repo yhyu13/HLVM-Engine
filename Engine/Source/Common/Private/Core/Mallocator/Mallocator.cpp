@@ -124,15 +124,19 @@ HLVM_THREAD_LOCAL_VAR IMallocator* GFallBacllMallocatorTLS = &GVMArenaMallocator
 
 void SwapMallocator(IMallocator* Mallocator) // Extern
 {
-	if (hlvm_private::GMallocatorTLSSwap == nullptr)
+	if (hlvm_private::GMallocatorTLSSwap == nullptr && Mallocator != nullptr)
 	{
 		hlvm_private::GMallocatorTLSSwap = GMallocatorTLS;
 		GMallocatorTLS = Mallocator;
 	}
-	else
+	else if (Mallocator == nullptr)
 	{
 		GMallocatorTLS = hlvm_private::GMallocatorTLSSwap;
 		hlvm_private::GMallocatorTLSSwap = nullptr;
+	}
+	else
+	{
+		HLVM_ENSURE(false, TXT("Mallocator swap is not supported in this case"));
 	}
 }
 
