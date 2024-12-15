@@ -31,7 +31,7 @@ namespace hlvm_private
 } // namespace hlvm_private
 
 /**
- * Templated printf that require now memory allocation, format only accept %% or %s for simplicity
+ * Templated printf that require no memory allocation, format only accept %% (displaying '%') or %s (displaying a char*) for simplicity
  */
 template <typename T, typename... Args>
 const char* StreamPrintf(T* ostream, const char* format, Args... args)

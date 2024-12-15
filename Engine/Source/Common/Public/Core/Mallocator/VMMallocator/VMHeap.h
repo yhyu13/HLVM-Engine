@@ -93,7 +93,7 @@ private:
 	});
 	static_assert(sizeof(FBlock) == 16, "FBlock size must be 16 bytes");
 	HLVM_INLINE_VAR HLVM_STATIC_VAR constexpr SizeType FBlock_Size = S_C(SizeType, sizeof(FBlock));
-	HLVM_INLINE_VAR HLVM_STATIC_VAR constexpr SizeType Minimal_Block_Size = HLVM_VMA_SMALL_ALLOC_THRESHOLD;
+	HLVM_INLINE_VAR HLVM_STATIC_VAR constexpr SizeType Minimal_Block_Size = HLVM_VMA_SMALL_BINNED_ALLOC_THRESHOLD;
 
 	/**
 	 * Cached free blocks, used to reduce the number of internal malloc/free calls

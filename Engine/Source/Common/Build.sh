@@ -28,7 +28,8 @@ RunRebuild=0
 Verbose=0
 BuildGraphViz=0
 RunGPerf=0
-ParallelThreads=$(nproc)
+Jobs=$(nproc)
+TestRepeatNum=5
 
 # Step 2: Loop through each argument
 for arg in "$@"; do
@@ -72,9 +73,14 @@ for arg in "$@"; do
         RunGPerf=1
     fi
 
-    # Step 11: Check for --ParallelThreads=value
-    if [[ $arg == --ParallelThreads=* ]]; then
-        ParallelThreads=${arg#*=}
+    # Step 11: Check for --Jobs=value
+    if [[ $arg == --Jobs=* ]]; then
+        Jobs=${arg#*=}
+    fi
+
+    # Step 12: Check for --TestRepeatNum
+    if [[ $arg == --TestRepeatNum ]]; then
+        TestRepeatNum=${arg#*=}
     fi
 done
 
@@ -87,7 +93,8 @@ echo_color 32 "Receive RunRebuild: ${RunRebuild}"
 echo_color 32 "Receive Verbose: ${Verbose}"
 echo_color 32 "Receive BuildGraphViz: ${BuildGraphViz}"
 echo_color 32 "Receive RunGPerf: ${RunGPerf}"
-echo_color 32 "Receive ParallelThreads: ${ParallelThreads}"
+echo_color 32 "Receive Jobs: ${Jobs}"
+echo_color 32 "Receive TestRepeatNum: ${TestRepeatNum}"
 #------------------------------------------------------------------
 time {
 
@@ -161,7 +168,7 @@ for config in "${buildConfigs[@]}"; do
     fi
 
     # 构建参数s
-    cbuild_param="-j ${ParallelThreads}"
+    cbuild_param="-j ${Jobs}"
     if [ ${Verbose} -eq 1 ]; then
         cbuild_param="--verbose"
     fi
@@ -178,8 +185,7 @@ for config in "${buildConfigs[@]}"; do
     # 构建项目
     build_cmd="${CMAKE_BIN} --build . ${cbuild_param}"
     echo_color 34 "Build cmd: ${build_cmd}"
-    (${build_cmd}) || exit 1 \
-      | tee "${CWD_DIR}/build_${config}.log"
+    (${build_cmd} || exit 1) | tee "${CWD_DIR}/build_${config}.log" 2>&1
 
     # 测试项目
     if [ ${RunTest} -eq 1 ]; then
@@ -187,8 +193,8 @@ for config in "${buildConfigs[@]}"; do
       CMAKE_BIN_DIR=${CWD_DIR}/Binary/${CMAKE_BUILD_TYPE}
 
 #      !!!Don't use Use ctest -j N (very buggy, generate strange errors for mallocator and parallel test that cannot reproduce)
-#      ctest_param="--parallel ${ParallelThreads} --output-on-failure --schedule-random"
-#      ctest_param+=" --test_timeout 30  --repeat-until-fail 2"
+#      ctest_param="--parallel ${Jobs} --output-on-failure --schedule-random"
+#      ctest_param+=" --test_timeout 600  --repeat-until-fail 1"
 #      if [ -n "${BuildTarget}" ]; then
 #          # ctest run only one target
 #          # https://stackoverflow.com/questions/54160415/running-only-one-single-test-with-cmake-make
@@ -198,63 +204,78 @@ for config in "${buildConfigs[@]}"; do
 #      # 测试项目
 #      test_cmd="${CTEST_BIN} . ${ctest_param}"
 #      echo_color 34 "Test cmd: ${test_cmd}"
-#      (${test_cmd} || exit 1) | tee "${CWD_DIR}/build_test_${config}.log"
+#      (${test_cmd} || exit 1) | tee "${CWD_DIR}/build_test_${config}.log" 2>&1
 
-      # Maually run test in each bg job parallely
-      pids=()
-      # Function to kill all background jobs
-      kill_jobs() {
-          for pid in "${pids[@]}"; do
-              job=$pid
-              echo_color 31 "Killing job $job"
-              kill $job > /dev/null 2>&1 || (kill -9 $job > /dev/null 2>&1 &)
-          done
-          echo "All tests have been terminated."
-          exit 0
-      }
-      # Set a trap to call kill_jobs on termination signals
-      trap kill_jobs SIGINT SIGTERM
-      test_logs=()
+      for ((i = 0 ; i < TestRepeatNum ; i++ )); do
+        # Maually run test in each bg job parallely
+        pids=()
+        max_jobs=4
+        # Function to kill all background jobs
+        kill_jobs() {
+            for pid in "${pids[@]}"; do
+                job=$pid
+                echo_color 31 "Killing job $job"
+                kill $job > /dev/null 2>&1 || (kill -9 $job > /dev/null 2>&1 &)
+            done
+            echo "All tests have been terminated."
+            exit 0
+        }
+        # Set a trap to call kill_jobs on termination signals
+        trap kill_jobs SIGINT SIGTERM
+        test_logs=()
 
-      # scan test dir and parallel execute ctest in each subprocess
-      for binary in ${CMAKE_BIN_DIR}/Test*; do
-        test_target=${binary#${CMAKE_BIN_DIR}/}
-        ctest_param="--output-on-failure"
-        ctest_param+=" --repeat-until-fail 2"
-        if [ -n "${BuildTarget}" ]; then
-            if [[ ${test_target} != "${BuildTarget}" ]]; then
-              continue
-            fi
-        fi
-        # To make ctest run only one target
-        # https://stackoverflow.com/questions/54160415/running-only-one-single-test-with-cmake-make
-        ctest_param="-R ${test_target} ${ctest_param}"
-
-        # 测试项目
-        test_cmd="${CTEST_BIN} . ${ctest_param}"
-        echo_color 34 "Test cmd: ${test_cmd}"
-        output_log="${CWD_DIR}/Testing/build_test_${config}_${test_target}.log"
-        cmd="(${test_cmd} || exit 1) | tee "${output_log}""
-        # execute command in background
-        timeout 120 bash -c "${cmd}" &
-        # Add PID to array
-        job=$!
-        echo_color 34 "Testing ${test_target} pid: ${job}"
-        pids+=(${job})
-        test_logs+=("${output_log}")
-      done
-      # Wait all tests finish
-      wait
-
-      for i in "${!test_logs[@]}"; do
-          test_log=${test_logs[$i]}
-          test_target=${test_log#${CWD_DIR}/Testing/build_test_${config}_}
-          test_target=${test_target%.log}
-          # If test log does not contain "100% tests passed, 0 tests failed ", output error log
-          if ! grep -q "100% tests passed, 0 tests failed" "${test_log}"; then
-              echo_color 31 "Testing ${config} ${test_target} failed"
-              exit 1
+        # scan test dir and parallel execute ctest in each subprocess
+        for binary in ${CMAKE_BIN_DIR}/Test*; do
+          test_target=${binary#${CMAKE_BIN_DIR}/}
+          ctest_param="--output-on-failure"
+          ctest_param+=" --repeat-until-fail 1"
+          if [ -n "${BuildTarget}" ]; then
+              if [[ ${test_target} != "${BuildTarget}" ]]; then
+                continue
+              fi
           fi
+          # To make ctest run only one target
+          # https://stackoverflow.com/questions/54160415/running-only-one-single-test-with-cmake-make
+          ctest_param="-R ${test_target} ${ctest_param}"
+
+          # 测试项目
+          test_cmd="${CTEST_BIN} . ${ctest_param}"
+          echo_color 34 "Test cmd: ${test_cmd}"
+          output_log="${CWD_DIR}/Testing/build_test_${config}_${test_target}.log"
+          cmd="(${test_cmd} || exit 1) | tee "${output_log}" 2>&1"
+          # execute command in background
+          timeout 600 bash -c "${cmd}" &
+          # Add PID to array
+          job=$!
+          echo_color 34 "Testing ${test_target} pid: ${job}"
+          pids+=(${job})
+          test_logs+=("${output_log}")
+          if [ ${#pids[@]} -ge ${max_jobs} ]; then
+              # Wait all tests finish
+              wait
+              # reset pids
+              pids=()
+          fi
+        done
+        # Wait all tests finish
+        wait
+
+        all_success=1
+        for i in "${!test_logs[@]}"; do
+            test_log=${test_logs[$i]}
+            test_target=${test_log#${CWD_DIR}/Testing/build_test_${config}_}
+            test_target=${test_target%.log}
+            # If test log does not contain "100% tests passed, 0 tests failed ", output error log
+            if ! grep -q "100% tests passed, 0 tests failed" "${test_log}"; then
+                echo_color 31 "Testing ${config} ${test_target} failed, checkout ${test_log}"
+                bash -c "code ${test_log}" &
+                all_success=0
+            fi
+        done
+        if [ ${all_success} -eq 0 ]; then
+            echo_color 31 "Testing ${config} failed, checkout ${CWD_DIR}/Testing/build_test_${config}_*"
+            exit 1
+        fi
       done
     fi
 
@@ -283,7 +304,7 @@ for config in "${buildConfigs[@]}"; do
               (${binary} --gperf=1 || exit 1)
               # 查看性能
               (${GPERF_BIN}/pprof --text ${binary} ${binary}_gperf.prof || exit 1) \
-                | tee -a "${TEST_LOG}"
+                | tee -a "${TEST_LOG}" 2>&1
             fi
         done
     fi

@@ -25,7 +25,7 @@
 // based on informations from:
 // https://software.intel.com/en-us/articles/benefitting-power-and-performance-sleep-loops
 // https://software.intel.com/en-us/articles/long-duration-spin-wait-loops-on-hyper-threading-technology-enabled-intel-processors
-static constexpr std::chrono::microseconds us0{ 0 };
+HLVM_STATIC_VAR constexpr std::chrono::microseconds us0{ 0 };
 #define THREAD_SLEEP0() std::this_thread::sleep_for(us0) // pause for 1000 clocks claimed by boost?
 #define SLEEP_SPIN_COUNT 32								 //
 #define CONTENTION_SPIN_COUNT 16						 //

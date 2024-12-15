@@ -18,11 +18,11 @@
 /**
  * General purpose Stack allocator
  */
-template <int32_t N = HLVM_STACK_MALLOCATOR_DEFAULT_SIZE,
-	bool		  bMonolithic = false,
-	bool		  bDefragment = true,
-	bool		  bAllowOverflowToHeap = true,
-	bool		  bUseHeapForAlignedAlloc = true,
+template <int32_t N = HLVM_STACK_MALLOCATOR_DEFAULT_SIZE, // max size is N
+	bool		  bMonolithic = false,					  // whether the allocator is monolithic growing or reuse blocks
+	bool		  bDefragment = true,					  // whether to defragment neighbor free blocks bubbles of the stack
+	bool		  bAllowOverflowToHeap = true,			  // whether to compensate allocation from the heap when stack cannot allocate
+	bool		  bUseHeapForAlignedAlloc = false,		  // whether to use aligned alloc from heap
 	bool		  bValidate = HLVM_MALLOC_VALIDATION>
 class TStackMallocator final : public IMallocator
 {
@@ -85,6 +85,7 @@ public:
 		}
 		else
 		{
+			size = AlignUp(size, align);
 			return InternalMalloc(size);
 		}
 	}
@@ -96,6 +97,7 @@ public:
 		}
 		else
 		{
+			size = AlignUp(size, align);
 			return InternalMalloc(size);
 		}
 	}
@@ -151,7 +153,6 @@ private:
 	static_assert(Size_UpperBound > 0);
 	HLVM_INLINE_VAR HLVM_STATIC_VAR constexpr SizeType Minimal_Block_Size = 24;
 
-	// TODO : Maybe consider implement aligned address looking up for stack allocator
 	void* InternalMalloc(size_t _size) noexcept(bValidate)
 	{
 		SizeType size = S_C(SizeType, _size);

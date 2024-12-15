@@ -50,16 +50,16 @@ HLVM_STATIC_VAR std::atomic_uint_fast64_t GMallocCounter;
 HLVM_STATIC_VAR std::atomic<double> GFreeDurationCounter;
 HLVM_STATIC_VAR std::atomic_uint_fast64_t GFreeCounter;
 #if !HLVM_SHIPPING
-	#define PROFILE_MALLOC_CUMU()                               \
+	#define PROFILE_MALLOC_CUMULATIVE()                         \
 		GMallocCounter.fetch_add(1, std::memory_order_relaxed); \
-		HLVM_SCOPED_TIMER_CUMU_ATOMIC(GMallocDurationCounter, std::micro)
+		HLVM_SCOPED_TIMER_CUMULATIVE_ATOMIC(GMallocDurationCounter, std::micro)
 
-	#define PROFILE_FREE_CUMU()                               \
+	#define PROFILE_FREE_CUMULATIVE()                         \
 		GFreeCounter.fetch_add(1, std::memory_order_relaxed); \
-		HLVM_SCOPED_TIMER_CUMU_ATOMIC(GFreeDurationCounter, std::micro)
+		HLVM_SCOPED_TIMER_CUMULATIVE_ATOMIC(GFreeDurationCounter, std::micro)
 #else
-	#define PROFILE_MALLOC_CUMU() ((void)0)
-	#define PROFILE_FREE_CUMU() ((void)0)
+	#define PROFILE_MALLOC_CUMULATIVE() ((void)0)
+	#define PROFILE_FREE_CUMULATIVE() ((void)0)
 #endif
 
 void InitMallocator() // Extern
@@ -176,7 +176,7 @@ void SwapMallocator(IMallocator* Mallocator) // Extern
 		#define NEW_WRAPPER(expr)              \
 			void* p = nullptr;                 \
 			{                                  \
-				PROFILE_MALLOC_CUMU();         \
+				PROFILE_MALLOC_CUMULATIVE();   \
 				expr                           \
 			}                                  \
 			HLVM_PROFILER_CPU_ON_MALLOC(p, n); \
@@ -201,11 +201,11 @@ void SwapMallocator(IMallocator* Mallocator) // Extern
 			{                              \
 			}
 
-		#define DELETE_WRAPPER(expr)   \
-			{                          \
-				PROFILE_FREE_CUMU();   \
-				TRY_CATCH_DELETE(expr) \
-			}                          \
+		#define DELETE_WRAPPER(expr)       \
+			{                              \
+				PROFILE_FREE_CUMULATIVE(); \
+				TRY_CATCH_DELETE(expr)     \
+			}                              \
 			HLVM_PROFILER_CPU_ON_FREE(p)
 
 void operator delete(void* p) noexcept

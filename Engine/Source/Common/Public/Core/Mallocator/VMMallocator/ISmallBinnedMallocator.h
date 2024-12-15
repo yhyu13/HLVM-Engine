@@ -15,7 +15,7 @@ struct FSmallBinnedBlockHead
 
 	bool Valid() const
 	{
-		return Pos < 32 && Alignment <= HLVM_VMA_SMALL_ALLOC_THRESHOLD && Alignment > 0;
+		return Pos < 32 && Alignment <= HLVM_VMA_SMALL_BINNED_ALLOC_THRESHOLD && Alignment > 0;
 	}
 	HLVM_STATIC_FUNC TUINT8 IsSmallAlloc(void* v)
 	{
@@ -28,7 +28,7 @@ struct FSmallBinnedBlockHead
 	}
 	HLVM_STATIC_FUNC TUINT8 GoodSize(size_t size)
 	{
-		return S_C(TUINT8, AlignUp(size, HLVM_VMA_SMALL_ALLOC_ALIGNMENT));
+		return S_C(TUINT8, AlignUp(size, HLVM_VMA_SMALL_BINNED_ALLOC_ALIGNMENT));
 	}
 };
 static_assert(sizeof(FSmallBinnedBlockHead) == 2);

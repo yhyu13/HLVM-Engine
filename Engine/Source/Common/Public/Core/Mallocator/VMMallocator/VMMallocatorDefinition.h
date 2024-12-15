@@ -10,39 +10,78 @@
 	#define HLVM_ENABLE_GLOBAL_VMMALLOCATOR 0 // We should not use vm mallocator golbally until it is stable
 #endif
 
-#ifndef HLVM_VMA_SMALL_ALLOC_ALIGNMENT
-	#define HLVM_VMA_SMALL_ALLOC_ALIGNMENT (16) // Every binned allocator manage a multiplier of alignment
+#ifndef HLVM_VMA_OSPAGE_SMALL_HEAP_SIZE
+	#define HLVM_VMA_OSPAGE_SMALL_HEAP_SIZE (1 << 11) // Must be power of 2
 #endif
-static_assert((HLVM_VMA_SMALL_ALLOC_ALIGNMENT & (HLVM_VMA_SMALL_ALLOC_ALIGNMENT - 1)) == 0, "Small alloc alignment must be power of 2");
+static_assert((HLVM_VMA_OSPAGE_SMALL_HEAP_SIZE & (HLVM_VMA_OSPAGE_SMALL_HEAP_SIZE - 1)) == 0, "Small heap size must be power of 2");
 
-#ifndef HLVM_VMA_SMALL_ALLOC_THRESHOLD
-	#define HLVM_VMA_SMALL_ALLOC_THRESHOLD (240) // Must be <= 256 - HLVM_VMA_SMALL_ALLOC_ALIGNMENT
+#ifndef HLVM_VMA_OSPAGE_LARGE_HEAP_SIZE
+	#define HLVM_VMA_OSPAGE_LARGE_HEAP_SIZE (1 << 25) // Must be power of 2
 #endif
-static_assert(HLVM_VMA_SMALL_ALLOC_THRESHOLD <= 256 - HLVM_VMA_SMALL_ALLOC_ALIGNMENT
-		&& HLVM_VMA_SMALL_ALLOC_THRESHOLD % HLVM_VMA_SMALL_ALLOC_ALIGNMENT == 0,
-	"Small alloc threshold must be <= 256 - HLVM_VMA_SMALL_ALLOC_ALIGNMENT and must be a multiple of HLVM_VMA_SMALL_ALLOC_ALIGNMENT");
+static_assert((HLVM_VMA_OSPAGE_LARGE_HEAP_SIZE & (HLVM_VMA_OSPAGE_LARGE_HEAP_SIZE - 1)) == 0, "Default heap size must be power of 2");
 
-#ifndef HLVM_VMA_SMALL_HEAP_SIZE
-	#define HLVM_VMA_SMALL_HEAP_SIZE (1 << 11) // Must be power of 2
+#ifndef HLVM_VMA_SMALL_BINNED_ALLOC_ALIGNMENT
+	#define HLVM_VMA_SMALL_BINNED_ALLOC_ALIGNMENT (16) // Every binned allocator manage a multiplier of alignment
 #endif
-static_assert((HLVM_VMA_SMALL_HEAP_SIZE & (HLVM_VMA_SMALL_HEAP_SIZE - 1)) == 0, "Small heap size must be power of 2");
+static_assert((HLVM_VMA_SMALL_BINNED_ALLOC_ALIGNMENT & (HLVM_VMA_SMALL_BINNED_ALLOC_ALIGNMENT - 1)) == 0, "Small alloc alignment must be power of 2");
 
-#ifndef HLVM_VMA_LARGE_HEAP_SIZE
-	#define HLVM_VMA_LARGE_HEAP_SIZE (1 << 25) // Must be power of 2
+#ifndef HLVM_VMA_SMALL_BINNED_ALLOC_THRESHOLD
+	#define HLVM_VMA_SMALL_BINNED_ALLOC_THRESHOLD (240)
 #endif
-static_assert((HLVM_VMA_LARGE_HEAP_SIZE & (HLVM_VMA_LARGE_HEAP_SIZE - 1)) == 0, "Default heap size must be power of 2");
+static_assert(HLVM_VMA_SMALL_BINNED_ALLOC_THRESHOLD <= 256 - HLVM_VMA_SMALL_BINNED_ALLOC_ALIGNMENT
+		&& HLVM_VMA_SMALL_BINNED_ALLOC_THRESHOLD % HLVM_VMA_SMALL_BINNED_ALLOC_ALIGNMENT == 0,
+	"Small alloc threshold must be <= 256 - HLVM_VMA_SMALL_BINNED_ALLOC_ALIGNMENT and must be a multiple of HLVM_VMA_SMALL_BINNED_ALLOC_ALIGNMENT");
+HLVM_INLINE_VAR constexpr size_t hlvm_vma_small_binned_alloc_num = HLVM_VMA_SMALL_BINNED_ALLOC_THRESHOLD / HLVM_VMA_SMALL_BINNED_ALLOC_ALIGNMENT;
 
-#ifndef HLVM_VMA_GENERIC_PENDING_FREE_LIST_SIZE
-	#define HLVM_VMA_GENERIC_PENDING_FREE_LIST_SIZE 1 // Set to 1 to disable pending free list
+#ifndef HLVM_VMA_MEDIAN_BINNED_ALLOC_ALIGNMENT
+	#define HLVM_VMA_MEDIAN_BINNED_ALLOC_ALIGNMENT (256) // Every binned allocator manage a multiplier of alignment
 #endif
+static_assert((HLVM_VMA_MEDIAN_BINNED_ALLOC_ALIGNMENT & (HLVM_VMA_MEDIAN_BINNED_ALLOC_ALIGNMENT - 1)) == 0, "MEDIAN alloc alignment must be power of 2");
+
+#ifndef HLVM_VMA_MEDIAN_BINNED_ALLOC_THRESHOLD
+	#define HLVM_VMA_MEDIAN_BINNED_ALLOC_THRESHOLD (3840)
+#endif
+static_assert(HLVM_VMA_MEDIAN_BINNED_ALLOC_THRESHOLD <= 4096 - HLVM_VMA_MEDIAN_BINNED_ALLOC_ALIGNMENT
+		&& HLVM_VMA_MEDIAN_BINNED_ALLOC_THRESHOLD % HLVM_VMA_MEDIAN_BINNED_ALLOC_ALIGNMENT == 0,
+	"MEDIAN alloc threshold must be <= 4096 - HLVM_VMA_MEDIAN_BINNED_ALLOC_ALIGNMENT and must be a multiple of HLVM_VMA_MEDIAN_BINNED_ALLOC_ALIGNMENT");
+HLVM_INLINE_VAR constexpr size_t hlvm_vma_median_binned_alloc_num = HLVM_VMA_MEDIAN_BINNED_ALLOC_THRESHOLD / HLVM_VMA_MEDIAN_BINNED_ALLOC_ALIGNMENT;
+
+#ifndef HLVM_VMA_LARGE_BINNED_ALLOC_ALIGNMENT
+	#define HLVM_VMA_LARGE_BINNED_ALLOC_ALIGNMENT (1024) // Every binned allocator manage a multiplier of alignment
+#endif
+static_assert((HLVM_VMA_LARGE_BINNED_ALLOC_ALIGNMENT & (HLVM_VMA_LARGE_BINNED_ALLOC_ALIGNMENT - 1)) == 0, "LARGE alloc alignment must be power of 2");
+
+#ifndef HLVM_VMA_LARGE_BINNED_ALLOC_THRESHOLD
+	#define HLVM_VMA_LARGE_BINNED_ALLOC_THRESHOLD (64512)
+#endif
+static_assert(HLVM_VMA_LARGE_BINNED_ALLOC_THRESHOLD <= 65536 - HLVM_VMA_LARGE_BINNED_ALLOC_ALIGNMENT
+		&& HLVM_VMA_LARGE_BINNED_ALLOC_THRESHOLD % HLVM_VMA_LARGE_BINNED_ALLOC_ALIGNMENT == 0,
+	"LARGE alloc threshold must be <= 65536 - HLVM_VMA_LARGE_BINNED_ALLOC_ALIGNMENT and must be a multiple of HLVM_VMA_LARGE_BINNED_ALLOC_ALIGNMENT");
+HLVM_INLINE_VAR constexpr size_t hlvm_vma_large_binned_alloc_num = HLVM_VMA_LARGE_BINNED_ALLOC_THRESHOLD / HLVM_VMA_LARGE_BINNED_ALLOC_ALIGNMENT;
+
+#if 1
+	#ifndef HLVM_VMA_GENERIC_PENDING_FREE_LIST_SIZE
+		#define HLVM_VMA_GENERIC_PENDING_FREE_LIST_SIZE 1
+	#endif
+	#ifndef HLVM_VMA_LOCAL_PENDING_FREE_LIST_SIZE
+		#define HLVM_VMA_LOCAL_PENDING_FREE_LIST_SIZE 1
+	#endif
+	#ifndef HLVM_VMA_NONLOCAL_PENDING_FREE_LIST_SIZE
+		#define HLVM_VMA_NONLOCAL_PENDING_FREE_LIST_SIZE 1
+	#endif
+#else
+	#ifndef HLVM_VMA_GENERIC_PENDING_FREE_LIST_SIZE
+		#define HLVM_VMA_GENERIC_PENDING_FREE_LIST_SIZE 64
+	#endif
 static_assert(HLVM_VMA_GENERIC_PENDING_FREE_LIST_SIZE < 255, "Generic pending free list size better be < 255 to avoid gc panic");
 
-#ifndef HLVM_VMA_LOCAL_PENDING_FREE_LIST_SIZE
-	#define HLVM_VMA_LOCAL_PENDING_FREE_LIST_SIZE 64 // Set to 1 to disable pending free list
-#endif
+	#ifndef HLVM_VMA_LOCAL_PENDING_FREE_LIST_SIZE
+		#define HLVM_VMA_LOCAL_PENDING_FREE_LIST_SIZE 64
+	#endif
 static_assert(HLVM_VMA_LOCAL_PENDING_FREE_LIST_SIZE < 255, "Local pending free list size better be < 255 to avoid gc panic");
 
-#ifndef HLVM_VMA_NONLOCAL_PENDING_FREE_LIST_SIZE
-	#define HLVM_VMA_NONLOCAL_PENDING_FREE_LIST_SIZE 64 // Set to 1 to disable pending free list
-#endif
+	#ifndef HLVM_VMA_NONLOCAL_PENDING_FREE_LIST_SIZE
+		#define HLVM_VMA_NONLOCAL_PENDING_FREE_LIST_SIZE 64
+	#endif
 static_assert(HLVM_VMA_NONLOCAL_PENDING_FREE_LIST_SIZE < 255, "Non-local pending free list size better be < 255 to avoid gc panic");
+#endif

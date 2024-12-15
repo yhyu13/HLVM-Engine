@@ -14,9 +14,6 @@ vcpkg_cxt = VcpkgContenxt(vcpkg_root_path='../Dependency/vcpkg',
                                                             "zstd",
                                                             "botan",
                                                             "rapidjson",
-                                                            # VcpkgPackage(name="opentelemetry-cpp",
-                                                            #              features=[], default_features=False),
-                                                            # "catch2"
                                                             "gperftools",  # linux cpu sampling
                                                             "minitrace",  # chrome format tracing
                                                             VcpkgPackage(name="luajit", features=["buildvm-64"],
@@ -78,36 +75,6 @@ rapidjson = FindPackage(name='RapidJSON',
                         required=True,
                         dependant_target_link_libs=[
                             DomainValueModel(domain=DomainEnum.PUBLIC, values=['rapidjson'])])
-
-# Find the opentelemtry package with the specified options
-# opentelemetry = FindPackage(name='opentelemetry-cpp',
-#                             config=True,
-#                             required=True,
-#                             dependant_target_include_dirs=[DomainValueModel(domain=DomainEnum.PUBLIC,
-#                                                                   values=['${OPENTELEMETRY_CPP_INCLUDE_DIRS}'])],
-#                             dependant_target_link_libs=[
-#                                 DomainValueModel(domain=DomainEnum.PUBLIC, values=['${OPENTELEMETRY_CPP_LIBRARIES}'])])
-# protobuf = FindPackage(name='protobuf',
-#                        config=False,
-#                        required=True)
-# grpc = FindPackage(name='gRPC',
-#                    config=False,
-#                    required=True)
-# curl = FindPackage(name='CURL',
-#                    config=False,
-#                    required=True)
-# nlohmann_json = FindPackage(name='nlohmann_json',
-#                             config=False,
-#                             required=True)
-
-# # Find the catch2 package with the specified options
-#  Linking time is too slowwww, just copy some key ideas e.g. stable seed, section, benchmarking macro)
-# catch2 = FindPackage(name='Catch2',
-#                         config=True,
-#                         required=True,
-#                         dependant_target_link_libs=[
-#                             DomainValueModel(domain=DomainEnum.PUBLIC, values=['Catch2::Catch2',
-#                                                                                'Catch2::Catch2WithMain'])])
 
 # Find the gperftools package with the specified options
 gperftools = FindPackage(name='Gperftools',
@@ -220,12 +187,6 @@ class CommonModule(BaseModule):
                                         botan3,
                                         zstd,
                                         rapidjson,
-                                        # opentelemetry,
-                                        # protobuf,
-                                        # grpc,
-                                        # curl,
-                                        # nlohmann_json,
-                                        # catch2
                                         gperftools,
                                         minitrace,
                                         luajit,

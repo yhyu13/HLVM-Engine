@@ -92,13 +92,13 @@ private:
 };
 
 #if !HLVM_SHIPPING
-	#define HLVM_SCOPED_TIMER_CUMU(Duration)        \
+	#define HLVM_SCOPED_TIMER_CUMULATIVE(Duration)  \
 		FScopedTimerCumu TOKENPASTE2LINE(__timer_){ \
 			Duration                                \
 		};                                          \
 		HLVM_ATOMIC_THREAD_FENCE()
 #else
-	#define HLVM_SCOPED_TIMER_CUMU(Msg) ((void)0)
+	#define HLVM_SCOPED_TIMER_CUMULATIVE(Msg) ((void)0)
 #endif
 
 template <typename ratio = std::ratio<1>, typename duration_type = double>
@@ -123,11 +123,11 @@ private:
 };
 
 #if !HLVM_SHIPPING
-	#define HLVM_SCOPED_TIMER_CUMU_ATOMIC(Duration, ratio)                                       \
+	#define HLVM_SCOPED_TIMER_CUMULATIVE_ATOMIC(Duration, ratio)                                 \
 		FScopedTimerCumuAtomic<ratio, decltype(Duration)::value_type> TOKENPASTE2LINE(__timer_){ \
 			Duration                                                                             \
 		};                                                                                       \
 		HLVM_ATOMIC_THREAD_FENCE()
 #else
-	#define HLVM_SCOPED_TIMER_CUMU_ATOMIC(Msg) ((void)0)
+	#define HLVM_SCOPED_TIMER_CUMULATIVE_ATOMIC(Msg) ((void)0)
 #endif

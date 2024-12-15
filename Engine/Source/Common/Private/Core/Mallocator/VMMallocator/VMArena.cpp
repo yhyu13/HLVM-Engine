@@ -76,7 +76,7 @@ FVMArena::FVMArena()
 		for (size_t i = 0; i < HLVM_VMA_INIT_LARGET_HEAP_NUM; ++i)
 		{
 			FVMHeapChain* Heap = std::construct_at(R_C(FVMHeapChain*, mOSPageMallocator.MallocSmall(sizeof(FVMHeapChain))));
-			Heap->HeapAllocator.Init(this, HLVM_VMA_LARGE_HEAP_SIZE);
+			Heap->HeapAllocator.Init(this, HLVM_VMA_OSPAGE_LARGE_HEAP_SIZE);
 			if (!mHeapChainHead)
 			{
 				// Set head if null
@@ -94,9 +94,9 @@ FVMArena::FVMArena()
 	/**
 	 * Intialize small binning allocators (using fancy compile time for-loop)
 	 */
-	ct_for<0, HLVM_VMA_SMALL_ALLOC_THRESHOLD / HLVM_VMA_SMALL_ALLOC_ALIGNMENT, 1, TUINT8>([&](auto i) {
+	ct_for<0, hlvm_vma_small_binned_alloc_num, 1, TUINT8>([&](auto i) {
 		// Initialize binned allocator
-		using BinnedMallocatorType = FSmallBinnedMallocator<(i + 1) * HLVM_VMA_SMALL_ALLOC_ALIGNMENT>;
+		using BinnedMallocatorType = FSmallBinnedMallocator<(i + 1) * HLVM_VMA_SMALL_BINNED_ALLOC_ALIGNMENT>;
 		mSmallBinnedMallocators[i] = std::construct_at(R_C(BinnedMallocatorType*, mOSPageMallocator.MallocSmall(sizeof(BinnedMallocatorType))));
 		mSmallBinnedMallocators[i]->Init(this);
 	});
@@ -106,28 +106,31 @@ FVMArena::~FVMArena()
 {
 	HLVM_ENSURE(GMallocatorTLS == &HLVM_LOW_GMALLOC_TLS, TXT("VMArena must be destroyed from low level mallocator"));
 	/**
-	 * Handle cache free list that are not yet free, especially non local free
+	 * Handle cache free list that are not yet free, just non local thread free,
+	 * and ignore local free since the whole vma is abandoned
 	 */
-	while (mPendingFressLists.GenericFreeList.size())
+	while (mPendingFreeLists.GenericFreeList.size())
 	{
-		auto LastGenericPtr = mPendingFressLists.GenericFreeList.back();
-		if (!Owned(LastGenericPtr))
+		auto GenericFreePtr = mPendingFreeLists.GenericFreeList.back();
+		if (!Owned(GenericFreePtr))
 		{
-			sNonLocalPendingFreeList.Push({ .ptrToBeFree = LastGenericPtr, .ArenaNotOwned = this });
+			// Since this arena is about to be destoyed, we simply assign arena not owned to null
+			sNonLocalPendingFreeList.Push({ .ptrToBeFree = GenericFreePtr, .ArenaNotOwned = nullptr });
 		}
-		mPendingFressLists.GenericFreeList.pop_back();
+		mPendingFreeLists.GenericFreeList.pop_back();
 	}
-	while (mPendingFressLists.NonLocalFreeList.size())
+	while (mPendingFreeLists.NonLocalFreeList.size())
 	{
-		auto LastNonLocalPtr = mPendingFressLists.NonLocalFreeList.back();
-		sNonLocalPendingFreeList.Push({ .ptrToBeFree = LastNonLocalPtr, .ArenaNotOwned = this });
-		mPendingFressLists.NonLocalFreeList.pop_back();
+		auto LastNonLocalPtr = mPendingFreeLists.NonLocalFreeList.back();
+		// Since this arena is about to be destoyed, we simply assign arena not owned to null
+		sNonLocalPendingFreeList.Push({ .ptrToBeFree = LastNonLocalPtr, .ArenaNotOwned = nullptr });
+		mPendingFreeLists.NonLocalFreeList.pop_back();
 	}
 
 	/**
 	 * Free all small binned allocators
 	 */
-	for (size_t i = 0; i < HLVM_VMA_SMALL_ALLOC_THRESHOLD / HLVM_VMA_SMALL_ALLOC_ALIGNMENT; ++i)
+	for (size_t i = 0; i < hlvm_vma_small_binned_alloc_num; ++i)
 	{
 		if (mSmallBinnedMallocators[i])
 		{
@@ -163,119 +166,166 @@ bool FVMArena::Owned(void* p)
 
 void* FVMArena::Malloc(size_t size)
 {
-	return size <= HLVM_VMA_SMALL_ALLOC_THRESHOLD ? MallocSmallBinned(size) : MallocHeap(size);
+	return size <= HLVM_VMA_SMALL_BINNED_ALLOC_THRESHOLD ? MallocSmallBinned(size) : MallocHeap(size);
 }
 
 void FVMArena::Free(void* p)
 {
-	if (mPendingFressLists.GenericFreeList.size() == mPendingFressLists.GenericFreeList.max_size())
+	mPendingFreeLists.GenericFreeList.push_back(p);
+	// Only free if pending free list is full
+	if (mPendingFreeLists.GenericFreeList.size() == mPendingFreeLists.GenericFreeList.max_size())
 	{
-		while (mPendingFressLists.GenericFreeList.size())
+		// Free generic free list one by one
+		while (mPendingFreeLists.GenericFreeList.size())
 		{
-			auto LastGenericPtr = mPendingFressLists.GenericFreeList.back();
-			if (Owned(LastGenericPtr))
+			auto GenericFreePtr = mPendingFreeLists.GenericFreeList.back();
 			{
-				if (mPendingFressLists.LocalFreeList.size() == mPendingFressLists.LocalFreeList.max_size())
+				// If owned, push pointer to local free list
+				if (Owned(GenericFreePtr))
 				{
-					while (mPendingFressLists.LocalFreeList.size())
+					mPendingFreeLists.LocalFreeList.push_back(GenericFreePtr);
+					// If local free list is full, free all of them at once
+					if (mPendingFreeLists.LocalFreeList.size() == mPendingFreeLists.LocalFreeList.max_size())
 					{
-						/**
-						 * Free local free list, a local pointer is either from bin or heap
-						 */
-						auto LastLocalPtr = mPendingFressLists.LocalFreeList.back();
-						if (auto alignment = FSmallBinnedBlockHead::IsSmallAlloc(LastLocalPtr);
-							alignment != 0)
+						while (mPendingFreeLists.LocalFreeList.size())
 						{
-							FreeSmallBinned(LastLocalPtr, alignment);
+							/**
+							 * Free local free list, any local pointer must be either from small bin allocator or heap allocator
+							 */
+							auto LastLocalPtr = mPendingFreeLists.LocalFreeList.back();
+							if (auto alignment = FSmallBinnedBlockHead::IsSmallAlloc(LastLocalPtr);
+								alignment != 0)
+							{
+								FreeSmallBinned(LastLocalPtr, alignment);
+							}
+							else
+							{
+								FreeHeap(LastLocalPtr);
+							}
+							mPendingFreeLists.LocalFreeList.pop_back();
 						}
-						else
-						{
-							FreeHeap(LastLocalPtr);
-						}
-						mPendingFressLists.LocalFreeList.pop_back();
 					}
 				}
-				mPendingFressLists.LocalFreeList.push_back(LastGenericPtr);
-			}
-			else
-			{
-				if (mPendingFressLists.NonLocalFreeList.size() == mPendingFressLists.NonLocalFreeList.max_size())
+				else
 				{
-					while (mPendingFressLists.NonLocalFreeList.size())
+					mPendingFreeLists.NonLocalFreeList.push_back(GenericFreePtr);
+					if (mPendingFreeLists.NonLocalFreeList.size() == mPendingFreeLists.NonLocalFreeList.max_size())
 					{
-						auto LastNonLocalPtr = mPendingFressLists.NonLocalFreeList.back();
-						sNonLocalPendingFreeList.Push<false>({ .ptrToBeFree = LastNonLocalPtr, .ArenaNotOwned = this });
-						mPendingFressLists.NonLocalFreeList.pop_back();
+						while (mPendingFreeLists.NonLocalFreeList.size())
+						{
+							auto LastNonLocalPtr = mPendingFreeLists.NonLocalFreeList.back();
+							sNonLocalPendingFreeList.Push<false>(
+								{ .ptrToBeFree = LastNonLocalPtr, .ArenaNotOwned = this });
+							mPendingFreeLists.NonLocalFreeList.pop_back();
+						}
 					}
 				}
-				mPendingFressLists.NonLocalFreeList.push_back(LastGenericPtr);
 			}
-			mPendingFressLists.GenericFreeList.pop_back();
+			mPendingFreeLists.GenericFreeList.pop_back();
 		}
 	}
-	mPendingFressLists.GenericFreeList.push_back(p);
 
 	/**
 	 * Try to pop from local pending free list to pending local free list
 	 */
-	while (mPendingFressLists.LocalFreeList.size() < mPendingFressLists.LocalFreeList.max_size())
+	if (!mLocalPendingFreeList.Empty())
 	{
-		FLocalPendingFree PendingFree;
-		if (mLocalPendingFreeList.PopFront<true>(PendingFree))
+		while (mPendingFreeLists.LocalFreeList.size() < mPendingFreeLists.LocalFreeList.max_size())
 		{
-			mPendingFressLists.LocalFreeList.push_back(PendingFree.ptrToBeFree);
+			FLocalPendingFree PendingFree;
+			if (mLocalPendingFreeList.PopFront<true>(PendingFree))
+			{
+				mPendingFreeLists.LocalFreeList.push_back(PendingFree.ptrToBeFree);
+			}
+			else
+			{
+				break;
+			}
 		}
-		else
+
+		// If local free list is full, free all of them at once (same as above)
+		if (mPendingFreeLists.LocalFreeList.size() == mPendingFreeLists.LocalFreeList.max_size())
 		{
-			break;
+			while (mPendingFreeLists.LocalFreeList.size())
+			{
+				/**
+				 * Free local free list, any local pointer must be either from small bin allocator or heap allocator
+				 */
+				auto LastLocalPtr = mPendingFreeLists.LocalFreeList.back();
+				if (auto alignment = FSmallBinnedBlockHead::IsSmallAlloc(LastLocalPtr);
+					alignment != 0)
+				{
+					FreeSmallBinned(LastLocalPtr, alignment);
+				}
+				else
+				{
+					FreeHeap(LastLocalPtr);
+				}
+				mPendingFreeLists.LocalFreeList.pop_back();
+			}
 		}
 	}
 }
 
 void* FVMArena::MallocHeap(size_t size)
 {
-	HLVM_CONSTEXPR_ASSERT(bValidate, size > HLVM_VMA_SMALL_ALLOC_THRESHOLD);
+	HLVM_CONSTEXPR_ASSERT(bValidate, size > HLVM_VMA_SMALL_BINNED_ALLOC_THRESHOLD);
 
 	auto Heap = mHeapChainHead;
 	while (Heap)
 	{
 		// Try to allocate from the current managed heaps
 		auto& HeapMallocator = Heap->HeapAllocator;
+		// If the heap is managed (i.e. not some super large block just to compensate as a wrapper of sys malloc but some block within our control),
+		// and the heap has enough free space to hold the allocation,
+		// try to allocate from it
 		if (HeapMallocator.Managed() && HeapMallocator.GetFreeBlockSizeUpperBound() >= size)
 		{
 			auto p = HeapMallocator.Malloc(size);
+			// Assert that the allocation is not null
 			HLVM_CONSTEXPR_ASSERT(bValidate, p != nullptr);
 			return p;
 		}
-		if (!Heap->Next)
+		// Or try next heap
+		else
 		{
-			break;
+			if (Heap->Next)
+			{
+				Heap = Heap->Next;
+			}
+			// If we reach the end of the heap chain, we need to allocate a new heap
+			else
+			{
+				break;
+			}
 		}
-		Heap = Heap->Next;
 	}
 
-	// Allocate new heap space for this allocation since we don't have an available heap
 	HLVM_CONSTEXPR_ASSERT(bValidate, Heap->Next == nullptr);
-	Heap->Next = std::construct_at(R_C(FVMHeapChain*, mOSPageMallocator.MallocSmall(sizeof(FVMHeapChain))));
-	auto& HeapMallocator = Heap->Next->HeapAllocator;
-	/**
-	 * Initialize heap with the size of the allocation
-	 */
-	if (auto estiamtedSize = FVMHeap::EstimateHeapCapacityBySize(size);
-		estiamtedSize <= HLVM_VMA_LARGE_HEAP_SIZE)
+	// Allocate new heap space since we don't have an available heap
+	auto  NewHeap = std::construct_at(R_C(FVMHeapChain*, mOSPageMallocator.MallocSmall(sizeof(FVMHeapChain))));
+	auto& HeapMallocator = NewHeap->HeapAllocator;
 	{
-		HeapMallocator.Init(this, HLVM_VMA_LARGE_HEAP_SIZE);
-		StreamPrintf(&std::cout, "VMArena::MallocHeap : heap managed %s\n", estiamtedSize);
+		/**
+		 * Initialize heap based on size of the allocation
+		 */
+		if (auto estiamtedCapacity = FVMHeap::EstimateHeapCapacityBySize(size);
+			estiamtedCapacity <= HLVM_VMA_OSPAGE_LARGE_HEAP_SIZE)
+		{
+			HeapMallocator.Init(this, HLVM_VMA_OSPAGE_LARGE_HEAP_SIZE);
+			StreamPrintf(&std::cout, "VMArena::MallocHeap : heap managed %s\n", estiamtedCapacity);
+		}
+		else
+		{
+			// Init heap with unmanged setting if the size is too large
+			HeapMallocator.Init(this, size, true);
+			StreamPrintf(&std::cout, "VMArena::MallocHeap : heap unmanaged %s\n", size);
+		}
+		HLVM_CONSTEXPR_ASSERT(bValidate, HeapMallocator.GetHeapSize() >= size);
 	}
-	else
-	{
-		// Init heap with unmanged setting if the size is too large
-		HeapMallocator.Init(this, size, true);
-		StreamPrintf(&std::cout, "VMArena::MallocHeap : heap unmanaged %s\n", size);
-	}
-	HLVM_CONSTEXPR_ASSERT(bValidate, HeapMallocator.GetHeapSize() >= size);
 	auto p = HeapMallocator.Malloc(size);
 	HLVM_CONSTEXPR_ASSERT(bValidate, p != nullptr);
+	Heap->Next = NewHeap;
 	return p;
 }
 
@@ -283,7 +333,7 @@ void FVMArena::FreeHeap(void* p)
 {
 	// Use 32MB mask to find head pointer of 32MB page which holds some pointers that point to allocator
 #if 1
-	auto	 HeapHeadBlock = R_C(FVMHeap::FHeapHeadBlock*, AlignDown(p, HLVM_VMA_LARGE_HEAP_SIZE));
+	auto	 HeapHeadBlock = R_C(FVMHeap::FHeapHeadBlock*, AlignDown(p, HLVM_VMA_OSPAGE_LARGE_HEAP_SIZE));
 	FVMHeap* OwnerHeap = HeapHeadBlock->OwnerHeap;
 	if constexpr (bValidate)
 	{
@@ -328,22 +378,22 @@ void FVMArena::FreeHeap(void* p)
 
 void* FVMArena::MallocSmallBinned(size_t _size)
 {
-	HLVM_CONSTEXPR_ASSERT(bValidate, _size <= HLVM_VMA_SMALL_ALLOC_THRESHOLD);
+	HLVM_CONSTEXPR_ASSERT(bValidate, _size <= HLVM_VMA_SMALL_BINNED_ALLOC_THRESHOLD);
 	TUINT8 size = FSmallBinnedBlockHead::GoodSize(_size);
-	auto   p = mSmallBinnedMallocators[size / HLVM_VMA_SMALL_ALLOC_ALIGNMENT - 1]->Malloc();
+	auto   p = mSmallBinnedMallocators[size / HLVM_VMA_SMALL_BINNED_ALLOC_ALIGNMENT - 1]->Malloc();
 	HLVM_CONSTEXPR_ASSERT(bValidate, p != nullptr);
 	return p;
 }
 
 void FVMArena::FreeSmallBinned(void* p, TUINT8 size)
 {
-	HLVM_CONSTEXPR_ASSERT(bValidate, size <= HLVM_VMA_SMALL_ALLOC_THRESHOLD);
-	mSmallBinnedMallocators[size / HLVM_VMA_SMALL_ALLOC_ALIGNMENT - 1]->Free(p);
+	HLVM_CONSTEXPR_ASSERT(bValidate, size <= HLVM_VMA_SMALL_BINNED_ALLOC_THRESHOLD);
+	mSmallBinnedMallocators[size / HLVM_VMA_SMALL_BINNED_ALLOC_ALIGNMENT - 1]->Free(p);
 }
 
 void* FVMArena::MallocOSPage(size_t N)
 {
-	const bool bValid = N <= HLVM_VMA_LARGE_HEAP_SIZE;
+	const bool bValid = N <= HLVM_VMA_OSPAGE_LARGE_HEAP_SIZE;
 	HLVM_CONSTEXPR_ASSERT(bValidate, bValid);
 	return mOSPageMallocator.MallocLargeHeap();
 }

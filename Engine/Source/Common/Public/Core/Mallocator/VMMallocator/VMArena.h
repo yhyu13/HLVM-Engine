@@ -64,14 +64,14 @@ private:
 					sNonLocalPendingFreeList;
 	HLVM_STATIC_VAR TSmallVector64<FVMArena*, TPMRLowLvl<FVMArena*>> sGlobalArenaList;
 
-	struct FLocalPendingFree
-	{
-		void* ptrToBeFree;
-	};
 	/**
 	 * Local pending free list pumped by global free list
 	 * These free pointers come from global free list finding a corresponding local free list
 	 */
+	struct FLocalPendingFree
+	{
+		void* ptrToBeFree;
+	};
 	TConcurrentQueue<FLocalPendingFree,
 		EConcurrentQueueMode::Spsc, false,
 		TPMRLowLvl<TConcurrentQueueNode<FLocalPendingFree>>>
@@ -90,11 +90,11 @@ private:
 	static_assert(sizeof(FPendingFreeLists) >= sizeof(void*) * HLVM_VMA_GENERIC_PENDING_FREE_LIST_SIZE
 				+ sizeof(void*) * HLVM_VMA_LOCAL_PENDING_FREE_LIST_SIZE
 				+ sizeof(void*) * HLVM_VMA_NONLOCAL_PENDING_FREE_LIST_SIZE,
-		"Pending free list size is too small, potential heap allocation instead of stack allocation");
-	FPendingFreeLists mPendingFressLists{};
+		"Pending free list size is too small, will trigger static vector's heap allocation instead of stack allocation");
+	FPendingFreeLists mPendingFreeLists{};
 
 	// Small binned allocator
-	ISmallBinnedMallocator* mSmallBinnedMallocators[HLVM_VMA_SMALL_ALLOC_THRESHOLD / HLVM_VMA_SMALL_ALLOC_ALIGNMENT];
+	ISmallBinnedMallocator* mSmallBinnedMallocators[hlvm_vma_small_binned_alloc_num];
 	// OS page allocator
 	FOSPageMallocator mOSPageMallocator{};
 
