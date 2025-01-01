@@ -20,7 +20,8 @@ vcpkg_cxt = VcpkgContenxt(vcpkg_root_path='../Dependency/vcpkg',
                                                                          default_features=True),
                                                             "sol2",
                                                             "pybind11",
-                                                            "taskflow"
+                                                            "taskflow",
+                                                            "glfw3"
                                                         ]))
 
 # Find the spdlog package with the specified options
@@ -105,12 +106,20 @@ sol2 = FindPackage(name='sol2',
                    dependant_target_link_libs=[
                        DomainValueModel(domain=DomainEnum.PUBLIC, values=['sol2'])])
 
-# Find the sol2 package with the specified options
+# Find the taskflow package with the specified options
 taskflow = FindPackage(name='Taskflow',
                    config=True,
                    required=True,
                    dependant_target_link_libs=[
                        DomainValueModel(domain=DomainEnum.PUBLIC, values=['Taskflow::Taskflow'])])
+
+# Find the glfw package with the specified options
+glfw3 = FindPackage(name='glfw3',
+                       config=True,
+                       required=True,
+                       dependant_target_link_libs=[
+                           DomainValueModel(domain=DomainEnum.PUBLIC, values=['glfw'])])
+
 
 ##########################################################
 
@@ -191,7 +200,8 @@ class CommonModule(BaseModule):
                                         minitrace,
                                         luajit,
                                         sol2,
-                                        taskflow
+                                        taskflow,
+                                        glfw3,
                                         ]
                          )
         self.target_interface.add_compile_options(domain=DomainEnum.PUBLIC, values=[
