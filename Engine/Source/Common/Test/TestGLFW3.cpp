@@ -118,6 +118,7 @@ RECORD(glfw_thread_test)
 		}
 	}
 
+	FTimer timer;
 	while (running)
 	{
 		glfwWaitEvents();
@@ -126,6 +127,14 @@ RECORD(glfw_thread_test)
 		{
 			if (glfwWindowShouldClose(threads[i].window))
 				running = GLFW_FALSE;
+		}
+
+		if (running && timer.MarkSec() > 10)
+		{
+			for (i = 0; i < count; i++)
+			{
+				glfwSetWindowShouldClose(threads[i].window, GLFW_TRUE);
+			}
 		}
 	}
 
