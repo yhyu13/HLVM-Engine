@@ -163,20 +163,30 @@ struct FThreadAffinityMode3
 
 namespace hlvm_private
 {
-	HLVM_INLINE_VAR FThreadAffinityMode2 AllPhysicalCores{
+	HLVM_INLINE_VAR FThreadAffinityMode2 NormalAllPhysicalCores{
 		.Priority = EThreadPriority::Normal,
 		.NumThreads = S_C(TUINT32, std::thread::hardware_concurrency() / HLVM_PLATFORM_SIMT_MULTIPLIER),
 		.TargetedCores = FCoreDescription::NPhysicalCores(std::thread::hardware_concurrency() / HLVM_PLATFORM_SIMT_MULTIPLIER)
 	};
-	HLVM_INLINE_VAR FThreadAffinityMode2 BgTwoPhysicalCores{
+	HLVM_INLINE_VAR FThreadAffinityMode2 NormalAllLogicalCores{
+		.Priority = EThreadPriority::Normal,
+		.NumThreads = S_C(TUINT32, std::thread::hardware_concurrency()),
+		.TargetedCores = FCoreDescription::NLogicalCores(std::thread::hardware_concurrency())
+	};
+	HLVM_INLINE_VAR FThreadAffinityMode2 Bg2PhysicalCores{
 		.Priority = EThreadPriority::Low,
 		.NumThreads = 2u,
 		.TargetedCores = FCoreDescription::NPhysicalCores(2u)
 	};
-	HLVM_INLINE_VAR FThreadAffinityMode2 AllLogicalCores{
-		.Priority = EThreadPriority::Normal,
-		.NumThreads = S_C(TUINT32, std::thread::hardware_concurrency()),
-		.TargetedCores = FCoreDescription::NLogicalCores(std::thread::hardware_concurrency())
+	HLVM_INLINE_VAR FThreadAffinityMode2 Bg4PhysicalCores{
+		.Priority = EThreadPriority::Low,
+		.NumThreads = 4u,
+		.TargetedCores = FCoreDescription::NPhysicalCores(4u)
+	};
+	HLVM_INLINE_VAR FThreadAffinityMode2 Bg8PhysicalCores{
+		.Priority = EThreadPriority::Low,
+		.NumThreads = 8u,
+		.TargetedCores = FCoreDescription::NPhysicalCores(8u)
 	};
 } // namespace hlvm_private
 
@@ -267,18 +277,28 @@ public:
 	}
 
 public:
-	HLVM_STATIC_VAR FThreadAffinityMode AllPhysicalCores()
+	HLVM_STATIC_VAR FThreadAffinityMode NormalAllPhysicalCores()
 	{
-		return FThreadAffinityMode{ hlvm_private::AllPhysicalCores };
+		return FThreadAffinityMode{ hlvm_private::NormalAllPhysicalCores };
 	}
 
-	HLVM_INLINE_VAR HLVM_STATIC_VAR FThreadAffinityMode BgTwoPhysicalCores()
+	HLVM_INLINE_VAR HLVM_STATIC_VAR FThreadAffinityMode NormalAllLogicalCores()
 	{
-		return FThreadAffinityMode{ hlvm_private::BgTwoPhysicalCores };
+		return FThreadAffinityMode{ hlvm_private::NormalAllLogicalCores };
 	}
 
-	HLVM_INLINE_VAR HLVM_STATIC_VAR FThreadAffinityMode AllLogicalCores()
+	HLVM_INLINE_VAR HLVM_STATIC_VAR FThreadAffinityMode Bg2PhysicalCores()
 	{
-		return FThreadAffinityMode{ hlvm_private::AllLogicalCores };
+		return FThreadAffinityMode{ hlvm_private::Bg2PhysicalCores };
+	}
+
+	HLVM_INLINE_VAR HLVM_STATIC_VAR FThreadAffinityMode Bg4PhysicalCores()
+	{
+		return FThreadAffinityMode{ hlvm_private::Bg4PhysicalCores };
+	}
+
+	HLVM_INLINE_VAR HLVM_STATIC_VAR FThreadAffinityMode Bg8PhysicalCores()
+	{
+		return FThreadAffinityMode{ hlvm_private::Bg8PhysicalCores };
 	}
 };

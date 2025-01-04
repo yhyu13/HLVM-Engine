@@ -12,7 +12,7 @@ class FWorkStealThreadPool
 {
 public:
 	NOCOPYMOVE(FWorkStealThreadPool)
-	explicit FWorkStealThreadPool(const FThreadAffinityMode& AffinityMode = FThreadAffinityMode::BgTwoPhysicalCores());
+	explicit FWorkStealThreadPool(const FThreadAffinityMode& AffinityMode = FThreadAffinityMode::NormalAllPhysicalCores());
 	~FWorkStealThreadPool();
 
 	static FWorkStealThreadPool* Get();
@@ -29,8 +29,9 @@ public:
 		using TaskRetType = std::invoke_result_t<F, Args...>;
 		using TaskType = std::packaged_task<TaskRetType()>;
 
-		auto	   task = new TaskType(std::bind(std::forward<F>(f), std::forward<Args>(args)...));
-		auto	   result = task->get_future();
+		auto task = new TaskType(std::bind(std::forward<F>(f), std::forward<Args>(args)...));
+		auto result = task->get_future();
+		// Since "task" is a pointer type, it is fine to just copy it to the lambda
 		auto	   work = [task]() { (*task)(); delete task; };
 		const auto index = (mJobIndex.fetch_add(1, std::memory_order_relaxed) % mCount);
 		mQueues[index]->Push(Priority, MoveTemp(work));

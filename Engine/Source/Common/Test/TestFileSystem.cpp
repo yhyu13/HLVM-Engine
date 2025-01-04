@@ -40,7 +40,7 @@ RECORD(boostfile_test, true, 1, 1)
 	{
 		FBoostStreamFileHandle fileHandle;
 		FFileOptions		   Options{ .eFileMode = EFileMode::RW, .eFileMapped = EFileMapped::NoMapped, .eFileLock = EFileLock::FullLock };
-		TCharArrayStr<4>	   Buffer;
+		TCharArray<4>		   Buffer;
 		fileHandle.Open(TXT("./test.txt"), Options)
 			.Write("test", 4, { .bEraseSeekPos = true })
 			.Read(Buffer.data(), Buffer.Capacity, { .bEraseSeekPos = true })
@@ -52,7 +52,7 @@ RECORD(boostfile_test, true, 1, 1)
 	{
 		FBoostMapFileHandle fileHandle;
 		FFileOptions		Options{ .eFileMode = EFileMode::RW, .eFileMapped = EFileMapped::Mapped, .eFileLock = EFileLock::FullLock };
-		TCharArrayStr<4>	Buffer;
+		TCharArray<4>		Buffer;
 		fileHandle.Open(TXT("./test_mapped.txt"), Options)
 			.Write("test", 4, { .bEraseSeekPos = true })
 			.Read(Buffer.data(), Buffer.Capacity, { .bEraseSeekPos = true })
@@ -143,7 +143,7 @@ RECORD(packed_test)
 #if TEST_FIBER_POOL
 				FWorkStealFiberPool::Get()->EnqueueTask(
 #else
-				FAsync::Launch(EAsyncMode::Thread,
+				FAsync::Launch(EAsyncMode::StandAlone,
 #endif
 					[&]() {
 						for (size_t i = 0; i < PackedData.size(); ++i)
@@ -213,7 +213,7 @@ RECORD(packed_test)
 #if TEST_FIBER_POOL
 			FWorkStealFiberPool::Get()->EnqueueTask(
 #else
-			FAsync::Launch(EAsyncMode::Thread,
+			FAsync::Launch(EAsyncMode::StandAlone,
 #endif
 										  [&]() {
 											  HLVM_LOG(LogTest, info, TXT("Test PackedFileHandle read token file: {}"), *PackedTokFile);

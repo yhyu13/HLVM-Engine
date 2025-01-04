@@ -38,7 +38,7 @@ class FWorkStealFiberPool
 {
 public:
 	NOCOPYMOVE(FWorkStealFiberPool)
-	explicit FWorkStealFiberPool(const FThreadAffinityMode& AffinityMode = AllPhysicalCores);
+	explicit FWorkStealFiberPool(const FThreadAffinityMode& AffinityMode = NormalAllPhysicalCores);
 	~FWorkStealFiberPool();
 
 	static FWorkStealFiberPool* Get();

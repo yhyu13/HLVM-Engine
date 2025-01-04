@@ -104,7 +104,7 @@ public:
 		// Amount of peers that will receive this message.
 		TUINT16 Receivers;
 
-		TCharArrayStr<63> Name;
+		TCharArray<63> Name;
 	};
 
 public:

@@ -11,21 +11,32 @@
 #include <future>
 
 HLVM_ENUM(EAsyncMode, TUINT8,
-	ThreadPool, // Add to default work steal thread pool
-	Thread		// Startup a new thread
+	PoolOrderless, // Add to default work steal thread pool (task order not guaranteed! So make sure tasks are not order dependent when launching)
+	PoolOrdered,
+	StandAlone // Startup a new thread
 );
 
 class FAsync
 {
 public:
+	/**
+	 * Launch a task
+	 * @tparam F
+	 * @tparam Args
+	 * @param mode If using pool, task will be launched in a thread from the default work steal thread pool, otherwise a new thread will be created.
+				   WARNING: If using pool, task launching order is not guaranteed! So make sure task indexing passed in is copy on value!
+	 * @param f
+	 * @param args
+	 * @return
+	 */
 	template <typename F, typename... Args>
 	HLVM_NODISCARD HLVM_STATIC_FUNC auto Launch(EAsyncMode mode, F&& f, Args&&... args)
 	{
-		if (mode == EAsyncMode::ThreadPool)
+		if (mode == EAsyncMode::PoolOrderless)
 		{
 			return FWorkStealThreadPool::Get()->EnqueueTask(FwdTemp<F>(f), FwdTemp<Args>(args)...);
 		}
-		else // Thread
+		else // Standalone Thread
 		{
 			using TaskRetType = std::invoke_result_t<F, Args...>;
 			using TaskType = std::packaged_task<TaskRetType()>;

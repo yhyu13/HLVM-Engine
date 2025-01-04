@@ -20,6 +20,8 @@ DECLARE_LOG_CATEGORY(LogTest)
 
 #define GLAD_GL_IMPLEMENTATION
 #include "TestGLFW3_Data/deps/glad/gl.h"
+#include "Core/Parallel/Async/Async.h"
+
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 
@@ -48,30 +50,38 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
 		glfwSetWindowShouldClose(window, GLFW_TRUE);
 }
 
+static auto lock = FAtomicFlag();
+
 static int thread_main(void* data)
 {
 	const Thread* thread = reinterpret_cast<const Thread*>(data);
 
-	glfwMakeContextCurrent(thread->window);
-	glfwSwapInterval(1);
+	{
+		// ATOMIC_LOCK_GUARD(lock);
+		glfwMakeContextCurrent(thread->window);
+		glfwSwapInterval(1);
+	}
 
 	while (running)
 	{
+		// ATOMIC_LOCK_GUARD(lock);
 		const float v = static_cast<float>(fabs(sin(glfwGetTime() * 2.)));
 		glClearColor(thread->r * v, thread->g * v, thread->b * v, 0.f);
 
 		glClear(GL_COLOR_BUFFER_BIT);
 		glfwSwapBuffers(thread->window);
 	}
-
-	glfwMakeContextCurrent(NULL);
+	{
+		// ATOMIC_LOCK_GUARD(lock);
+		glfwMakeContextCurrent(NULL);
+	}
 	return 0;
 }
 
 /*
 	<test method>
 */
-RECORD(glfw_thread_test)
+RECORD_BOOL(glfw_thread_test)
 {
 	int	   i, result;
 	Thread threads[] = {
@@ -84,7 +94,7 @@ RECORD(glfw_thread_test)
 	glfwSetErrorCallback(error_callback);
 
 	if (!glfwInit())
-		exit(EXIT_FAILURE);
+		return false;
 
 	for (i = 0; i < count; i++)
 	{
@@ -97,7 +107,7 @@ RECORD(glfw_thread_test)
 		if (!threads[i].window)
 		{
 			glfwTerminate();
-			exit(EXIT_FAILURE);
+			return false;
 		}
 
 		glfwSetKeyCallback(threads[i].window, key_callback);
@@ -107,21 +117,28 @@ RECORD(glfw_thread_test)
 	gladLoadGL(glfwGetProcAddress);
 	glfwMakeContextCurrent(NULL);
 
+	std::vector<std::future<void>> jobs;
 	for (i = 0; i < count; i++)
 	{
-		if (thrd_create(&threads[i].id, thread_main, threads + i) != thrd_success)
-		{
-			fprintf(stderr, "Failed to create secondary thread\n");
+		//		if (thrd_create(&threads[i].id, thread_main, threads + i) != thrd_success)
+		//		{
+		//			fprintf(stderr, "Failed to create secondary thread\n");
+		//
+		//			glfwTerminate();
+		//			return false;
+		//		}
 
-			glfwTerminate();
-			exit(EXIT_FAILURE);
-		}
+		jobs.emplace_back(FAsync::Launch(EAsyncMode::PoolOrderless,
+			[i, &threads]() {
+				thread_main(threads + i);
+			}));
 	}
 
 	FTimer timer;
 	while (running)
 	{
-		glfwWaitEvents();
+		// glfwWaitEvents(); // YuHang : Blocking, so not used here
+		glfwPollEvents();
 
 		for (i = 0; i < count; i++)
 		{
@@ -129,7 +146,7 @@ RECORD(glfw_thread_test)
 				running = GLFW_FALSE;
 		}
 
-		if (running && timer.MarkSec() > 10)
+		if (running && timer.MarkSec() > 5)
 		{
 			for (i = 0; i < count; i++)
 			{
@@ -141,7 +158,14 @@ RECORD(glfw_thread_test)
 	for (i = 0; i < count; i++)
 		glfwHideWindow(threads[i].window);
 
-	for (i = 0; i < count; i++)
-		thrd_join(threads[i].id, &result);
+	//	for (i = 0; i < count; i++)
+	//		thrd_join(threads[i].id, &result);
+
+	for (auto& job : jobs)
+	{
+		job.wait();
+	}
+
+	return true;
 };
 #pragma clang diagnostic pop

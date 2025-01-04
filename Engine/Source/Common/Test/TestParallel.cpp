@@ -463,7 +463,7 @@ RECORD(pool_test, true)
 			std::atomic_int_fast32_t	   Counter{ kNumThreads };
 			std::vector<std::future<void>> PushThreads;
 			std::vector<std::future<void>> PopThreads;
-			FWorkStealThreadPool		   Pool{ FThreadAffinityMode::BgTwoPhysicalCores() };
+			FWorkStealThreadPool		   Pool{ FThreadAffinityMode::Bg2PhysicalCores() };
 
 			for (int i = 0; i < kNumThreads; ++i)
 			{
@@ -516,7 +516,7 @@ RECORD(pool_test, true)
 			std::atomic_int_fast32_t				 Counter{ kNumThreads };
 			std::vector<boost::fibers::future<void>> PushThreads;
 			std::vector<boost::fibers::future<void>> PopThreads;
-			FWorkStealFiberPool						 Pool{ FThreadAffinityMode::BgTwoPhysicalCores() };
+			FWorkStealFiberPool						 Pool{ FThreadAffinityMode::Bg2PhysicalCores() };
 
 			for (int i = 0; i < kNumThreads; ++i)
 			{

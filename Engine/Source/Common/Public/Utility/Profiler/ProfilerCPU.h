@@ -51,7 +51,7 @@ public:
 		/**
 		 * Name of the event with finite size
 		 */
-		TCharArrayStr<23> Name;
+		TCharArray<23> Name;
 	});
 
 	/**
@@ -92,8 +92,9 @@ public:
 	public:
 		/**
 		 * Extracts all events from the buffer and clears the buffer.
-		 * Note, this method is not thread safe in theory, but since the internally event buffer does not extra memory allocation besides when intialized,
-		 * which makes this method is thread memory safe. And since we don't care about data race, we can just ignore the thread safety after all.
+		 * Note, this method is not thread safe in theory,
+		 * but since we don't care about data race,
+		 * we can just ignore the thread safety after all.
 		 * @return The events.
 		 */
 		TVector<FTrackedEvent> ExtractEvents();

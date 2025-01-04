@@ -101,8 +101,8 @@ public:
 };
 
 /**
- * FStdStringView is just a wrapper around a already allocated std::string whose sole purpose is to
- * be used as a const TCHAR* later, and thus avoid copying into FString.
+ * FStdString is just a wrapper around a already allocated std::string
+ * with our custom string api in addition
  */
 class FStdString final : public std::basic_string<char>
 {
@@ -138,13 +138,13 @@ public:
 };
 
 template <size_t N, typename CHAR = TCHAR>
-PACK(class TCharArrayStr {
+PACK(class TCharArray {
 public:
 	static constexpr size_t Capacity{ N };
 
-	TCharArrayStr() = default;
+	TCharArray() = default;
 
-	TCharArrayStr& operator=(const CHAR* input)
+	TCharArray& operator=(const CHAR* input)
 	{
 		if (input)
 		{
