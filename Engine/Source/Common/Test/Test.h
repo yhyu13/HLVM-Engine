@@ -206,7 +206,7 @@ inline double RunTestAndCalculateAvg(const TestFuncType& func, uint32_t num_iter
 int main(int ac, char* av[])
 {
 	{
-		GExecutableName = boost::filesystem::path(TO_CHAR_STR(av[0])).filename().c_str();
+		GExecutableName = boost::filesystem::path(TO_CHAR_CSTR(av[0])).filename().c_str();
 		GExecutablePath = boost::filesystem::current_path();
 	}
 	{

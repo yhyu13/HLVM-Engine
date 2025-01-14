@@ -7,7 +7,7 @@
 
 FBoostFileStat::FBoostFileStat(const FPath& Path)
 {
-	mFs = boost::filesystem::status(Path.ToCharStr());
+	mFs = boost::filesystem::status(Path.ToCharCStr());
 }
 
 bool FBoostFileStat::IsDirectory() const

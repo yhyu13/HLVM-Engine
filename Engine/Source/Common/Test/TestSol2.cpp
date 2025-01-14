@@ -638,51 +638,51 @@ RECORD(sol2_hlvm_refcount_test)
 		FNameCtr{};
 	lua.new_usertype<FName>("FName",
 		FNameCtr,
-		"NumRef",
-		&FName::NumRef,
-		"ToCharStr",
-		&FName::ToCharStr);
+		"RefCount",
+		&FName::RefCount,
+		"ToCharCStr",
+		&FName::ToCharCStr);
 
 	FName name("test");
-	HLVM_ENSURE(name.NumRef() == 1, TXT("name should have 1 reference"));
+	HLVM_ENSURE(name.RefCount() == 1, TXT("name should have 1 reference"));
 
 	// Lua Only store rc-obj as a raw pointer, so rc remain 1
 	lua["name0"] = &(name);
 	lua.script(R"(
-        assert(name0:NumRef() == 1)
-        print(name0:NumRef())
+        assert(name0:RefCount() == 1)
+        print(name0:RefCount())
     )");
 
 	// Lua Store a copy of rc-obj, so rc increase to 2 because now lua_state owns it too
 	lua["name"] = CopyTemp(name);
 	lua.script(R"(
-        assert(name:NumRef() == 2)
-        print(name:NumRef())
+        assert(name:RefCount() == 2)
+        print(name:RefCount())
     )");
 
 	// Lua Store a second copy of rc-obj, so rc increase to 3 because now lua_state owns it too
 	lua["name2"] = CopyTemp(name);
 	lua.script(R"(
-        assert(name2:NumRef() == 3)
-        print(name2:NumRef())
+        assert(name2:RefCount() == 3)
+        print(name2:RefCount())
     )");
 
 	// cpp create a third copy of rc-obj, so rc increase to 4 because now cpp owns it too
 	FName name2 = CopyTemp(name);
 	lua.script(R"(
-        assert(name:NumRef() == 4)
-        print(name:NumRef())
+        assert(name:RefCount() == 4)
+        print(name:RefCount())
     )");
 	lua.script(R"(
-        assert(name2:NumRef() == 4)
-        print(name2:NumRef())
+        assert(name2:RefCount() == 4)
+        print(name2:RefCount())
     )");
 
 	// lua create a new rc-obj which should has rc 1
 	lua.script(R"(
         local name3 = FName.new("test2")
-        assert(name3:NumRef() == 1)
-        print(name3:NumRef())
+        assert(name3:RefCount() == 1)
+        print(name3:RefCount())
     )");
 }
 
@@ -733,11 +733,11 @@ RECORD(sol2_effil_test)
 				try
 				{
 					FScopedTimerLog timer(FString::Format(TXT("Test lua file: {}"), *LuaFile));
-					auto			Result = lua.safe_script_file(LuaFile.ToCharStr());
+					auto			Result = lua.safe_script_file(LuaFile.ToCharCStr());
 					if (!Result.valid())
 					{
 						sol::error err = Result;
-						HLVM_LOG(LogTest, err, TXT("Test lua file: {} failed: {}"), *LuaFile, TO_TCHAR_STR(err.what()));
+						HLVM_LOG(LogTest, err, TXT("Test lua file: {} failed: {}"), *LuaFile, TO_TCHAR_CSTR(err.what()));
 					}
 				}
 				catch (...)

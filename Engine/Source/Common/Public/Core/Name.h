@@ -75,20 +75,20 @@ public:
 		return FString{};
 	}
 
-	const char* ToCharStr() const
+	const char* ToCharCStr() const
 	{
 		if (mInternal.Valid())
 		{
-			return mInternal->Name.ToCharStr();
+			return mInternal->Name.ToCharCStr();
 		}
 		return "";
 	}
 
-	size_t NumRef() const
+	size_t RefCount() const
 	{
 		if (mInternal.Valid())
 		{
-			return mInternal->NumRef();
+			return mInternal->RefCount();
 		}
 		return 0;
 	}

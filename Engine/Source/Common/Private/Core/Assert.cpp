@@ -69,6 +69,6 @@ namespace hlvm_private
 		HLVM_TRY_DEBUG_BREAK();
 
 		// Use original GMallocator to copy stack allocated msg back to heap
-		throw std::runtime_error(TO_CHAR_STR(Expression));
+		throw std::runtime_error(TO_CHAR_CSTR(Expression));
 	}
 } // namespace hlvm_private

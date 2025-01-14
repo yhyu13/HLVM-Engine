@@ -56,5 +56,5 @@ HLVM_INLINE_FUNC void FSpdlogConsoleDevice::Sink(const FLogContext& Context, con
 	// Get the loggers
 	const auto& Logger = (S_C(int, Context.LogLevel) >= S_C(int, spdlog::level::warn)) ? ImmediateLogger : AsyncLogger;
 	// Log the message
-	Logger->log(Context.LogLevel, TO_CHAR_STR(Message.c_str()));
+	Logger->log(Context.LogLevel, TO_CHAR_CSTR(Message.c_str()));
 }

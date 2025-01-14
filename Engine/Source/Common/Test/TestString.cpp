@@ -127,15 +127,15 @@ RECORD(test_name, true)
 	HLVM_LOG(LogTest, trace, TXT("Test FName!"));
 	FName name("test");
 	{
-		HLVM_LOG(LogTest, info, TXT("name: {0}, ref {1}"), *name.ToString(), name.NumRef());
+		HLVM_LOG(LogTest, info, TXT("name: {0}, ref {1}"), *name.ToString(), name.RefCount());
 		for (int i = 0; i < 1000000; ++i)
 		{
 			FName name2 = name;
 			if (i % 100000 == 0)
 			{
-				HLVM_LOG(LogTest, info, TXT("name: {0}, ref {1}"), *name.ToString(), name.NumRef());
+				HLVM_LOG(LogTest, info, TXT("name: {0}, ref {1}"), *name.ToString(), name.RefCount());
 			}
 		}
-		HLVM_LOG(LogTest, info, TXT("name: {0}, ref {1}"), *name.ToString(), name.NumRef());
+		HLVM_LOG(LogTest, info, TXT("name: {0}, ref {1}"), *name.ToString(), name.RefCount());
 	}
 }

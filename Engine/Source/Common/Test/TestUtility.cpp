@@ -63,11 +63,11 @@ static bool test_hash_test()
 	std::string TextData = "Hello World";
 	{
 		FMD5Digest Digest = FMD5Hash::Hash(TextData.c_str(), TextData.length());
-		HLVM_LOG(LogTest, info, TXT("MD5 Hash digest for {0} is {1}"), TO_TCHAR_STR(TextData.c_str()), *Digest.ToString());
+		HLVM_LOG(LogTest, info, TXT("MD5 Hash digest for {0} is {1}"), TO_TCHAR_CSTR(TextData.c_str()), *Digest.ToString());
 	}
 	{
 		FSHA1Digest Digest = FSHA1Hash::Hash(TextData.c_str(), TextData.length());
-		HLVM_LOG(LogTest, info, TXT("SHA1 Hash digest for {0} is {1}"), TO_TCHAR_STR(TextData.c_str()), *Digest.ToString());
+		HLVM_LOG(LogTest, info, TXT("SHA1 Hash digest for {0} is {1}"), TO_TCHAR_CSTR(TextData.c_str()), *Digest.ToString());
 	}
 	return true;
 };

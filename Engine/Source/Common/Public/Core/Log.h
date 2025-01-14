@@ -198,7 +198,7 @@ private:
 				->Pump(FLogContext{                                                                    \
 						   .Category = &_Category,                                                     \
 						   .LogLevel = spdlog::level::_level,                                          \
-						   .FileName = TO_TCHAR_STR(&std::string_view(ct_strrchr(__FILE__, '/'))[1]),  \
+						   .FileName = TO_TCHAR_CSTR(&std::string_view(ct_strrchr(__FILE__, '/'))[1]),  \
 						   .Line = __LINE__ },                                                         \
 					fmt, ##__VA_ARGS__);                                                               \
 	}                                                                                                  \
@@ -213,7 +213,7 @@ private:
 					->Pump(FLogContext{                                                                   \
 							   .Category = &_Category,                                                    \
 							   .LogLevel = spdlog::level::_level,                                         \
-							   .FileName = TO_TCHAR_STR(&std::string_view(ct_strrchr(__FILE__, '/'))[1]), \
+							   .FileName = TO_TCHAR_CSTR(&std::string_view(ct_strrchr(__FILE__, '/'))[1]), \
 							   .Line = __LINE__ },                                                        \
 						fmt, ##__VA_ARGS__);                                                              \
 	}                                                                                                     \
@@ -227,7 +227,7 @@ private:
 				->Pump(FLogContext{                                                                                  \
 						   .Category = &_Category,                                                                   \
 						   .LogLevel = (static_cast<bool>(_COND)) ? spdlog::level::_level : spdlog::level::critical, \
-						   .FileName = TO_TCHAR_STR(&std::string_view(ct_strrchr(__FILE__, '/'))[1]),                \
+						   .FileName = TO_TCHAR_CSTR(&std::string_view(ct_strrchr(__FILE__, '/'))[1]),                \
 						   .Line = __LINE__ },                                                                       \
 					fmt, ##__VA_ARGS__);                                                                             \
 	}                                                                                                                \

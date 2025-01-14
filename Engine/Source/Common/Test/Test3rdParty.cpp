@@ -197,17 +197,17 @@ RECORD(phmap_test)
 		map["world"] = 2;
 		for (auto& [key, value] : map)
 		{
-			HLVM_LOG(LogTest, info, TXT("key: {} value: {}"), TO_TCHAR_STR(key.c_str()), value);
+			HLVM_LOG(LogTest, info, TXT("key: {} value: {}"), TO_TCHAR_CSTR(key.c_str()), value);
 		}
 		map.erase("hello");
 		for (auto& [key, value] : map)
 		{
-			HLVM_LOG(LogTest, info, TXT("key: {} value: {}"), TO_TCHAR_STR(key.c_str()), value);
+			HLVM_LOG(LogTest, info, TXT("key: {} value: {}"), TO_TCHAR_CSTR(key.c_str()), value);
 		}
 		map.clear();
 		for (auto& [key, value] : map)
 		{
-			HLVM_LOG(LogTest, info, TXT("key: {} value: {}"), TO_TCHAR_STR(key.c_str()), value);
+			HLVM_LOG(LogTest, info, TXT("key: {} value: {}"), TO_TCHAR_CSTR(key.c_str()), value);
 		}
 	}
 	{
@@ -216,17 +216,17 @@ RECORD(phmap_test)
 		map["world"] = 2;
 		for (auto& [key, value] : map)
 		{
-			HLVM_LOG(LogTest, info, TXT("key: {} value: {}"), TO_TCHAR_STR(key.c_str()), value);
+			HLVM_LOG(LogTest, info, TXT("key: {} value: {}"), TO_TCHAR_CSTR(key.c_str()), value);
 		}
 		map.erase("hello");
 		for (auto& [key, value] : map)
 		{
-			HLVM_LOG(LogTest, info, TXT("key: {} value: {}"), TO_TCHAR_STR(key.c_str()), value);
+			HLVM_LOG(LogTest, info, TXT("key: {} value: {}"), TO_TCHAR_CSTR(key.c_str()), value);
 		}
 		map.clear();
 		for (auto& [key, value] : map)
 		{
-			HLVM_LOG(LogTest, info, TXT("key: {} value: {}"), TO_TCHAR_STR(key.c_str()), value);
+			HLVM_LOG(LogTest, info, TXT("key: {} value: {}"), TO_TCHAR_CSTR(key.c_str()), value);
 		}
 	}
 	{
@@ -236,17 +236,17 @@ RECORD(phmap_test)
 			map["world"] = 2;
 			for (auto& [key, value] : map)
 			{
-				HLVM_LOG(LogTest, info, TXT("key: {} value: {}"), TO_TCHAR_STR(key.c_str()), value);
+				HLVM_LOG(LogTest, info, TXT("key: {} value: {}"), TO_TCHAR_CSTR(key.c_str()), value);
 			}
 			map.erase("hello");
 			for (auto& [key, value] : map)
 			{
-				HLVM_LOG(LogTest, info, TXT("key: {} value: {}"), TO_TCHAR_STR(key.c_str()), value);
+				HLVM_LOG(LogTest, info, TXT("key: {} value: {}"), TO_TCHAR_CSTR(key.c_str()), value);
 			}
 			map.clear();
 			for (auto& [key, value] : map)
 			{
-				HLVM_LOG(LogTest, info, TXT("key: {} value: {}"), TO_TCHAR_STR(key.c_str()), value);
+				HLVM_LOG(LogTest, info, TXT("key: {} value: {}"), TO_TCHAR_CSTR(key.c_str()), value);
 			}
 		}
 	}

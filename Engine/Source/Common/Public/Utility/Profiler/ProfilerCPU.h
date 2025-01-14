@@ -188,7 +188,7 @@ struct FScopeEventCPU
 
 	HLVM_INLINE_FUNC explicit FScopeEventCPU(const char* name)
 	{
-		Index = FProfilerCPU::BeginEvent(TO_TCHAR_STR(name));
+		Index = FProfilerCPU::BeginEvent(TO_TCHAR_CSTR(name));
 	}
 
 	HLVM_INLINE_FUNC explicit FScopeEventCPU(const TCHAR* name)

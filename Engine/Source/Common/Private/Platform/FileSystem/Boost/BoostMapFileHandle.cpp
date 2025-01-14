@@ -18,8 +18,8 @@ DECLARE_LOG_CATEGORY(LogBoostFileHandle)
 	if (mFileLock)                                                                  \
 	__lock_file = MoveTemp(boost::interprocess::sharable_lock<boost::interprocess::file_lock>(*mFileLock))
 
-#define BMFH_HANDLE_EXCPETIONS() HandleException(Status_InOut, TO_TCHAR_STR(__FUNCTION__), Exception)
-#define BMFH_HANDLE_EXCPETIONS2() HandleException2(Status_InOut, TO_TCHAR_STR(__FUNCTION__))
+#define BMFH_HANDLE_EXCPETIONS() HandleException(Status_InOut, TO_TCHAR_CSTR(__FUNCTION__), Exception)
+#define BMFH_HANDLE_EXCPETIONS2() HandleException2(Status_InOut, TO_TCHAR_CSTR(__FUNCTION__))
 
 #define BMFH_HANDLE_ASSERT(x, ...) HLVM_ASSERT(x, TXT("File {} : {}"), *mFilePath, FString::Format(__VA_ARGS__))
 #define BMFH_HANDLE_ENSURE(x, ...) HLVM_ENSURE(x, TXT("File {} : {}"), *mFilePath, FString::Format(__VA_ARGS__))
@@ -558,7 +558,7 @@ IFileHandle::OpRetType FBoostMapFileHandle::Truncate(size_t Size)
 		BMFH_SCOPE_LOCK();
 		{
 			boost::system::error_code ec;
-			boost::filesystem::resize_file(mFilePath.ToCharStr(), Size, ec);
+			boost::filesystem::resize_file(mFilePath.ToCharCStr(), Size, ec);
 			BMFH_HANDLE_ENSURE(!ec, TXT("File truncate failed"));
 		}
 
@@ -654,7 +654,7 @@ void FBoostMapFileHandle::MappedFileInit()
 {
 	BMFH_HANDLE_ASSERT(!mMappedFile.is_open(), TXT("MappedFile file already opened!"));
 	boost::iostreams::mapped_file_params params;
-	params.path = mFilePath.ToCharStr();
+	params.path = mFilePath.ToCharCStr();
 	params.flags = (mFileOptions.eFileMode & EFileMode::W) ? boost::iostreams::mapped_file::readwrite : boost::iostreams::mapped_file::readonly;
 	mMappedFile.open(params);
 	BMFH_HANDLE_ENSURE(mMappedFile.is_open(), TXT("MappedFile file open failed"));

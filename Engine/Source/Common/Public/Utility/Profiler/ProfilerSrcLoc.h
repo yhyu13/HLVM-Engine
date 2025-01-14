@@ -26,9 +26,9 @@ struct FProfilerSrcLoc
 	operator tracy::SourceLocationData()
 	{
 		return tracy::SourceLocationData{
-			.name = TO_CHAR_STR(Name),
-			.function = TO_CHAR_STR(Function),
-			.file = TO_CHAR_STR(File),
+			.name = TO_CHAR_CSTR(Name),
+			.function = TO_CHAR_CSTR(Function),
+			.file = TO_CHAR_CSTR(File),
 			.line = Line,
 			.color = 0
 		};

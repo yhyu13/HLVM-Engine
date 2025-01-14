@@ -15,4 +15,4 @@
 #define HLVM_ENUM_V(enum_class, enum_value) static_cast<std::underlying_type_t<enum_class>>(enum_class::enum_value)
 #define HLVM_ENUM_SIZE_T(enum_value) static_cast<size_t>((enum_value))
 
-#define HLVM_ENUM_TCHAR_STR(value) TO_TCHAR_STR(magic_enum::enum_name((value)).data())
+#define HLVM_ENUM_TCHAR_STR(value) TO_TCHAR_CSTR(magic_enum::enum_name((value)).data())

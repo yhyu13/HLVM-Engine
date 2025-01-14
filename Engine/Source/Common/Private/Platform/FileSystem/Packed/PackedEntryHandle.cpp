@@ -13,8 +13,8 @@ DECLARE_LOG_CATEGORY(LogPackedEntryHandle)
 
 #define PEH_SCOPE_LOCK()
 
-#define PEH_HANDLE_EXCPETIONS() HandleException(Status_InOut, TO_TCHAR_STR(__FUNCTION__), Exception)
-#define PEH_HANDLE_EXCPETIONS2() HandleException2(Status_InOut, TO_TCHAR_STR(__FUNCTION__))
+#define PEH_HANDLE_EXCPETIONS() HandleException(Status_InOut, TO_TCHAR_CSTR(__FUNCTION__), Exception)
+#define PEH_HANDLE_EXCPETIONS2() HandleException2(Status_InOut, TO_TCHAR_CSTR(__FUNCTION__))
 
 #define PEH_HANDLE_ASSERT(x, ...) HLVM_ASSERT(x, TXT("File {} : {}"), *mFilePath, FString::Format(__VA_ARGS__))
 #define PEH_HANDLE_ENSURE(x, ...) HLVM_ENSURE(x, TXT("File {} : {}"), *mFilePath, FString::Format(__VA_ARGS__))

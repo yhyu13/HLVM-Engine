@@ -18,8 +18,8 @@ DECLARE_LOG_CATEGORY(LogBoostStreamFileHandle)
 	if (mFileLock)                                                                  \
 	__lock_file = MoveTemp(boost::interprocess::sharable_lock<boost::interprocess::file_lock>(*mFileLock))
 
-#define BSFH_HANDLE_EXCPETIONS() HandleException(Status_InOut, TO_TCHAR_STR(__FUNCTION__), Exception)
-#define BSFH_HANDLE_EXCPETIONS2() HandleException2(Status_InOut, TO_TCHAR_STR(__FUNCTION__))
+#define BSFH_HANDLE_EXCPETIONS() HandleException(Status_InOut, TO_TCHAR_CSTR(__FUNCTION__), Exception)
+#define BSFH_HANDLE_EXCPETIONS2() HandleException2(Status_InOut, TO_TCHAR_CSTR(__FUNCTION__))
 
 #define BSFH_HANDLE_ASSERT(x, ...) HLVM_ASSERT(x, TXT("File {} : {}"), *mFilePath, FString::Format(__VA_ARGS__))
 #define BSFH_HANDLE_ENSURE(x, ...) HLVM_ENSURE(x, TXT("File {} : {}"), *mFilePath, FString::Format(__VA_ARGS__))
@@ -474,7 +474,7 @@ IFileHandle::OpRetType FBoostStreamFileHandle::Truncate(size_t Size)
 		BSFH_SCOPE_LOCK();
 		{
 			boost::system::error_code ec;
-			boost::filesystem::resize_file(mFilePath.ToCharStr(), Size, ec);
+			boost::filesystem::resize_file(mFilePath.ToCharCStr(), Size, ec);
 			BSFH_HANDLE_ENSURE(!ec, TXT("File truncate failed"));
 		}
 

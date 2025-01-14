@@ -98,7 +98,7 @@ bool FMiMallocator::Owned(void* ptr) noexcept
 	}
 	catch (std::exception& e)
 	{
-		HLVM_ENSURE(false, TO_TCHAR_STR(e.what()));
+		HLVM_ENSURE(false, TO_TCHAR_CSTR(e.what()));
 		return false;
 	}
 }

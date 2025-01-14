@@ -14,7 +14,7 @@ HLVM_NODISCARD TVector<TBYTE> FZstd::Compress(const FConstByteBuffer& data, int 
 
 	size_t est_compress_size = ZSTD_compressBound(data.size());
 	HLVM_ENSURE(ZSTD_isError(est_compress_size) == 0, TXT("ZSTD_compressBound = {}, ErrMsg: {}"),
-		est_compress_size, TO_TCHAR_STR(ZSTD_getErrorName(est_compress_size)));
+		est_compress_size, TO_TCHAR_CSTR(ZSTD_getErrorName(est_compress_size)));
 
 	TVector<TBYTE> comp_buffer;
 	comp_buffer.resize(est_compress_size);

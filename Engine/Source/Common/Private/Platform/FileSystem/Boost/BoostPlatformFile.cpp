@@ -41,7 +41,7 @@ bool FBoostPlatformFile::Exists(const FPath& path)
 TSmallVector32<FPath> FBoostPlatformFile::Glob(const FPath& root_dir, const FString& regex, bool recursive)
 {
 	TSmallVector32<FPath> Result;
-	std::regex			  Regex{ regex.ToCharStr() };
+	std::regex			  Regex{ regex.ToCharCStr() };
 
 	if (recursive)
 	{

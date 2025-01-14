@@ -38,7 +38,7 @@ public:
 		ResolvePath();
 	}
 	FPath(const FString& str, EPlatformFileType FileType = EPlatformFileType::Unkown)
-		: boost::filesystem::path(str.ToCharStr()), mFileType(FileType)
+		: boost::filesystem::path(str.ToCharCStr()), mFileType(FileType)
 	{
 		ResolvePath();
 	}
@@ -76,7 +76,7 @@ public:
 	// Convert to FString
 	operator FString() const
 	{
-		return FString(ToCharStr());
+		return FString(ToCharCStr());
 	}
 
 	// Convert to const TCHAR*
@@ -94,7 +94,7 @@ public:
 	{
 		return this->c_str();
 	}
-	const char* ToCharStr() const
+	const char* ToCharCStr() const
 	{
 		return static_cast<const char*>(*this);
 	}
@@ -114,7 +114,7 @@ public:
 	}
 
 	FPath  ChangeExtension(const FString& new_ext) const;
-	FPath& ChangeExtension_Inplace(const FString& new_ext);
+	FPath& ChangeExtensionInplace(const FString& new_ext);
 	FPath  AppendExtension(const FString& new_ext) const;
 
 	/**
@@ -156,5 +156,7 @@ namespace std
 	};
 } // namespace std
 
+// Path replace pattern, inspired by linux bash variable: ${...}, e.g. ${PROJECT_DIR}
 HLVM_INLINE_VAR const std::regex PathReplacePattern{ R"(\$\{([^}]+)\})" };
+// Path replace map: replace pattern with value, e.g. ${PROJECT_DIR} -> /Users/xxx/project
 HLVM_INLINE_VAR TMap<std::string, std::string> PathReplaceMap;

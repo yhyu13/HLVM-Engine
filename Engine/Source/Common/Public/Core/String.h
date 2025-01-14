@@ -69,7 +69,7 @@ public:
 	{
 		return reinterpret_cast<const char*>(this->c_str());
 	}
-	const char* ToCharStr() const
+	const char* ToCharCStr() const
 	{
 		return static_cast<const char*>(*this);
 	}

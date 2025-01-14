@@ -7,7 +7,6 @@
 
 DECLARE_LOG_CATEGORY(LogFPath)
 
-
 bool FPath::IsDirectory(const FPath& path)
 {
 	return FGenericPlatformFile::Get()->IsDirectory(path);
@@ -31,16 +30,16 @@ FString FPath::DumpJson(const TSmallVector32<FPath>& paths)
 
 void FPath::ResolvePath()
 {
-	if (std::regex_match(this->ToCharStr(), PathReplacePattern))
+	if (std::regex_match(this->ToCharCStr(), PathReplacePattern))
 		HLVM_UNLIKELY
 		{
 			HLVM_ASSERT(PathReplaceMap.size() > 0, TXT("PathReplaceMap is empty"));
-			std::string result = this->ToCharStr();
+			std::string result = this->ToCharCStr();
 			for (auto const& replacement : PathReplaceMap)
 			{
 				result = std::regex_replace(result, PathReplacePattern, replacement.second);
 			}
-			HLVM_LOG(LogFPath, trace, TXT("Path {} is resolved to {}"), *(*this), TO_TCHAR_STR(result.c_str()));
+			HLVM_LOG(LogFPath, trace, TXT("Path {} is resolved to {}"), *(*this), TO_TCHAR_CSTR(result.c_str()));
 			this->assign(MoveTemp(result));
 		}
 }
@@ -68,14 +67,14 @@ FPath FPath::ChangeExtension(const FString& new_ext) const
 {
 	HLVM_ASSERT(new_ext[0] == TXT('.'), TXT("{} must start with '.'"), new_ext);
 	FPath new_path = *this;
-	new_path.replace_extension(new_ext.ToCharStr());
+	new_path.replace_extension(new_ext.ToCharCStr());
 	return new_path;
 }
 
-FPath& FPath::ChangeExtension_Inplace(const FString& new_ext)
+FPath& FPath::ChangeExtensionInplace(const FString& new_ext)
 {
 	HLVM_ASSERT(new_ext[0] == TXT('.'), TXT("{} must start with '.'"), new_ext);
-	this->replace_extension(new_ext.ToCharStr());
+	this->replace_extension(new_ext.ToCharCStr());
 	return *this;
 }
 

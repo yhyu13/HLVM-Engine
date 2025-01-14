@@ -14,8 +14,8 @@ DECLARE_LOG_CATEGORY(LogPackedFileHandle)
 
 #define PFH_SCOPE_LOCK()
 
-#define PFH_HANDLE_EXCPETIONS() HandleException(Status_InOut, TO_TCHAR_STR(__FUNCTION__), Exception)
-#define PFH_HANDLE_EXCPETIONS2() HandleException2(Status_InOut, TO_TCHAR_STR(__FUNCTION__))
+#define PFH_HANDLE_EXCPETIONS() HandleException(Status_InOut, TO_TCHAR_CSTR(__FUNCTION__), Exception)
+#define PFH_HANDLE_EXCPETIONS2() HandleException2(Status_InOut, TO_TCHAR_CSTR(__FUNCTION__))
 
 #define PFH_HANDLE_ASSERT(x, ...) HLVM_ASSERT(x, TXT("File {} : {}"), *mFilePath, FString::Format(__VA_ARGS__))
 #define PFH_HANDLE_ENSURE(x, ...) HLVM_ENSURE(x, TXT("File {} : {}"), *mFilePath, FString::Format(__VA_ARGS__))
@@ -61,7 +61,7 @@ IFileHandle::OpRetType FPackedFileHandle::Open(const FPath& FilePath, const FFil
 	mFilePath = FilePath;
 	const bool _noExtension = !mFilePath.has_extension();
 	PFH_HANDLE_ASSERT(_noExtension, TXT("Packed file path input should not have extension"));
-	if (std::regex_search(mFilePath.ToCharStr(), HLVM_PACKED_PATCH_FILE_MATCH_PATTERN))
+	if (std::regex_search(mFilePath.ToCharCStr(), HLVM_PACKED_PATCH_FILE_MATCH_PATTERN))
 	{
 		mPackedFileType = EPackedFileType::Patch;
 		std::smatch matches;
@@ -75,10 +75,10 @@ IFileHandle::OpRetType FPackedFileHandle::Open(const FPath& FilePath, const FFil
 		}
 		catch (const std::invalid_argument& e)
 		{
-			PFH_HANDLE_ENSURE(false, TXT("Invalid input: {}"), TO_TCHAR_STR(e.what()));
+			PFH_HANDLE_ENSURE(false, TXT("Invalid input: {}"), TO_TCHAR_CSTR(e.what()));
 		}
 	}
-	else if (std::regex_search(mFilePath.ToCharStr(), HLVM_PACKED_FILE_MATCH_PATTERN))
+	else if (std::regex_search(mFilePath.ToCharCStr(), HLVM_PACKED_FILE_MATCH_PATTERN))
 	{
 		mPackedFileType = EPackedFileType::Base;
 	}
@@ -114,7 +114,7 @@ IFileHandle::OpRetType FPackedFileHandle::Open(const FPath& FilePath, const FFil
 						mContainerFileLock = MoveTemp(sharable_lock<file_lock>(_Lock));
 
 						// Open container file
-						mContainerMappedFile = MoveTemp(file_mapping(ContainerFilePath.ToCharStr(), read_only));
+						mContainerMappedFile = MoveTemp(file_mapping(ContainerFilePath.ToCharCStr(), read_only));
 						PFH_HANDLE_ENSURE(mContainerMappedFile.get_mapping_handle().handle, TXT("MappedFile file open failed"));
 						PFH_VERBOSE_LOG(TXT("Container file opened {}"), *ContainerFilePath);
 					}
@@ -168,7 +168,7 @@ IFileHandle::OpRetType FPackedFileHandle::Open(const FPath& FilePath, const FFil
 					auto   ExtractTokenEntry = [&](FPackedTokenEntry& Entry) {
 						  bool bSuccess = SerializeFrom(Entry, FConstByteBuffer{ lineStart, S_C(size_t, lineEnd - lineStart) });
 						  PFH_HANDLE_ENSURE(bSuccess, TXT("Failed to deserialize entry #{}"), Num);
-						  PFH_VERBOSE_LOG(TXT("Entry #{}:\n{}"), Num, TO_TCHAR_STR(ToJson(Entry).c_str()));
+						  PFH_VERBOSE_LOG(TXT("Entry #{}:\n{}"), Num, TO_TCHAR_CSTR(ToJson(Entry).c_str()));
 						  ++Num;
 					};
 

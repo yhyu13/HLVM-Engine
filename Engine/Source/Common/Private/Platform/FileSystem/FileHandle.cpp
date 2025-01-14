@@ -19,7 +19,7 @@ void IFileHandle::HandleException(const OpStatusType& Status_InOut, const TCHAR*
 		Function,
 		HLVM_ENUM_TCHAR_STR(Status_InOut->eFileOpStatus),
 		HLVM_ENUM_TCHAR_STR(Status_InOut->eFileOpErrorNo),
-		TO_TCHAR_STR(Exception.what()));
+		TO_TCHAR_CSTR(Exception.what()));
 	if (!Status_InOut->bCancelByUser)
 	{
 		HLVM_LOG(LogIFileHandle, err, MoveTemp(Msg));

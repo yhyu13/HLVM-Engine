@@ -15,7 +15,7 @@
 #if HLVM_COMPILE_WITH_PROFILER
 	#if HLVM_PROFILER_USE_TRACY
 
-		#include "Utility/Profiler/PrifilerSrcLoc.h"
+		#include "Utility/Profiler/ProfilerSrcLoc.h"
 
 		// Undef empty macros for disabled profiler
 		#undef HLVM_PROFILE_CPU

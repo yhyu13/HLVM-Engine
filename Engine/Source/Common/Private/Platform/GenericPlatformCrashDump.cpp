@@ -41,7 +41,7 @@ void FGenericPlatformCrashDump::ReportDump(bool DeleteDumpAfterReport)
 			backtraceStream << st << std::endl;
 
 			// TODO Implement cerr log device (belong to warn and above verbosity)
-			std::cerr << CrashDumpFilePath.ToCharStr() << "\n";
+			std::cerr << CrashDumpFilePath.ToCharCStr() << "\n";
 			std::cerr << backtraceStream.str();
 
 			// sending the code from st

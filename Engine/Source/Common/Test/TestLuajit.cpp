@@ -356,17 +356,17 @@ RECORD(luajit_openresty_testsuit_test)
 #else
 				{
 					const std::string package_cpath = lua["package"]["cpath"];
-					lua["package"]["cpath"] = package_cpath + (!package_cpath.empty() ? ";" : "") + std::string{ FString::Format(TXT("{}/test/clib/?;;"), *DataDir).ToCharStr() };
+					lua["package"]["cpath"] = package_cpath + (!package_cpath.empty() ? ";" : "") + std::string{ FString::Format(TXT("{}/test/clib/?;;"), *DataDir).ToCharCStr() };
 				}
 #endif
 				try
 				{
 					FScopedTimerLog timer(FString::Format(TXT("Test lua file: {}"), *LuaFile));
-					auto			Result = lua.safe_script_file(LuaFile.ToCharStr());
+					auto			Result = lua.safe_script_file(LuaFile.ToCharCStr());
 					if (!Result.valid())
 					{
 						sol::error err = Result;
-						HLVM_LOG(LogTest, err, TXT("Test lua file: {} failed: {}"), *LuaFile, TO_TCHAR_STR(err.what()));
+						HLVM_LOG(LogTest, err, TXT("Test lua file: {} failed: {}"), *LuaFile, TO_TCHAR_CSTR(err.what()));
 					}
 				}
 				catch (...)

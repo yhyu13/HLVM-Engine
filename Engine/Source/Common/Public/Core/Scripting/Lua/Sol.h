@@ -53,7 +53,7 @@ namespace hlvm_lua
 
 	HLVM_INLINE_FUNC int lua_panic(lua_State* L)
 	{
-		HLVM_LOG(LogLua, err, TXT("Lua panic at {}!"), TO_TCHAR_STR(lua_tostring(L, -1)));
+		HLVM_LOG(LogLua, err, TXT("Lua panic at {}!"), TO_TCHAR_CSTR(lua_tostring(L, -1)));
 		return 0;
 	}
 

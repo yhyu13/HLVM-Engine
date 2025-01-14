@@ -40,7 +40,7 @@ public:
 		return mCounter.fetch_sub(1, std::memory_order_relaxed) > 1;
 	}
 
-	HLVM_INLINE_FUNC size_t NumRef() const noexcept
+	HLVM_INLINE_FUNC size_t RefCount() const noexcept
 	{
 		return mCounter.load(std::memory_order_relaxed);
 	}

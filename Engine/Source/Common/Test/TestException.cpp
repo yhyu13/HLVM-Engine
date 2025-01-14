@@ -26,7 +26,7 @@ RECORD(excpetion_test)
 	}
 	catch (const std::runtime_error& e)
 	{
-		HLVM_LOG(LogTest, warn, TO_TCHAR_STR(e.what()));
+		HLVM_LOG(LogTest, warn, TO_TCHAR_CSTR(e.what()));
 	}
 	try
 	{
@@ -35,6 +35,6 @@ RECORD(excpetion_test)
 	}
 	catch (const std::runtime_error& e)
 	{
-		HLVM_LOG(LogTest, warn, TO_TCHAR_STR(e.what()));
+		HLVM_LOG(LogTest, warn, TO_TCHAR_CSTR(e.what()));
 	}
 };
