@@ -7,25 +7,26 @@
 
 #include <rapidjson/prettywriter.h>
 
-bool SerializeTo(const FPackedTokenEntry& Data, FByteBuffer& Buffer)
+bool FPackedTokenEntry::Serialize(FByteBuffer& Buffer) const
 {
 	const bool bValid = Buffer.size() == FPackedTokenEntry_SerializedSize;
 	HLVM_ASSERT(bValid, TXT("Buffer size {} is not enough for serialized data size {}"), Buffer.size(), FPackedTokenEntry_SerializedSize);
-	return std::memcpy(Buffer.data(), &Data, FPackedTokenEntry_SerializedSize) == Buffer.data();
+	return std::memcpy(Buffer.data(), this, FPackedTokenEntry_SerializedSize) == Buffer.data();
 }
 
-bool SerializeFrom(FPackedTokenEntry& Data, const FConstByteBuffer& Buffer)
+bool FPackedTokenEntry::Deserialize(const FConstByteBuffer& Buffer)
 {
 	const bool bValid = Buffer.size() == FPackedTokenEntry_SerializedSize;
 	HLVM_ASSERT(bValid, TXT("Buffer size {} is not enough for serialized data size {}"), Buffer.size(), FPackedTokenEntry_SerializedSize);
-	return std::memcpy(&Data, Buffer.data(), FPackedTokenEntry_SerializedSize) == &Data;
+	return std::memcpy(this, Buffer.data(), FPackedTokenEntry_SerializedSize) == this;
 }
 
-std::string ToJson(const FPackedTokenEntry& Entry)
+std::string FPackedTokenEntry::ToJsonString() const
 {
 	using namespace rapidjson;
 	StringBuffer			   sb;
 	PrettyWriter<StringBuffer> writer(sb);
+	const FPackedTokenEntry&   Entry = *this;
 
 	writer.StartObject();
 	{
@@ -53,11 +54,12 @@ std::string ToJson(const FPackedTokenEntry& Entry)
 	return sb.GetString();
 }
 
-std::string ToJson(const FPackedTokenEntryWithPath& Data)
+std::string FPackedTokenEntryWithPath::ToJsonString() const
 {
 	using namespace rapidjson;
-	StringBuffer			   sb;
-	PrettyWriter<StringBuffer> writer(sb);
+	StringBuffer					 sb;
+	PrettyWriter<StringBuffer>		 writer(sb);
+	const FPackedTokenEntryWithPath& Data = *this;
 
 	writer.StartObject();
 	{

@@ -54,7 +54,7 @@ public:
 	}
 
 private:
-    friend FPackedPlatformFile;
+	friend FPackedPlatformFile;
 
 	boost::interprocess::file_mapping					mContainerMappedFile;
 	TVector<FPackedContainerFragment>					mContainerFragments;
@@ -63,7 +63,7 @@ private:
 	boost::interprocess::sharable_lock<boost::interprocess::file_lock> mTokenFileLock;
 	boost::interprocess::sharable_lock<boost::interprocess::file_lock> mContainerFileLock;
 
-	// Counting total opened packed entry handle that use data in this file handle
+	// TODO : Counting total opened packed entry handle that use data in this file handle
 	// used to identify whether or not we can close this file
 	std::atomic_uint_fast32_t mPackedEntryRefCount{ 0 };
 	// Mounting order, the larger the prior when searching for files

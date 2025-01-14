@@ -336,10 +336,10 @@ RECORD(luajit_openresty_testsuit_test)
 	{
 		auto	   CWD = boost::filesystem::current_path();
 		const auto DataDir = FString::Format(TXT("{}/{}_Data"), *GExecutablePath, *GExecutableName);
-		const bool bDataDirExist = FGenericPlatformFile::Get(EPlatformFileType::Local)->Exists(DataDir);
+		const bool bDataDirExist = FGenericPlatformFile::Get(EPlatformFileType::Disk)->Exists(DataDir);
 		if (bDataDirExist)
 		{
-			auto AllLuaFiles = FGenericPlatformFile::Get(EPlatformFileType::Local)->Glob(DataDir, TXT(R"(.*\.lua$)"), true);
+			auto AllLuaFiles = FGenericPlatformFile::Get(EPlatformFileType::Disk)->Glob(DataDir, TXT(R"(.*\.lua$)"), true);
 			for (auto LuaFile : AllLuaFiles)
 			{
 				HLVM_LOG(LogTest, info, TXT("Test lua file: {}"), *LuaFile);

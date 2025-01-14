@@ -21,14 +21,13 @@ void FPackedContainerFragment::Open()
 		/**
 		 * Move construct our Region of interest
 		 */
-		// CAUTION : If throwing is xsi errors on Linux system, switch back mode to read_only instead of read_private
-		Region = MoveTemp(mapped_region(*FileMapping, read_private, S_C(offset_t, FragmentStartPos), FragmentSize, nullptr, default_map_options));
+		// CAUTION : If exception throwing is xsi errors on Linux system, switch back mode to read_only instead of read_private
+		Region = MoveTemp(mapped_region(*ContainerFileMapping, read_private, S_C(offset_t, FragmentStartPos), FragmentSize, nullptr, default_map_options));
 	}
 }
 
 void FPackedContainerFragment::Close()
 {
-	// TODO : Consider delay freeing, instead, push freeing to free queue and regularly free in period
 	using namespace boost::interprocess;
 	if (FramgentRefCount.fetch_sub(1, std::memory_order_relaxed) == 1)
 	{

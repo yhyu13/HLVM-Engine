@@ -21,13 +21,9 @@ class FAsync
 public:
 	/**
 	 * Launch a task
-	 * @tparam F
-	 * @tparam Args
 	 * @param mode If using pool, task will be launched in a thread from the default work steal thread pool, otherwise a new thread will be created.
 				   WARNING: If using pool, task launching order is not guaranteed! So make sure task indexing passed in is copy on value!
-	 * @param f
-	 * @param args
-	 * @return
+	 * @return std::future
 	 */
 	template <typename F, typename... Args>
 	HLVM_NODISCARD HLVM_STATIC_FUNC auto Launch(EAsyncMode mode, F&& f, Args&&... args)

@@ -70,6 +70,7 @@ IFileHandle::OpRetType FPackedFileHandle::Open(const FPath& FilePath, const FFil
 		PFH_HANDLE_ASSERT(bValid, TXT("Patch regex matching failed with wrong size {}"), matches.size());
 		try
 		{
+			// Find mount order from patch file name, e.g. packed-456790-pat, where 456790 is the patch CL
 			mMountOrder = std::stoull(matches[1]);
 			PFH_VERBOSE_LOG(TXT("Mount order: {}"), mMountOrder);
 		}
@@ -135,7 +136,7 @@ IFileHandle::OpRetType FPackedFileHandle::Open(const FPath& FilePath, const FFil
 
 				// Open token file
 				FBoostMapFileHandle fileHandle;
-				size_t			 fileSize = 0;
+				size_t				fileSize = 0;
 				fileHandle.Open(TokenFilePath, mFileOptions)
 					.Size(fileSize);
 				// Read token file in 1 shot
@@ -166,9 +167,9 @@ IFileHandle::OpRetType FPackedFileHandle::Open(const FPath& FilePath, const FFil
 
 					size_t Num = 0;
 					auto   ExtractTokenEntry = [&](FPackedTokenEntry& Entry) {
-						  bool bSuccess = SerializeFrom(Entry, FConstByteBuffer{ lineStart, S_C(size_t, lineEnd - lineStart) });
+						  bool bSuccess = Entry.Deserialize(FConstByteBuffer{ lineStart, S_C(size_t, lineEnd - lineStart) });
 						  PFH_HANDLE_ENSURE(bSuccess, TXT("Failed to deserialize entry #{}"), Num);
-						  PFH_VERBOSE_LOG(TXT("Entry #{}:\n{}"), Num, TO_TCHAR_CSTR(ToJson(Entry).c_str()));
+						  PFH_VERBOSE_LOG(TXT("Entry #{}:\n{}"), Num, TO_TCHAR_CSTR(Entry.ToJsonString().c_str()));
 						  ++Num;
 					};
 
@@ -190,7 +191,7 @@ IFileHandle::OpRetType FPackedFileHandle::Open(const FPath& FilePath, const FFil
 						{
 							bCurrentFragmentInit = true;
 							CurrentFragment.FragmentStartPos = Entry.Data.StartPos;
-							CurrentFragment.FileMapping = &mContainerMappedFile;
+							CurrentFragment.ContainerFileMapping = &mContainerMappedFile;
 						}
 
 						// Fragment full, initiate another fragment

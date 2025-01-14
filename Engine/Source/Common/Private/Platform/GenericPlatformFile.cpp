@@ -38,26 +38,31 @@ FGenericPlatformFile* FGenericPlatformFile::Get(EPlatformFileType PlatformFileTy
 
 bool FGenericPlatformFile::IsDirectory(const FPath& path)
 {
-	if (path.Type() == EPlatformFileType::Local)
+	if (path.Type() == EPlatformFileType::Disk)
 	{
-		return S_C(FBoostPlatformFile*, sPlatformFileRedirector[HLVM_ENUM_V(EPlatformFileType, Local)])->IsDirectory(path);
+		return S_C(FBoostPlatformFile*, sPlatformFileRedirector[HLVM_ENUM_V(EPlatformFileType, Disk)])->IsDirectory(path);
 	}
 	else if (path.Type() == EPlatformFileType::Packed)
 	{
 		return S_C(FPackedPlatformFile*, sPlatformFileRedirector[HLVM_ENUM_V(EPlatformFileType, Packed)])->IsDirectory(path);
 	}
+	else if (path.Type() == EPlatformFileType::Remote)
+	{
+		return false;
+		// return S_C(FPackedPlatformFile*, sPlatformFileRedirector[HLVM_ENUM_V(EPlatformFileType, Remote)])->IsDirectory(path);
+	}
 	else
 	{
 		// TODO
-		return S_C(FBoostPlatformFile*, sPlatformFileRedirector[HLVM_ENUM_V(EPlatformFileType, Local)])->IsDirectory(path);
+		return S_C(FBoostPlatformFile*, sPlatformFileRedirector[HLVM_ENUM_V(EPlatformFileType, Disk)])->IsDirectory(path);
 	}
 }
 
 bool FGenericPlatformFile::Exists(const FPath& path)
 {
-	if (path.Type() == EPlatformFileType::Local)
+	if (path.Type() == EPlatformFileType::Disk)
 	{
-		return S_C(FBoostPlatformFile*, sPlatformFileRedirector[HLVM_ENUM_V(EPlatformFileType, Local)])->Exists(path);
+		return S_C(FBoostPlatformFile*, sPlatformFileRedirector[HLVM_ENUM_V(EPlatformFileType, Disk)])->Exists(path);
 	}
 	else if (path.Type() == EPlatformFileType::Packed)
 	{
@@ -66,15 +71,15 @@ bool FGenericPlatformFile::Exists(const FPath& path)
 	else
 	{
 		// TODO
-		return S_C(FBoostPlatformFile*, sPlatformFileRedirector[HLVM_ENUM_V(EPlatformFileType, Local)])->Exists(path);
+		return S_C(FBoostPlatformFile*, sPlatformFileRedirector[HLVM_ENUM_V(EPlatformFileType, Disk)])->Exists(path);
 	}
 }
 
 TSmallVector32<FPath> FGenericPlatformFile::Glob(const FPath& path, const FString& regex, bool recursive)
 {
-	if (path.Type() == EPlatformFileType::Local)
+	if (path.Type() == EPlatformFileType::Disk)
 	{
-		return S_C(FBoostPlatformFile*, sPlatformFileRedirector[HLVM_ENUM_V(EPlatformFileType, Local)])->Glob(path, regex, recursive);
+		return S_C(FBoostPlatformFile*, sPlatformFileRedirector[HLVM_ENUM_V(EPlatformFileType, Disk)])->Glob(path, regex, recursive);
 	}
 	else if (path.Type() == EPlatformFileType::Packed)
 	{
@@ -83,6 +88,6 @@ TSmallVector32<FPath> FGenericPlatformFile::Glob(const FPath& path, const FStrin
 	else
 	{
 		// TODO
-		return S_C(FBoostPlatformFile*, sPlatformFileRedirector[HLVM_ENUM_V(EPlatformFileType, Local)])->Glob(path, regex, recursive);
+		return S_C(FBoostPlatformFile*, sPlatformFileRedirector[HLVM_ENUM_V(EPlatformFileType, Disk)])->Glob(path, regex, recursive);
 	}
 }

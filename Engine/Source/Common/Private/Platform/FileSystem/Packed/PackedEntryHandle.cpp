@@ -68,6 +68,8 @@ IFileHandle::OpRetType FPackedEntryHandle::Open(const FPath& FilePath, const FFi
 			auto Data = mQuickFind.Data;
 			auto Fragment = mQuickFind.Fragment;
 			Fragment->Open();
+			auto RefCount = mQuickFind.RefCount;
+			RefCount->fetch_add(1, std::memory_order_relaxed);
 			auto RawBuffer = Fragment->GetSubRegion(*Data);
 
 			// Decryption
@@ -154,6 +156,8 @@ IFileHandle::OpRetType FPackedEntryHandle::Close()
 		{
 			auto Fragment = mQuickFind.Fragment;
 			Fragment->Close();
+			auto RefCount = mQuickFind.RefCount;
+			RefCount->fetch_sub(1, std::memory_order_relaxed);
 			mContentBuffer.clear();
 		}
 

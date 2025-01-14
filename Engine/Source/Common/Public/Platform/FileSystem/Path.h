@@ -10,8 +10,9 @@
 #include <boost/filesystem/path.hpp>
 
 HLVM_ENUM(EPlatformFileType, TUINT8,
-	Local,
+	Disk,
 	Packed,
+	Remote,
 	Unkown);
 
 /**

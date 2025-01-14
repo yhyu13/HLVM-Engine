@@ -149,7 +149,7 @@ RECORD(packed_test)
 						for (size_t i = 0; i < PackedData.size(); ++i)
 						{
 							const auto& Entry_Dev = get<0>(PackedData[i]);
-							std::string json = ToJson(Entry_Dev);
+							std::string json = Entry_Dev.ToJsonString();
 							json += "\n";
 							fileJsonlHandle.Write(json.c_str(), json.size());
 						}
@@ -164,7 +164,7 @@ RECORD(packed_test)
 				{
 					TBYTE		buffer[FPackedTokenEntry_SerializedSize];
 					FByteBuffer buffer_span = buffer;
-					bool		bSuccess = SerializeTo(Entry_Dev.Entry, buffer_span);
+					bool		bSuccess = Entry_Dev.Entry.Serialize(buffer_span);
 					HLVM_ENSURE(bSuccess, TXT("SerializeTo failed"));
 					std::move(buffer_span.begin(), buffer_span.end(), std::back_inserter(TokenData));
 				}

@@ -16,10 +16,12 @@
 #endif
 
 #ifndef HLVM_PACKED_FILE_MATCH_PATTERN
+// Match pattern for token file, e.g. packed-456789, where 456789 is the CL
 	#define HLVM_PACKED_FILE_MATCH_PATTERN std::regex(R"(packed-\S*)")
 #endif
 
 #ifndef HLVM_PACKED_PATCH_FILE_MATCH_PATTERN
+// Match pattern for patch file, e.g. packed-456790-pat, where 456790 is the patch CL
 	#define HLVM_PACKED_PATCH_FILE_MATCH_PATTERN std::regex(R"(packed-\S*-\d+-pat)")
 #endif
 

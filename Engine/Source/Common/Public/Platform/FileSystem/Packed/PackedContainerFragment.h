@@ -27,7 +27,7 @@ struct FPackedContainerFragment
 
 	std::atomic_uint_fast16_t				 FramgentRefCount{ 0 };
 	boost::interprocess::mapped_region		 Region;
-	const boost::interprocess::file_mapping* FileMapping;
+	const boost::interprocess::file_mapping* ContainerFileMapping;
 	size_t									 FragmentStartPos{ 0 };
 	size_t									 FragmentSize{ 0 };
 
@@ -37,7 +37,7 @@ struct FPackedContainerFragment
 	{
 		FramgentRefCount = Other.FramgentRefCount.load(std::memory_order_relaxed);
 		Region = MoveTemp(Other.Region);
-		FileMapping = MoveTemp(Other.FileMapping);
+		ContainerFileMapping = MoveTemp(Other.ContainerFileMapping);
 		FragmentStartPos = MoveTemp(Other.FragmentStartPos);
 		FragmentSize = MoveTemp(Other.FragmentSize);
 	}
@@ -51,4 +51,5 @@ struct FPackedEntryQuickFind
 {
 	const FPackedTokenEntryData* Data{ nullptr };
 	FPackedContainerFragment*	 Fragment{ nullptr };
+	std::atomic_uint_fast32_t*	 RefCount{ nullptr };
 };

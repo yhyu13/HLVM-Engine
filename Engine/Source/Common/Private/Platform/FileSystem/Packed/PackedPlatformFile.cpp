@@ -22,22 +22,29 @@ FPackedPlatformFile* FPackedPlatformFile::Get()
 
 bool FPackedPlatformFile::IsDirectory(const FPath&)
 {
-	LOCK_GUARD_RIVAL(mMountedPackedFileHandlesLock, FRWRivalLock::Group::Read);
-	// TODO : actually we should set IsDirectory for packed file to N/A
+	//	LOCK_GUARD_RIVAL(mMountedPackedFileHandlesLock, FRWRivalLock::Group::Read);
+	//	Packed file does not contain directory
+	HLVM_LOG(LogPackedPlatformFile, warn, TXT("Packed file does not contain directory"));
 	return false;
 }
 
-bool FPackedPlatformFile::Exists(const FPath&)
+bool FPackedPlatformFile::Exists(const FPath& path)
 {
 	LOCK_GUARD_RIVAL(mMountedPackedFileHandlesLock, FRWRivalLock::Group::Read);
-	// TODO : iterate all mounted packed file handles
-	return true;
+	for (auto& packed_file_handle : mMountedPackedFileHandles)
+	{
+		if (packed_file_handle->mTokenEntryFragmentMap.find(path.GetHash()) != packed_file_handle->mTokenEntryFragmentMap.end())
+		{
+			return true;
+		}
+	}
+	return false;
 }
 
 TSmallVector32<FPath> FPackedPlatformFile::Glob(const FPath&, const FString&, bool)
 {
-	LOCK_GUARD_RIVAL(mMountedPackedFileHandlesLock, FRWRivalLock::Group::Read);
-	// TODO : actually we should set Find for packed file to N/A
+	// LOCK_GUARD_RIVAL(mMountedPackedFileHandlesLock, FRWRivalLock::Group::Read);
+	HLVM_LOG(LogPackedPlatformFile, warn, TXT("Packed file does not support glob"));
 	return TSmallVector32<FPath>();
 }
 
@@ -54,12 +61,12 @@ bool FPackedPlatformFile::Mount(const FPath& path)
 			[](const std::unique_ptr<FPackedFileHandle>& a, const std::unique_ptr<FPackedFileHandle>& b) -> bool {
 				return *a > *b;
 			});
-		HLVM_LOG(LogPackedPlatformFile, info, TXT("Success to mount packed file : %s"), *path);
+		HLVM_LOG(LogPackedPlatformFile, info, TXT("Success to mount packed file : {}"), *path);
 		return true;
 	}
 	catch (...)
 	{
-		HLVM_LOG(LogPackedPlatformFile, err, TXT("Exception happened when mount packed file : %s"), *path);
+		HLVM_LOG(LogPackedPlatformFile, err, TXT("Exception happened when mount packed file : {}"), *path);
 		return false;
 	}
 }
@@ -83,25 +90,25 @@ bool FPackedPlatformFile::Unmount(const FPath& path)
 				mMountedPackedFileHandles.erase(iter);
 				// Clear quick find map
 				mPackedEntryQuickFindMap.clear();
-				HLVM_LOG(LogPackedPlatformFile, info, TXT("Success to unmount packed file : %s"), *path);
+				HLVM_LOG(LogPackedPlatformFile, info, TXT("Success to unmount packed file : {}"), *path);
 				return true;
 			}
 			else
 			{
-				// TODO Spit out more debug info
-				HLVM_LOG(LogPackedPlatformFile, warn, TXT("Fail to unmount packed file : %s, because it is still in use"), *path);
+				HLVM_LOG(LogPackedPlatformFile, warn, TXT("Fail to unmount packed file : {}, because it is still in use by {} opened pak entries"),
+					*path, packed_file_handle->mPackedEntryRefCount.load());
 				return false;
 			}
 		}
 		else
 		{
-			HLVM_LOG(LogPackedPlatformFile, err, TXT("Fail to find to be unmount packed file : %s"), *path);
+			HLVM_LOG(LogPackedPlatformFile, err, TXT("Fail to find to be unmount packed file handle : {}"), *path);
 			return false;
 		}
 	}
 	catch (...)
 	{
-		HLVM_LOG(LogPackedPlatformFile, err, TXT("Exception happened when unmount packed file : %s"), *path);
+		HLVM_LOG(LogPackedPlatformFile, err, TXT("Exception happened when unmount packed file : {}"), *path);
 		return false;
 	}
 }
@@ -127,15 +134,17 @@ FPackedEntryQuickFind FPackedPlatformFile::QuickFindPackedEntry(const FPath& pat
 		HLVM_MAP_FIND(packed_file_handle->mTokenEntryFragmentMap, path.GetHash())
 		{
 			auto Data = &(iter->second.Data);
+			auto RefCount = &(packed_file_handle->mPackedEntryRefCount);
 			auto Fragment = &(packed_file_handle->mContainerFragments[iter->second.FragmentID]);
 			{
 				ATOMIC_LOCK_GUARD(mPackedEntryQuickFindMapLock);
-				auto Result = mPackedEntryQuickFindMap.insert_or_assign(path.GetHash(), { .Data = Data, .Fragment = Fragment });
+				auto Result = mPackedEntryQuickFindMap.insert_or_assign(path.GetHash(),
+					{ .Data = Data, .Fragment = Fragment, .RefCount = RefCount });
 				return Result.first->second;
 			}
 		}
 	}
 
-	HLVM_ENSURE(false, TXT("Fail to find content from packed file : %s"), *path);
+	HLVM_ENSURE(false, TXT("Fail to find content from packed file : {}"), *path);
 	return {};
 }
