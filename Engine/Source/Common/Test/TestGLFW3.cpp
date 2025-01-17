@@ -120,17 +120,9 @@ RECORD_BOOL(glfw_thread_test)
 	std::vector<std::future<void>> jobs;
 	for (i = 0; i < count; i++)
 	{
-		//		if (thrd_create(&threads[i].id, thread_main, threads + i) != thrd_success)
-		//		{
-		//			fprintf(stderr, "Failed to create secondary thread\n");
-		//
-		//			glfwTerminate();
-		//			return false;
-		//		}
-
-		jobs.emplace_back(FAsync::Launch(EAsyncMode::PoolOrderless,
-			[i, &threads]() {
-				thread_main(threads + i);
+		jobs.emplace_back(FAsync::Launch(EAsyncMode::PoolOrderlessExec,
+			[_i = i, &threads]() {
+				thread_main(threads + _i);
 			}));
 	}
 
@@ -157,9 +149,6 @@ RECORD_BOOL(glfw_thread_test)
 
 	for (i = 0; i < count; i++)
 		glfwHideWindow(threads[i].window);
-
-	//	for (i = 0; i < count; i++)
-	//		thrd_join(threads[i].id, &result);
 
 	for (auto& job : jobs)
 	{

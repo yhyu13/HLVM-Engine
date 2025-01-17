@@ -183,6 +183,7 @@ public:
 			}
 			else
 			{
+				// Yield and then block until task queue is not empty
 				std::this_thread::yield();
 				{
 					std::unique_lock<std::mutex> lock(mMutex);

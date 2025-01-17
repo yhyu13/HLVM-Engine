@@ -295,7 +295,7 @@ RECORD(lock_free_queue_test, true)
 	}
 
 	double ratio = time_lock / time_concurrent;
-	HLVM_CLOG_OR_FATAL(ratio > 1, LogTest, info, TXT("Queue test #1 TConcurrentQueue = {0:.2f}x faster than Queue test #2 boost::lockfree::queue"), ratio);
+	HLVM_CLOG_OR_FATAL(ratio > 1, LogTest, info, TXT("Result : Queue test #1 TConcurrentQueue = {0:.2f}x faster than Queue test #2 boost::lockfree::queue"), ratio);
 };
 
 #include "Core/Parallel/FixedSizeQueue.h"
@@ -434,12 +434,12 @@ RECORD(fixed_queue_test, true)
 	}
 
 	double ratio = time_lock / time_concurrent;
-	HLVM_CLOG_OR_FATAL(ratio > 1, LogTest, info, TXT("Fixed Queue test #1 TFixedSizeQueue = {0:.2f}x faster than Fixed Queue test #2 boost::fiber::buffered_channel"), ratio);
+	HLVM_CLOG_OR_FATAL(ratio > 1, LogTest, info, TXT("Result : Fixed Queue test #1 TFixedSizeQueue = {0:.2f}x faster than Fixed Queue test #2 boost::fiber::buffered_channel"), ratio);
 };
 
 #include "Core/Parallel/Async/WorkStealThreadPool.h"
-#define HLVM_ENABLE_FIBER_POOL 0
-#if HLVM_ENABLE_FIBER_POOL
+#define HLVM_ENABLE_BOOST_FIBER_POOL 0
+#if HLVM_ENABLE_BOOST_FIBER_POOL
 	#include "Core/Parallel/Async/WorkStealFiberPool.h"
 #else
 	#include "Core/Parallel/Async/FiberPool.hpp"
@@ -508,7 +508,7 @@ RECORD(pool_test, true)
 
 	{
 		HLVM_LOG(LogTest, info, TXT("Pool test #2 Fiber"));
-#if HLVM_ENABLE_FIBER_POOL
+#if HLVM_ENABLE_BOOST_FIBER_POOL
 		auto Test2Func = [&](double& Duration) -> bool {
 			std::atomic_int_fast32_t				 Number = 0;
 			FTimer									 Timer;
@@ -608,7 +608,7 @@ RECORD(pool_test, true)
 #endif
 	}
 
-	HLVM_CLOG_OR_FATAL(time_2 / time_1 > 1, LogTest, info, TXT("Pool Test Thread #1 = {0:.2f}x faster than Pool Test Fiber #2"), time_2 / time_1);
+	HLVM_CLOG_OR_FATAL(time_2 / time_1 > 1, LogTest, info, TXT("Result : Pool Test Thread #1 = {0:.2f}x faster than Pool Test Fiber #2"), time_2 / time_1);
 
 	{
 		HLVM_LOG(LogTest, info, TXT("Pool test #3 Async"));
@@ -661,5 +661,5 @@ RECORD(pool_test, true)
 		HLVM_LOG(LogTest, info, TXT("Pool test #3 ThreadPool avg took {0:f}, iter {1:d}"), time_3, kNumIterations);
 	}
 
-	HLVM_CLOG_OR_FATAL(time_3 / time_1 > 1, LogTest, info, TXT("Pool Test Thread #1 = {0:.2f}x faster than Pool Test Aync #3"), time_3 / time_1);
+	HLVM_CLOG_OR_FATAL(time_3 / time_1 > 1, LogTest, info, TXT("Result : Pool Test Thread #1 = {0:.2f}x faster than Pool Test Aync #3"), time_3 / time_1);
 };

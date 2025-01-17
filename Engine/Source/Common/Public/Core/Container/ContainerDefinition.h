@@ -44,8 +44,14 @@ using TVector = boost::container::vector<T, Allocator>;
 template <typename Key, typename Value, typename Allocator = std::allocator<std::pair<Key, Value>>>
 using TMap = phmap::flat_hash_map<Key, Value, std::hash<Key>, std::equal_to<Key>, Allocator>;
 
-template <typename Key, typename Value, typename Allocator = std::allocator<std::pair<Key, Value>>>
-using TStableMap = phmap::node_hash_map<Key, Value, std::hash<Key>, std::equal_to<Key>, Allocator>;
+// template <typename Key, typename Value, typename Allocator = std::allocator<std::pair<Key, Value>>>
+// using TStableMap = phmap::node_hash_map<Key, Value, std::hash<Key>, std::equal_to<Key>, Allocator>;
+
+template <typename T, typename Allocator = std::allocator<T>>
+using TSet = phmap::flat_hash_set<T, std::hash<T>, std::equal_to<T>, Allocator>;
+
+// template <typename T, typename Allocator = std::allocator<T>>
+// using TStableSet = phmap::node_hash_set<T, std::hash<T>, std::equal_to<T>, Allocator>;
 
 #define HLVM_MAP_FIND(map, key)        \
 	if (auto iter = (map).find((key)); \

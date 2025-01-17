@@ -9,6 +9,9 @@
 #define PADDING(size) TBYTE TOKENPASTE2(__padding_, __LINE__)[size]
 #define TOKENPASTE2LINE(varname) TOKENPASTE2(varname, __LINE__)
 
-#define BIT_FLAG(x) bool x // bool x : 1 // May not be reliable for all compilers (e.g. msvc, gnu, clang), so disable, padding for bool may generally be a bad idea
+// bool x : 1 // May not be reliable for all compilers (e.g. msvc, gnu, clang), so disable, padding for bool may generally be a bad idea
+#define BIT_FLAG(x) bool x
 
 #define INVALID_INDEX_SIZE_T() std::numeric_limits<size_t>::max()
+
+#define DEPRECATED(Version, Message) [[deprecated(Message)]]

@@ -39,10 +39,13 @@ FWorkStealThreadPool::FWorkStealThreadPool(const FThreadAffinityMode& AffinityMo
 	for (uint32_t i = 0; i < mCount; ++i)
 	{
 		auto Func = [this, index = i] {
-			if constexpr (HLVM_DEBUG_THREAD_UTIL)
+			if constexpr (HLVM_DEBUG_THREAD_UTILITY)
 			{
 				HLVM_LOG(LogWorkStealThreadPool, trace, TXT("Thread {} created"), index);
 			}
+			// Register TID as worker thread
+			FWorkerPoolTIDUtil::TIDRegisterScoped tidRegister{};
+
 			auto& Queue = mQueues[index];
 			for (;;)
 			{
@@ -52,12 +55,12 @@ FWorkStealThreadPool::FWorkStealThreadPool(const FThreadAffinityMode& AffinityMo
 				 */
 				for (uint32_t n = 0; n < mCount; ++n)
 				{
-					auto stolen = (index + n) % mCount;
-					if (mQueues[stolen]->PopFront<true>(task))
+					auto stolenFromIndex = (index + n) % mCount;
+					if (mQueues[stolenFromIndex]->PopFront<true>(task))
 					{
-						if constexpr (HLVM_DEBUG_THREAD_UTIL)
+						if constexpr (HLVM_DEBUG_THREAD_UTILITY)
 						{
-							HLVM_LOG(LogWorkStealThreadPool, trace, TXT("Thread {} stole job from {}"), index, stolen);
+							HLVM_LOG(LogWorkStealThreadPool, trace, TXT("Thread {} stole job from {}"), index, stolenFromIndex);
 						}
 						break;
 					}
@@ -69,13 +72,14 @@ FWorkStealThreadPool::FWorkStealThreadPool(const FThreadAffinityMode& AffinityMo
 				{
 					if (Queue->PopFront<false>(task))
 					{
-						if constexpr (HLVM_DEBUG_THREAD_UTIL)
+						if constexpr (HLVM_DEBUG_THREAD_UTILITY)
 						{
-							HLVM_LOG(LogWorkStealThreadPool, trace, TXT("Thread {} no stole job"), index);
+							HLVM_LOG(LogWorkStealThreadPool, trace, TXT("Thread {} no stole job but wait on self"), index);
 						}
 					}
 					else
 					{
+						// If should stop, stop the thread
 						if (Queue->ShouldStopPop())
 						{
 							break;
@@ -87,9 +91,9 @@ FWorkStealThreadPool::FWorkStealThreadPool(const FThreadAffinityMode& AffinityMo
 				}
 				HLVM_ASSERT(task, TXT("Task is null"));
 
-				if constexpr (HLVM_DEBUG_THREAD_UTIL)
+				if constexpr (HLVM_DEBUG_THREAD_UTILITY)
 				{
-					FScopedTimerLog Timer(FString::Format(TXT("Thread {}"), index));
+					FScopedTimerLog Timer(FString::Format(TXT("Thread {} exec task"), index));
 					task();
 				}
 				else

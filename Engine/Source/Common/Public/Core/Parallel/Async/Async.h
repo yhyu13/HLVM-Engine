@@ -10,9 +10,13 @@
 
 #include <future>
 
+DECLARE_LOG_CATEGORY(LogAsync)
+
 HLVM_ENUM(EAsyncMode, TUINT8,
-	PoolOrderless, // Add to default work steal thread pool (task order not guaranteed! So make sure tasks are not order dependent when launching)
-	PoolOrdered,
+	// Add to default work steal thread pool (task execution order not guaranteed!
+	// As parallelism does not work with sequential execution in mind. So make sure tasks and variables passed in are not order dependent when launching)
+	// Especially loop index should be copied on value!
+	PoolOrderlessExec,
 	StandAlone // Startup a new thread
 );
 
@@ -28,7 +32,17 @@ public:
 	template <typename F, typename... Args>
 	HLVM_NODISCARD HLVM_STATIC_FUNC auto Launch(EAsyncMode mode, F&& f, Args&&... args)
 	{
-		if (mode == EAsyncMode::PoolOrderless)
+		bool bCanUsePool = mode == EAsyncMode::PoolOrderlessExec;
+		if (bCanUsePool)
+		{
+			bCanUsePool = FWorkerPoolTIDUtil::IsThreadValidToUseWorkerPool();
+			if (!bCanUsePool)
+			{
+				HLVM_LOG(LogAsync, critical, TXT("Launch cannot use pool, thread {} is not valid to use pool!"), GCurrentTID64);
+			}
+		}
+
+		if (bCanUsePool)
 		{
 			return FWorkStealThreadPool::Get()->EnqueueTask(FwdTemp<F>(f), FwdTemp<Args>(args)...);
 		}

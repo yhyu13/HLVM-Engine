@@ -4,14 +4,15 @@
 
 #pragma once
 
-#ifndef HLVM_ENABLE_FIBER_POOL
+#ifndef HLVM_ENABLE_BOOST_FIBER_POOL
 	/**
-	 * Fiber pool segfaults on Ubuntu20.04 x64 with Mimalloc for no apparent reasons, so disable it
+	 * Boost fiber pool segfaults on Ubuntu20.04 x64 with Mimalloc for no apparent reasons, so disable it
+	 * Also codes in this file maybe deprecated
 	 */
-	#define HLVM_ENABLE_FIBER_POOL 0
+	#define HLVM_ENABLE_BOOST_FIBER_POOL 0
 #endif
 
-#if HLVM_ENABLE_FIBER_POOL
+#if HLVM_ENABLE_BOOST_FIBER_POOL
 
 	#include "Core/Parallel/ConcurrentQueue.h"
 	#include "AsyncConfig.h"

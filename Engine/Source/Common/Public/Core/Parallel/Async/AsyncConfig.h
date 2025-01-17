@@ -302,3 +302,42 @@ public:
 		return FThreadAffinityMode{ hlvm_private::Bg8PhysicalCores };
 	}
 };
+
+class FWorkerPoolTIDUtil
+{
+public:
+	struct TIDRegisterScoped
+	{
+		TIDRegisterScoped()
+		{
+			ATOMIC_LOCK_GUARD(sWorkerPoolTIDsLock);
+			sWorkerPoolTIDs.emplace(GCurrentTID64);
+		}
+
+		~TIDRegisterScoped()
+		{
+			ATOMIC_LOCK_GUARD(sWorkerPoolTIDsLock);
+			sWorkerPoolTIDs.erase(GCurrentTID64);
+		}
+	};
+
+	// Threads that are worker thread are not valid to use worker pool in order to prevent recursive call that stall all worker pools
+	HLVM_STATIC_FUNC bool IsThreadValidToUseWorkerPool()
+	{
+		ATOMIC_LOCK_GUARD(sWorkerPoolTIDsLock);
+		if (sWorkerPoolTIDs.empty())
+			HLVM_UNLIKELY
+			{
+				return true;
+			}
+		else
+			HLVM_LIKELY
+			{
+				return std::find(sWorkerPoolTIDs.begin(), sWorkerPoolTIDs.end(), GCurrentTID64) == sWorkerPoolTIDs.end();
+			}
+	}
+
+private:
+	HLVM_INLINE_VAR HLVM_STATIC_VAR FAtomicFlag sWorkerPoolTIDsLock;
+	HLVM_INLINE_VAR HLVM_STATIC_VAR TSet<TUINT64> sWorkerPoolTIDs;
+};

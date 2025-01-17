@@ -64,6 +64,7 @@ public:
 	bool PopFront(TaskType& Task) noexcept
 	{
 	TRY_POP:
+		// Regardless "bTryPop" is true or not, try to pop from higher priority to lower
 		for (int i = ETaskPriority_NUM - 1; i >= 0; --i)
 		{
 			if (mTaskQueues[i].template PopFront<true>(Task))
@@ -74,6 +75,7 @@ public:
 
 		if constexpr (!bTryPop)
 		{
+			// Yield and then block until task queue is not empty
 			std::this_thread::yield();
 			{
 				std::unique_lock<std::mutex> lock(mMutex);
@@ -81,6 +83,7 @@ public:
 					return true;
 				});
 			}
+			// if not stop pop, try pop again
 			if (!ShouldStopPop())
 			{
 				goto TRY_POP;
@@ -89,6 +92,10 @@ public:
 		return false;
 	}
 
+	/**
+	 * Check if should stop pop, only stop when all priority queue should stop pop
+	 * @return true if should stop pop
+	 */
 	bool ShouldStopPop() const noexcept
 	{
 		bool bShouldStop = true;

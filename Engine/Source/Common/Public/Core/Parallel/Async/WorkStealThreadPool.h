@@ -29,9 +29,12 @@ public:
 		using TaskRetType = std::invoke_result_t<F, Args...>;
 		using TaskType = std::packaged_task<TaskRetType()>;
 
+		// Check if the current thread is valid to use the worker pool
+		HLVM_ASSERT(FWorkerPoolTIDUtil::IsThreadValidToUseWorkerPool(), TXT("IsThreadValidToUseWorkerPool false for thread {}"), GCurrentTID64);
+
 		auto task = new TaskType(std::bind(std::forward<F>(f), std::forward<Args>(args)...));
 		auto result = task->get_future();
-		// Since "task" is a pointer type, it is fine to just copy it to the lambda
+		// Since "task" is a pointer type, it is fine to just copy by value
 		auto	   work = [task]() { (*task)(); delete task; };
 		const auto index = (mJobIndex.fetch_add(1, std::memory_order_relaxed) % mCount);
 		mQueues[index]->Push(Priority, MoveTemp(work));

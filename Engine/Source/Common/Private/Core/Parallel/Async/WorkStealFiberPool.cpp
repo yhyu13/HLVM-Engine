@@ -4,7 +4,7 @@
 
 #include "Core/Parallel/Async/WorkStealFiberPool.h"
 
-#if HLVM_ENABLE_FIBER_POOL
+#if HLVM_ENABLE_BOOST_FIBER_POOL
 	#include "Platform/GenericPlatformThreadUtil.h"
 
 DECLARE_LOG_CATEGORY(LogWorkStealFiberPool);
@@ -43,12 +43,12 @@ FWorkStealFiberPool::FWorkStealFiberPool(const FThreadAffinityMode& AffinityMode
 	for (uint32_t i = 0; i < mCount; ++i)
 	{
 		auto Func = [this
-	#if HLVM_DEBUG_THREAD_UTIL
+	#if HLVM_DEBUG_THREAD_UTILITY
 						,
 						index = i
 	#endif
 		] {
-			if constexpr (HLVM_DEBUG_THREAD_UTIL)
+			if constexpr (HLVM_DEBUG_THREAD_UTILITY)
 			{
 				HLVM_LOG(LogWorkStealFiberPool, trace, TXT("Fiber {} created"), index);
 			}
@@ -80,7 +80,7 @@ FWorkStealFiberPool::FWorkStealFiberPool(const FThreadAffinityMode& AffinityMode
 				ProcType task;
 				if (mQueue.PopFront<false>(task))
 				{
-					if constexpr (HLVM_DEBUG_THREAD_UTIL)
+					if constexpr (HLVM_DEBUG_THREAD_UTILITY)
 					{
 						HLVM_LOG(LogWorkStealFiberPool, trace, TXT("Fiber {} stole job"), index);
 					}
