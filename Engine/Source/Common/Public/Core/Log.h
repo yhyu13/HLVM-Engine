@@ -15,7 +15,7 @@
 	#undef SPDLOG_ACTIVE_LEVEL
 #endif
 #define SPDLOG_ACTIVE_LEVEL 0
-#define HLVM_SPDLOG_USE_ASYNC 1 //! TODO : Maybe consider no async log for HLVM_BUILD_DEBUG
+#define HLVM_SPDLOG_USE_ASYNC (!HLVM_BUILD_DEBUG)
 #include <spdlog/spdlog.h>
 #if HLVM_SPDLOG_USE_ASYNC
 	#include <spdlog/async.h>
@@ -30,27 +30,31 @@ struct FLogCatgegory
 	NOCOPYMOVE(FLogCatgegory)
 	FLogCatgegory() = delete;
 	constexpr explicit FLogCatgegory(const TCHAR* CategoryName,
-		const spdlog::level::level_enum			  Level =
+		const spdlog::level::level_enum			  MinimumLogLevel =
 #if !HLVM_BUILD_RELEASE
 			spdlog::level::trace
-#else
+#else // Release build forbid all traces logs to reduce log frequences, change this behavior as your need though
 			spdlog::level::info
 #endif
 		)
-		: Name(CategoryName), LogLevel(Level)
+		: Name(CategoryName), LogLevel(MinimumLogLevel)
 	{
 	}
 	const TCHAR*					Name;
-	const spdlog::level::level_enum LogLevel;
+	const spdlog::level::level_enum LogLevel; // Minimum Log level, below this level will ignore
 };
 
-// Macro for declare a log category
+// Macro for declare & define a log category, each unique log category should only call this macro once
 #define DECLARE_LOG_CATEGORY(category) \
 	HLVM_INLINE_VAR constexpr FLogCatgegory category = FLogCatgegory(TXT(#category));
 #define DELCARE_LOG_CATEGORY2(category, _level) \
 	HLVM_INLINE_VAR constexpr FLogCatgegory category = FLogCatgegory(TXT(#category), spdlog::level::_level);
 
+/**
+ * Define basic log categories
+ */
 DECLARE_LOG_CATEGORY(LogAssert)
+// Use LogTemp as default log category if you don't know what to use
 DECLARE_LOG_CATEGORY(LogTemp)
 
 /**
@@ -198,28 +202,28 @@ private:
 				->Pump(FLogContext{                                                                    \
 						   .Category = &_Category,                                                     \
 						   .LogLevel = spdlog::level::_level,                                          \
-						   .FileName = TO_TCHAR_CSTR(&std::string_view(ct_strrchr(__FILE__, '/'))[1]),  \
+						   .FileName = TO_TCHAR_CSTR(&std::string_view(ct_strrchr(__FILE__, '/'))[1]), \
 						   .Line = __LINE__ },                                                         \
 					fmt, ##__VA_ARGS__);                                                               \
 	}                                                                                                  \
 	while (0)
 
-#define HLVM_CLOG(_COND, _Category, _level, fmt, ...)                                                     \
-	do                                                                                                    \
-	{                                                                                                     \
-		if constexpr (static_cast<int>(spdlog::level::_level) >= static_cast<int>(_Category.LogLevel))    \
-			if (static_cast<bool>(_COND))                                                                 \
-				FLogRedirector::Get()                                                                     \
-					->Pump(FLogContext{                                                                   \
-							   .Category = &_Category,                                                    \
-							   .LogLevel = spdlog::level::_level,                                         \
+#define HLVM_CLOG(_COND, _Category, _level, fmt, ...)                                                      \
+	do                                                                                                     \
+	{                                                                                                      \
+		if constexpr (static_cast<int>(spdlog::level::_level) >= static_cast<int>(_Category.LogLevel))     \
+			if (static_cast<bool>(_COND))                                                                  \
+				FLogRedirector::Get()                                                                      \
+					->Pump(FLogContext{                                                                    \
+							   .Category = &_Category,                                                     \
+							   .LogLevel = spdlog::level::_level,                                          \
 							   .FileName = TO_TCHAR_CSTR(&std::string_view(ct_strrchr(__FILE__, '/'))[1]), \
-							   .Line = __LINE__ },                                                        \
-						fmt, ##__VA_ARGS__);                                                              \
-	}                                                                                                     \
+							   .Line = __LINE__ },                                                         \
+						fmt, ##__VA_ARGS__);                                                               \
+	}                                                                                                      \
 	while (0)
 
-#define HLVM_CLOG_OR_FATAL(_COND, _Category, _level, fmt, ...)                                                       \
+#define HLVM_CLOG_ELSE_FATAL(_COND, _Category, _level, fmt, ...)                                                     \
 	do                                                                                                               \
 	{                                                                                                                \
 		if constexpr (static_cast<int>(spdlog::level::_level) >= static_cast<int>(_Category.LogLevel))               \
@@ -227,7 +231,7 @@ private:
 				->Pump(FLogContext{                                                                                  \
 						   .Category = &_Category,                                                                   \
 						   .LogLevel = (static_cast<bool>(_COND)) ? spdlog::level::_level : spdlog::level::critical, \
-						   .FileName = TO_TCHAR_CSTR(&std::string_view(ct_strrchr(__FILE__, '/'))[1]),                \
+						   .FileName = TO_TCHAR_CSTR(&std::string_view(ct_strrchr(__FILE__, '/'))[1]),               \
 						   .Line = __LINE__ },                                                                       \
 					fmt, ##__VA_ARGS__);                                                                             \
 	}                                                                                                                \

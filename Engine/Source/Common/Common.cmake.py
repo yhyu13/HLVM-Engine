@@ -21,7 +21,10 @@ vcpkg_cxt = VcpkgContenxt(vcpkg_root_path='../Dependency/vcpkg',
                                                             "sol2",
                                                             "pybind11",
                                                             "taskflow",
-                                                            "glfw3"
+                                                            "glfw3",
+                                                            "glm",
+                                                            "dylib",
+                                                            "vulkan-headers",
                                                         ]))
 
 # Find the spdlog package with the specified options
@@ -120,6 +123,28 @@ glfw3 = FindPackage(name='glfw3',
                        dependant_target_link_libs=[
                            DomainValueModel(domain=DomainEnum.PUBLIC, values=['glfw'])])
 
+# Find the glm package with the specified options
+glm = FindPackage(name='glm',
+                    config=True,
+                    required=True,
+                    dependant_target_link_libs=[
+                        DomainValueModel(domain=DomainEnum.PUBLIC, values=['glm::glm'])])
+
+
+# Find the dylib package with the specified options
+dylib = FindPackage(name='dylib',
+                    config=True,
+                    required=True,
+                    dependant_target_include_dirs=[
+                        DomainValueModel(domain=DomainEnum.PUBLIC, values=['${DYLIB_INCLUDE_DIRS}'])])
+
+# Find the vulkan-headers package with the specified options
+vulkan_header = FindPackage(name='VulkanHeaders',
+                    config=True,
+                    required=False,
+                    dependant_target_link_libs=[
+                        DomainValueModel(domain=DomainEnum.PUBLIC, values=['Vulkan::Headers'])])
+
 
 ##########################################################
 
@@ -202,6 +227,9 @@ class CommonModule(BaseModule):
                                         sol2,
                                         taskflow,
                                         glfw3,
+                                        glm,
+                                        dylib,
+                                        vulkan_header,
                                         ]
                          )
         self.target_interface.add_compile_options(domain=DomainEnum.PUBLIC, values=[

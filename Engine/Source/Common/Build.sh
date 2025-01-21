@@ -209,7 +209,7 @@ for config in "${buildConfigs[@]}"; do
       for ((i = 0 ; i < TestRepeatNum ; i++ )); do
         # Maually run test in each bg job parallely
         pids=()
-        max_jobs=4
+        max_jobs=8
         # Function to kill all background jobs
         kill_jobs() {
             for pid in "${pids[@]}"; do
@@ -222,6 +222,7 @@ for config in "${buildConfigs[@]}"; do
         }
         # Set a trap to call kill_jobs on termination signals
         trap kill_jobs SIGINT SIGTERM
+        test_cmds=()
         test_logs=()
 
         # scan test dir and parallel execute ctest in each subprocess
@@ -244,12 +245,13 @@ for config in "${buildConfigs[@]}"; do
           output_log="${CWD_DIR}/Testing/build_test_${config}_${test_target}.log"
           cmd="(${test_cmd} || exit 1) | tee "${output_log}" 2>&1"
           # execute command in background
-          timeout 600 bash -c "${cmd}" &
+          timeout 120 bash -c "${cmd}" &
           # Add PID to array
           job=$!
           echo_color 34 "Testing ${test_target} pid: ${job}"
           pids+=(${job})
           test_logs+=("${output_log}")
+          test_cmds+=("${cmd}")
           if [ ${#pids[@]} -ge ${max_jobs} ]; then
               # Wait all tests finish
               wait
@@ -262,19 +264,22 @@ for config in "${buildConfigs[@]}"; do
 
         all_success=1
         for i in "${!test_logs[@]}"; do
+            test_cmd=${test_cmds[$i]}
             test_log=${test_logs[$i]}
             test_target=${test_log#${CWD_DIR}/Testing/build_test_${config}_}
             test_target=${test_target%.log}
             # If test log does not contain "100% tests passed, 0 tests failed ", output error log
             if ! grep -q "100% tests passed, 0 tests failed" "${test_log}"; then
-                echo_color 31 "Testing ${config} ${test_target} failed, checkout ${test_log}"
+                echo_color 31 "Testing Config ${config} Target ${test_target} failed, checkout ${test_log}, test command ${test_cmd}"
                 bash -c "code ${test_log}" &
                 all_success=0
             fi
         done
         if [ ${all_success} -eq 0 ]; then
-            echo_color 31 "Testing ${config} failed, checkout ${CWD_DIR}/Testing/build_test_${config}_*"
+            echo_color 31 "Testing Config ${config} failed, log at ${CWD_DIR}/Testing/build_test_${config}_*.log"
             exit 1
+        else
+            echo_color 32 "Testing Config ${config} success, log at ${CWD_DIR}/Testing/build_test_${config}_*.log"
         fi
       done
     fi
@@ -310,5 +315,5 @@ for config in "${buildConfigs[@]}"; do
     fi
 done
 
-echo_color 32 "\n\nFinished building all targets...exiting"
+echo_color 32 "\n\nFinished Build.sh ... exiting"
 }
