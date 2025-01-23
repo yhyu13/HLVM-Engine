@@ -1,9 +1,9 @@
 from PyCMake.cmakecpp import *
 
 # Create a VcpkgContext object with the specified path for vcpkg root and version
-vcpkg_cxt = VcpkgContenxt(vcpkg_root_path='../Dependency/vcpkg',
+vcpkg_cxt_common = VcpkgContenxt(vcpkg_root_path='../Dependency/vcpkg',
                           vcpkg_config=VcpkgConfigModel(name='Common',
-                                                        version='0.2.0',
+                                                        version='0.2.1',
                                                         dependencies=[
                                                             "spdlog",
                                                             VcpkgPackage(name="mimalloc", features=["asm", "secure"],
@@ -205,7 +205,7 @@ class CommonModule(BaseModule):
     def __init__(self):
         super().__init__(module=ModuleTargetModel(target='Common',
                                                   type=ModuleEnum.SHARED if bBuildShared else ModuleEnum.STATIC,
-                                                  source_files=glob_cmake_paths([GlobModel(path='./Private/**/*.cpp',
+                                                  source_files=PyCMakeUtil.glob([PyCMakeUtil.GlobModel(path='./Private/**/*.cpp',
                                                                                            recursive=True)
                                                                                  ]),
                                                   unity_build=True),
@@ -254,7 +254,7 @@ class TestCommonModule(BaseModule):
     def __init__(self, cpp_path: str):
         super().__init__(module=ModuleTargetModel(target=os.path.basename(cpp_path).split('.')[0],
                                                   type=ModuleEnum.EXECUTABLE_AND_TEST,
-                                                  source_files=[ToCMakePath(cpp_path)],
+                                                  source_files=[cpp_path],
                                                   unity_build=False),
                          fetch_packages=[],
                          find_packages=[]
@@ -273,10 +273,7 @@ class CommonProject(BaseProject):
     def __init__(self, **kwargs):
         super().__init__(name='Common',
                          version='3.14',
-                         vcpkg_context=vcpkg_cxt, **kwargs)
-
-        # Vcpkg Dependencies
-        vcpkg_cxt.dump('./vcpkg.json')
+                         vcpkg_context=vcpkg_cxt_common, **kwargs)
 
         # Linker
         if bBuildShared:
@@ -324,6 +321,6 @@ if __name__ == '__main__':
     os.chdir(_dir)
 
     # write cmake file
-    dump_to_cmake_list([
+    PyCMakeUtil.dump_to_cmake_list([
         CommonProject()
     ], './')

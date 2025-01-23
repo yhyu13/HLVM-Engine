@@ -5,6 +5,7 @@ Intermediate/
 Testing/
 CMakeLists.txt
 vcpkg.json
+__pycache__/
 
 *.o
 *.a
