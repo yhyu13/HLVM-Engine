@@ -7,7 +7,6 @@ vcpkg_ctx_runtime = VcpkgContenxt(vcpkg_root_path='../Dependency/vcpkg',
                                                         dependencies=[
                                                             "glfw3",
                                                             "glm",
-                                                            "dylib",
                                                             "vulkan-headers",
                                                             "assimp",
                                                             "bullet3",
@@ -21,17 +20,47 @@ from Common import Common_cmake
 vcpkg_ctx_runtime.merge_vckpkg_context(Common_cmake.vcpkg_cxt_common)
 
 
+# Find the glfw package with the specified options
+glfw3 = FindPackage(name='glfw3',
+                    config=True,
+                    required=True,
+                    dependant_target_link_libs=[
+                        DomainValueModel(domain=DomainEnum.PUBLIC, values=['glfw'])])
+
+# Find the glm package with the specified options
+glm = FindPackage(name='glm',
+                  config=True,
+                  required=True,
+                  dependant_target_link_libs=[
+                      DomainValueModel(domain=DomainEnum.PUBLIC, values=['glm::glm'])])
+
+# Find the vulkan-headers package with the specified options
+vulkan_header = FindPackage(name='VulkanHeaders',
+                            config=True,
+                            required=False,
+                            dependant_target_link_libs=[
+                                DomainValueModel(domain=DomainEnum.PUBLIC, values=['Vulkan::Headers'])])
+
+"""
+Global Config :
+"""
+bThreadSanitizer = False
+bBuildShared = False
+
 # Create a RuntimeModule object with the specified options
 class RuntimeModule(BaseModule):
     def __init__(self):
         super().__init__(module=ModuleTargetModel(target='Runtime',
-                                                  type=ModuleEnum.STATIC,
+                                                  type=ModuleEnum.SHARED if bBuildShared else ModuleEnum.STATIC,
                                                   source_files=PyCMakeUtil.glob([PyCMakeUtil.GlobModel(path='./Private/**/*.cpp',
                                                                                            recursive=True)
                                                                                  ]),
                                                   unity_build=True),
                          fetch_packages=[],
-                         find_packages=[]
+                         find_packages=[glfw3,
+                                        glm,
+                                        vulkan_header
+                                        ]
                          )
         self.target_interface.add_compile_options(domain=DomainEnum.PUBLIC, values=[
             '$<$<COMPILE_LANGUAGE:C>: -Wall -Wextra -pedantic -Werror>',
@@ -40,10 +69,21 @@ class RuntimeModule(BaseModule):
             '$<$<COMPILE_LANGUAGE:CXX>:-Wno-error=global-constructors -Wno-error=exit-time-destructors -Wno-error=unsafe-buffer-usage -Wno-error=unused-function -Wno-error=unused-but-set-variable -Wno-error=unused-variable -Wno-error=unused-member-function>'
         ])
 
+        # Do we have to include subdirectory's include paths? probably not
+        self.target_interface.add_include_dirs(domain=DomainEnum.PUBLIC,
+                                       values=['./../Common/Public'])
+        self.target_interface.add_include_dirs(domain=DomainEnum.PUBLIC,
+                                               values=['./../Common/Test'])
         self.target_interface.add_include_dirs(domain=DomainEnum.PUBLIC,
                                                values=['./Public'])
         self.target_interface.add_pch_files(domain=DomainEnum.PUBLIC,
                                             values=['./Public/Runtime.shared.pch'])
+        self.target_interface.add_link_libs(domain=DomainEnum.PUBLIC, values=['Common'])
+
+
+        if bThreadSanitizer:
+            self.target_interface.add_compile_options(domain=DomainEnum.PUBLIC, values=['${HLVM_CMAKE_CXX_FLAGS_TSAN}'])
+            self.target_interface.add_link_libs(domain=DomainEnum.PUBLIC, values=['tsan'])
 
 
 # Create a TestRuntimeModule object with the specified options
@@ -60,6 +100,12 @@ class TestRuntimeModule(BaseModule):
                                             values=['Runtime'])
         self.target_interface.add_link_libs(domain=DomainEnum.PRIVATE, values=['Runtime'])
 
+        if bBuildShared:
+            # TODO : windows platform compatibility check!
+            # https://gitlab.kitware.com/cmake/cmake/-/issues/20289
+            self.target_interface.add_compile_options(domain=DomainEnum.PRIVATE, values=['-fPIC'])
+
+
 
 # Create a RuntimeProject object with the specified options
 class RuntimeProject(BaseProject):
@@ -73,20 +119,34 @@ class RuntimeProject(BaseProject):
                                                     output_dir="Common.output",
                                                     exclude_by_default=True))
 
+        # Linker
+        if bBuildShared:
+            self.global_interface.add_global_set('CMAKE_POSITION_INDEPENDENT_CODE', ['ON'])
+        else:
+            self.global_interface.add_global_set('CMAKE_POLICY_DEFAULT_CMP0069', ['NEW'])
+            self.global_interface.add_global_set('CMAKE_INTERPROCEDURAL_OPTIMIZATION', ['ON'])
+        self.global_interface.add_global_set('CMAKE_LINKER_TYPE', ['GOLD'])
+
+        # Compiler
         self.global_interface.add_global_set('CMAKE_EXPORT_COMPILE_COMMANDS', ['ON'])
         self.global_interface.add_global_set('CMAKE_C_STANDARD', ['23'])
         self.global_interface.add_global_set('CMAKE_CXX_STANDARD', ['23'])
         self.global_interface.add_global_set('CMAKE_DEBUG_POSTFIX', ['d'])
+
+        # Output
         bin_output_dir = '${PROJECT_SOURCE_DIR}/Binary/${CMAKE_BUILD_TYPE}'
         self.global_interface.add_global_set('CMAKE_RUNTIME_OUTPUT_DIRECTORY', [bin_output_dir])
         self.global_interface.add_global_set('CMAKE_LIBRARY_OUTPUT_DIRECTORY', [bin_output_dir])
         self.global_interface.add_global_set('CMAKE_ARCHIVE_OUTPUT_DIRECTORY', [bin_output_dir])
 
+        # Definitions
+        self.global_interface.add_global_set('HLVM_CMAKE_CXX_FLAGS_TSAN', ['-fsanitize=thread'])
         self.global_interface.add_compile_definitions(domain=DomainEnum.GLOBAL,
                                                       values=["$<$<CONFIG:Debug>:HLVM_BUILD_DEBUG=1>",
                                                               "$<$<CONFIG:RelWithDebInfo>:HLVM_BUILD_DEVELOPMENT=1>",
                                                               "$<$<CONFIG:Release>:HLVM_BUILD_RELEASE=1>",
-                                                              "$<$<CONFIG:MinSizeRel>:HLVM_BUILD_RELEASE=1>"])
+                                                              "$<$<CONFIG:MinSizeRel>:HLVM_BUILD_RELEASE=1>",
+                                                              f"HLVM_COMMON_DYNAMIC_LINKED={bBuildShared * 1}"])
 
 
         self.modules.append(RuntimeModule())

@@ -21,8 +21,6 @@ vcpkg_cxt_common = VcpkgContenxt(vcpkg_root_path='../Dependency/vcpkg',
                                                             "sol2",
                                                             "pybind11",
                                                             "taskflow",
-                                                            "glfw3",
-                                                            "glm",
                                                             "dylib",
                                                             "vulkan-headers",
                                                         ]))
@@ -115,21 +113,6 @@ taskflow = FindPackage(name='Taskflow',
                    required=True,
                    dependant_target_link_libs=[
                        DomainValueModel(domain=DomainEnum.PUBLIC, values=['Taskflow::Taskflow'])])
-
-# Find the glfw package with the specified options
-glfw3 = FindPackage(name='glfw3',
-                       config=True,
-                       required=True,
-                       dependant_target_link_libs=[
-                           DomainValueModel(domain=DomainEnum.PUBLIC, values=['glfw'])])
-
-# Find the glm package with the specified options
-glm = FindPackage(name='glm',
-                    config=True,
-                    required=True,
-                    dependant_target_link_libs=[
-                        DomainValueModel(domain=DomainEnum.PUBLIC, values=['glm::glm'])])
-
 
 # Find the dylib package with the specified options
 dylib = FindPackage(name='dylib',
@@ -226,8 +209,6 @@ class CommonModule(BaseModule):
                                         luajit,
                                         sol2,
                                         taskflow,
-                                        glfw3,
-                                        glm,
                                         dylib,
                                         vulkan_header,
                                         ]
@@ -287,16 +268,16 @@ class CommonProject(BaseProject):
         self.global_interface.add_global_set('CMAKE_EXPORT_COMPILE_COMMANDS', ['ON'])
         self.global_interface.add_global_set('CMAKE_C_STANDARD', ['23'])
         self.global_interface.add_global_set('CMAKE_CXX_STANDARD', ['23'])
+        self.global_interface.add_global_set('CMAKE_DEBUG_POSTFIX', ['d'])
 
         # Output
-        self.global_interface.add_global_set('CMAKE_DEBUG_POSTFIX', ['d'])
         bin_output_dir = '${PROJECT_SOURCE_DIR}/Binary/${CMAKE_BUILD_TYPE}'
         self.global_interface.add_global_set('CMAKE_RUNTIME_OUTPUT_DIRECTORY', [bin_output_dir])
         self.global_interface.add_global_set('CMAKE_LIBRARY_OUTPUT_DIRECTORY', [bin_output_dir])
         self.global_interface.add_global_set('CMAKE_ARCHIVE_OUTPUT_DIRECTORY', [bin_output_dir])
-        self.global_interface.add_global_set('HLVM_CMAKE_CXX_FLAGS_TSAN', ['-fsanitize=thread'])
 
         # Definitions
+        self.global_interface.add_global_set('HLVM_CMAKE_CXX_FLAGS_TSAN', ['-fsanitize=thread'])
         self.global_interface.add_compile_definitions(domain=DomainEnum.GLOBAL,
                                                       values=["$<$<CONFIG:Debug>:HLVM_BUILD_DEBUG=1>",
                                                               "$<$<CONFIG:RelWithDebInfo>:HLVM_BUILD_DEVELOPMENT=1>",

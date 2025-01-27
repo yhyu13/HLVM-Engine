@@ -4,6 +4,7 @@
 
 #include "Test.h"
 #include "Core/Log.h"
+#include "Core/Parallel/Async/Async.h"
 
 DECLARE_LOG_CATEGORY(LogTest)
 
@@ -20,7 +21,6 @@ DECLARE_LOG_CATEGORY(LogTest)
 
 #define GLAD_GL_IMPLEMENTATION
 #include "TestGLFW3_Data/deps/glad/gl.h"
-#include "Core/Parallel/Async/Async.h"
 
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
