@@ -4,16 +4,13 @@
 
 #pragma once
 
+#include "GlobalDefinition.h"
 #include "Math/MathDefinitions.h"
 
 // RHI Interface Types
 enum class ERHIInterfaceType : TUINT8
 {
 	Vulkan,
-	//D3D11,
-	//D3D12,
-	//OpenGL,
-	//Metal,
 	Null,
 	// Add other RHI types as needed
 };
@@ -122,12 +119,6 @@ inline const TCHAR* GetRHIName(ERHIInterfaceType Type)
 	switch (Type)
 	{
 		case ERHIInterfaceType::Vulkan: return TXT("Vulkan");
-//		case ERHIInterfaceType::D3D11: return TXT("DirectX 11");
-//		case ERHIInterfaceType::D3D12: return TXT("DirectX 12");
-//		case ERHIInterfaceType::OpenGL: return TXT("OpenGL");
-//		case ERHIInterfaceType::Metal: return TXT("Metal");
 		case ERHIInterfaceType::Null: return TXT("Null");
-		default:
-			return nullptr;
 	}
 };

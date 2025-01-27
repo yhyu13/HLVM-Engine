@@ -240,9 +240,9 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityF
 	else if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
 		std::cerr << "Warning Message: " << pCallbackData->pMessage << std::endl;
 	}
-	else {
+	else if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT) {
 		std::cout << "Info Message: " << pCallbackData->pMessage << std::endl;
-	}
+	} // ignore verbose logs
 	return VK_FALSE;
 }
 
@@ -378,6 +378,12 @@ RECORD_BOOL(vulkan_test1)
 		deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
 		deviceCreateInfo.pQueueCreateInfos = &queueCreateInfo;
 		deviceCreateInfo.queueCreateInfoCount = 1;
+
+		VkPhysicalDeviceFeatures deviceFeatures{};
+		deviceFeatures.geometryShader = true;
+		deviceCreateInfo.pEnabledFeatures = &deviceFeatures;
+		deviceCreateInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
+		deviceCreateInfo.ppEnabledExtensionNames = deviceExtensions.data();
 
 		result = vkCreateDevice(physicalDevice, &deviceCreateInfo, nullptr, &device);
 		CHECK_VK_RESULT(result, "Failed to create logical device!");

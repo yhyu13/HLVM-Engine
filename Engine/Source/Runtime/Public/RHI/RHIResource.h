@@ -26,6 +26,7 @@ enum class ERHIResourceType : TUINT8
 	DepthStencilView,
 	PipelineState,
 	Query,
+	VertexDeclaration,
 	// Add other resource types as needed
 };
 
@@ -53,7 +54,7 @@ public:
 	virtual ~FRHITexture() override = default;
 
 	// Returns the dimensions of the texture
-	virtual FVec3 GetSize() const = 0;
+	virtual FIntVec3 GetSize() const = 0;
 
 	// Returns the pixel format of the texture
 	virtual EPixelFormat GetFormat() const = 0;

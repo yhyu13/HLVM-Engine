@@ -66,6 +66,11 @@ RECORD(boostfile_test, true, 1, 1)
 		HLVM_ENSURE(FPath::Exists("./test.txt"), TXT("Test failed"));
 
 		auto all_matches = FPath::Glob("./", R"(.*Test.*)", true);
+		static auto DumpJson = [](const TSmallVector32<FPath>& paths) -> FString
+		{
+			return FString::Join(
+				paths, [](auto& item) { return FString::Format(TXT("\"{}\""), *item); }, TXT(",\n"));
+		}
 		HLVM_LOG(LogTest, info, TXT("Test FPath::Find result:\n{}"), *FPath::DumpJson(all_matches));
 	}
 }

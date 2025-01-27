@@ -19,6 +19,7 @@ void VulkanLoader::LoadOnce()
 
 #define GET_VK_FUNCTION_PROCADDR(function) \
 	function = reinterpret_cast<PFN_##function>(vulkanlib.get_function<PFN_##function>(#function));
+
 		APPLY_PFN_DEF_VK_FUNCTIONS(GET_VK_FUNCTION_PROCADDR)
 	});
 }

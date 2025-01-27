@@ -138,7 +138,7 @@ RECORD_BOOL(glfw_thread_test)
 				running = GLFW_FALSE;
 		}
 
-		if (running && timer.MarkSec() > 5)
+		if (!running || timer.MarkSec() > 5)
 		{
 			for (i = 0; i < count; i++)
 			{

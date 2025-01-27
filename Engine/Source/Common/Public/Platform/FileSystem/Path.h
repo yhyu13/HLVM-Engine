@@ -79,12 +79,12 @@ public:
 	{
 		return FString(ToCharCStr());
 	}
-
 	// Convert to const TCHAR*
 	operator const TCHAR*() const
 	{
 		return reinterpret_cast<const TCHAR*>(this->c_str());
 	}
+	// Convert to const TCHAR* by left * operator (e.g. const TCHAR* path = *mypath)
 	friend const TCHAR* operator*(const FPath& fs)
 	{
 		return static_cast<const TCHAR*>(fs);
@@ -95,6 +95,7 @@ public:
 	{
 		return this->c_str();
 	}
+	// Convert to const char*
 	const char* ToCharCStr() const
 	{
 		return static_cast<const char*>(*this);
@@ -124,7 +125,21 @@ public:
 	static bool					 IsDirectory(const FPath& path);
 	static bool					 Exists(const FPath& path);
 	static TSmallVector32<FPath> Glob(const FPath& root_dir, const FString& regex, bool recursive = false);
-	static FString				 DumpJson(const TSmallVector32<FPath>& paths);
+
+	// variadic template of combining N paths
+	template <typename... Args>
+	static FPath Combine(const FPath& path1, const FPath& path2, Args&&... args)
+	{
+		FPath result = path1 / path2;
+		if constexpr (sizeof...(args) > 0)
+		{
+			return Combine(result, ForwardTemp<Args>(args)...);
+		}
+		else
+		{
+			return result;
+		}
+	}
 
 private:
 	/**

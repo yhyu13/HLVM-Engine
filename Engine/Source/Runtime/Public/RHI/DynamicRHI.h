@@ -6,34 +6,7 @@
 
 #include "RHIDefinition.h"
 #include "RHIResource.h"
-#include "RHITextureReference.h"
-#include "RHIShader.h"
-#include "RHIBuffer.h"
-#include "RHIVertexDeclaration.h"
-#include "RHIShaderResourceView.h"
-#include "RHIUnorderedAccessView.h"
-#include "RHIRenderPassInfo.h"
-#include "RHIShaderParameters.h"
-#include "RHIShaderParameterStruct.h"
-#include "RHIShaderParameterStructInline.h"
-#include "RHIShaderParameterStructResource.h"
-#include "RHIShaderParameterStructSampler.h"
-#include "RHIShaderParameterStructUniformBuffer.h"
-#include "RHIShaderParameterStructStorageBuffer.h"
-#include "RHIShaderParameterStructRayTracing.h"
-#include "RHIShaderParameterStructInlineUniformBuffer.h"
-#include "RHIShaderParameterStructResourceArray.h"
-#include "RHIShaderParameterStructResourceTable.h"
-#include "RHIShaderParameterStructResourceView.h"
-#include "RHIShaderParameterStructSamplerState.h"
-#include "RHIShaderParameterStructUniformBufferArray.h"
-#include "RHIShaderParameterStructStorageBufferArray.h"
-#include "RHIShaderParameterStructRayTracingArray.h"
-#include "RHIShaderParameterStructInlineUniformBufferArray.h"
-#include "RHIShaderParameterStructResourceArrayArray.h"
-#include "RHIShaderParameterStructResourceTableArray.h"
-#include "RHIShaderParameterStructResourceViewArray.h"
-#include "RHIShaderParameterStructSamplerStateArray.h"
+#include "RHIResourceDeclaration.h"
 
 class FDynamicRHI
 {
@@ -71,27 +44,27 @@ public:
 	virtual void RHIFlushResources() = 0;
 
 	// Viewport and Swap Chain
-	virtual void RHICreateViewport(void* WindowHandle, uint32 Width, uint32 Height, bool bIsFullscreen, EPixelFormat PreferredPixelFormat, FViewportRHIRef& OutViewport) = 0;
-	virtual void RHIResizeViewport(FViewportRHIRef& Viewport, uint32 Width, uint32 Height, bool bIsFullscreen, EPixelFormat PreferredPixelFormat) = 0;
+	virtual void RHICreateViewport(void* WindowHandle, TUINT32 Width, TUINT32 Height, bool bIsFullscreen, EPixelFormat PreferredPixelFormat, FViewportRHIRef& OutViewport) = 0;
+	virtual void RHIResizeViewport(FViewportRHIRef& Viewport, TUINT32 Width, TUINT32 Height, bool bIsFullscreen, EPixelFormat PreferredPixelFormat) = 0;
 	virtual void RHISwapBuffers(FViewportRHIRef& Viewport) = 0;
 
 	// Render Pass and Draw Commands
 	virtual void RHIBeginRenderPass(const FRHIRenderPassInfo& RenderPassInfo, const TCHAR* Name) = 0;
 	virtual void RHIEndRenderPass() = 0;
-	virtual void RHIDrawPrimitive(uint32 BaseVertexIndex, uint32 NumPrimitives, uint32 NumInstances) = 0;
-	virtual void RHIDrawIndexedPrimitive(FRHIBuffer* IndexBuffer, uint32 BaseVertexIndex, uint32 FirstInstance, uint32 NumVertices, uint32 StartIndex, uint32 NumPrimitives, uint32 NumInstances) = 0;
+	virtual void RHIDrawPrimitive(TUINT32 BaseVertexIndex, TUINT32 NumPrimitives, TUINT32 NumInstances) = 0;
+	virtual void RHIDrawIndexedPrimitive(FRHIBuffer* IndexBuffer, TUINT32 BaseVertexIndex, TUINT32 FirstInstance, TUINT32 NumVertices, TUINT32 StartIndex, TUINT32 NumPrimitives, TUINT32 NumInstances) = 0;
 
 	// Compute Dispatch
-	virtual void RHIDispatchComputeShader(uint32 ThreadGroupCountX, uint32 ThreadGroupCountY, uint32 ThreadGroupCountZ) = 0;
+	virtual void RHIDispatchComputeShader(TUINT32 ThreadGroupCountX, TUINT32 ThreadGroupCountY, TUINT32 ThreadGroupCountZ) = 0;
 
 	// Query and Timestamp
 	virtual FRHIQueryRHIRef CreateQuery(ERHIQueryType QueryType) = 0;
 	virtual void RHIBeginQuery(FRHIQueryRHIRef& Query) = 0;
 	virtual void RHIEndQuery(FRHIQueryRHIRef& Query) = 0;
-	virtual void RHIGetQueryResults(FRHIQueryRHIRef& Query, uint64& OutResult, bool bWait) = 0;
+	virtual void RHIGetQueryResults(FRHIQueryRHIRef& Query, TUINT64& OutResult, bool bWait) = 0;
 
 	// Debugging and Profiling
-	virtual void RHIPushEvent(const TCHAR* Name, FColor Color) = 0;
+	virtual void RHIPushEvent(const TCHAR* Name) = 0;
 	virtual void RHIPopEvent() = 0;
 
 	// Memory Management
@@ -100,6 +73,6 @@ public:
 	// Misc
 	virtual void RHISetGraphicsPipelineState(FRHIGraphicsPipelineState* PipelineState) = 0;
 	virtual void RHISetComputePipelineState(FRHIComputePipelineState* PipelineState) = 0;
-	virtual void RHISetViewport(uint32 MinX, uint32 MinY, float MinZ, uint32 MaxX, uint32 MaxY, float MaxZ) = 0;
-	virtual void RHISetScissorRect(bool bEnable, uint32 MinX, uint32 MinY, uint32 MaxX, uint32 MaxY) = 0;
+	virtual void RHISetViewport(TUINT32 MinX, TUINT32 MinY, float MinZ, TUINT32 MaxX, TUINT32 MaxY, float MaxZ) = 0;
+	virtual void RHISetScissorRect(bool bEnable, TUINT32 MinX, TUINT32 MinY, TUINT32 MaxX, TUINT32 MaxY) = 0;
 };

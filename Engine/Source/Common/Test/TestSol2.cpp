@@ -704,7 +704,9 @@ RECORD(sol2_effil_test)
 	{
 		auto	   CWD = boost::filesystem::current_path();
 		const auto DataDir = FString::Format(TXT("{}/{}_Data"), *GExecutablePath, *GExecutableName);
+		// const auto DataDir = FString::Format(TXT("{}/../../Test/{}_Data"), *GExecutablePath, *GExecutableName);
 		const bool bDataDirExist = FGenericPlatformFile::Get(EPlatformFileType::Disk)->Exists(DataDir);
+		// HLVM_ENSURE(bDataDirExist, TXT("Data dir not exist: {}"), *DataDir);
 		if (bDataDirExist)
 		{
 			auto AllLuaFiles = FGenericPlatformFile::Get(EPlatformFileType::Disk)->Glob(DataDir, TXT(R"(.*run_tests\.lua$)"), true);

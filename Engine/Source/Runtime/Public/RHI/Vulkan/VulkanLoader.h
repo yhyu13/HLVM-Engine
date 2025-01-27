@@ -172,7 +172,7 @@ APPLY_PFN_DEF_VK_FUNCTIONS(DEFINE_VK_FUNCTION_MACRO)
 
 class VulkanLoader
 {
+public:
 	NOCOPYMOVE(VulkanLoader)
-
 	static void LoadOnce();
 };

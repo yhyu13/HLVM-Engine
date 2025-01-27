@@ -334,9 +334,11 @@ RECORD(luajit_openresty_testsuit_test)
 {
 	HLVM_PROFILE_CPU_NAMED("luajit_openresty_testsuite_test");
 	{
-		auto	   CWD = boost::filesystem::current_path();
-		const auto DataDir = FString::Format(TXT("{}/{}_Data"), *GExecutablePath, *GExecutableName);
+		auto CWD = boost::filesystem::current_path();
+		// const auto DataDir = FString::Format(TXT("{}/{}_Data"), *GExecutablePath, *GExecutableName);
+		const auto DataDir = FString::Format(TXT("{}/../../Test/{}_Data"), *GExecutablePath, *GExecutableName);
 		const bool bDataDirExist = FGenericPlatformFile::Get(EPlatformFileType::Disk)->Exists(DataDir);
+		HLVM_ENSURE(bDataDirExist, TXT("Data directory not exist: {}"), *DataDir);
 		if (bDataDirExist)
 		{
 			auto AllLuaFiles = FGenericPlatformFile::Get(EPlatformFileType::Disk)->Glob(DataDir, TXT(R"(.*\.lua$)"), true);

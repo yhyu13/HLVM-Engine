@@ -22,12 +22,6 @@ TSmallVector32<FPath> FPath::Glob(const FPath& root_dir, const FString& regex, b
 	return FGenericPlatformFile::Get()->Glob(root_dir, regex, recursive);
 }
 
-FString FPath::DumpJson(const TSmallVector32<FPath>& paths)
-{
-	return FString::Join(
-		paths, [](auto& item) { return FString::Format(TXT("\"{}\""), *item); }, TXT(",\n"));
-}
-
 void FPath::ResolvePath()
 {
 	if (std::regex_match(this->ToCharCStr(), PathReplacePattern))

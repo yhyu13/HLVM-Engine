@@ -58,8 +58,13 @@ HLVM_NODISCARD constexpr typename TReferenceRemoved<T>::Type CopyTemp(T& Var) no
 }
 
 template <typename T>
-inline typename TReferenceRemoved<T>::Type CopyTemp(const T& Var) noexcept
+HLVM_NODISCARD constexpr typename TReferenceRemoved<T>::Type CopyTemp(const T& Var) noexcept
 {
 	using OutType = typename TReferenceRemoved<T>::Type;
 	return const_cast<const OutType&>(Var);
+}
+
+template<typename T>
+HLVM_NODISCARD constexpr T&& ForwardTemp(TReferenceRemoved<T>& t) {
+	return static_cast<T&&>(t);
 }
