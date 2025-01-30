@@ -57,7 +57,7 @@ std::function<void()> _make_test_wrapper(const FString& name, Func test_function
 			{
 				HLVM_ENSURE(test_function(), TXT("Test failed {}, return false"), *name);
 			}
-			if constexpr (std::is_same_v<decltype(test_function()), int>)
+			else if constexpr (std::is_same_v<decltype(test_function()), int>)
 			{
 				int ret = test_function();
 				HLVM_ENSURE(ret == 0, TXT("Test failed {}, return {}"), *name, ret);

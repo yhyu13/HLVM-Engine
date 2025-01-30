@@ -70,8 +70,8 @@ RECORD(boostfile_test, true, 1, 1)
 		{
 			return FString::Join(
 				paths, [](auto& item) { return FString::Format(TXT("\"{}\""), *item); }, TXT(",\n"));
-		}
-		HLVM_LOG(LogTest, info, TXT("Test FPath::Find result:\n{}"), *FPath::DumpJson(all_matches));
+		};
+		HLVM_LOG(LogTest, info, TXT("Test FPath::Find result:\n{}"), *DumpJson(all_matches));
 	}
 }
 

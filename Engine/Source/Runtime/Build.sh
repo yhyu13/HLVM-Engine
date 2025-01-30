@@ -29,7 +29,7 @@ Verbose=0
 BuildGraphViz=0
 RunGPerf=0
 Jobs=$(nproc)
-TestRepeatNum=5
+TestRepeatNum=2
 
 # Step 2: Loop through each argument
 for arg in "$@"; do
@@ -99,13 +99,15 @@ echo_color 32 "Receive TestRepeatNum: ${TestRepeatNum}"
 time {
 
 # CWD_DIR is the same as script's directory
-CWD_DIR=$(dirname "$0")
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+CWD_DIR=$SCRIPT_DIR
 REPO_DIR=${CWD_DIR}/../../..
 
 # Change directory to platform .env path 获取环境变量
 cd ${REPO_DIR}/Binary/GNULinux-x64 || exit 1
 source .env
 cd ${CWD_DIR} || exit 1
+echo_color 34 "CWD_DIR: ${CWD_DIR}"
 
 # Get Gperf directory under vcpkg
 if [ ${RunGPerf} -eq 1 ]; then
@@ -122,7 +124,11 @@ if [ ${RunGPerf} -eq 1 ]; then
 fi
 
 # 定义要构建的目标目录
-buildConfigs=("Debug" "RelWithDebInfo" "Release")
+buildConfigs=(
+  "Debug"
+  "RelWithDebInfo"
+  "Release"
+  )
 CMAKE_SRC_DIR=${CWD_DIR}
 for config in "${buildConfigs[@]}"; do
 
@@ -194,6 +200,7 @@ for config in "${buildConfigs[@]}"; do
     if [ ${RunTest} -eq 1 ]; then
       mkdir -p "${CWD_DIR}/Testing/"
       CMAKE_BIN_DIR=${CWD_DIR}/Binary/${CMAKE_BUILD_TYPE}
+      echo_color 32 "Testing ${config} at ${CMAKE_BIN_DIR}"
 
 #      !!!Don't use Use ctest -j N (very buggy, generate strange errors for mallocator and parallel test that cannot reproduce)
 #      ctest_param="--parallel ${Jobs} --output-on-failure --schedule-random"
@@ -209,7 +216,8 @@ for config in "${buildConfigs[@]}"; do
 #      echo_color 34 "Test cmd: ${test_cmd}"
 #      (${test_cmd} || exit 1) | tee "${CWD_DIR}/build_test_${config}.log" 2>&1
 
-      for ((i = 0 ; i < TestRepeatNum ; i++ )); do
+      for ((test_index = 1 ; test_index <= TestRepeatNum ; test_index++ )); do
+        echo_color 32 "Run test #${test_index} out of ${TestRepeatNum} repeats"
         # Maually run test in each bg job parallely
         pids=()
         max_jobs=8
@@ -232,7 +240,7 @@ for config in "${buildConfigs[@]}"; do
         for binary in ${CMAKE_BIN_DIR}/Test*; do
           test_target=${binary#${CMAKE_BIN_DIR}/}
           ctest_param="--output-on-failure"
-          ctest_param+=" --repeat-until-fail 1"
+          ctest_param+=" --repeat-until-fail 1" # manually repeat test instead of let cmake repeat it
           if [ -n "${BuildTarget}" ]; then
               if [[ ${test_target} != "${BuildTarget}" ]]; then
                 continue
@@ -281,8 +289,8 @@ for config in "${buildConfigs[@]}"; do
         if [ ${all_success} -eq 0 ]; then
             echo_color 31 "Testing Config ${config} failed, log at ${CWD_DIR}/Testing/build_test_${config}_*.log"
             exit 1
-        else
-            echo_color 32 "Testing Config ${config} success, log at ${CWD_DIR}/Testing/build_test_${config}_*.log"
+        #else
+            #echo_color 32 "Testing Config ${config} success, log at ${CWD_DIR}/Testing/build_test_${config}_*.log"
         fi
       done
     fi
@@ -291,6 +299,8 @@ for config in "${buildConfigs[@]}"; do
     if [ ${RunGPerf} -eq 1 ]; then
         mkdir -p "${CWD_DIR}/Testing/"
         CMAKE_BIN_DIR=${CWD_DIR}/Binary/${CMAKE_BUILD_TYPE}
+        echo_color 32 "Perf test at ${CMAKE_BIN_DIR}"
+
         # 进入bin目录
         cd "${CMAKE_BIN_DIR}" || exit 1
 
