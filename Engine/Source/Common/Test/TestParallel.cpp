@@ -67,9 +67,9 @@ RECORD(lock_test, true)
 		auto TestFunc = [&](double& Duration) -> bool {
 			int	   i = 0;
 			FTimer Timer;
-			//  std::optional<FAtomicFlag> lock; // test empty lock
-			// std::optional<FAtomicFlag> lock = FAtomicFlag{}; // test non empty lock
-			// std::optional<FRecursiveAtomicFlag> lock = FRecursiveAtomicFlag{}; // test recursive lock
+			// TOptional<FAtomicFlag> lock; // test empty lock
+			// TOptional<FAtomicFlag> lock = FAtomicFlag{}; // test non empty lock
+			// TOptional<FRecursiveAtomicFlag> lock = FRecursiveAtomicFlag{}; // test recursive lock
 			auto					 lock = FAtomicFlag();
 			std::once_flag			 Flag;
 			std::atomic_int_fast32_t Counter{ kNumThreads };
@@ -112,7 +112,7 @@ RECORD(lock_test, true)
 			ratio, efficient);
 	}
 	{
-		HLVM_LOG(LogTest, info, TXT("With lock : Create 10 threads and adds to i"));
+		HLVM_LOG(LogTest, info, TXT("With boost lock : Create 10 threads and adds to i"));
 		auto TestFunc = [&](double& Duration) -> bool {
 			int						 i = 0;
 			FTimer					 Timer;
@@ -563,8 +563,8 @@ RECORD(pool_test, true)
 			FTimer													Timer;
 			std::once_flag											Flag;
 			std::atomic_int_fast32_t								Counter{ kNumThreads };
-			std::vector<std::optional<boost::fibers::future<void>>> PushThreads;
-			std::vector<std::optional<boost::fibers::future<void>>> PopThreads;
+			std::vector<TOptional<boost::fibers::future<void>>> PushThreads;
+			std::vector<TOptional<boost::fibers::future<void>>> PopThreads;
 			auto													Pool = FiberPool::FiberPoolSharing<>{};
 			for (int i = 0; i < kNumThreads; ++i)
 			{

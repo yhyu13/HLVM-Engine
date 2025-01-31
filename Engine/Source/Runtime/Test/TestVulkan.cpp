@@ -168,17 +168,23 @@ DECLARE_LOG_CATEGORY(LogTest)
 	PFN_DEF(vkCmdEndRenderPass)                             \
 	PFN_DEF(vkCmdExecuteCommands)
 
-#define DEFINE_VK_FUNCTION_MACRO(function) \
-	static PFN_##function function;
+// Either use static definition for PFN functions or use extern & define
+//#define DEFINE_VK_FUNCTION_MACRO(function) \
+//	static PFN_##function function = nullptr;
+//APPLY_PFN_DEF_VK_FUNCTIONS(DEFINE_VK_FUNCTION_MACRO)
 
+#define DEFINE_VK_FUNCTION_MACRO(function) \
+	extern PFN_##function function;
 APPLY_PFN_DEF_VK_FUNCTIONS(DEFINE_VK_FUNCTION_MACRO)
+#define DEFINE_VK_FUNCTION_MACRO2(function) \
+	PFN_##function function = nullptr;
+APPLY_PFN_DEF_VK_FUNCTIONS(DEFINE_VK_FUNCTION_MACRO2)
 
 static void load_vulkan_functions()
 {
 	static dylib vulkanlib(VULKAN_LIB, false);
 #define GET_VK_FUNCTION_PROCADDR(function) \
 	function = reinterpret_cast<PFN_##function>(vulkanlib.get_function<PFN_##function>(#function));
-
 	APPLY_PFN_DEF_VK_FUNCTIONS(GET_VK_FUNCTION_PROCADDR)
 
 	HLVM_ENSURE(vulkanlib.native_handle() != nullptr, TXT("Failed to load vulkan library"));

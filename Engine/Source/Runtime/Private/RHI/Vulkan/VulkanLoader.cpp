@@ -5,10 +5,9 @@
 #include "RHI/Vulkan/VulkanLoader.h"
 #include <mutex>
 
-#define DEFINE_VK_FUNCTION_MACRO2(function) \
-	PFN_##function function;
-
-APPLY_PFN_DEF_VK_FUNCTIONS(DEFINE_VK_FUNCTION_MACRO2)
+#define DEFINE_VK_FUNCTION_MACRO(function) \
+	PFN_##function function = nullptr;
+APPLY_PFN_DEF_VK_FUNCTIONS(DEFINE_VK_FUNCTION_MACRO)
 
 void VulkanLoader::LoadOnce()
 {

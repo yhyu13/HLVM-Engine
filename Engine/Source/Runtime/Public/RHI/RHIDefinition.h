@@ -5,7 +5,7 @@
 #pragma once
 
 #include "GlobalDefinition.h"
-#include "Math/MathDefinitions.h"
+#include "Math/MathGLM.h"
 
 // RHI Interface Types
 enum class ERHIInterfaceType : TUINT8

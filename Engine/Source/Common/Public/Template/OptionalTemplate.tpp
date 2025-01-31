@@ -4,6 +4,9 @@
 
 #pragma once
 
+template <typename T>
+using TOptional = std::optional<T>;
+
 // First, let's create a type trait to extract the inner type from an optional
 template <typename T>
 struct TOptionalRemoved

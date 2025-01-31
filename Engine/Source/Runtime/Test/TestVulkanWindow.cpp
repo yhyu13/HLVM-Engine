@@ -4,7 +4,7 @@
 
 #include "Test.h"
 
-#include "Window/GLFW3/GLFW3Vulkan.h"
+#include "Window/Vulkan/GLFW3Vulkan.h"
 
 DECLARE_LOG_CATEGORY(LogTest)
 

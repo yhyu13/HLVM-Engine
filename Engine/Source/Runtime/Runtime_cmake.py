@@ -55,7 +55,8 @@ class RuntimeModule(BaseModule):
                                                   source_files=PyCMakeUtil.glob([PyCMakeUtil.GlobModel(path='./Private/**/*.cpp',
                                                                                            recursive=True)
                                                                                  ]),
-                                                  unity_build=True),
+                                                  unity_build=True,
+                                                  unity_build_exclusion_patterns = ['*VulkanLoader*']),
                          fetch_packages=[],
                          find_packages=[glfw3,
                                         glm,

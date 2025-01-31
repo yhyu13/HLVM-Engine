@@ -165,10 +165,9 @@
 	PFN_DEF(vkCmdEndRenderPass)                             \
 	PFN_DEF(vkCmdExecuteCommands)
 
-#define DEFINE_VK_FUNCTION_MACRO(function) \
+#define DECLARE_VK_FUNCTION_MACRO(function) \
 	extern PFN_##function function;
-
-APPLY_PFN_DEF_VK_FUNCTIONS(DEFINE_VK_FUNCTION_MACRO)
+APPLY_PFN_DEF_VK_FUNCTIONS(DECLARE_VK_FUNCTION_MACRO)
 
 class VulkanLoader
 {
