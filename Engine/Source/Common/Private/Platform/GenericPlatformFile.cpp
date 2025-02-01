@@ -17,7 +17,7 @@ void FGenericPlatformFile::_Init()
 {
 	HLVM_ASSERT(!sPlatformFileRedirector[HLVM_ENUM_V(EPlatformFileType, Unkown)], TXT("Unkown Platform file is already registered"));
 	sPlatformFileRedirector[HLVM_ENUM_V(EPlatformFileType, Unkown)] = &SGenericPlatformFile;
-	HLVM_LOG(LogGenericPlatformFile, debug, TXT("FGenericPlatformFile init FGenericPlatformFile"));
+	HLVM_LOG(LogGenericPlatformFile, debug, TXT("Init FGenericPlatformFile"));
 }
 
 FGenericPlatformFile* FGenericPlatformFile::Get(EPlatformFileType PlatformFileType)

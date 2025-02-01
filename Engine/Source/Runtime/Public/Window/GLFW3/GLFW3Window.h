@@ -7,6 +7,7 @@
 #include "Window/IWindow.h"
 
 #if HLVM_WINDOW_USE_VULKAN
+	// We have to preload vulkan header before glfw to enable glfw's vulkan api
 	#include "RHI/Vulkan/VulkanLoader.h"
 #endif
 
@@ -19,16 +20,17 @@
 #pragma clang diagnostic ignored "-Wcast-function-type-strict"
 #pragma clang diagnostic ignored "-Wunused-parameter"
 #define GLFW_INCLUDE_NONE
+// Do not define GLFW_INCLUDE_VULKAN since we have already included vulkan header above
 #include <GLFW/glfw3.h>
 #pragma clang diagnostic pop
 
-class GLFW3Window : public IWindow
+class FGLFW3Window : public IWindow
 {
 public:
-	NOCOPYMOVE(GLFW3Window)
+	NOCOPYMOVE(FGLFW3Window)
 
-	GLFW3Window(const FProperties& InProperties);
-	virtual ~GLFW3Window() override;
+	FGLFW3Window(const FProperties& InProperties);
+	virtual ~FGLFW3Window() override;
 
 	bool ShouldClose() override;
 	void ProcessEvents() override;

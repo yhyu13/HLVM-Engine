@@ -4,9 +4,11 @@
 
 #include "Test.h"
 
-#include "Window/Vulkan/GLFW3Vulkan.h"
-
 DECLARE_LOG_CATEGORY(LogTest)
+
+#include "Window/WindowDefinition.h"
+#if HLVM_WINDOW_USE_VULKAN
+#include "Window/Vulkan/GLFW3Vulkan.h"
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdocumentation"
@@ -1226,3 +1228,5 @@ RECORD_BOOL(test_GLFW3VulkanWindow)
 	}
 	return true;
 }
+
+#endif

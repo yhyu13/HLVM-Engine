@@ -4,32 +4,35 @@
 
 #include "Window/GLFW3/GLFW3Window.h"
 
-GLFW3Window::GLFW3Window(const FProperties& InProperties)
+DECLARE_LOG_CATEGORY(LogGLFW3Window)
+
+FGLFW3Window::FGLFW3Window(const FProperties& InProperties)
 : IWindow(InProperties)
 {
+	HLVM_LOG(LogGLFW3Window, info, TXT("GLFW3Window Init"));
 }
 
-GLFW3Window::~GLFW3Window()
+FGLFW3Window::~FGLFW3Window()
 {
 	glfwTerminate();
 }
 
-void GLFW3Window::Close()
+void FGLFW3Window::Close()
 {
 	glfwSetWindowShouldClose(Window, GLFW_TRUE);
 }
 
-bool GLFW3Window::ShouldClose()
+bool FGLFW3Window::ShouldClose()
 {
 	return glfwWindowShouldClose(Window);
 }
 
-void GLFW3Window::ProcessEvents()
+void FGLFW3Window::ProcessEvents()
 {
 	glfwPollEvents();
 }
 
-TFP32 GLFW3Window::GetDPIScaleFactor() const
+TFP32 FGLFW3Window::GetDPIScaleFactor() const
 {
 	auto primary_monitor = glfwGetPrimaryMonitor();
 	auto vidmode         = glfwGetVideoMode(primary_monitor);
@@ -46,7 +49,7 @@ TFP32 GLFW3Window::GetDPIScaleFactor() const
 	return dpi_factor;
 }
 
-TFP32 GLFW3Window::GetContentScaleFactor() const
+TFP32 FGLFW3Window::GetContentScaleFactor() const
 {
 	int fb_width, fb_height;
 	glfwGetFramebufferSize(Window, &fb_width, &fb_height);

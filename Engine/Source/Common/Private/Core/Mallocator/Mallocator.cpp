@@ -81,7 +81,7 @@ void FinlMallocator() // Extern
 	FMallocatorShutdownCtx Ctx;
 	CoreDelegates::OnMallocatorShutdown.Invoke(&Ctx);
 
-	HLVM_LOG(LogMiMallocator, info, TXT("\nMallocator summary:\nCumulative time on malloc {} micro sec\nCumulative number of malloc #{}\nPer malloc time {} micro sec\nCumulative time on free {} micro sec\nCumulative number of free #{}\nPer free time {} micro sec"),
+	HLVM_LOG(LogMiMallocator, info, TXT("Mallocator summary:\nTotal time on malloc {} micro sec\nNumber of malloc #{}\nPer malloc time {} micro sec\nTotal time on free {} micro sec\nNumber of free #{}\nPer free time {} micro sec"),
 		GMallocDurationCounter.load(),
 		GMallocCounter.load(),
 		GMallocDurationCounter.load() / static_cast<double>(GMallocCounter.load()),

@@ -18,14 +18,13 @@ HLVM_ENUM(EWindowType, TUINT8,
 class IWindow
 {
 public:
-
 	struct FExtent
 	{
 		TUINT32 Width;
 		TUINT32 Height;
 	};
 
-	enum class EMode
+	enum class EDisplayMode
 	{
 		NoRender,
 		Headless,
@@ -46,10 +45,11 @@ public:
 	struct FProperties
 	{
 		FString Title = TXT("Nameless Window");
-		EMode	Mode = EMode::Default;
+		EDisplayMode Mode = EDisplayMode::Default;
 		bool	Resizable = true;
 		EVsync	VSync = EVsync::Default;
 		FExtent Extent = { 1280, 720 };
+		// Add more properties, e.g. monitor perference
 	};
 
 	struct FOptionalExtent
@@ -61,7 +61,7 @@ public:
 	struct FOptionalProperties
 	{
 		TOptional<FString> Title;
-		TOptional<EMode>   Mode;
+		TOptional<EDisplayMode>   Mode;
 		TOptional<bool>	   Resizable;
 		TOptional<EVsync>  VSync;
 		FOptionalExtent	   Extent;
@@ -127,7 +127,7 @@ public:
 		return Properties.Extent;
 	}
 
-	HLVM_INLINE_FUNC EMode GetWindowMode() const
+	HLVM_INLINE_FUNC EDisplayMode GetWindowMode() const
 	{
 		return Properties.Mode;
 	}

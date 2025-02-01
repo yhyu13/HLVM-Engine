@@ -12,7 +12,7 @@ void FPackedPlatformFile::_Init()
 {
 	HLVM_ASSERT(!sPlatformFileRedirector[HLVM_ENUM_V(EPlatformFileType, Packed)], TXT("Packed Platform file is already registered"));
 	sPlatformFileRedirector[HLVM_ENUM_V(EPlatformFileType, Packed)] = FPackedPlatformFile::Get();
-	HLVM_LOG(LogPackedPlatformFile, debug, TXT("FGenericPlatformFile init FPackedPlatformFile"));
+	HLVM_LOG(LogPackedPlatformFile, debug, TXT("Init FPackedPlatformFile"));
 }
 
 FPackedPlatformFile* FPackedPlatformFile::Get()

@@ -4,9 +4,12 @@
 
 #pragma once
 
+/*
+ * Inspired by https://gitee.com/sumcai/MiniVulkanTriangle to load vulkan api during runtime
+ */
+
+#include "VulkanDefinition.h"
 #include <dylib.hpp>
-#define VK_NO_PROTOTYPES
-#include <vulkan/vulkan_core.h>
 
 #if defined(WIN32) || defined(_WIN32) || defined(_WIN32_) || defined(WIN64) || defined(_WIN64) || defined(_WIN64_)
 	#define VULKAN_LIB "vulkan-1.dll"
@@ -16,7 +19,7 @@
 	#define VULKAN_LIB "libvulkan.so.1"
 #endif
 
-#define APPLY_PFN_DEF_VK_FUNCTIONS(PFN_DEF)                 \
+#define APPLY_PFN_DEF_VK_FUNCTIONS_CORE(PFN_DEF)                 \
 	PFN_DEF(vkGetInstanceProcAddr)                          \
 	PFN_DEF(vkCreateInstance)                               \
 	PFN_DEF(vkEnumerateInstanceExtensionProperties)         \
@@ -165,13 +168,27 @@
 	PFN_DEF(vkCmdEndRenderPass)                             \
 	PFN_DEF(vkCmdExecuteCommands)
 
+#if USE_VK_DISPLAY
+	#define APPLY_PFN_DEF_VK_FUNCTIONS_DISPLAY(PFN_DEF)                 \
+		PFN_DEF(vkCreateDisplayModeKHR) \
+		PFN_DEF(vkCreateDisplayPlaneSurfaceKHR) \
+		PFN_DEF(vkGetDisplayModePropertiesKHR) \
+		PFN_DEF(vkGetDisplayPlaneCapabilitiesKHR) \
+		PFN_DEF(vkGetDisplayPlaneSupportedDisplaysKHR) \
+		PFN_DEF(vkGetPhysicalDeviceDisplayPlanePropertiesKHR) \
+		PFN_DEF(vkGetPhysicalDeviceDisplayPropertiesKHR)
+#else
+	#define APPLY_PFN_DEF_VK_FUNCTIONS_DISPLAY(...)
+#endif /* defined(VK_KHR_display) */
+
 #define DECLARE_VK_FUNCTION_MACRO(function) \
-	extern PFN_##function function;
-APPLY_PFN_DEF_VK_FUNCTIONS(DECLARE_VK_FUNCTION_MACRO)
+	HLVM_EXTERN_FUNC PFN_##function function;
+APPLY_PFN_DEF_VK_FUNCTIONS_CORE(DECLARE_VK_FUNCTION_MACRO)
+APPLY_PFN_DEF_VK_FUNCTIONS_DISPLAY(DECLARE_VK_FUNCTION_MACRO)
 
 class VulkanLoader
 {
 public:
 	NOCOPYMOVE(VulkanLoader)
-	static void LoadOnce();
+	HLVM_STATIC_FUNC void LoadOnce();
 };

@@ -16,7 +16,7 @@ void FBoostPlatformFile::_Init()
 {
 	HLVM_ASSERT(!sPlatformFileRedirector[HLVM_ENUM_V(EPlatformFileType, Disk)], TXT("Local Platform file is already registered"));
 	sPlatformFileRedirector[HLVM_ENUM_V(EPlatformFileType, Disk)] = FBoostPlatformFile::Get();
-	HLVM_LOG(LogBoostPlatformFile, debug, TXT("FGenericPlatformFile init FBoostPlatformFile"));
+	HLVM_LOG(LogBoostPlatformFile, debug, TXT("Init FBoostPlatformFile"));
 }
 
 FBoostPlatformFile* FBoostPlatformFile::Get()
