@@ -8,6 +8,7 @@ vcpkg_ctx_runtime = VcpkgContenxt(vcpkg_root_path='../Dependency/vcpkg',
                                                             "glfw3",
                                                             "glm",
                                                             "vulkan-headers",
+                                                            "vulkan-memory-allocator",
                                                             "assimp",
                                                             "bullet3",
                                                         ]))
@@ -41,6 +42,13 @@ vulkan_header = FindPackage(name='VulkanHeaders',
                             dependant_target_link_libs=[
                                 DomainValueModel(domain=DomainEnum.PUBLIC, values=['Vulkan::Headers'])])
 
+# Find the vulkan-headers package with the specified options
+vulkan_memory_allocator = FindPackage(name='VulkanMemoryAllocator',
+                            config=True,
+                            required=True,
+                            dependant_target_link_libs=[
+                                DomainValueModel(domain=DomainEnum.PUBLIC, values=['GPUOpen::VulkanMemoryAllocator'])])
+
 """
 Global Config :
 """
@@ -55,12 +63,13 @@ class RuntimeModule(BaseModule):
                                                   source_files=PyCMakeUtil.glob([PyCMakeUtil.GlobModel(path='./Private/**/*.cpp',
                                                                                            recursive=True)
                                                                                  ]),
-                                                  unity_build=True,
-                                                  unity_build_exclusion_patterns = ['*VulkanLoader*']),
+                                                  unity_build=True, unity_build_exclusion_patterns = ['*VulkanLoader*']),
+                                                  #unity_build=False),
                          fetch_packages=[],
                          find_packages=[glfw3,
                                         glm,
-                                        vulkan_header
+                                        vulkan_header,
+                                        vulkan_memory_allocator,
                                         ]
                          )
         self.target_interface.add_compile_options(domain=DomainEnum.PUBLIC, values=[

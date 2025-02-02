@@ -192,3 +192,6 @@ public:
 	NOCOPYMOVE(VulkanLoader)
 	HLVM_STATIC_FUNC void LoadOnce();
 };
+
+// VK RHI Globals
+HLVM_EXTERN_VAR VkAllocationCallbacks* VkCPUAllocator;

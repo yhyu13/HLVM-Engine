@@ -14,7 +14,9 @@ class FGLFW3Vulkan final : public FGLFW3Window
 public:
 	NOCOPYMOVE(FGLFW3Vulkan)
 
-	FGLFW3Vulkan(const FProperties& InProperties);
+	FGLFW3Vulkan() = delete;
+	explicit FGLFW3Vulkan(const FProperties& InProperties);
+	virtual ~FGLFW3Vulkan() override;
 
 	/**
 	 * @brief Gets a handle from the platform's Vulkan surface

@@ -10,6 +10,7 @@ DECLARE_LOG_CATEGORY(LogTest)
 #if HLVM_WINDOW_USE_VULKAN
 #include "Window/Vulkan/GLFW3Vulkan.h"
 
+#if 1 // Test Vulkan triangle program with direct vulkan api calls
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdocumentation"
 #pragma clang diagnostic ignored "-Wzero-as-null-pointer-constant"
@@ -1215,7 +1216,7 @@ private:
 };
 #pragma clang diagnostic pop
 
-RECORD_BOOL(test_GLFW3VulkanWindow)
+RECORD_BOOL(test_GLFW3VulkanWindowRaw)
 {
 	VulkanLoader::LoadOnce();
 
@@ -1226,6 +1227,16 @@ RECORD_BOOL(test_GLFW3VulkanWindow)
 		cerr << "Error Code: "<<e.what() << endl;
 		return false;
 	}
+	return true;
+}
+#endif
+
+RECORD_BOOL(test_GLFW3VulkanWindow)
+{
+	IWindow::FProperties Properties;
+	Properties.Resizable = false;
+	Properties.Mode = IWindow::EDisplayMode::Windowed;
+	FGLFW3Vulkan Window(Properties);
 	return true;
 }
 

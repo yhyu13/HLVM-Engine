@@ -4,4 +4,5 @@
 
 #pragma once
 
+/// @brief Enable Vulkan backend for window management.
 #define HLVM_WINDOW_USE_VULKAN 1

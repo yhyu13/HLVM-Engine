@@ -25,3 +25,6 @@ void VulkanLoader::LoadOnce()
 		APPLY_PFN_DEF_VK_FUNCTIONS_DISPLAY(GET_VK_FUNCTION_PROCADDR)
 	});
 }
+
+// Extern : TODO actually implement CPU size of VkAllocationCallbacks
+VkAllocationCallbacks* VkCPUAllocator = nullptr;

@@ -28,16 +28,16 @@ class FGLFW3Window : public IWindow
 {
 public:
 	NOCOPYMOVE(FGLFW3Window)
-
-	FGLFW3Window(const FProperties& InProperties);
+	FGLFW3Window() = delete;
+	explicit FGLFW3Window(const FProperties& InProperties);
 	virtual ~FGLFW3Window() override;
 
-	bool ShouldClose() override;
-	void ProcessEvents() override;
-	void Close() override;
+	virtual bool ShouldClose() override;
+	virtual void ProcessEvents() override;
+	virtual void Close() override;
 
-	TFP32 GetDPIScaleFactor() const override;
-	TFP32 GetContentScaleFactor() const override;
+	virtual TFP32 GetDPIScaleFactor() const override;
+	virtual TFP32 GetContentScaleFactor() const override;
 
 protected:
 	GLFWwindow* Window;

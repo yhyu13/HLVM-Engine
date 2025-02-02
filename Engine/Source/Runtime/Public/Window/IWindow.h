@@ -69,17 +69,6 @@ public:
 
 public:
 	NOCOPYMOVE(IWindow)
-	/**
-	 * @brief Constructs a Window
-	 * @param InProperties The preferred configuration of the window
-	 */
-	IWindow(const FProperties& InProperties)
-		:
-		Properties(InProperties),
-		Type(EWindowType::NoRender)
-	{
-	}
-
 	virtual ~IWindow() = default;
 
 	/**
@@ -105,7 +94,7 @@ public:
 	/**
 	 * @return The scale factor for systems with heterogeneous window and pixel coordinates
 	 */
-	virtual float GetContentScaleFactor() const;
+	virtual float GetContentScaleFactor() const = 0;
 
 	/**
 	 * @brief Attempt to resize the window - not guaranteed to change
@@ -136,6 +125,14 @@ public:
 	{
 		return Properties;
 	}
+
+	HLVM_INLINE_FUNC EWindowType GetType() const
+	{
+		return Type;
+	}
+
+protected:
+	IWindow() = default;
 
 protected:
 	FProperties Properties;
