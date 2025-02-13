@@ -39,9 +39,10 @@ class FLinuxGNUPlatformCrashDump final : public FGenericPlatformCrashDump
 protected:
 	virtual void InternalInit() final override
 	{
+		// Register signal handler
 		::signal(SIGSEGV, hlvm_private::SignalHandler);
 		::signal(SIGABRT, hlvm_private::SignalHandler);
-
+		// Register terminate handler
 		std::set_terminate(hlvm_private::TerminateHandler);
 	}
 };

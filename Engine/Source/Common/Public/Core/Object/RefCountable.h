@@ -5,14 +5,12 @@
 #pragma once
 
 // A base class for reference counting which supports non-copyable inherited classes.
-struct FRefCountable
+class FRefCountable
 {
 public:
-	FRefCountable() = default;
 	FRefCountable(const FRefCountable&)
 	{
-		// Trivial,
-		// copy construct would not copy the value of counter as it is a brand new object
+		// Trivial, copy construct would not copy the value of counter as it is a brand new object
 	}
 	FRefCountable(FRefCountable&& Other)
 	{
@@ -20,8 +18,7 @@ public:
 	}
 	FRefCountable& operator=(const FRefCountable&)
 	{
-		// Trivial,
-		// copy construct would not copy the value of counter as it is a brand new object
+		// Trivial, copy construct would not copy the value of counter as it is a brand new object
 		return *this;
 	}
 	FRefCountable& operator=(FRefCountable&& Other)
@@ -45,6 +42,9 @@ public:
 		return mCounter.load(std::memory_order_relaxed);
 	}
 
+protected:
+	FRefCountable() = default;
+
 private:
 	mutable std::atomic_uint_fast32_t mCounter{ 0 };
 };
@@ -54,7 +54,7 @@ template <typename T>
 concept CRefCountable = requires(T&& t) {
 	{
 		t.IncrementRef()
-	};
+	} -> std::same_as<void>;
 } && requires(T&& t) {
 	{
 		t.DecrementRef()

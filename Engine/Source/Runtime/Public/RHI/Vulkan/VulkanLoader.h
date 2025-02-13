@@ -4,13 +4,16 @@
 
 #pragma once
 
+#include "VulkanDefinition.h"
+
+#if USE_VK_VMA
+	#include <vk_mem_alloc.h>
+#endif
+
 /*
  * Inspired by https://gitee.com/sumcai/MiniVulkanTriangle to load vulkan api during runtime
  */
-
-#include "VulkanDefinition.h"
 #include <dylib.hpp>
-
 #if defined(WIN32) || defined(_WIN32) || defined(_WIN32_) || defined(WIN64) || defined(_WIN64) || defined(_WIN64_)
 	#define VULKAN_LIB "vulkan-1.dll"
 #elif defined(ANDROID) || defined(_ANDROID_)
@@ -19,7 +22,7 @@
 	#define VULKAN_LIB "libvulkan.so.1"
 #endif
 
-#define APPLY_PFN_DEF_VK_FUNCTIONS_CORE(PFN_DEF)                 \
+#define APPLY_PFN_DEF_VK_FUNCTIONS_CORE(PFN_DEF)            \
 	PFN_DEF(vkGetInstanceProcAddr)                          \
 	PFN_DEF(vkCreateInstance)                               \
 	PFN_DEF(vkEnumerateInstanceExtensionProperties)         \
@@ -169,29 +172,78 @@
 	PFN_DEF(vkCmdExecuteCommands)
 
 #if USE_VK_DISPLAY
-	#define APPLY_PFN_DEF_VK_FUNCTIONS_DISPLAY(PFN_DEF)                 \
-		PFN_DEF(vkCreateDisplayModeKHR) \
-		PFN_DEF(vkCreateDisplayPlaneSurfaceKHR) \
-		PFN_DEF(vkGetDisplayModePropertiesKHR) \
-		PFN_DEF(vkGetDisplayPlaneCapabilitiesKHR) \
-		PFN_DEF(vkGetDisplayPlaneSupportedDisplaysKHR) \
+	#define APPLY_PFN_DEF_VK_FUNCTIONS_DISPLAY(PFN_DEF)       \
+		PFN_DEF(vkCreateDisplayModeKHR)                       \
+		PFN_DEF(vkCreateDisplayPlaneSurfaceKHR)               \
+		PFN_DEF(vkGetDisplayModePropertiesKHR)                \
+		PFN_DEF(vkGetDisplayPlaneCapabilitiesKHR)             \
+		PFN_DEF(vkGetDisplayPlaneSupportedDisplaysKHR)        \
 		PFN_DEF(vkGetPhysicalDeviceDisplayPlanePropertiesKHR) \
 		PFN_DEF(vkGetPhysicalDeviceDisplayPropertiesKHR)
 #else
 	#define APPLY_PFN_DEF_VK_FUNCTIONS_DISPLAY(...)
 #endif /* defined(VK_KHR_display) */
 
+#if USE_VK_VMA
+	#if VMA_DEDICATED_ALLOCATION || VMA_VULKAN_VERSION >= 1001000
+		#define APPLY_PFN_DEF_VK_FUNCTIONS_VMA_1(PFN_DEF) \
+			PFN_DEF(vkGetBufferMemoryRequirements2)    \
+			PFN_DEF(vkGetImageMemoryRequirements2)
+	#else
+		#define APPLY_PFN_DEF_VK_FUNCTIONS_VMA_1(...)
+	#endif
+	#if VMA_BIND_MEMORY2 || VMA_VULKAN_VERSION >= 1001000
+		#define APPLY_PFN_DEF_VK_FUNCTIONS_VMA_2(PFN_DEF) \
+			PFN_DEF(vkBindBufferMemory2)               \
+			PFN_DEF(vkBindImageMemory2)
+	#else
+		#define APPLY_PFN_DEF_VK_FUNCTIONS_VMA_2(...)
+	#endif
+	#if VMA_MEMORY_BUDGET || VMA_VULKAN_VERSION >= 1001000
+		#define APPLY_PFN_DEF_VK_FUNCTIONS_VMA_3(PFN_DEF) \
+			PFN_DEF(vkGetPhysicalDeviceMemoryProperties2)
+
+	#else
+		#define APPLY_PFN_DEF_VK_FUNCTIONS_VMA_3(...)
+	#endif
+	#if VMA_VULKAN_VERSION >= 1003000
+		#define APPLY_PFN_DEF_VK_FUNCTIONS_VMA_4(PFN_DEF) \
+			PFN_DEF(vkGetDeviceBufferMemoryRequirements)  \
+			PFN_DEF(vkGetDeviceImageMemoryRequirements)
+	#else
+		#define APPLY_PFN_DEF_VK_FUNCTIONS_VMA_4(...)
+	#endif
+
+	#define APPLY_PFN_DEF_VK_FUNCTIONS_VMA(PFN_DEF) \
+		APPLY_PFN_DEF_VK_FUNCTIONS_VMA_1(PFN_DEF)   \
+		APPLY_PFN_DEF_VK_FUNCTIONS_VMA_2(PFN_DEF)   \
+		APPLY_PFN_DEF_VK_FUNCTIONS_VMA_3(PFN_DEF)   \
+		APPLY_PFN_DEF_VK_FUNCTIONS_VMA_4(PFN_DEF)
+#else
+	#define APPLY_PFN_DEF_VK_FUNCTIONS_VMA(...)
+#endif /* USE_VK_VMA */
+
 #define DECLARE_VK_FUNCTION_MACRO(function) \
 	HLVM_EXTERN_FUNC PFN_##function function;
 APPLY_PFN_DEF_VK_FUNCTIONS_CORE(DECLARE_VK_FUNCTION_MACRO)
 APPLY_PFN_DEF_VK_FUNCTIONS_DISPLAY(DECLARE_VK_FUNCTION_MACRO)
+APPLY_PFN_DEF_VK_FUNCTIONS_VMA(DECLARE_VK_FUNCTION_MACRO)
+
+// VK RHI Globals
+HLVM_EXTERN_VAR VmaAllocator		   VMAAllocator;
+HLVM_EXTERN_VAR VmaVulkanFunctions	   VMAVulkanFunctions;
+HLVM_EXTERN_VAR VkAllocationCallbacks* VkCPUAllocator;
 
 class VulkanLoader
 {
 public:
 	NOCOPYMOVE(VulkanLoader)
-	HLVM_STATIC_FUNC void LoadOnce();
-};
+	VulkanLoader() = default;
+	~VulkanLoader();
 
-// VK RHI Globals
-HLVM_EXTERN_VAR VkAllocationCallbacks* VkCPUAllocator;
+public:
+	HLVM_STATIC_FUNC void LoadOnce();
+
+private:
+	dylib* vklib;
+};

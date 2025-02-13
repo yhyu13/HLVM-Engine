@@ -186,7 +186,7 @@ private:
 			glfwPollEvents(); // 函数检查是否由事件输入
 			drawFrame();
 
-			if (timer.MarkSec() > 5)
+			if (timer.MarkSec() > 2.0)
 			{
 				glfwSetWindowShouldClose(window, GLFW_TRUE);
 			}
@@ -1231,12 +1231,46 @@ RECORD_BOOL(test_GLFW3VulkanWindowRaw)
 }
 #endif
 
+#include "RHI/Vulkan/VulkanRHI.h"
+
 RECORD_BOOL(test_GLFW3VulkanWindow)
 {
 	IWindow::FProperties Properties;
 	Properties.Resizable = false;
 	Properties.Mode = IWindow::EDisplayMode::Windowed;
 	FGLFW3Vulkan Window(Properties);
+
+	FVulkanRHI* RHI = nullptr;
+	{
+		// Vulkan rhi init
+		RHI = new FVulkanRHI();
+		RHI->Init();
+	}
+
+	/*
+	 * initWindow();
+initVulkan();
+mainLoop();
+cleanup();
+	 */
+
+	/*
+	 * cout << "initVulkan IN" << endl;
+createInstance();
+setupDebugMessenger();
+createSurface();
+pickPhysicalDevice();
+createLogicalDevice();
+createSwapChain();
+createImageViews();
+PrepareVertexAndIndexBuffer();
+createRenderPass();
+createGraphicsPipeline();
+createFramebuffers();
+createCommandPool();
+createCommandBuffers();
+createSyncObjects();
+	 */
 	return true;
 }
 

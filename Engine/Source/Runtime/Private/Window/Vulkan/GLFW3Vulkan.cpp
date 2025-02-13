@@ -49,3 +49,12 @@ VkSurfaceKHR FGLFW3Vulkan::CreateSurface(VkInstance instance)
 	VK_ENSURE(glfwCreateWindowSurface(instance, Window, VkCPUAllocator, &surface));
 	return surface;
 }
+
+TVector<FString> FGLFW3Vulkan::GetRequiredExtensions() const
+{
+	TUINT32 glfwExtensionCount = 0;
+	const char** glfwExtensions;
+	glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+	TVector<FString> Exts(glfwExtensions, glfwExtensions + glfwExtensionCount);
+	return Exts;
+}

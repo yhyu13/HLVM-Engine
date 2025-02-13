@@ -5,6 +5,7 @@
 #pragma once
 
 #include "RefCountable.h"
+#include "Core/Assert.h"
 
 /**
  *  @brief A reference pointer requires template class instance method (1) Increment reference (2) Decrement reference
@@ -14,17 +15,31 @@
  *  @details On construction, the TRefCountPtr increment the reference counting.
  *          On destruction, the TRefCountPtr tries to decrement the reference counting.
  */
-template <CRefCountable T>
+template <CRefCountable T, bool bAllowPolymorphic = true>
 class TRefCountPtr
 {
 public:
 	// Big Five----------------------------------------------------------------------------------------------------
 	TRefCountPtr() = default;
 
-	explicit TRefCountPtr(T* obj)
+	TRefCountPtr(T* obj)
 		: m_ptr(obj)
 	{
 		m_ptr->IncrementRef();
+	}
+
+	template <class U>
+	TRefCountPtr(U* obj)
+	{
+		if constexpr (!bAllowPolymorphic)
+		{
+			static_assert(std::is_same_v<T, U>, "TRefCountPtr Polymorphism Casting not allowed!");
+		}
+		else
+		{
+			m_ptr = static_cast<T*>(obj);
+			m_ptr->IncrementRef();
+		}
 	}
 
 	~TRefCountPtr()
@@ -55,11 +70,11 @@ public:
 	{
 		if (this != &other)
 		{
-			this->~TRefCountPtr();
-			m_ptr = other.m_ptr;
+			Reset(); // Reset first
+			m_ptr = other.m_ptr; // Copy
 			if (m_ptr)
 			{
-				m_ptr->IncrementRef();
+				m_ptr->IncrementRef(); // Increment
 			}
 		}
 		return *this;
@@ -69,9 +84,9 @@ public:
 	{
 		if (this != &other)
 		{
-			this->~TRefCountPtr();
-			m_ptr = other.m_ptr;
-			other.m_ptr = nullptr;
+			Reset(); // Destructor first
+			m_ptr = other.m_ptr; // Copy
+			other.m_ptr = nullptr; // Reset
 		}
 		return *this;
 	}
@@ -79,27 +94,67 @@ public:
 	// Polymorphism Casting---------------------------------------------------------------------------------------------
 
 	template <class U>
-	TRefCountPtr(const TRefCountPtr<U>&) noexcept
+	TRefCountPtr(const TRefCountPtr<U>& other) noexcept
 	{
-		static_assert(std::is_same_v<T, U>, "TRefCountPtr Polymorphism Casting not allowed!");
+		if constexpr (!bAllowPolymorphic)
+		{
+			static_assert(std::is_same_v<T, U>, "TRefCountPtr Polymorphism Casting not allowed!");
+		}
+		else
+		{
+			m_ptr = static_cast<T*>(other.m_ptr);
+			if (m_ptr)
+			{
+				m_ptr->IncrementRef();
+			}
+		}
 	}
 
 	template <class U>
-	TRefCountPtr(TRefCountPtr<U>&&) noexcept
+	TRefCountPtr(TRefCountPtr<U>&& other) noexcept
 	{
-		static_assert(std::is_same_v<T, U>, "TRefCountPtr Polymorphism Casting not allowed!");
+		if constexpr (!bAllowPolymorphic)
+		{
+			static_assert(std::is_same_v<T, U>, "TRefCountPtr Polymorphism Casting not allowed!");
+		}
+		else
+		{
+			m_ptr = static_cast<T*>(other.m_ptr);
+			other.m_ptr = nullptr;
+		}
 	}
 
 	template <class U>
-	TRefCountPtr& operator=(const TRefCountPtr<U>&) noexcept
+	TRefCountPtr& operator=(const TRefCountPtr<U>& other) noexcept
 	{
-		static_assert(std::is_same_v<T, U>, "TRefCountPtr Polymorphism Casting not allowed!");
+		if constexpr (!bAllowPolymorphic)
+		{
+			static_assert(std::is_same_v<T, U>, "TRefCountPtr Polymorphism Casting not allowed!");
+		}
+		else
+		{
+			Reset();
+			m_ptr = static_cast<T*>(other.m_ptr);
+			if (m_ptr)
+			{
+				m_ptr->IncrementRef();
+			}
+		}
 	}
 
 	template <class U>
-	TRefCountPtr& operator=(TRefCountPtr<U>&&) noexcept
+	TRefCountPtr& operator=(TRefCountPtr<U>&& other) noexcept
 	{
-		static_assert(std::is_same_v<T, U>, "TRefCountPtr Polymorphism Casting not allowed!");
+		if constexpr (!bAllowPolymorphic)
+		{
+			static_assert(std::is_same_v<T, U>, "TRefCountPtr Polymorphism Casting not allowed!");
+		}
+		else
+		{
+			Reset();
+			m_ptr = static_cast<T*>(other.m_ptr);
+			other.m_ptr = nullptr;
+		}
 	}
 
 	// Operator overloading---------------------------------------------------------------------------------------------

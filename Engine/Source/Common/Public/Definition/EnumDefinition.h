@@ -16,3 +16,9 @@
 #define HLVM_ENUM_SIZE_T(enum_value) static_cast<size_t>((enum_value))
 
 #define HLVM_ENUM_TCHAR_STR(value) TO_TCHAR_CSTR(magic_enum::enum_name((value)).data())
+
+#define HLVM_ENUM_FLAG_OPERATOR(enum_class, operator_type)                                                                              \
+	HLVM_INLINE_FUNC bool operator operator_type(const enum_class& lhs, const enum_class& rhs)                                          \
+	{                                                                                                                                   \
+		return static_cast<std::underlying_type_t<enum_class>>(lhs) operator_type static_cast<std::underlying_type_t<enum_class>>(rhs); \
+	}

@@ -69,6 +69,7 @@ public:
 
 public:
 	NOCOPYMOVE(IWindow)
+	IWindow() = default;
 	virtual ~IWindow() = default;
 
 	/**
@@ -130,9 +131,6 @@ public:
 	{
 		return Type;
 	}
-
-protected:
-	IWindow() = default;
 
 protected:
 	FProperties Properties;

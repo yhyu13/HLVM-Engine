@@ -27,6 +27,7 @@ namespace hlvm_private
 #endif
 
 #ifndef HLVM_ASSERT_ALWAYS_EVLUATE_EXPERSION
+	/// @brief 是否总是执行断言的表达式，即使发布模式下，默认为0，即不执行断言的表达式。
 	#define HLVM_ASSERT_ALWAYS_EVLUATE_EXPERSION 0
 #endif
 
@@ -48,6 +49,7 @@ namespace hlvm_private
 			}                                                                                                                         \
 		}                                                                                                                             \
 		while (0)
+	#define HLVM_ASSERT2(x) HLVM_ASSERT(x, TXT("condition failed: {}"), STRTIFY(x))
 #else
 	#if HLVM_ASSERT_ALWAYS_EVLUATE_EXPERSION
 		#define HLVM_ASSERT(x, ...)    \
@@ -56,6 +58,7 @@ namespace hlvm_private
 				static_cast<bool>((x)) \
 			}                          \
 			while (0)
+		#define HLVM_ASSERT2(x) HLVM_ASSERT(x, TXT("condition failed: {}"), STRTIFY(x))
 	#else
 namespace hlvm_private
 {
@@ -66,6 +69,8 @@ namespace hlvm_private
 } // namespace hlvm_private
 		#define HLVM_ASSERT(x, ...) \
 			static_assert(!(hlvm_private::ctre_checkExpressionPassAssert(STRTIFY(x))), "Should not ignore evaluation of this expression, consider set HLVM_ASSERT_ALWAYS_EVLUATE_EXPERSION=1 or using HLVM_ENSURE")
+		#define HLVM_ASSERT2(x, ...) \
+			static_assert(!(hlvm_private::ctre_checkExpressionPassAssert(STRTIFY(x))), "Should not ignore evaluation of this expression, consider set HLVM_ASSERT_ALWAYS_EVLUATE_EXPERSION=1 or using HLVM_ENSURE2")
 	#endif
 #endif
 
@@ -86,3 +91,4 @@ namespace hlvm_private
 		}                                                                                                                         \
 	}                                                                                                                             \
 	while (0)
+#define HLVM_ENSURE2(x) HLVM_ENSURE(x, TXT("condition failed: {}"), STRTIFY(x))

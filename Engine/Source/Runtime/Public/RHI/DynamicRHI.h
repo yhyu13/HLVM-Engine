@@ -6,7 +6,8 @@
 
 #include "RHIDefinition.h"
 #include "RHIResource.h"
-#include "RHIResourceDeclaration.h"
+#include "RHIPipeline.h"
+#include "RHICommand.h"
 
 class FDynamicRHI
 {
@@ -24,7 +25,7 @@ public:
 	virtual FTextureRHIRef CreateTexture(const FRHITextureCreateDesc& CreateDesc) = 0;
 	virtual FBufferRHIRef CreateBuffer(const FRHIBufferCreateDesc& CreateDesc) = 0;
 	virtual FShaderResourceViewRHIRef CreateShaderResourceView(FRHITexture* Texture, const FRHIShaderResourceViewCreateInfo& CreateInfo) = 0;
-	virtual FUnorderedAccessViewRHIRef CreateUnorderedAccessView(FRHITexture* Texture, const FRHIUnorderedAccessViewCreateInfo& CreateInfo) = 0;
+	virtual FUnorderedAccessViewRHIRef CreateUnorderedAccessView(FRHIBuffer* Buffer, const FRHIUnorderedAccessViewCreateInfo& CreateInfo) = 0;
 	virtual FVertexDeclarationRHIRef CreateVertexDeclaration(const FVertexDeclarationElementList& Elements) = 0;
 
 	// Shader Management
@@ -76,3 +77,5 @@ public:
 	virtual void RHISetViewport(TUINT32 MinX, TUINT32 MinY, float MinZ, TUINT32 MaxX, TUINT32 MaxY, float MaxZ) = 0;
 	virtual void RHISetScissorRect(bool bEnable, TUINT32 MinX, TUINT32 MinY, TUINT32 MaxX, TUINT32 MaxY) = 0;
 };
+
+HLVM_EXTERN_VAR FDynamicRHI* GDynamicRHI;

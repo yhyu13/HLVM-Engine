@@ -11,19 +11,30 @@
 /// @brief Since we used glfw, no need to use VK display api (unless we want to take over window management)
 #define USE_VK_DISPLAY (VK_KHR_display && 0)
 
-#define VMA_STATIC_VULKAN_FUNCTIONS 0
-#define VMA_DYNAMIC_VULKAN_FUNCTIONS 0
-#include <vk_mem_alloc.h>
+/// @brief Use VMA for memory management
+#define USE_VK_VMA 1
+#if USE_VK_VMA
+	#define VMA_STATIC_VULKAN_FUNCTIONS 0
+	#define VMA_DYNAMIC_VULKAN_FUNCTIONS 0
+#endif
 
-/// @brief Helper macro to test the result of Vulkan calls which can return an error.
-#define VK_ENSURE(x)                                                                                \
-	do                                                                                             \
-	{                                                                                              \
-		VkResult _result = (x);                                                                     \
-		if (_result != VK_SUCCESS)                                                                  \
-		{                                                                                          \
-			HLVM_ENSURE(false, TXT("Vulkan call failed with error: {}"), TO_TCHAR_CSTR(string_VkResult(_result))); \
-		}                                                                                          \
-	}                                                                                              \
+/// @brief Helper macro to convert VkResult to TCHAR string
+#define VK_RESULT_TO_TCHAR(x) TO_TCHAR_CSTR(string_VkResult(x))
+
+/// @brief Helper macro to test the result of Vulkan calls which can return an error. (HLVM_ENSURE)
+#define VK_ENSURE(x)                                                                                               \
+	do                                                                                                             \
+	{                                                                                                              \
+		VkResult _result = (x);                                                                                    \
+		HLVM_ENSURE(_result == VK_SUCCESS, TXT("Vulkan call failed with error: {}"), VK_RESULT_TO_TCHAR(_result)); \
+	}                                                                                                              \
 	while (0)
 
+/// @brief Helper macro to test the result of Vulkan calls which can return an error. (HLVM_ASSERT)
+#define VK_ASSERT(x)                                                                                               \
+	do                                                                                                             \
+	{                                                                                                              \
+		VkResult _result = (x);                                                                                    \
+		HLVM_ASSERT(_result == VK_SUCCESS, TXT("Vulkan call failed with error: {}"), VK_RESULT_TO_TCHAR(_result)); \
+	}                                                                                                              \
+	while (0)

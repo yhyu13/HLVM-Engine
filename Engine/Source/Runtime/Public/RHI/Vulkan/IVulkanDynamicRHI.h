@@ -1,0 +1,57 @@
+/**
+* Copyright (c) 2025. MIT License. All rights reserved.
+ */
+
+#pragma once
+
+#include "RHI/DynamicRHI.h"
+#include "VulkanLoader.h"
+#include "VulkanRHIResource.h"
+
+class IVulkanDynamicRHI : public FDynamicRHI
+{
+public:
+	// RHI Interface Type
+	virtual ERHIInterfaceType GetInterfaceType() const override { return ERHIInterfaceType::Vulkan; }
+
+	// Vulkan-specific initialization
+	virtual void CreateVulkanInstance() = 0;
+	virtual void CreateVulkanDevice() = 0;
+	virtual void CreateVulkanQueues() = 0;
+
+	// Vulkan-specific resource creation
+	virtual VkImage CreateVulkanImage(const FRHITextureCreateDesc& CreateDesc) = 0;
+	virtual VkBuffer CreateVulkanBuffer(const FRHIBufferCreateDesc& CreateDesc) = 0;
+	virtual VkImageView CreateVulkanImageView(VkImage Image, const FRHIShaderResourceViewCreateInfo& CreateInfo) = 0;
+	virtual VkBufferView CreateVulkanBufferView(VkBuffer Buffer, const FRHIUnorderedAccessViewCreateInfo& CreateInfo) = 0;
+
+	// Vulkan-specific command list management
+	virtual VkCommandBuffer BeginVulkanCommandBuffer() = 0;
+	virtual void EndVulkanCommandBuffer(VkCommandBuffer CommandBuffer) = 0;
+
+	// Vulkan-specific synchronization
+	virtual void SubmitVulkanCommandsAndFlushGPU() = 0;
+	virtual void FlushVulkanResources() = 0;
+
+	// Vulkan-specific viewport and swap chain management
+	virtual void CreateVulkanSwapChain(void* WindowHandle, TUINT32 Width, TUINT32 Height, bool bIsFullscreen, EPixelFormat PreferredPixelFormat, FViewportRHIRef& OutViewport) = 0;
+	virtual void ResizeVulkanSwapChain(FViewportRHIRef& Viewport, TUINT32 Width, TUINT32 Height, bool bIsFullscreen, EPixelFormat PreferredPixelFormat) = 0;
+	virtual void PresentVulkanSwapChain(FViewportRHIRef& Viewport) = 0;
+
+	// Vulkan-specific render pass management
+	virtual void BeginVulkanRenderPass(const FRHIRenderPassInfo& RenderPassInfo, const TCHAR* Name) = 0;
+	virtual void EndVulkanRenderPass() = 0;
+
+	// Vulkan-specific query and timestamp management
+	virtual VkQueryPool CreateVulkanQueryPool(ERHIQueryType QueryType) = 0;
+	virtual void BeginVulkanQuery(VkQueryPool QueryPool, TUINT32 QueryIndex) = 0;
+	virtual void EndVulkanQuery(VkQueryPool QueryPool, TUINT32 QueryIndex) = 0;
+	virtual void GetVulkanQueryResults(VkQueryPool QueryPool, TUINT32 QueryIndex, TUINT64& OutResult, bool bWait) = 0;
+
+	// Vulkan-specific debugging and profiling
+	virtual void PushVulkanEvent(const TCHAR* Name) = 0;
+	virtual void PopVulkanEvent() = 0;
+
+	// Vulkan-specific memory management
+	virtual void FlushVulkanPendingDeletes() = 0;
+};

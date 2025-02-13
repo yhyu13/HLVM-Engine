@@ -24,4 +24,10 @@ public:
 	 * @returns A VkSurfaceKHR handle, for use by the application
 	 */
 	VkSurfaceKHR CreateSurface(VkInstance instance);
+
+	/**
+	 * @brief Gets the required extensions for Vulkan
+	 * @return A vector of extension names
+	 */
+	TVector<FString> GetRequiredExtensions() const;
 };

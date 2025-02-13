@@ -17,6 +17,7 @@ using FMat3 = glm::mat3;
 using FMat4 = glm::mat4;
 
 using FIntVec3 = glm::ivec3;
+using FUIntVec3 = glm::uvec3;
 
 // Define a mathematical structure using GLM types
 struct Transform {

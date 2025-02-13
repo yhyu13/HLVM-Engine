@@ -1,17 +1,12 @@
 /**
 * Copyright (c) 2025. MIT License. All rights reserved.
-*/
+ */
 
 #pragma once
 
-#include "RHIDefinition.h"
 #include "Core/Object/RefCountPtr.h"
-
-// Forward Declarations
-class FRHICommandListBase;
-class FRHICommandListImmediate;
-class FRHIComputeCommandList;
-
+#include "RHIDefinition.h"
+#include "RHIResourceDeclaration.h"
 
 // Enumeration of RHI resource types
 enum class ERHIResourceType : TUINT8
@@ -46,130 +41,117 @@ public:
 	virtual FString GetName() const { return TXT("Unnamed RHI Resource"); }
 };
 
-
 // Base class for RHI textures
-class FRHITexture : public FRHIResource
+class FRHITexture : virtual public FRHIResource
 {
 public:
-	virtual ~FRHITexture() override = default;
+	FRHITextureCreateDesc CreateDesc; // Declaration struct as a member
 
 	// Returns the dimensions of the texture
-	virtual FIntVec3 GetSize() const = 0;
+	virtual FIntVec3 GetSize() const { return CreateDesc.Dimensions; }
 
 	// Returns the pixel format of the texture
-	virtual EPixelFormat GetFormat() const = 0;
+	virtual EPixelFormat GetFormat() const { return CreateDesc.Format; }
 
 	// Returns the texture flags
-	virtual ETextureCreateFlags GetFlags() const = 0;
+	virtual ETextureCreateFlags GetFlags() const { return CreateDesc.Flags; }
 
 	// Returns the type of the RHI resource
 	virtual ERHIResourceType GetType() const override { return ERHIResourceType::Texture; }
 };
 
 // Base class for RHI buffers
-class FRHIBuffer : public FRHIResource
+class FRHIBuffer : virtual public FRHIResource
 {
 public:
-	virtual ~FRHIBuffer() override = default;
+	FRHIBufferCreateDesc CreateDesc; // Declaration struct as a member
 
 	// Returns the size of the buffer in bytes
-	virtual TUINT32 GetSize() const = 0;
+	virtual TUINT32 GetSize() const { return CreateDesc.SizeInBytes; }
 
 	// Returns the usage flags of the buffer
-	virtual EBufferUsageFlags GetUsageFlags() const = 0;
+	virtual EBufferUsageFlags GetUsageFlags() const { return CreateDesc.UsageFlags; }
 
 	// Returns the type of the RHI resource
 	virtual ERHIResourceType GetType() const override { return ERHIResourceType::Buffer; }
 };
 
 // Base class for RHI shaders
-class FRHIShader : public FRHIResource
+class FRHIShader : virtual public FRHIResource
 {
 public:
-	virtual ~FRHIShader() override = default;
+	FShaderCreateInfo CreateDesc; // Declaration struct as a member
 
 	// Returns the shader stage (e.g., vertex, pixel, compute)
-	virtual EShaderStage GetStage() const = 0;
+	virtual EShaderStage GetStage() const { return CreateDesc.Stage; }
 
 	// Returns the type of the RHI resource
 	virtual ERHIResourceType GetType() const override { return ERHIResourceType::Shader; }
 };
 
 // Base class for RHI shader resource views
-class FRHIShaderResourceView : public FRHIResource
+class FRHIShaderResourceView : virtual public FRHIResource
 {
 public:
-	virtual ~FRHIShaderResourceView() override = default;
+	FRHIShaderResourceViewCreateInfo CreateDesc; // Declaration struct as a member
 
 	// Returns the type of the RHI resource
 	virtual ERHIResourceType GetType() const override { return ERHIResourceType::ShaderResourceView; }
 };
 
 // Base class for RHI unordered access views
-class FRHIUnorderedAccessView : public FRHIResource
+class FRHIUnorderedAccessView : virtual public FRHIResource
 {
 public:
-	virtual ~FRHIUnorderedAccessView() override = default;
+	FRHIUnorderedAccessViewCreateInfo CreateDesc; // Declaration struct as a member
 
 	// Returns the type of the RHI resource
 	virtual ERHIResourceType GetType() const override { return ERHIResourceType::UnorderedAccessView; }
 };
 
 // Base class for RHI sampler states
-class FRHISamplerState : public FRHIResource
+class FRHISamplerState : virtual public FRHIResource
 {
 public:
-	virtual ~FRHISamplerState() override = default;
-
 	// Returns the type of the RHI resource
 	virtual ERHIResourceType GetType() const override { return ERHIResourceType::SamplerState; }
 };
 
 // Base class for RHI render target views
-class FRHIRenderTargetView : public FRHIResource
+class FRHIRenderTargetView : virtual public FRHIResource
 {
 public:
-	virtual ~FRHIRenderTargetView() override = default;
-
 	// Returns the type of the RHI resource
 	virtual ERHIResourceType GetType() const override { return ERHIResourceType::RenderTargetView; }
 };
 
 // Base class for RHI depth-stencil views
-class FRHIDepthStencilView : public FRHIResource
+class FRHIDepthStencilView : virtual public FRHIResource
 {
 public:
-	virtual ~FRHIDepthStencilView() override = default;
-
 	// Returns the type of the RHI resource
 	virtual ERHIResourceType GetType() const override { return ERHIResourceType::DepthStencilView; }
 };
 
 // Base class for RHI pipeline states
-class FRHIGraphicsPipelineState : public FRHIResource
+class FRHIGraphicsPipelineState : virtual public FRHIResource
 {
 public:
-	virtual ~FRHIGraphicsPipelineState() override = default;
-
 	// Returns the type of the RHI resource
 	virtual ERHIResourceType GetType() const override { return ERHIResourceType::PipelineState; }
 };
 
-class FRHIComputePipelineState : public FRHIResource
+class FRHIComputePipelineState : virtual public FRHIResource
 {
 public:
-	virtual ~FRHIComputePipelineState() override = default;
-
 	// Returns the type of the RHI resource
 	virtual ERHIResourceType GetType() const override { return ERHIResourceType::PipelineState; }
 };
 
 // Base class for RHI queries
-class FRHIQuery : public FRHIResource
+class FRHIQuery : virtual public FRHIResource
 {
 public:
-	virtual ~FRHIQuery() override = default;
-
 	// Returns the type of the query (e.g., occlusion, timestamp)
 	virtual ERHIQueryType GetQueryType() const = 0;
 
