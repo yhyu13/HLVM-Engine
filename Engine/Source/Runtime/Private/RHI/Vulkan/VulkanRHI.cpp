@@ -5,93 +5,218 @@
 
 DECLARE_LOG_CATEGORY(LogVulkanRHI)
 
-static std::vector<VkExtensionProperties> EnumerateInstanceExtensionProperties(const char* pLayerName)
+namespace
 {
-	uint32_t extCount = 0;
-	VkResult result = vkEnumerateInstanceExtensionProperties(pLayerName, &extCount, nullptr);
-	if (result != VK_SUCCESS)
+	HLVM_STATIC_VAR bool bUseValidationLayers = VK_ENABLE_VALIDATION_LAYERS;
+
+	HLVM_STATIC_VAR const TVector<const char*> validationLayers = {
+		"VK_LAYER_KHRONOS_validation" // 开启可用的校验层, extend if will
+	};
+
+	HLVM_STATIC_VAR const TVector<const char*> deviceExtensions = {
+		VK_KHR_SWAPCHAIN_EXTENSION_NAME // 交换链扩展集合, extend if will
+	};
+
+	HLVM_STATIC_VAR TVector<std::string> requiredExtensions = {
+		/* requested during runtime */
+	};
+
+	HLVM_STATIC_FUNC std::vector<VkExtensionProperties> EnumerateInstanceExtensionProperties(const char* pLayerName)
 	{
-		HLVM_LOG(LogVulkanRHI, err, TXT("vkEnumerateInstanceExtensionProperties failed to get extension count. VkResult = {}"), VK_RESULT_TO_TCHAR(result));
-		return {};
-	}
-
-	std::vector<VkExtensionProperties> extensionProperties(extCount);
-	result = vkEnumerateInstanceExtensionProperties(pLayerName, &extCount, extensionProperties.data());
-	if (result != VK_SUCCESS)
-	{
-		HLVM_LOG(LogVulkanRHI, err, TXT("vkEnumerateInstanceExtensionProperties failed to get extension properties. VkResult = {}"), VK_RESULT_TO_TCHAR(result));
-		return {};
-	}
-	return extensionProperties;
-}
-
-static bool IsExtensionSupported(const char* extensionName, const char* pLayerName)
-{
-	auto extProps = EnumerateInstanceExtensionProperties(pLayerName);
-	auto compare = [&](const VkExtensionProperties& rhs) { return strcmp(extensionName, rhs.extensionName) == 0; };
-	return std::find_if(extProps.begin(), extProps.end(), compare) != extProps.end();
-}
-
-static std::vector<VkLayerProperties> EnumerateInstanceLayerProperties()
-{
-	uint32_t layerCount;
-	vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
-
-	std::vector<VkLayerProperties> availableLayers(layerCount);
-	vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
-	return availableLayers;
-}
-
-static std::vector<std::string> ValidateInstanceLayerNames(const std::vector<std::string>& names)
-{
-	if (names.empty())
-	{
-		return names;
-	}
-
-	auto availableLayers = EnumerateInstanceLayerProperties();
-
-	std::set<std::string> layerNames;
-	for (const auto& layer : availableLayers)
-	{
-		HLVM_LOG(LogVulkanRHI, debug, TXT("Available layer: {}"), TO_TCHAR_CSTR(layer.layerName));
-		if (layer.layerName[0] != 0)
-			layerNames.insert(layer.layerName);
-	}
-
-	std::vector<std::string> validatedNames;
-	validatedNames.reserve(names.size());
-	for (const auto& requestedName : names)
-	{
-		if (layerNames.count(requestedName) != 0)
+		uint32_t extCount = 0;
+		VkResult result = vkEnumerateInstanceExtensionProperties(pLayerName, &extCount, nullptr);
+		if (result != VK_SUCCESS)
 		{
-			HLVM_LOG(LogVulkanRHI, debug, TXT("Valid requested layer: {}"), TO_TCHAR_CSTR(requestedName.c_str()));
-			validatedNames.push_back(requestedName);
+			HLVM_LOG(LogVulkanRHI, err, TXT("vkEnumerateInstanceExtensionProperties failed to get extension count. VkResult = {}"), VK_RESULT_TO_TCHAR(result));
+			return {};
+		}
+
+		std::vector<VkExtensionProperties> extensionProperties(extCount);
+		result = vkEnumerateInstanceExtensionProperties(pLayerName, &extCount, extensionProperties.data());
+		if (result != VK_SUCCESS)
+		{
+			HLVM_LOG(LogVulkanRHI, err, TXT("vkEnumerateInstanceExtensionProperties failed to get extension properties. VkResult = {}"), VK_RESULT_TO_TCHAR(result));
+			return {};
+		}
+		return extensionProperties;
+	}
+
+	HLVM_STATIC_FUNC bool IsExtensionSupported(const char* extensionName, const char* pLayerName)
+	{
+		auto extProps = EnumerateInstanceExtensionProperties(pLayerName);
+		auto compare = [&](const VkExtensionProperties& rhs) { return strcmp(extensionName, rhs.extensionName) == 0; };
+		return std::find_if(extProps.begin(), extProps.end(), compare) != extProps.end();
+	}
+
+	HLVM_STATIC_FUNC std::vector<VkLayerProperties> EnumerateInstanceLayerProperties()
+	{
+		uint32_t layerCount;
+		vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
+
+		std::vector<VkLayerProperties> availableLayers(layerCount);
+		vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
+		return availableLayers;
+	}
+
+	HLVM_STATIC_FUNC std::vector<std::string> ValidateInstanceLayerNames(const std::vector<std::string>& names)
+	{
+		if (names.empty())
+		{
+			return names;
+		}
+
+		auto availableLayers = EnumerateInstanceLayerProperties();
+
+		std::set<std::string> layerNames;
+		for (const auto& layer : availableLayers)
+		{
+			HLVM_LOG(LogVulkanRHI, debug, TXT("Available layer: {}"), TO_TCHAR_CSTR(layer.layerName));
+			if (layer.layerName[0] != 0)
+				layerNames.insert(layer.layerName);
+		}
+
+		std::vector<std::string> validatedNames;
+		validatedNames.reserve(names.size());
+		for (const auto& requestedName : names)
+		{
+			if (layerNames.count(requestedName) != 0)
+			{
+				HLVM_LOG(LogVulkanRHI, debug, TXT("Valid requested layer: {}"), TO_TCHAR_CSTR(requestedName.c_str()));
+				validatedNames.push_back(requestedName);
+			}
+			else
+			{
+				HLVM_LOG(LogVulkanRHI, warn, TXT("Invalid requested layer: {}"), TO_TCHAR_CSTR(requestedName.c_str()));
+			}
+		}
+
+		return validatedNames;
+	}
+
+	HLVM_STATIC_FUNC bool CheckValidationLayerSupport()
+	{
+		uint32_t layerCount = 0;
+		vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
+
+		TVector<VkLayerProperties> availableLayers(layerCount);
+		vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
+		for (const char* layerName : validationLayers)
+		{
+			bool layerFound = false;
+			for (const auto& layerProperties : availableLayers)
+			{
+				if (strcmp(layerName, layerProperties.layerName) == 0)
+				{
+					layerFound = true;
+					break;
+				}
+			}
+			if (!layerFound)
+			{
+				return false;
+			}
+		}
+		return true;
+	}
+
+	HLVM_STATIC_FUNC TVector<const char*> GetRequiredExtensions()
+	{
+		if (bUseValidationLayers)
+		{
+			requiredExtensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME); // 添加调试扩展
+		}
+		TVector<const char*> Ret;
+		for (const auto& extension : requiredExtensions)
+		{
+			Ret.push_back(extension.c_str());
+		}
+		return Ret;
+	}
+
+	// Since we are using the debug layer, we need to provide a callback function that will be called when an error occurs
+	// We follow vulkan api calling convention as this method is called by vulkan api internally
+	HLVM_STATIC_FUNC VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT /*messageType*/,
+		const VkDebugUtilsMessengerCallbackDataEXT*														 pCallbackData, void* /*pUserData*/)
+	{
+		if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
+		{
+			HLVM_LOG(LogVulkanRHI, err, TXT("Error : {}"), TO_TCHAR_CSTR(pCallbackData->pMessage));
+		}
+		else if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
+		{
+			HLVM_LOG(LogVulkanRHI, warn, TXT("Warning : {}"), TO_TCHAR_CSTR(pCallbackData->pMessage));
+		}
+		else if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT)
+		{
+			HLVM_LOG(LogVulkanRHI, info, TXT("Info : {}"), TO_TCHAR_CSTR(pCallbackData->pMessage));
+		} // ignore verbose logs
+		return VK_FALSE;
+	}
+
+	HLVM_STATIC_FUNC void PopulateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo)
+	{
+		createInfo = {};
+		createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+		createInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+		createInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+		createInfo.pfnUserCallback = DebugCallback;
+	}
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wcast-function-type-strict"
+	// 使用vkGetInstanceProcAddr获取某个api的函数指针
+	HLVM_STATIC_FUNC VkResult CreateDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDebugUtilsMessengerEXT* pDebugMessenger)
+	{
+		auto func = R_C(PFN_vkCreateDebugUtilsMessengerEXT, vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT"));
+		if (func != nullptr)
+		{
+			return func(instance, pCreateInfo, pAllocator, pDebugMessenger);
 		}
 		else
 		{
-			HLVM_LOG(LogVulkanRHI, warn, TXT("Invalid requested layer: {}"), TO_TCHAR_CSTR(requestedName.c_str()));
+			return VK_ERROR_EXTENSION_NOT_PRESENT;
 		}
 	}
 
-	return validatedNames;
+	HLVM_STATIC_FUNC void DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger, const VkAllocationCallbacks* pAllocator)
+	{
+		auto func = R_C(PFN_vkDestroyDebugUtilsMessengerEXT, vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT"));
+		if (func != nullptr)
+		{
+			func(instance, debugMessenger, pAllocator);
+		}
+	}
+#pragma clang diagnostic pop
+} // namespace
+
+FVulkanRHI::FVulkanRHI(const FVulkanRHI::FInitializer& Params)
+	: InitializerParam(Params)
+{
+	for (const auto& extensions : Params.RequiredExtensions)
+	{
+		for (const auto& extension : extensions)
+		{
+			requiredExtensions.push_back(extension.ToCharCStr());
+		}
+	}
 }
 
 // Initialization and Shutdown
 void FVulkanRHI::Init()
 {
 	CreateVulkanInstance();
+	/**
+	 * Create Debug Messenger right after creating the instance
+	 */
+	if (bUseValidationLayers)
+	{
+		CreateDebugLayer();
+	}
+	CreateSurface();
 	CreateVulkanDevice();
 	CreateVulkanQueues();
-
-	VmaAllocatorCreateInfo allocatorCreateInfo = {};
-	allocatorCreateInfo.flags = VMA_ALLOCATOR_CREATE_EXT_MEMORY_BUDGET_BIT;
-	allocatorCreateInfo.vulkanApiVersion = VK_API_VERSION_1_3;
-	allocatorCreateInfo.physicalDevice = VulkanPhysicalDevice;
-	allocatorCreateInfo.device = VulkanDevice;
-	allocatorCreateInfo.instance = VulkanInstance;
-	allocatorCreateInfo.pVulkanFunctions = &VMAVulkanFunctions;
-	vmaCreateAllocator(&allocatorCreateInfo, &VMAAllocator);
+	// TODO : Create Vulkan SwapChain and so on
+	CreateVulkanMemoryAllocator();
 }
 
 void FVulkanRHI::Shutdown()
@@ -153,32 +278,32 @@ FVertexDeclarationRHIRef FVulkanRHI::CreateVertexDeclaration(const FVertexDeclar
 FShaderRHIRef FVulkanRHI::CreateShader(const FShaderCreateInfo& CreateInfo)
 {
 	return nullptr;
-//	VkShaderModule ShaderModule = CreateVulkanShaderModule(CreateInfo);
-//	return new FVulkanShader(ShaderModule, CreateInfo.Stage);
+	//	VkShaderModule ShaderModule = CreateVulkanShaderModule(CreateInfo);
+	//	return new FVulkanShader(ShaderModule, CreateInfo.Stage);
 }
 
 void FVulkanRHI::ReleaseShader(FShaderRHIRef& Shader)
 {
-//	FVulkanShader* VulkanShader = static_cast<FVulkanShader*>(Shader.GetReference());
-//	vkDestroyShaderModule(VulkanDevice, VulkanShader->GetShaderModule(), nullptr);
-//	Shader.SafeRelease();
+	//	FVulkanShader* VulkanShader = static_cast<FVulkanShader*>(Shader.GetReference());
+	//	vkDestroyShaderModule(VulkanDevice, VulkanShader->GetShaderModule(), nullptr);
+	//	Shader.SafeRelease();
 }
 
 // Pipeline State Management
 FRHIGraphicsPipelineState* FVulkanRHI::CreateGraphicsPipelineState(const FGraphicsPipelineStateInitializer& Initializer)
 {
 	return nullptr;
-//	VkPipeline		 Pipeline = CreateVulkanGraphicsPipeline(Initializer);
-//	VkPipelineLayout PipelineLayout = CreateVulkanPipelineLayout(Initializer);
-//	return new FVulkanGraphicsPipelineState(Pipeline, PipelineLayout);
+	//	VkPipeline		 Pipeline = CreateVulkanGraphicsPipeline(Initializer);
+	//	VkPipelineLayout PipelineLayout = CreateVulkanPipelineLayout(Initializer);
+	//	return new FVulkanGraphicsPipelineState(Pipeline, PipelineLayout);
 }
 
 FRHIComputePipelineState* FVulkanRHI::CreateComputePipelineState(const FComputePipelineStateInitializer& Initializer)
 {
 	return nullptr;
-//	VkPipeline		 Pipeline = CreateVulkanComputePipeline(Initializer);
-//	VkPipelineLayout PipelineLayout = CreateVulkanPipelineLayout(Initializer);
-//	return new FVulkanComputePipelineState(Pipeline, PipelineLayout);
+	//	VkPipeline		 Pipeline = CreateVulkanComputePipeline(Initializer);
+	//	VkPipelineLayout PipelineLayout = CreateVulkanPipelineLayout(Initializer);
+	//	return new FVulkanComputePipelineState(Pipeline, PipelineLayout);
 }
 
 // Command List and Context
@@ -254,26 +379,26 @@ void FVulkanRHI::RHIDispatchComputeShader(TUINT32 ThreadGroupCountX, TUINT32 Thr
 FRHIQueryRHIRef FVulkanRHI::CreateQuery(ERHIQueryType QueryType)
 {
 	return FRHIQueryRHIRef{};
-//	VkQueryPool QueryPool = CreateVulkanQueryPool(QueryType);
-//	return new FVulkanQuery(QueryPool, 0, QueryType);
+	//	VkQueryPool QueryPool = CreateVulkanQueryPool(QueryType);
+	//	return new FVulkanQuery(QueryPool, 0, QueryType);
 }
 
 void FVulkanRHI::RHIBeginQuery(FRHIQueryRHIRef& Query)
 {
-//	FVulkanQuery* VulkanQuery = static_cast<FVulkanQuery*>(Query.GetReference());
-//	BeginVulkanQuery(VulkanQuery->GetQueryPool(), VulkanQuery->GetQueryIndex());
+	//	FVulkanQuery* VulkanQuery = static_cast<FVulkanQuery*>(Query.GetReference());
+	//	BeginVulkanQuery(VulkanQuery->GetQueryPool(), VulkanQuery->GetQueryIndex());
 }
 
 void FVulkanRHI::RHIEndQuery(FRHIQueryRHIRef& Query)
 {
-//	FVulkanQuery* VulkanQuery = static_cast<FVulkanQuery*>(Query.GetReference());
-//	EndVulkanQuery(VulkanQuery->GetQueryPool(), VulkanQuery->GetQueryIndex());
+	//	FVulkanQuery* VulkanQuery = static_cast<FVulkanQuery*>(Query.GetReference());
+	//	EndVulkanQuery(VulkanQuery->GetQueryPool(), VulkanQuery->GetQueryIndex());
 }
 
 void FVulkanRHI::RHIGetQueryResults(FRHIQueryRHIRef& Query, TUINT64& OutResult, bool bWait)
 {
-//	FVulkanQuery* VulkanQuery = static_cast<FVulkanQuery*>(Query.GetReference());
-//	GetVulkanQueryResults(VulkanQuery->GetQueryPool(), VulkanQuery->GetQueryIndex(), OutResult, bWait);
+	//	FVulkanQuery* VulkanQuery = static_cast<FVulkanQuery*>(Query.GetReference());
+	//	GetVulkanQueryResults(VulkanQuery->GetQueryPool(), VulkanQuery->GetQueryIndex(), OutResult, bWait);
 }
 
 // Debugging and Profiling
@@ -296,26 +421,26 @@ void FVulkanRHI::RHIFlushPendingDeletes()
 // Misc
 void FVulkanRHI::RHISetGraphicsPipelineState(FRHIGraphicsPipelineState* PipelineState)
 {
-//	FVulkanGraphicsPipelineState* VulkanPipelineState = static_cast<FVulkanGraphicsPipelineState*>(PipelineState);
-//	vkCmdBindPipeline(GetCurrentCommandBuffer(), VK_PIPELINE_BIND_POINT_GRAPHICS, VulkanPipelineState->GetPipeline());
+	//	FVulkanGraphicsPipelineState* VulkanPipelineState = static_cast<FVulkanGraphicsPipelineState*>(PipelineState);
+	//	vkCmdBindPipeline(GetCurrentCommandBuffer(), VK_PIPELINE_BIND_POINT_GRAPHICS, VulkanPipelineState->GetPipeline());
 }
 
 void FVulkanRHI::RHISetComputePipelineState(FRHIComputePipelineState* PipelineState)
 {
-//	FVulkanComputePipelineState* VulkanPipelineState = static_cast<FVulkanComputePipelineState*>(PipelineState);
-//	vkCmdBindPipeline(GetCurrentCommandBuffer(), VK_PIPELINE_BIND_POINT_COMPUTE, VulkanPipelineState->GetPipeline());
+	//	FVulkanComputePipelineState* VulkanPipelineState = static_cast<FVulkanComputePipelineState*>(PipelineState);
+	//	vkCmdBindPipeline(GetCurrentCommandBuffer(), VK_PIPELINE_BIND_POINT_COMPUTE, VulkanPipelineState->GetPipeline());
 }
 
 void FVulkanRHI::RHISetViewport(TUINT32 MinX, TUINT32 MinY, float MinZ, TUINT32 MaxX, TUINT32 MaxY, float MaxZ)
 {
-//	VkViewport Viewport = { static_cast<float>(MinX), static_cast<float>(MinY), static_cast<float>(MaxX - MinX), static_cast<float>(MaxY - MinY), MinZ, MaxZ };
-//	vkCmdSetViewport(GetCurrentCommandBuffer(), 0, 1, &Viewport);
+	//	VkViewport Viewport = { static_cast<float>(MinX), static_cast<float>(MinY), static_cast<float>(MaxX - MinX), static_cast<float>(MaxY - MinY), MinZ, MaxZ };
+	//	vkCmdSetViewport(GetCurrentCommandBuffer(), 0, 1, &Viewport);
 }
 
 void FVulkanRHI::RHISetScissorRect(bool bEnable, TUINT32 MinX, TUINT32 MinY, TUINT32 MaxX, TUINT32 MaxY)
 {
-//	VkRect2D Scissor = { { static_cast<int32_t>(MinX), static_cast<int32_t>(MinY) }, { MaxX - MinX, MaxY - MinY } };
-//	vkCmdSetScissor(GetCurrentCommandBuffer(), 0, 1, &Scissor);
+	//	VkRect2D Scissor = { { static_cast<int32_t>(MinX), static_cast<int32_t>(MinY) }, { MaxX - MinX, MaxY - MinY } };
+	//	vkCmdSetScissor(GetCurrentCommandBuffer(), 0, 1, &Scissor);
 }
 
 // Vulkan-specific initialization
@@ -323,18 +448,59 @@ void FVulkanRHI::CreateVulkanInstance()
 {
 	VkApplicationInfo AppInfo = {};
 	AppInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-	AppInfo.pApplicationName = "Vulkan_RHI";
+	AppInfo.pApplicationName = "HLVM";
 	AppInfo.applicationVersion = VK_MAKE_VERSION(0, 2, 1);
-	AppInfo.pEngineName = "HLVM_Engine";
+	AppInfo.pEngineName = "HLVM";
 	AppInfo.engineVersion = VK_MAKE_VERSION(0, 2, 1);
-	AppInfo.apiVersion = VK_API_VERSION_1_3;
+	AppInfo.apiVersion = VULKAN_API_VERSION;
 
 	VkInstanceCreateInfo CreateInfo = {};
 	CreateInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
 	CreateInfo.pApplicationInfo = &AppInfo;
 
+	auto extensions = GetRequiredExtensions();
+	CreateInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
+	CreateInfo.ppEnabledExtensionNames = extensions.data();
+
+	VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo;
+	if (bUseValidationLayers)
+	{
+		if (CheckValidationLayerSupport())
+		{
+			CreateInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
+			CreateInfo.ppEnabledLayerNames = validationLayers.data();
+
+			PopulateDebugMessengerCreateInfo(debugCreateInfo);
+			CreateInfo.pNext = S_C(VkDebugUtilsMessengerCreateInfoEXT*, &debugCreateInfo);
+		}
+		else
+		{
+			HLVM_LOG(LogVulkanRHI, warn, TXT("Validation layers requested, but not available!"));
+			bUseValidationLayers = false;
+		}
+	}
+	else
+	{
+		CreateInfo.enabledLayerCount = 0;
+		CreateInfo.pNext = nullptr;
+	}
+
 	VkResult Result = vkCreateInstance(&CreateInfo, nullptr, &VulkanInstance);
 	HLVM_ENSURE2(Result == VK_SUCCESS);
+}
+
+void FVulkanRHI::CreateDebugLayer()
+{
+	VkDebugUtilsMessengerCreateInfoEXT createInfo;
+	PopulateDebugMessengerCreateInfo(createInfo);
+	VkResult Result = CreateDebugUtilsMessengerEXT(VulkanInstance, &createInfo, nullptr, &DebugMessenger);
+	HLVM_ENSURE2(Result == VK_SUCCESS);
+}
+
+void FVulkanRHI::CreateSurface()
+{
+	VulkanSurface = InitializerParam.CreateSurfaceFunc(VulkanInstance);
+	HLVM_ENSURE2(VulkanSurface != VK_NULL_HANDLE);
 }
 
 void FVulkanRHI::CreateVulkanDevice()
@@ -370,6 +536,18 @@ void FVulkanRHI::CreateVulkanDevice()
 void FVulkanRHI::CreateVulkanQueues()
 {
 	// Queues are created during device creation
+}
+
+void FVulkanRHI::CreateVulkanMemoryAllocator()
+{
+	VmaAllocatorCreateInfo allocatorCreateInfo = {};
+	allocatorCreateInfo.flags = VMA_ALLOCATOR_CREATE_EXT_MEMORY_BUDGET_BIT;
+	allocatorCreateInfo.vulkanApiVersion = VULKAN_API_VERSION;
+	allocatorCreateInfo.physicalDevice = VulkanPhysicalDevice;
+	allocatorCreateInfo.device = VulkanDevice;
+	allocatorCreateInfo.instance = VulkanInstance;
+	allocatorCreateInfo.pVulkanFunctions = &VMAVulkanFunctions;
+	vmaCreateAllocator(&allocatorCreateInfo, &VMAAllocator);
 }
 
 // Vulkan-specific resource creation
@@ -453,7 +631,7 @@ VkCommandBuffer FVulkanRHI::BeginVulkanCommandBuffer()
 {
 	VkCommandBufferAllocateInfo AllocInfo = {};
 	AllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-	//AllocInfo.commandPool = GetCommandPool();
+	// AllocInfo.commandPool = GetCommandPool();
 	AllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
 	AllocInfo.commandBufferCount = 1;
 
@@ -483,7 +661,7 @@ void FVulkanRHI::SubmitVulkanCommandsAndFlushGPU()
 	VkSubmitInfo SubmitInfo = {};
 	SubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 	SubmitInfo.commandBufferCount = 1;
-	//SubmitInfo.pCommandBuffers = &GetCurrentCommandBuffer();
+	// SubmitInfo.pCommandBuffers = &GetCurrentCommandBuffer();
 
 	VkResult Result = vkQueueSubmit(GraphicsQueue, 1, &SubmitInfo, VK_NULL_HANDLE);
 	HLVM_ENSURE2(Result == VK_SUCCESS);
@@ -528,7 +706,7 @@ VkQueryPool FVulkanRHI::CreateVulkanQueryPool(ERHIQueryType QueryType)
 {
 	VkQueryPoolCreateInfo PoolInfo = {};
 	PoolInfo.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
-	//PoolInfo.queryType = ConvertQueryTypeToVulkan(QueryType);
+	// PoolInfo.queryType = ConvertQueryTypeToVulkan(QueryType);
 	PoolInfo.queryCount = 1;
 
 	VkQueryPool QueryPool;
@@ -540,12 +718,12 @@ VkQueryPool FVulkanRHI::CreateVulkanQueryPool(ERHIQueryType QueryType)
 
 void FVulkanRHI::BeginVulkanQuery(VkQueryPool QueryPool, TUINT32 QueryIndex)
 {
-	//vkCmdBeginQuery(GetCurrentCommandBuffer(), QueryPool, QueryIndex, 0);
+	// vkCmdBeginQuery(GetCurrentCommandBuffer(), QueryPool, QueryIndex, 0);
 }
 
 void FVulkanRHI::EndVulkanQuery(VkQueryPool QueryPool, TUINT32 QueryIndex)
 {
-	//vkCmdEndQuery(GetCurrentCommandBuffer(), QueryPool, QueryIndex);
+	// vkCmdEndQuery(GetCurrentCommandBuffer(), QueryPool, QueryIndex);
 }
 
 void FVulkanRHI::GetVulkanQueryResults(VkQueryPool QueryPool, TUINT32 QueryIndex, TUINT64& OutResult, bool bWait)
@@ -696,23 +874,23 @@ VkPipelineLayoutCreateInfo FVulkanRHI::GenerateVkPipelineLayoutCreateInfo(const 
 	VkPipelineLayoutCreateInfo PipelineLayoutCreateInfo = {};
 	PipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 
-//	// Add descriptor set layouts
-//	std::vector<VkDescriptorSetLayout> descriptorSetLayouts;
-//	for (const auto& layout : CreateDesc.DescriptorSetLayouts)
-//	{
-//		descriptorSetLayouts.push_back(layout);
-//	}
-//	PipelineLayoutCreateInfo.descriptorSetLayoutCount = static_cast<uint32_t>(descriptorSetLayouts.size());
-//	PipelineLayoutCreateInfo.pDescriptorSetLayouts = descriptorSetLayouts.data();
-//
-//	// Add push constant ranges
-//	std::vector<VkPushConstantRange> pushConstantRanges;
-//	for (const auto& range : CreateDesc.PushConstantRanges)
-//	{
-//		pushConstantRanges.push_back(range);
-//	}
-//	PipelineLayoutCreateInfo.pushConstantRangeCount = static_cast<uint32_t>(pushConstantRanges.size());
-//	PipelineLayoutCreateInfo.pPushConstantRanges = pushConstantRanges.data();
+	//	// Add descriptor set layouts
+	//	std::vector<VkDescriptorSetLayout> descriptorSetLayouts;
+	//	for (const auto& layout : CreateDesc.DescriptorSetLayouts)
+	//	{
+	//		descriptorSetLayouts.push_back(layout);
+	//	}
+	//	PipelineLayoutCreateInfo.descriptorSetLayoutCount = static_cast<uint32_t>(descriptorSetLayouts.size());
+	//	PipelineLayoutCreateInfo.pDescriptorSetLayouts = descriptorSetLayouts.data();
+	//
+	//	// Add push constant ranges
+	//	std::vector<VkPushConstantRange> pushConstantRanges;
+	//	for (const auto& range : CreateDesc.PushConstantRanges)
+	//	{
+	//		pushConstantRanges.push_back(range);
+	//	}
+	//	PipelineLayoutCreateInfo.pushConstantRangeCount = static_cast<uint32_t>(pushConstantRanges.size());
+	//	PipelineLayoutCreateInfo.pPushConstantRanges = pushConstantRanges.data();
 
 	return PipelineLayoutCreateInfo;
 }
@@ -737,29 +915,29 @@ VkGraphicsPipelineCreateInfo FVulkanRHI::GenerateVkGraphicsPipelineCreateInfo(co
 	PipelineCreateInfo.stageCount = static_cast<uint32_t>(shaderStages.size());
 	PipelineCreateInfo.pStages = shaderStages.data();
 
-//	// Add vertex input state
-//	PipelineCreateInfo.pVertexInputState = &CreateDesc.VertexInputState;
-//
-//	// Add input assembly state
-//	PipelineCreateInfo.pInputAssemblyState = &CreateDesc.InputAssemblyState;
-//
-//	// Add viewport state
-//	PipelineCreateInfo.pViewportState = &CreateDesc.ViewportState;
-//
-//	// Add rasterization state
-//	PipelineCreateInfo.pRasterizationState = &CreateDesc.RasterizationState;
-//
-//	// Add multisample state
-//	PipelineCreateInfo.pMultisampleState = &CreateDesc.MultisampleState;
-//
-//	// Add depth stencil state
-//	PipelineCreateInfo.pDepthStencilState = &CreateDesc.DepthStencilState;
-//
-//	// Add color blend state
-//	PipelineCreateInfo.pColorBlendState = &CreateDesc.ColorBlendState;
-//
-//	// Add dynamic state
-//	PipelineCreateInfo.pDynamicState = &CreateDesc.DynamicState;
+	//	// Add vertex input state
+	//	PipelineCreateInfo.pVertexInputState = &CreateDesc.VertexInputState;
+	//
+	//	// Add input assembly state
+	//	PipelineCreateInfo.pInputAssemblyState = &CreateDesc.InputAssemblyState;
+	//
+	//	// Add viewport state
+	//	PipelineCreateInfo.pViewportState = &CreateDesc.ViewportState;
+	//
+	//	// Add rasterization state
+	//	PipelineCreateInfo.pRasterizationState = &CreateDesc.RasterizationState;
+	//
+	//	// Add multisample state
+	//	PipelineCreateInfo.pMultisampleState = &CreateDesc.MultisampleState;
+	//
+	//	// Add depth stencil state
+	//	PipelineCreateInfo.pDepthStencilState = &CreateDesc.DepthStencilState;
+	//
+	//	// Add color blend state
+	//	PipelineCreateInfo.pColorBlendState = &CreateDesc.ColorBlendState;
+	//
+	//	// Add dynamic state
+	//	PipelineCreateInfo.pDynamicState = &CreateDesc.DynamicState;
 
 	// Add pipeline layout
 	PipelineCreateInfo.layout = VK_NULL_HANDLE; // To be set later
@@ -785,7 +963,7 @@ VkQueryPoolCreateInfo FVulkanRHI::GenerateVkQueryPoolCreateInfo(const FRHIQueryC
 {
 	VkQueryPoolCreateInfo QueryPoolCreateInfo = {};
 	QueryPoolCreateInfo.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
-	//QueryPoolCreateInfo.queryType = VulkanQueryTypeFromRHIQueryType(CreateDesc.QueryType); // Helper function to convert RHI query type to Vulkan query type
+	// QueryPoolCreateInfo.queryType = VulkanQueryTypeFromRHIQueryType(CreateDesc.QueryType); // Helper function to convert RHI query type to Vulkan query type
 	QueryPoolCreateInfo.queryCount = CreateDesc.NumQueries;
 
 	return QueryPoolCreateInfo;
@@ -796,14 +974,14 @@ VkDeviceMemory FVulkanRHI::AllocateVulkanMemory(VkBuffer Buffer, EBufferUsageFla
 	VkBufferCreateInfo bufferInfo;
 	bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
 	bufferInfo.size = 65536;
-	//bufferInfo.usage = UsageFlags;
+	// bufferInfo.usage = UsageFlags;
 
 	VmaAllocationCreateInfo allocInfo = {};
 	allocInfo.usage = VMA_MEMORY_USAGE_AUTO;
 
-	VkBuffer buffer;
+	VkBuffer	  buffer;
 	VmaAllocation allocation;
-	//vmaAllocateMemoryForBuffer(VMAAllocator, &bufferInfo, &allocInfo, &buffer, &allocation, nullptr);
+	// vmaAllocateMemoryForBuffer(VMAAllocator, &bufferInfo, &allocInfo, &buffer, &allocation, nullptr);
 
 	VkDeviceMemory dm = nullptr;
 	return dm;

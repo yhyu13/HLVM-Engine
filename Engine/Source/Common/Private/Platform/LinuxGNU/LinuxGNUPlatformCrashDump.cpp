@@ -7,7 +7,9 @@
 #ifdef PLATFORM_LINUXGNU
 	#include "Platform/GenericPlatformCrashDump.h"
 
-// Reference : https://stackoverflow.com/a/54427899/6658943
+// Reference :
+// https://stackoverflow.com/questions/77005/how-to-automatically-generate-a-stacktrace-when-my-program-crashes
+// https://stackoverflow.com/a/54427899/6658943
 	#include <signal.h> // ::signal, ::raise
 	#include <boost/stacktrace.hpp>
 

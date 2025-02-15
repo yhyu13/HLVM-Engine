@@ -53,7 +53,8 @@ struct FLogCatgegory
 /**
  * Define basic log categories
  */
-DECLARE_LOG_CATEGORY(LogAssert)
+// LogCrashDump is used for assertion
+DECLARE_LOG_CATEGORY(LogCrashDump)
 // Use LogTemp as default log category if you don't know what to use
 DECLARE_LOG_CATEGORY(LogTemp)
 

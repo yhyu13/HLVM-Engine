@@ -8,26 +8,26 @@ DECLARE_LOG_CATEGORY(LogTest)
 
 #include "Window/WindowDefinition.h"
 #if HLVM_WINDOW_USE_VULKAN
-#include "Window/Vulkan/GLFW3Vulkan.h"
+	#include "Window/Vulkan/GLFW3Vulkan.h"
 
-#if 1 // Test Vulkan triangle program with direct vulkan api calls
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdocumentation"
-#pragma clang diagnostic ignored "-Wzero-as-null-pointer-constant"
-#pragma clang diagnostic ignored "-Wold-style-cast"
-#pragma clang diagnostic ignored "-Wextra-semi-stmt"
-#pragma clang diagnostic ignored "-Wmissing-noreturn"
-#pragma clang diagnostic ignored "-Wcast-function-type-strict"
-#pragma clang diagnostic ignored "-Wunused-parameter"
-#pragma clang diagnostic ignored "-Wshadow"
-#pragma clang diagnostic ignored "-Wmissing-braces"
-#pragma clang diagnostic ignored "-Wsign-conversion"
+	#if 1 // Test Vulkan triangle program with direct vulkan api calls
+		#pragma clang diagnostic push
+		#pragma clang diagnostic ignored "-Wdocumentation"
+		#pragma clang diagnostic ignored "-Wzero-as-null-pointer-constant"
+		#pragma clang diagnostic ignored "-Wold-style-cast"
+		#pragma clang diagnostic ignored "-Wextra-semi-stmt"
+		#pragma clang diagnostic ignored "-Wmissing-noreturn"
+		#pragma clang diagnostic ignored "-Wcast-function-type-strict"
+		#pragma clang diagnostic ignored "-Wunused-parameter"
+		#pragma clang diagnostic ignored "-Wshadow"
+		#pragma clang diagnostic ignored "-Wmissing-braces"
+		#pragma clang diagnostic ignored "-Wsign-conversion"
 
 using namespace std;
 
-const uint32_t WIDTH = 800;
-const uint32_t HEIGHT = 600;
-static const char*	   WINDOW_TITLE = "Vulkan Test";
+const uint32_t	   WIDTH = 800;
+const uint32_t	   HEIGHT = 600;
+static const char* WINDOW_TITLE = "Vulkan Test";
 
 const int MAX_FRAMES_IN_FLIGHT = 2; // 定义GPU同时渲染帧数
 
@@ -39,11 +39,11 @@ const vector<const char*> deviceExtensions = {
 	VK_KHR_SWAPCHAIN_EXTENSION_NAME // 交换链扩展集合
 };
 
-#ifdef VALIDATE
+		#if VK_ENABLE_VALIDATION_LAYERS
 const bool enableValidationLayers = true;
-#else
+		#else
 const bool enableValidationLayers = false;
-#endif // NDEBUG
+		#endif // NDEBUG
 
 // 使用vkGetInstanceProcAddr获取某个api的函数指针
 static VkResult createDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDebugUtilsMessengerEXT* pDebugMessenger)
@@ -1210,28 +1210,42 @@ private:
 	static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType,
 		const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, void* pUserData)
 	{
-		cerr << "Error Message: " << pCallbackData->pMessage << endl;
+		if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
+		{
+			std::cerr << "Error Message: " << pCallbackData->pMessage << std::endl;
+		}
+		else if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
+		{
+			std::cerr << "Warning Message: " << pCallbackData->pMessage << std::endl;
+		}
+		else if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT)
+		{
+			std::cout << "Info Message: " << pCallbackData->pMessage << std::endl;
+		} // ignore verbose logs
 		return VK_FALSE;
 	}
 };
-#pragma clang diagnostic pop
+		#pragma clang diagnostic pop
 
 RECORD_BOOL(test_GLFW3VulkanWindowRaw)
 {
 	VulkanLoader::LoadOnce();
 
 	HelloTriangleApplication app;
-	try {
+	try
+	{
 		app.run();
-	} catch (const std::exception& e) {
-		cerr << "Error Code: "<<e.what() << endl;
+	}
+	catch (const std::exception& e)
+	{
+		cerr << "Error Code: " << e.what() << endl;
 		return false;
 	}
 	return true;
 }
-#endif
+	#endif
 
-#include "RHI/Vulkan/VulkanRHI.h"
+	#include "RHI/Vulkan/VulkanRHI.h"
 
 RECORD_BOOL(test_GLFW3VulkanWindow)
 {
@@ -1243,7 +1257,10 @@ RECORD_BOOL(test_GLFW3VulkanWindow)
 	FVulkanRHI* RHI = nullptr;
 	{
 		// Vulkan rhi init
-		RHI = new FVulkanRHI();
+		FVulkanRHI::FInitializer Initializer;
+		Initializer.RequiredExtensions = { Window.GetRequiredExtensions() };
+		Initializer.CreateSurfaceFunc = [&Window](VkInstance Instance){ return Window.CreateSurface(Instance); };
+		RHI = new FVulkanRHI(Initializer);
 		RHI->Init();
 	}
 

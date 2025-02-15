@@ -14,11 +14,6 @@ public:
 	// RHI Interface Type
 	virtual ERHIInterfaceType GetInterfaceType() const override { return ERHIInterfaceType::Vulkan; }
 
-	// Vulkan-specific initialization
-	virtual void CreateVulkanInstance() = 0;
-	virtual void CreateVulkanDevice() = 0;
-	virtual void CreateVulkanQueues() = 0;
-
 	// Vulkan-specific resource creation
 	virtual VkImage CreateVulkanImage(const FRHITextureCreateDesc& CreateDesc) = 0;
 	virtual VkBuffer CreateVulkanBuffer(const FRHIBufferCreateDesc& CreateDesc) = 0;
@@ -54,4 +49,10 @@ public:
 
 	// Vulkan-specific memory management
 	virtual void FlushVulkanPendingDeletes() = 0;
+
+protected:
+	// Vulkan-specific initialization
+	virtual void CreateVulkanInstance() = 0;
+	virtual void CreateVulkanDevice() = 0;
+	virtual void CreateVulkanQueues() = 0;
 };

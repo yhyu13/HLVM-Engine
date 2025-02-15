@@ -1,36 +1,46 @@
 /**
-* Copyright (c) 2025. MIT License. All rights reserved.
+ * Copyright (c) 2025. MIT License. All rights reserved.
  */
 
 #pragma once
 
 #include "IVulkanDynamicRHI.h"
+#include <functional>
 
-class FVulkanRHI : public IVulkanDynamicRHI
+class FVulkanRHI final : public IVulkanDynamicRHI
 {
 public:
+	struct FInitializer
+	{
+		TVector<TVector<FString>> RequiredExtensions;
+		std::function<VkSurfaceKHR(VkInstance)> CreateSurfaceFunc;
+	};
+
+public:
+	explicit FVulkanRHI(const FInitializer& Params);
+
 	// Initialization and Shutdown
 	virtual void Init() override;
 	virtual void Shutdown() override;
 
 	// Resource Creation
-	virtual FTextureRHIRef CreateTexture(const FRHITextureCreateDesc& CreateDesc) override;
-	virtual FBufferRHIRef CreateBuffer(const FRHIBufferCreateDesc& CreateDesc) override;
-	virtual FShaderResourceViewRHIRef CreateShaderResourceView(FRHITexture* Texture, const FRHIShaderResourceViewCreateInfo& CreateInfo) override;
+	virtual FTextureRHIRef			   CreateTexture(const FRHITextureCreateDesc& CreateDesc) override;
+	virtual FBufferRHIRef			   CreateBuffer(const FRHIBufferCreateDesc& CreateDesc) override;
+	virtual FShaderResourceViewRHIRef  CreateShaderResourceView(FRHITexture* Texture, const FRHIShaderResourceViewCreateInfo& CreateInfo) override;
 	virtual FUnorderedAccessViewRHIRef CreateUnorderedAccessView(FRHIBuffer* Buffer, const FRHIUnorderedAccessViewCreateInfo& CreateInfo) override;
-	virtual FVertexDeclarationRHIRef CreateVertexDeclaration(const FVertexDeclarationElementList& Elements) override;
+	virtual FVertexDeclarationRHIRef   CreateVertexDeclaration(const FVertexDeclarationElementList& Elements) override;
 
 	// Shader Management
 	virtual FShaderRHIRef CreateShader(const FShaderCreateInfo& CreateInfo) override;
-	virtual void ReleaseShader(FShaderRHIRef& Shader) override;
+	virtual void		  ReleaseShader(FShaderRHIRef& Shader) override;
 
 	// Pipeline State Management
 	virtual FRHIGraphicsPipelineState* CreateGraphicsPipelineState(const FGraphicsPipelineStateInitializer& Initializer) override;
-	virtual FRHIComputePipelineState* CreateComputePipelineState(const FComputePipelineStateInitializer& Initializer) override;
+	virtual FRHIComputePipelineState*  CreateComputePipelineState(const FComputePipelineStateInitializer& Initializer) override;
 
 	// Command List and Context
 	virtual FRHICommandListImmediate& GetImmediateCommandList() override;
-	virtual FRHIComputeCommandList& GetComputeCommandList() override;
+	virtual FRHIComputeCommandList&	  GetComputeCommandList() override;
 
 	// Synchronization
 	virtual void RHISubmitCommandsAndFlushGPU() override;
@@ -52,9 +62,9 @@ public:
 
 	// Query and Timestamp
 	virtual FRHIQueryRHIRef CreateQuery(ERHIQueryType QueryType) override;
-	virtual void RHIBeginQuery(FRHIQueryRHIRef& Query) override;
-	virtual void RHIEndQuery(FRHIQueryRHIRef& Query) override;
-	virtual void RHIGetQueryResults(FRHIQueryRHIRef& Query, TUINT64& OutResult, bool bWait) override;
+	virtual void			RHIBeginQuery(FRHIQueryRHIRef& Query) override;
+	virtual void			RHIEndQuery(FRHIQueryRHIRef& Query) override;
+	virtual void			RHIGetQueryResults(FRHIQueryRHIRef& Query, TUINT64& OutResult, bool bWait) override;
 
 	// Debugging and Profiling
 	virtual void RHIPushEvent(const TCHAR* Name) override;
@@ -69,21 +79,15 @@ public:
 	virtual void RHISetViewport(TUINT32 MinX, TUINT32 MinY, float MinZ, TUINT32 MaxX, TUINT32 MaxY, float MaxZ) override;
 	virtual void RHISetScissorRect(bool bEnable, TUINT32 MinX, TUINT32 MinY, TUINT32 MaxX, TUINT32 MaxY) override;
 
-
-	// Vulkan-specific initialization
-	void CreateVulkanInstance() override;
-	void CreateVulkanDevice() override;
-	void CreateVulkanQueues() override;
-
 	// Vulkan-specific resource creation
-	VkImage CreateVulkanImage(const FRHITextureCreateDesc& CreateDesc) override;
-	VkBuffer CreateVulkanBuffer(const FRHIBufferCreateDesc& CreateDesc) override;
-	VkImageView CreateVulkanImageView(VkImage Image, const FRHIShaderResourceViewCreateInfo& CreateInfo) override;
+	VkImage		 CreateVulkanImage(const FRHITextureCreateDesc& CreateDesc) override;
+	VkBuffer	 CreateVulkanBuffer(const FRHIBufferCreateDesc& CreateDesc) override;
+	VkImageView	 CreateVulkanImageView(VkImage Image, const FRHIShaderResourceViewCreateInfo& CreateInfo) override;
 	VkBufferView CreateVulkanBufferView(VkBuffer Buffer, const FRHIUnorderedAccessViewCreateInfo& CreateInfo) override;
 
 	// Vulkan-specific command list management
 	VkCommandBuffer BeginVulkanCommandBuffer() override;
-	void EndVulkanCommandBuffer(VkCommandBuffer CommandBuffer) override;
+	void			EndVulkanCommandBuffer(VkCommandBuffer CommandBuffer) override;
 
 	// Vulkan-specific synchronization
 	void SubmitVulkanCommandsAndFlushGPU() override;
@@ -100,9 +104,9 @@ public:
 
 	// Vulkan-specific query and timestamp management
 	VkQueryPool CreateVulkanQueryPool(ERHIQueryType QueryType) override;
-	void BeginVulkanQuery(VkQueryPool QueryPool, TUINT32 QueryIndex) override;
-	void EndVulkanQuery(VkQueryPool QueryPool, TUINT32 QueryIndex) override;
-	void GetVulkanQueryResults(VkQueryPool QueryPool, TUINT32 QueryIndex, TUINT64& OutResult, bool bWait) override;
+	void		BeginVulkanQuery(VkQueryPool QueryPool, TUINT32 QueryIndex) override;
+	void		EndVulkanQuery(VkQueryPool QueryPool, TUINT32 QueryIndex) override;
+	void		GetVulkanQueryResults(VkQueryPool QueryPool, TUINT32 QueryIndex, TUINT64& OutResult, bool bWait) override;
 
 	// Vulkan-specific debugging and profiling
 	void PushVulkanEvent(const TCHAR* Name) override;
@@ -112,9 +116,18 @@ public:
 	void FlushVulkanPendingDeletes() override;
 
 protected:
+	// Vulkan-specific initialization
+	void CreateVulkanInstance() override;
+	void CreateDebugLayer();
+	void CreateSurface();
+	void CreateVulkanDevice() override;
+	void CreateVulkanQueues() override;
+
+	void CreateVulkanMemoryAllocator();
+
 	// Function to generate VkImageCreateInfo from FRHITextureCreateDesc
 	VkImageCreateInfo GenerateVkImageCreateInfo(const FRHITextureCreateDesc& CreateDesc);
-	
+
 	// Function to generate VkBufferCreateInfo from FRHIBufferCreateDesc
 	VkBufferCreateInfo GenerateVkBufferCreateInfo(const FRHIBufferCreateDesc& CreateDesc);
 
@@ -147,12 +160,16 @@ protected:
 
 	// Function to allocate Vulkan memory for a given buffer and usage flags
 	VkDeviceMemory AllocateVulkanMemory(VkBuffer Buffer, EBufferUsageFlags UsageFlags);
-	
-protected:
+
+private:
+	FInitializer InitializerParam;
+
 	// Vulkan-specific members and methods
-	VkInstance VulkanInstance;
-	VkDevice VulkanDevice;
-	VkPhysicalDevice VulkanPhysicalDevice;
-	VkQueue GraphicsQueue;
-	VkQueue ComputeQueue;
+	VkInstance				 VulkanInstance;
+	VkDebugUtilsMessengerEXT DebugMessenger;
+	VkSurfaceKHR			 VulkanSurface; // 用于显示的窗口句柄
+	VkDevice				 VulkanDevice;
+	VkPhysicalDevice		 VulkanPhysicalDevice;
+	VkQueue					 GraphicsQueue;
+	VkQueue					 ComputeQueue;
 };

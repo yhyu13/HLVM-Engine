@@ -57,7 +57,7 @@ namespace hlvm_private
 			delete Message;
 
 			// Log message
-			HLVM_LOG(LogAssert, critical, **LogMsg);
+			HLVM_LOG(LogCrashDump, critical, **LogMsg);
 
 			delete LogMsg;
 
