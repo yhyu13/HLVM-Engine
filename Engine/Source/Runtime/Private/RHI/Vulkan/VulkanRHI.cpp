@@ -486,7 +486,7 @@ void FVulkanRHI::CreateVulkanInstance()
 	}
 
 	VkResult Result = vkCreateInstance(&CreateInfo, nullptr, &VulkanInstance);
-	HLVM_ENSURE2(Result == VK_SUCCESS);
+	HLVM_ENSURE(Result == VK_SUCCESS);
 }
 
 void FVulkanRHI::CreateDebugLayer()
@@ -494,20 +494,20 @@ void FVulkanRHI::CreateDebugLayer()
 	VkDebugUtilsMessengerCreateInfoEXT createInfo;
 	PopulateDebugMessengerCreateInfo(createInfo);
 	VkResult Result = CreateDebugUtilsMessengerEXT(VulkanInstance, &createInfo, nullptr, &DebugMessenger);
-	HLVM_ENSURE2(Result == VK_SUCCESS);
+	HLVM_ENSURE(Result == VK_SUCCESS);
 }
 
 void FVulkanRHI::CreateSurface()
 {
 	VulkanSurface = InitializerParam.CreateSurfaceFunc(VulkanInstance);
-	HLVM_ENSURE2(VulkanSurface != VK_NULL_HANDLE);
+	HLVM_ENSURE(VulkanSurface != VK_NULL_HANDLE);
 }
 
 void FVulkanRHI::CreateVulkanDevice()
 {
 	uint32_t DeviceCount = 0;
 	vkEnumeratePhysicalDevices(VulkanInstance, &DeviceCount, nullptr);
-	HLVM_ENSURE2(DeviceCount > 0);
+	HLVM_ENSURE(DeviceCount > 0);
 
 	std::vector<VkPhysicalDevice> PhysicalDevices(DeviceCount);
 	vkEnumeratePhysicalDevices(VulkanInstance, &DeviceCount, PhysicalDevices.data());
@@ -527,7 +527,7 @@ void FVulkanRHI::CreateVulkanDevice()
 	DeviceCreateInfo.pQueueCreateInfos = &QueueCreateInfo;
 
 	VkResult Result = vkCreateDevice(VulkanPhysicalDevice, &DeviceCreateInfo, nullptr, &VulkanDevice);
-	HLVM_ENSURE2(Result == VK_SUCCESS);
+	HLVM_ENSURE(Result == VK_SUCCESS);
 
 	vkGetDeviceQueue(VulkanDevice, 0, 0, &GraphicsQueue);
 	vkGetDeviceQueue(VulkanDevice, 0, 0, &ComputeQueue);
@@ -570,7 +570,7 @@ VkImage FVulkanRHI::CreateVulkanImage(const FRHITextureCreateDesc& CreateDesc)
 
 	VkImage	 Image;
 	VkResult Result = vkCreateImage(VulkanDevice, &ImageInfo, nullptr, &Image);
-	HLVM_ENSURE2(Result == VK_SUCCESS);
+	HLVM_ENSURE(Result == VK_SUCCESS);
 
 	return Image;
 }
@@ -585,7 +585,7 @@ VkBuffer FVulkanRHI::CreateVulkanBuffer(const FRHIBufferCreateDesc& CreateDesc)
 
 	VkBuffer Buffer;
 	VkResult Result = vkCreateBuffer(VulkanDevice, &BufferInfo, nullptr, &Buffer);
-	HLVM_ENSURE2(Result == VK_SUCCESS);
+	HLVM_ENSURE(Result == VK_SUCCESS);
 
 	return Buffer;
 }
@@ -605,7 +605,7 @@ VkImageView FVulkanRHI::CreateVulkanImageView(VkImage Image, const FRHIShaderRes
 
 	VkImageView ImageView;
 	VkResult	Result = vkCreateImageView(VulkanDevice, &ViewInfo, nullptr, &ImageView);
-	HLVM_ENSURE2(Result == VK_SUCCESS);
+	HLVM_ENSURE(Result == VK_SUCCESS);
 
 	return ImageView;
 }
@@ -621,7 +621,7 @@ VkBufferView FVulkanRHI::CreateVulkanBufferView(VkBuffer Buffer, const FRHIUnord
 
 	VkBufferView BufferView;
 	VkResult	 Result = vkCreateBufferView(VulkanDevice, &ViewInfo, nullptr, &BufferView);
-	HLVM_ENSURE2(Result == VK_SUCCESS);
+	HLVM_ENSURE(Result == VK_SUCCESS);
 
 	return BufferView;
 }
@@ -637,14 +637,14 @@ VkCommandBuffer FVulkanRHI::BeginVulkanCommandBuffer()
 
 	VkCommandBuffer CommandBuffer;
 	VkResult		Result = vkAllocateCommandBuffers(VulkanDevice, &AllocInfo, &CommandBuffer);
-	HLVM_ENSURE2(Result == VK_SUCCESS);
+	HLVM_ENSURE(Result == VK_SUCCESS);
 
 	VkCommandBufferBeginInfo BeginInfo = {};
 	BeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 	BeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
 	Result = vkBeginCommandBuffer(CommandBuffer, &BeginInfo);
-	HLVM_ENSURE2(Result == VK_SUCCESS);
+	HLVM_ENSURE(Result == VK_SUCCESS);
 
 	return CommandBuffer;
 }
@@ -652,7 +652,7 @@ VkCommandBuffer FVulkanRHI::BeginVulkanCommandBuffer()
 void FVulkanRHI::EndVulkanCommandBuffer(VkCommandBuffer CommandBuffer)
 {
 	VkResult Result = vkEndCommandBuffer(CommandBuffer);
-	HLVM_ENSURE2(Result == VK_SUCCESS);
+	HLVM_ENSURE(Result == VK_SUCCESS);
 }
 
 // Vulkan-specific synchronization
@@ -664,7 +664,7 @@ void FVulkanRHI::SubmitVulkanCommandsAndFlushGPU()
 	// SubmitInfo.pCommandBuffers = &GetCurrentCommandBuffer();
 
 	VkResult Result = vkQueueSubmit(GraphicsQueue, 1, &SubmitInfo, VK_NULL_HANDLE);
-	HLVM_ENSURE2(Result == VK_SUCCESS);
+	HLVM_ENSURE(Result == VK_SUCCESS);
 
 	vkQueueWaitIdle(GraphicsQueue);
 }
@@ -711,7 +711,7 @@ VkQueryPool FVulkanRHI::CreateVulkanQueryPool(ERHIQueryType QueryType)
 
 	VkQueryPool QueryPool;
 	VkResult	Result = vkCreateQueryPool(VulkanDevice, &PoolInfo, nullptr, &QueryPool);
-	HLVM_ENSURE2(Result == VK_SUCCESS);
+	HLVM_ENSURE(Result == VK_SUCCESS);
 
 	return QueryPool;
 }
@@ -729,7 +729,7 @@ void FVulkanRHI::EndVulkanQuery(VkQueryPool QueryPool, TUINT32 QueryIndex)
 void FVulkanRHI::GetVulkanQueryResults(VkQueryPool QueryPool, TUINT32 QueryIndex, TUINT64& OutResult, bool bWait)
 {
 	VkResult Result = vkGetQueryPoolResults(VulkanDevice, QueryPool, QueryIndex, 1, sizeof(OutResult), &OutResult, sizeof(OutResult), bWait ? VK_QUERY_RESULT_WAIT_BIT : 0);
-	HLVM_ENSURE2(Result == VK_SUCCESS);
+	HLVM_ENSURE(Result == VK_SUCCESS);
 }
 
 // Vulkan-specific debugging and profiling

@@ -32,7 +32,7 @@ FWorkStealFiberPool::FWorkStealFiberPool(const FThreadAffinityMode& AffinityMode
 	}
 	#endif
 
-	HLVM_ENSURE(AffinityMode.Valid(), TXT("AffinityMode not valid {}"), AffinityMode.ToString());
+	HLVM_ENSURE_F(AffinityMode.Valid(), TXT("AffinityMode not valid {}"), AffinityMode.ToString());
 
 	// TODO : support other thread affinity mode
 	auto Config2 = S_C(const FThreadAffinityMode2*, AffinityMode);
@@ -100,10 +100,10 @@ FWorkStealFiberPool::FWorkStealFiberPool(const FThreadAffinityMode& AffinityMode
 		};
 
 		auto Thread = mThreads.create_thread(MoveTemp(Func));
-		HLVM_ENSURE(Thread, TXT("Thread init failed {}"), i);
+		HLVM_ENSURE_F(Thread, TXT("Thread init failed {}"), i);
 		Threads.push_back(Thread);
 	}
-	HLVM_ENSURE(FGenericPlatformThreadUtil::SetThreadsWithAffinity(Threads, AffinityMode), TXT("Thread affinity set failed with"));
+	HLVM_ENSURE_F(FGenericPlatformThreadUtil::SetThreadsWithAffinity(Threads, AffinityMode), TXT("Thread affinity set failed with"));
 }
 
 FWorkStealFiberPool::~FWorkStealFiberPool()

@@ -30,7 +30,7 @@ public:
 		using TaskType = std::packaged_task<TaskRetType()>;
 
 		// Check if the current thread is valid to use the worker pool
-		HLVM_ASSERT(FWorkerPoolTIDUtil::IsThreadValidToUseWorkerPool(), TXT("IsThreadValidToUseWorkerPool false for thread {}"), GCurrentTID64);
+		HLVM_ASSERT_F(FWorkerPoolTIDUtil::IsThreadValidToUseWorkerPool(), TXT("IsThreadValidToUseWorkerPool false for thread {}"), GCurrentTID64);
 
 		auto task = new TaskType(std::bind(std::forward<F>(f), std::forward<Args>(args)...));
 		auto result = task->get_future();

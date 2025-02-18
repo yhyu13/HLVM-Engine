@@ -10,7 +10,7 @@
 
 #if HLVM_DEADLOCK_TIMER
 	#define INIT_DEADLOCK_TIMER() FTimer _timer
-	#define ASSERT_DEADLOCK_TIMER() HLVM_ENSURE(_timer.Mark() < 10., TXT("Dead lock after 10s"))
+	#define ASSERT_DEADLOCK_TIMER() HLVM_ENSURE_F(_timer.Mark() < 10., TXT("Dead lock after 10s"))
 #else
 	#define INIT_DEADLOCK_TIMER() void(0)
 	#define ASSERT_DEADLOCK_TIMER() void(0)

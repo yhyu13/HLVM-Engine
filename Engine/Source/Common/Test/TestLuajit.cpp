@@ -338,7 +338,7 @@ RECORD(luajit_openresty_testsuit_test)
 		// const auto DataDir = FString::Format(TXT("{}/{}_Data"), *GExecutablePath, *GExecutableName);
 		const auto DataDir = FString::Format(TXT("{}/../../Test/{}_Data"), *GExecutablePath, *GExecutableName);
 		const bool bDataDirExist = FGenericPlatformFile::Get(EPlatformFileType::Disk)->Exists(DataDir);
-		HLVM_ENSURE(bDataDirExist, TXT("Data directory not exist: {}"), *DataDir);
+		HLVM_ENSURE_F(bDataDirExist, TXT("Data directory not exist: {}"), *DataDir);
 		if (bDataDirExist)
 		{
 			auto AllLuaFiles = FGenericPlatformFile::Get(EPlatformFileType::Disk)->Glob(DataDir, TXT(R"(.*\.lua$)"), true);

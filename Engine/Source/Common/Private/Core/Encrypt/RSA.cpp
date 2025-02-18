@@ -16,12 +16,12 @@ HLVM_NODISCARD std::vector<TUINT8> FRSA::Encrypt(const FConstByteBuffer& Buffer)
 	using namespace hlvm_private;
 	HLVM_SCOPED_TIMER_LOG(FString::Format(TXT("RSA Encrypt size {}"), Buffer.size()));
 	const bool bValidBuffer = Buffer.size() > 0;
-	HLVM_ASSERT(bValidBuffer, TXT("Buffer must has content"));
+	HLVM_ASSERT_F(bValidBuffer, TXT("Buffer must has content"));
 
 	Botan::PK_Encryptor_EME enc(**公钥, 随机, 算法一);
 	std::vector<TUINT8>	out = enc.encrypt(R_C(const TUINT8*, Buffer.data()), Buffer.size(), 随机);
 	const bool				bValidOut = out.size() > 0;
-	HLVM_ASSERT(bValidOut, TXT("Out must has content"));
+	HLVM_ASSERT_F(bValidOut, TXT("Out must has content"));
 
 	HLVM_LOG(LogRSA, trace, TXT("PCKS8 Encrypt Buffer size {}, out size {}"), Buffer.size(), out.size());
 
@@ -33,12 +33,12 @@ HLVM_NODISCARD Botan::secure_vector<TUINT8> FRSA::Decrypt(const FConstByteBuffer
 	using namespace hlvm_private;
 	HLVM_SCOPED_TIMER_LOG(FString::Format(TXT("RSA Decrypt size {}"), Buffer.size()));
 	const bool bValidBuffer = Buffer.size() > 0;
-	HLVM_ASSERT(bValidBuffer, TXT("Buffer must has content"));
+	HLVM_ASSERT_F(bValidBuffer, TXT("Buffer must has content"));
 
 	Botan::PK_Decryptor_EME		  dec(**私钥, 随机, 算法一);
 	Botan::secure_vector<TUINT8> out = dec.decrypt(R_C(const TUINT8*, Buffer.data()), Buffer.size());
 	const bool					  bValidOut = out.size() > 0;
-	HLVM_ASSERT(bValidOut, TXT("Out must has content"));
+	HLVM_ASSERT_F(bValidOut, TXT("Out must has content"));
 
 	HLVM_LOG(LogRSA, trace, TXT("PCKS8 Decrypt Buffer size {}, out size {}"), Buffer.size(), out.size());
 
@@ -64,7 +64,7 @@ void FRSA::SignToFile(const FConstByteBuffer& Buffer, const FPath& signature_pat
 	using namespace hlvm_private;
 	HLVM_SCOPED_TIMER_LOG(FString::Format(TXT("RSA SignToFile size {} path {}"), Buffer.size(), *signature_path));
 	const bool bValidBuffer = Buffer.size() > 0;
-	HLVM_ASSERT(bValidBuffer, TXT("Buffer must has content"));
+	HLVM_ASSERT_F(bValidBuffer, TXT("Buffer must has content"));
 
 	/**
 	 *    1. Digest the digestBuffer
@@ -75,7 +75,7 @@ void FRSA::SignToFile(const FConstByteBuffer& Buffer, const FPath& signature_pat
 	Botan::PK_Signer	 签名(**私钥, 随机, 算法二);
 	std::vector<TUINT8> signature = 签名.sign_message(digestBuffer, 随机);
 	const bool			 bValidSig = signature.size() > 0;
-	HLVM_ASSERT(bValidSig, TXT("signature must has content"));
+	HLVM_ASSERT_F(bValidSig, TXT("signature must has content"));
 
 	/**
 	 *   2. Encode the signature
@@ -101,7 +101,7 @@ HLVM_NODISCARD bool FRSA::VerifyFileSignature(const FConstByteBuffer& Buffer, co
 	using namespace hlvm_private;
 	HLVM_SCOPED_TIMER_LOG(FString::Format(TXT("RSA VerifyFromFile size {} path {}"), Buffer.size(), *signature_path));
 	const bool bValidBuffer = Buffer.size() > 0;
-	HLVM_ASSERT(bValidBuffer, TXT("Buffer must has content"));
+	HLVM_ASSERT_F(bValidBuffer, TXT("Buffer must has content"));
 
 	TUINT8 digest[SignatureDigestSize] = { 0 };
 	auto	digestBuffer = TO_SPAN(digest, SignatureDigestSize);
@@ -124,7 +124,7 @@ HLVM_NODISCARD bool FRSA::VerifyFileSignature(const FConstByteBuffer& Buffer, co
 		Botan::secure_vector<TUINT8> signature = Botan::base64_decode(base64_signature.data(), base64_signature.size(),
 			false);
 		const bool					  bValidSig = signature.size() > 0;
-		HLVM_ASSERT(bValidSig, TXT("signature must has content"));
+		HLVM_ASSERT_F(bValidSig, TXT("signature must has content"));
 
 		Botan::PK_Verifier 验证(**公钥, 算法二);
 		return 验证.verify_message(digestBuffer, signature);

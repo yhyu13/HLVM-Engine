@@ -24,33 +24,33 @@ static bool test_timer_test()
 	{
 		// Trivially construct w/o reset, and no period given
 		FTimer Timer;
-		HLVM_ENSURE(Timer.Mark() == 0, TXT("Timer Mark() should be zero when not Reset()"));
-		HLVM_ENSURE(Timer.Check() == true, TXT("Timer check should be true for period == 0"));
-		HLVM_ENSURE(Timer.Mark() > 0, TXT("Timer Mark() should be greater than zero second calling"));
+		HLVM_ENSURE_F(Timer.Mark() == 0, TXT("Timer Mark() should be zero when not Reset()"));
+		HLVM_ENSURE_F(Timer.Check() == true, TXT("Timer check should be true for period == 0"));
+		HLVM_ENSURE_F(Timer.Mark() > 0, TXT("Timer Mark() should be greater than zero second calling"));
 	}
 	{
 		// construct with reset
 		FTimer Timer{ true };
-		HLVM_ENSURE(Timer.Mark() > 0, TXT("Timer Mark() should be greater than zero second calling"));
-		HLVM_ENSURE(Timer.Check() == true, TXT("Timer check should be true for period == 0"));
+		HLVM_ENSURE_F(Timer.Mark() > 0, TXT("Timer Mark() should be greater than zero second calling"));
+		HLVM_ENSURE_F(Timer.Check() == true, TXT("Timer check should be true for period == 0"));
 	}
 	{
 		// construct with period but no reset
 		FTimer Timer{ 1s };
-		HLVM_ENSURE(Timer.Mark() == 0, TXT("Timer Mark() should be zero when not Reset()"));
-		HLVM_ENSURE(Timer.Check() == false, TXT("Timer check should be false for period not reached"));
+		HLVM_ENSURE_F(Timer.Mark() == 0, TXT("Timer Mark() should be zero when not Reset()"));
+		HLVM_ENSURE_F(Timer.Check() == false, TXT("Timer check should be false for period not reached"));
 		sleep(1);
-		HLVM_ENSURE(Timer.Check() == true, TXT("Timer check should be false for period reached"));
+		HLVM_ENSURE_F(Timer.Check() == true, TXT("Timer check should be false for period reached"));
 	}
 	{
 		// construct with period but no reset
 		FTimer Timer{ 1s, true };
-		HLVM_ENSURE(Timer.Mark() > 0, TXT("Timer Mark() should be greater than zero second calling"));
-		HLVM_ENSURE(Timer.Check(true) == false, TXT("Timer check should be false for period not reached"));
+		HLVM_ENSURE_F(Timer.Mark() > 0, TXT("Timer Mark() should be greater than zero second calling"));
+		HLVM_ENSURE_F(Timer.Check(true) == false, TXT("Timer check should be false for period not reached"));
 		boost::this_thread::sleep_for(boost::chrono::milliseconds(501));
-		HLVM_ENSURE(Timer.Check() == false, TXT("Timer check should be false for period not reached"));
+		HLVM_ENSURE_F(Timer.Check() == false, TXT("Timer check should be false for period not reached"));
 		boost::this_thread::sleep_for(boost::chrono::milliseconds(501));
-		HLVM_ENSURE(Timer.Check() == true, TXT("Timer check should be false for period reached"));
+		HLVM_ENSURE_F(Timer.Check() == true, TXT("Timer check should be false for period reached"));
 		HLVM_LOG(LogTest, info, TXT("Timer mark on sleep finished {0}"), Timer.Mark());
 	}
 	return true;

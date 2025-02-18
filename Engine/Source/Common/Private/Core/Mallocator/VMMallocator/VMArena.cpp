@@ -44,14 +44,14 @@ void FVMArena::NonLocalFreeHandler()
 		}
 		else
 		{
-			HLVM_ENSURE(false, TXT("Non local free list is empty but should stop is false"));
+			HLVM_ENSURE_F(false, TXT("Non local free list is empty but should stop is false"));
 		}
 	}
 }
 
 FVMArena::FVMArena()
 {
-	HLVM_ENSURE(GMallocatorTLS == &HLVM_LOW_GMALLOC_TLS, TXT("VMArena must be created from low level mallocator"));
+	HLVM_ENSURE_F(GMallocatorTLS == &HLVM_LOW_GMALLOC_TLS, TXT("VMArena must be created from low level mallocator"));
 	// create a detached thread inside a do once region that handle non local free list
 	// and find correct arena that own pointer from free list and pump it
 	static std::once_flag _Flag;
@@ -104,7 +104,7 @@ FVMArena::FVMArena()
 
 FVMArena::~FVMArena()
 {
-	HLVM_ENSURE(GMallocatorTLS == &HLVM_LOW_GMALLOC_TLS, TXT("VMArena must be destroyed from low level mallocator"));
+	HLVM_ENSURE_F(GMallocatorTLS == &HLVM_LOW_GMALLOC_TLS, TXT("VMArena must be destroyed from low level mallocator"));
 	/**
 	 * Handle cache free list that are not yet free, just non local thread free,
 	 * and ignore local free since the whole vma is abandoned
@@ -343,7 +343,7 @@ void FVMArena::FreeHeap(void* p)
 			auto& HeapMallocator = Heap->HeapAllocator;
 			if (&HeapMallocator == OwnerHeap)
 			{
-				HLVM_ENSURE(HeapMallocator.Owned(p), TXT("FVMArena::FreeHeap : Heap {} not own pointer {}"),
+				HLVM_ENSURE_F(HeapMallocator.Owned(p), TXT("FVMArena::FreeHeap : Heap {} not own pointer {}"),
 					R_C(void*, OwnerHeap), R_C(void*, p));
 				HeapMallocator.Free(p);
 				return;
@@ -354,7 +354,7 @@ void FVMArena::FreeHeap(void* p)
 	else
 	{
 		auto& HeapMallocator = *OwnerHeap;
-		HLVM_ENSURE(HeapMallocator.Owned(p), TXT("FVMArena::FreeHeap : Heap {} not own pointer {}"),
+		HLVM_ENSURE_F(HeapMallocator.Owned(p), TXT("FVMArena::FreeHeap : Heap {} not own pointer {}"),
 			R_C(void*, OwnerHeap), R_C(void*, p));
 		HeapMallocator.Free(p);
 		return;
@@ -373,7 +373,7 @@ void FVMArena::FreeHeap(void* p)
 		Heap = Heap->Next;
 	}
 #endif
-	HLVM_ENSURE(false, TXT("FVMArena::FreeHeap : Failed to free {} from heap"), R_C(void*, p));
+	HLVM_ENSURE_F(false, TXT("FVMArena::FreeHeap : Failed to free {} from heap"), R_C(void*, p));
 }
 
 void* FVMArena::MallocSmallBinned(size_t _size)
@@ -410,6 +410,6 @@ void* FVMArena::MallocLowLevel(size_t size)
 
 void FVMArena::FreeLowLevel(void* p)
 {
-	HLVM_ENSURE(mOSPageMallocator.FreeAlign(p) == EFreeRetType::Success,
+	HLVM_ENSURE_F(mOSPageMallocator.FreeAlign(p) == EFreeRetType::Success,
 		TXT("FreeLowLevel failed {}"), R_C(void*, p));
 }

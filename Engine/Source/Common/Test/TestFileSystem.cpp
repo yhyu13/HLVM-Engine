@@ -62,8 +62,8 @@ RECORD(boostfile_test, true, 1, 1)
 		HLVM_LOG(LogTest, info, TXT("Test BoostFileHandle mapped result: {}"), Buffer.c_str());
 	}
 	{
-		HLVM_ENSURE(!FPath::IsDirectory("./test.txt"), TXT("Test failed"));
-		HLVM_ENSURE(FPath::Exists("./test.txt"), TXT("Test failed"));
+		HLVM_ENSURE_F(!FPath::IsDirectory("./test.txt"), TXT("Test failed"));
+		HLVM_ENSURE_F(FPath::Exists("./test.txt"), TXT("Test failed"));
 
 		auto all_matches = FPath::Glob("./", R"(.*Test.*)", true);
 		static auto DumpJson = [](const TSmallVector32<FPath>& paths) -> FString
@@ -170,7 +170,7 @@ RECORD(packed_test)
 					TBYTE		buffer[FPackedTokenEntry_SerializedSize];
 					FByteBuffer buffer_span = buffer;
 					bool		bSuccess = Entry_Dev.Entry.Serialize(buffer_span);
-					HLVM_ENSURE(bSuccess, TXT("SerializeTo failed"));
+					HLVM_ENSURE_F(bSuccess, TXT("SerializeTo failed"));
 					std::move(buffer_span.begin(), buffer_span.end(), std::back_inserter(TokenData));
 				}
 				{

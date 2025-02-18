@@ -37,7 +37,7 @@ namespace hlvm_private
  * 条件大多数情况下就是简单的表达式，如：x == 100，x > 100，x < 100。发布环境下，判断条件被省略，可以避免不必要的计算。
  */
 #if !HLVM_BUILD_RELEASE || HLVM_ASSERT_EVEN_IN_RELEASE
-	#define HLVM_ASSERT(x, ...)                                                                                                       \
+	#define HLVM_ASSERT_F(x, ...)                                                                                                       \
 		do                                                                                                                            \
 		{                                                                                                                             \
 			if (static_cast<bool>((x)) == false)                                                                                      \
@@ -49,16 +49,16 @@ namespace hlvm_private
 			}                                                                                                                         \
 		}                                                                                                                             \
 		while (0)
-	#define HLVM_ASSERT2(x) HLVM_ASSERT(x, TXT("condition failed: {}"), STRTIFY(x))
+	#define HLVM_ASSERT(x) HLVM_ASSERT_F(x, TXT("condition failed: {}"), STRTIFY(x))
 #else
 	#if HLVM_ASSERT_ALWAYS_EVLUATE_EXPERSION
-		#define HLVM_ASSERT(x, ...)    \
+		#define HLVM_ASSERT_F(x, ...)    \
 			do                         \
 			{                          \
 				static_cast<bool>((x)) \
 			}                          \
 			while (0)
-		#define HLVM_ASSERT2(x) HLVM_ASSERT(x, TXT("condition failed: {}"), STRTIFY(x))
+		#define HLVM_ASSERT(x) HLVM_ASSERT_F(x, TXT("condition failed: {}"), STRTIFY(x))
 	#else
 namespace hlvm_private
 {
@@ -67,10 +67,10 @@ namespace hlvm_private
 		return ctre_MatchFunctionCall(sv) || ctre_MatchAssignment(sv);
 	};
 } // namespace hlvm_private
+		#define HLVM_ASSERT_F(x, ...) \
+			static_assert(!(hlvm_private::ctre_checkExpressionPassAssert(STRTIFY(x))), "Should not ignore evaluation of this expression, consider set HLVM_ASSERT_ALWAYS_EVLUATE_EXPERSION=1 or using HLVM_ENSURE_F")
 		#define HLVM_ASSERT(x, ...) \
 			static_assert(!(hlvm_private::ctre_checkExpressionPassAssert(STRTIFY(x))), "Should not ignore evaluation of this expression, consider set HLVM_ASSERT_ALWAYS_EVLUATE_EXPERSION=1 or using HLVM_ENSURE")
-		#define HLVM_ASSERT2(x, ...) \
-			static_assert(!(hlvm_private::ctre_checkExpressionPassAssert(STRTIFY(x))), "Should not ignore evaluation of this expression, consider set HLVM_ASSERT_ALWAYS_EVLUATE_EXPERSION=1 or using HLVM_ENSURE2")
 	#endif
 #endif
 
@@ -79,7 +79,7 @@ namespace hlvm_private
  * 确保：开发与发布模式下，判断语句返回值是否为真，否则抛出异常
  * 语句大多数是函数执行结果，如：x() == 100，x() > 100，x() < 100。如果x()不计算会影响到程序的正确性，则不能用断言
  */
-#define HLVM_ENSURE(x, ...)                                                                                                       \
+#define HLVM_ENSURE_F(x, ...)                                                                                                       \
 	do                                                                                                                            \
 	{                                                                                                                             \
 		if (static_cast<bool>((x)) == false)                                                                                      \
@@ -91,4 +91,4 @@ namespace hlvm_private
 		}                                                                                                                         \
 	}                                                                                                                             \
 	while (0)
-#define HLVM_ENSURE2(x) HLVM_ENSURE(x, TXT("condition failed: {}"), STRTIFY(x))
+#define HLVM_ENSURE(x) HLVM_ENSURE_F(x, TXT("condition failed: {}"), STRTIFY(x))

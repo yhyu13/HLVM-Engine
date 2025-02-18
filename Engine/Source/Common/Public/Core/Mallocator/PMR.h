@@ -204,12 +204,12 @@ struct TPMRCustom
 		{
 			if constexpr (bForceAlignedAlloc)
 			{
-				HLVM_ENSURE(Mallocator->FreeSizeAligned(p, realSize, alignof(T)) == EFreeRetType::Success,
+				HLVM_ENSURE_F(Mallocator->FreeSizeAligned(p, realSize, alignof(T)) == EFreeRetType::Success,
 					TXT("aligned deallocate failed {}"), p);
 			}
 			else
 			{
-				HLVM_ENSURE(Mallocator->FreeSize(p, realSize) == EFreeRetType::Success,
+				HLVM_ENSURE_F(Mallocator->FreeSize(p, realSize) == EFreeRetType::Success,
 					TXT("deallocate failed {}"), p);
 			}
 		}
@@ -301,12 +301,12 @@ struct TPMRLowLvl
 		size_t realSize = n * sizeof(T);
 		if constexpr (bForceAlignedAlloc)
 		{
-			HLVM_ENSURE(HLVM_LOW_GMALLOC_TLS.FreeSizeAligned(p, realSize, alignof(T)) == EFreeRetType::Success,
+			HLVM_ENSURE_F(HLVM_LOW_GMALLOC_TLS.FreeSizeAligned(p, realSize, alignof(T)) == EFreeRetType::Success,
 				TXT("deallocate failed {}"), p);
 		}
 		else
 		{
-			HLVM_ENSURE(HLVM_LOW_GMALLOC_TLS.FreeSize(p, realSize) == EFreeRetType::Success,
+			HLVM_ENSURE_F(HLVM_LOW_GMALLOC_TLS.FreeSize(p, realSize) == EFreeRetType::Success,
 				TXT("deallocate failed {}"), p);
 		}
 #if HVLM_MALLOCATOR_DEATIL_TRACE

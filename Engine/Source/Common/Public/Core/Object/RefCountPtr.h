@@ -162,28 +162,28 @@ public:
 	T* operator->() noexcept
 	{
 		auto bValid = Valid();
-		HLVM_ASSERT(bValid, TXT("TRefCountPtr nullptr error!"));
+		HLVM_ASSERT_F(bValid, TXT("TRefCountPtr nullptr error!"));
 		return m_ptr;
 	}
 
 	T& operator*() noexcept
 	{
 		auto bValid = Valid();
-		HLVM_ASSERT(bValid, TXT("TRefCountPtr nullptr error!"));
+		HLVM_ASSERT_F(bValid, TXT("TRefCountPtr nullptr error!"));
 		return *m_ptr;
 	}
 
 	const T* operator->() const noexcept
 	{
 		auto bValid = Valid();
-		HLVM_ASSERT(bValid, TXT("TRefCountPtr nullptr error!"));
+		HLVM_ASSERT_F(bValid, TXT("TRefCountPtr nullptr error!"));
 		return m_ptr;
 	}
 
 	const T& operator*() const noexcept
 	{
 		auto bValid = Valid();
-		HLVM_ASSERT(bValid, TXT("TRefCountPtr nullptr error!"));
+		HLVM_ASSERT_F(bValid, TXT("TRefCountPtr nullptr error!"));
 		return *m_ptr;
 	}
 
@@ -194,7 +194,7 @@ public:
 	{
 		if constexpr (bValidate)
 		{
-			HLVM_ENSURE(Valid(), TXT("TRefCountPtr nullptr error!"));
+			HLVM_ENSURE_F(Valid(), TXT("TRefCountPtr nullptr error!"));
 		}
 		return m_ptr;
 	}
@@ -204,7 +204,7 @@ public:
 	{
 		if constexpr (bValidate)
 		{
-			HLVM_ENSURE(Valid(), TXT("TRefCountPtr nullptr error!"));
+			HLVM_ENSURE_F(Valid(), TXT("TRefCountPtr nullptr error!"));
 		}
 		return m_ptr;
 	}

@@ -27,7 +27,7 @@ void FPath::ResolvePath()
 	if (std::regex_match(this->ToCharCStr(), PathReplacePattern))
 		HLVM_UNLIKELY
 		{
-			HLVM_ASSERT(PathReplaceMap.size() > 0, TXT("PathReplaceMap is empty"));
+			HLVM_ASSERT_F(PathReplaceMap.size() > 0, TXT("PathReplaceMap is empty"));
 			std::string result = this->ToCharCStr();
 			for (auto const& replacement : PathReplaceMap)
 			{
@@ -59,7 +59,7 @@ FPathHash FPath::CalculateHash() const noexcept
 
 FPath FPath::ChangeExtension(const FString& new_ext) const
 {
-	HLVM_ASSERT(new_ext[0] == TXT('.'), TXT("{} must start with '.'"), new_ext);
+	HLVM_ASSERT_F(new_ext[0] == TXT('.'), TXT("{} must start with '.'"), new_ext);
 	FPath new_path = *this;
 	new_path.replace_extension(new_ext.ToCharCStr());
 	return new_path;
@@ -67,14 +67,14 @@ FPath FPath::ChangeExtension(const FString& new_ext) const
 
 FPath& FPath::ChangeExtensionInplace(const FString& new_ext)
 {
-	HLVM_ASSERT(new_ext[0] == TXT('.'), TXT("{} must start with '.'"), new_ext);
+	HLVM_ASSERT_F(new_ext[0] == TXT('.'), TXT("{} must start with '.'"), new_ext);
 	this->replace_extension(new_ext.ToCharCStr());
 	return *this;
 }
 
 FPath FPath::AppendExtension(const FString& new_ext) const
 {
-	HLVM_ASSERT(new_ext[0] == TXT('.'), TXT("{} must start with '.'"), new_ext);
+	HLVM_ASSERT_F(new_ext[0] == TXT('.'), TXT("{} must start with '.'"), new_ext);
 	std::string new_path = this->string();
 	new_path += new_ext;
 	return FPath{ new_path, this->mFileType };

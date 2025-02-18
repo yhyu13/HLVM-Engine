@@ -183,8 +183,8 @@ RECORD(lock_free_queue_test, true)
 			{
 				Queue.Push(1);
 				int& val = Queue.PeekFront();
-				HLVM_ENSURE(val == 1, TXT("Queue peek front failed"));
-				HLVM_ENSURE(Queue.PopFront(val), TXT("Queue pop front failed"));
+				HLVM_ENSURE_F(val == 1, TXT("Queue peek front failed"));
+				HLVM_ENSURE_F(Queue.PopFront(val), TXT("Queue pop front failed"));
 			}
 			for (int i = 0; i < kNumThreads; ++i)
 			{
@@ -223,7 +223,7 @@ RECORD(lock_free_queue_test, true)
 			{
 				t.join();
 			}
-			HLVM_ENSURE(Queue.Num() == 0, TXT("Queue test #1 failed"));
+			HLVM_ENSURE_F(Queue.Num() == 0, TXT("Queue test #1 failed"));
 			HLVM_LOG(LogTest, info, TXT("Queue test #1 took {0:f}, queue size {1:d}"), Duration, Queue.Num());
 			return true;
 		};
@@ -245,8 +245,8 @@ RECORD(lock_free_queue_test, true)
 			{
 				Queue.push(1);
 				int val;
-				HLVM_ENSURE(Queue.pop(val), TXT("Queue pop front failed"));
-				HLVM_ENSURE(val == 1, TXT("Queue peek front failed"));
+				HLVM_ENSURE_F(Queue.pop(val), TXT("Queue pop front failed"));
+				HLVM_ENSURE_F(val == 1, TXT("Queue peek front failed"));
 			}
 			for (int i = 0; i < kNumThreads; ++i)
 			{
@@ -285,7 +285,7 @@ RECORD(lock_free_queue_test, true)
 			{
 				t.join();
 			}
-			HLVM_ENSURE(Queue.empty(), TXT("Queue test #2 failed"));
+			HLVM_ENSURE_F(Queue.empty(), TXT("Queue test #2 failed"));
 			HLVM_LOG(LogTest, info, TXT("Queue test #2 took {0:f}, queue size {1:d}"), Duration, Queue.empty() ? 0 : -1);
 			return true;
 		};
@@ -323,8 +323,8 @@ RECORD(fixed_queue_test, true)
 			{
 				Queue.Push(1);
 				int& val = Queue.PeekFront();
-				HLVM_ENSURE(val == 1, TXT("Queue peek front failed"));
-				HLVM_ENSURE(Queue.PopFront(val), TXT("Queue pop front failed"));
+				HLVM_ENSURE_F(val == 1, TXT("Queue peek front failed"));
+				HLVM_ENSURE_F(Queue.PopFront(val), TXT("Queue pop front failed"));
 			}
 			for (int i = 0; i < kNumThreads; ++i)
 			{
@@ -334,7 +334,7 @@ RECORD(fixed_queue_test, true)
 					});
 					for (int j = 0; j < kNumLoops; ++j)
 					{
-						HLVM_ENSURE(Queue.Push(j), TXT("Queue push failed"));
+						HLVM_ENSURE_F(Queue.Push(j), TXT("Queue push failed"));
 					}
 				});
 
@@ -363,7 +363,7 @@ RECORD(fixed_queue_test, true)
 			{
 				t.join();
 			}
-			HLVM_ENSURE(Queue.Num() == 0, TXT("Queue test #1 failed"));
+			HLVM_ENSURE_F(Queue.Num() == 0, TXT("Queue test #1 failed"));
 			HLVM_LOG(LogTest, info, TXT("Fixed Queue test #1 took {0:f}, queue size {1:d}"), Duration, Queue.Num());
 			return true;
 		};
@@ -385,8 +385,8 @@ RECORD(fixed_queue_test, true)
 			{
 				Queue.push(1);
 				int val;
-				HLVM_ENSURE(Queue.pop(val) == boost::fibers::channel_op_status::success, TXT("Queue pop front failed"));
-				HLVM_ENSURE(val == 1, TXT("Queue peek front failed"));
+				HLVM_ENSURE_F(Queue.pop(val) == boost::fibers::channel_op_status::success, TXT("Queue pop front failed"));
+				HLVM_ENSURE_F(val == 1, TXT("Queue peek front failed"));
 			}
 			for (int i = 0; i < kNumThreads; ++i)
 			{
@@ -424,7 +424,7 @@ RECORD(fixed_queue_test, true)
 			{
 				t.join();
 			}
-			HLVM_ENSURE(J == kNumLoops * kNumThreads, TXT("Queue test #2 boost::fiber::buffered_channel failed"));
+			HLVM_ENSURE_F(J == kNumLoops * kNumThreads, TXT("Queue test #2 boost::fiber::buffered_channel failed"));
 			HLVM_LOG(LogTest, info, TXT("Fixed Queue test #2 took {0:f}, queue size {1:d}"), Duration, J == kNumLoops * kNumThreads ? 0 : -1);
 			return true;
 		};
@@ -497,7 +497,7 @@ RECORD(pool_test, true)
 			{
 				t.wait();
 			}
-			HLVM_ENSURE(Number.load() == 0, TXT("Pool test #1 Thread failed"));
+			HLVM_ENSURE_F(Number.load() == 0, TXT("Pool test #1 Thread failed"));
 			HLVM_LOG(LogTest, info, TXT("Pool test #1 took {0:f}, queue size {1:d}"), Duration, Number.load());
 			return true;
 		};
@@ -550,7 +550,7 @@ RECORD(pool_test, true)
 			{
 				t.wait();
 			}
-			HLVM_ENSURE(Number.load() == 0, TXT("Pool test #2 Fiber failed"));
+			HLVM_ENSURE_F(Number.load() == 0, TXT("Pool test #2 Fiber failed"));
 			HLVM_LOG(LogTest, info, TXT("Pool test #2 took {0:f}, queue size {1:d}"), Duration, Number.load());
 			return true;
 		};
@@ -598,7 +598,7 @@ RECORD(pool_test, true)
 			{
 				t->wait();
 			}
-			HLVM_ENSURE(Number.load() == 0, TXT("Pool test #2 Fiber failed"));
+			HLVM_ENSURE_F(Number.load() == 0, TXT("Pool test #2 Fiber failed"));
 			HLVM_LOG(LogTest, info, TXT("Pool test #2 took {0:f}, queue size {1:d}"), Duration, Number.load());
 			return true;
 		};
@@ -652,7 +652,7 @@ RECORD(pool_test, true)
 			{
 				t.wait();
 			}
-			HLVM_ENSURE(Number.load() == 0, TXT("Pool test #3 Async failed"));
+			HLVM_ENSURE_F(Number.load() == 0, TXT("Pool test #3 Async failed"));
 			HLVM_LOG(LogTest, info, TXT("Pool test #3 took {0:f}, queue size {1:d}"), Duration, Number.load());
 			return true;
 		};

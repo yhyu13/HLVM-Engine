@@ -55,12 +55,12 @@ std::function<void()> _make_test_wrapper(const FString& name, Func test_function
 			// check if test_function has return type bool
 			if constexpr (std::is_same_v<decltype(test_function()), bool>)
 			{
-				HLVM_ENSURE(test_function(), TXT("Test failed {}, return false"), *name);
+				HLVM_ENSURE_F(test_function(), TXT("Test failed {}, return false"), *name);
 			}
 			else if constexpr (std::is_same_v<decltype(test_function()), int>)
 			{
 				int ret = test_function();
-				HLVM_ENSURE(ret == 0, TXT("Test failed {}, return {}"), *name, ret);
+				HLVM_ENSURE_F(ret == 0, TXT("Test failed {}, return {}"), *name, ret);
 			}
 			else
 			{
@@ -181,7 +181,7 @@ inline double RunTestAndCalculateAvg(const TestFuncType& func, uint32_t num_iter
 	for (uint32_t _i = 0u; _i < num_iterations; ++_i)
 	{
 		double duration;
-		HLVM_ENSURE(func(duration), TXT("Test case failed"));
+		HLVM_ENSURE_F(func(duration), TXT("Test case failed"));
 		times.emplace_back(duration);
 	}
 	// Remove max and min duration from data collected (by moving them to the end of the array)

@@ -245,7 +245,7 @@ public:
 	{
 		TVector<TBYTE> TokenData{};
 		size_t		   fileSize = 0;
-		HLVM_ENSURE(fileHandle->IsOpen(), TXT("file {} is not opened yet"), *fileHandle->GetPath());
+		HLVM_ENSURE_F(fileHandle->IsOpen(), TXT("file {} is not opened yet"), *fileHandle->GetPath());
 		fileHandle->Size(fileSize);
 		if (fileSize > 0)
 		{

@@ -25,7 +25,7 @@ namespace hlvm_private
 				policy = SCHED_IDLE;
 				break;
 			case EThreadPriority::HLVM_NUM:
-				HLVM_ASSERT(false, TXT("Unknown thread priority"));
+				HLVM_ASSERT_F(false, TXT("Unknown thread priority"));
 				break;
 		}
 		struct sched_param param;
@@ -80,7 +80,7 @@ protected:
 							}
 							else
 							{
-								HLVM_ASSERT(false, TXT("Unknown core type"));
+								HLVM_ASSERT_F(false, TXT("Unknown core type"));
 							}
 						}
 						int rc = pthread_setaffinity_np(Thread->native_handle(),
@@ -127,7 +127,7 @@ protected:
 							}
 							else
 							{
-								HLVM_ASSERT(false, TXT("Unknown core type"));
+								HLVM_ASSERT_F(false, TXT("Unknown core type"));
 							}
 						}
 						int rc = pthread_setaffinity_np(Thread->native_handle(),
@@ -179,7 +179,7 @@ protected:
 									}
 									else
 									{
-										HLVM_ASSERT(false, TXT("Unknown core type"));
+										HLVM_ASSERT_F(false, TXT("Unknown core type"));
 									}
 								}
 							}
@@ -198,7 +198,7 @@ protected:
 		}
 		else
 		{
-			HLVM_ASSERT(false, TXT("Unknown thread affinity mode"));
+			HLVM_ASSERT_F(false, TXT("Unknown thread affinity mode"));
 			bNoError = false;
 		}
 		return bNoError;

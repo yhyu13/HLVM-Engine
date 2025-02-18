@@ -97,7 +97,7 @@ public:
 	TConcurrentQueue()
 	{
 		mHead = mTail = std::construct_at(R_C(QueueNodeType*, Mallocator.allocate()));
-		HLVM_ASSERT(mHead.IsLockFree(), TXT("TAtomicPointer is not lock free"));
+		HLVM_ASSERT_F(mHead.IsLockFree(), TXT("TAtomicPointer is not lock free"));
 	}
 
 	~TConcurrentQueue() noexcept
@@ -162,7 +162,7 @@ public:
 	 */
 	T& PeekFront() noexcept
 	{
-		HLVM_ASSERT(mTail->mNextNode, TXT("Queue Tail is null"));
+		HLVM_ASSERT_F(mTail->mNextNode, TXT("Queue Tail is null"));
 		return mTail->mNextNode->mItem;
 	}
 
@@ -213,7 +213,7 @@ public:
 				}
 				else
 				{
-					HLVM_ASSERT(false, TXT("Type {} must be move or copy constructible"), TO_TCHAR_CSTR(typeid(T).name()));
+					HLVM_ASSERT_F(false, TXT("Type {} must be move or copy constructible"), TO_TCHAR_CSTR(typeid(T).name()));
 				}
 
 				// Step3 delete old tail
@@ -244,7 +244,7 @@ public:
 					}
 					else
 					{
-						HLVM_ASSERT(false, TXT("Type {} must be move or copy constructible"), TO_TCHAR_CSTR(typeid(T).name()));
+						HLVM_ASSERT_F(false, TXT("Type {} must be move or copy constructible"), TO_TCHAR_CSTR(typeid(T).name()));
 					}
 
 					// Step3 delete old tail

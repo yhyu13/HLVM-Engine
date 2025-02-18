@@ -126,7 +126,7 @@ public:
 	T& PeekFront() noexcept
 	{
 		LOCK_GUARD_NC();
-		HLVM_ASSERT(!EmptyInternal(), TXT("Queue Tail is null"));
+		HLVM_ASSERT_F(!EmptyInternal(), TXT("Queue Tail is null"));
 		return QueueNodes[mTail].mItem;
 	}
 
@@ -173,7 +173,7 @@ public:
 				}
 				else
 				{
-					HLVM_ASSERT(false, TXT("Type {} must be move or copy constructible"), TO_TCHAR_CSTR(typeid(T).name()));
+					HLVM_ASSERT_F(false, TXT("Type {} must be move or copy constructible"), TO_TCHAR_CSTR(typeid(T).name()));
 				}
 
 				// Step2 Move tail

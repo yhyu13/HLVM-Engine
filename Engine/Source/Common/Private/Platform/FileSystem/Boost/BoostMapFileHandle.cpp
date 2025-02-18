@@ -21,9 +21,9 @@ DECLARE_LOG_CATEGORY(LogBoostFileHandle)
 #define BMFH_HANDLE_EXCPETIONS() HandleException(Status_InOut, TO_TCHAR_CSTR(__FUNCTION__), Exception)
 #define BMFH_HANDLE_EXCPETIONS2() HandleException2(Status_InOut, TO_TCHAR_CSTR(__FUNCTION__))
 
-#define BMFH_HANDLE_ASSERT(x, ...) HLVM_ASSERT(x, TXT("File {} : {}"), *mFilePath, FString::Format(__VA_ARGS__))
-#define BMFH_HANDLE_ENSURE(x, ...) HLVM_ENSURE(x, TXT("File {} : {}"), *mFilePath, FString::Format(__VA_ARGS__))
-#define BMFH_HANDLE_ENSURE2(x, ...) HLVM_ENSURE(x, TXT("File {} : {}"), *FilePath, FString::Format(__VA_ARGS__))
+#define BMFH_HANDLE_ASSERT(x, ...) HLVM_ASSERT_F(x, TXT("File {} : {}"), *mFilePath, FString::Format(__VA_ARGS__))
+#define BMFH_HANDLE_ENSURE(x, ...) HLVM_ENSURE_F(x, TXT("File {} : {}"), *mFilePath, FString::Format(__VA_ARGS__))
+#define BMFH_HANDLE_ENSURE2(x, ...) HLVM_ENSURE_F(x, TXT("File {} : {}"), *FilePath, FString::Format(__VA_ARGS__))
 #define BMFH_VERBOSE_LOG(...)                                                                                   \
 	do                                                                                                          \
 	{                                                                                                           \

@@ -187,7 +187,7 @@ static void load_vulkan_functions()
 	function = reinterpret_cast<PFN_##function>(vulkanlib.get_function<PFN_##function>(#function));
 	APPLY_PFN_DEF_VK_FUNCTIONS(GET_VK_FUNCTION_PROCADDR)
 
-	HLVM_ENSURE(vulkanlib.native_handle() != nullptr, TXT("Failed to load vulkan library"));
+	HLVM_ENSURE_F(vulkanlib.native_handle() != nullptr, TXT("Failed to load vulkan library"));
 }
 
 const std::vector<const char*> validationLayers = {

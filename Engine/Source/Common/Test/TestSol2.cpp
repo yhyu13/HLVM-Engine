@@ -32,13 +32,13 @@ RECORD(sol2_writing_template_functions_test)
 
 	lua.script("my_num = my_int_add(1, 2)");
 	int my_num = lua["my_num"];
-	HLVM_ENSURE(my_num == 3, TXT("my_num should be 3"));
+	HLVM_ENSURE_F(my_num == 3, TXT("my_num should be 3"));
 
 	lua.script(
 		"my_str = my_string_combine('bark bark', ' woof "
 		"woof')");
 	std::string my_str = lua["my_str"];
-	HLVM_ENSURE(my_str == "bark bark woof woof", TXT("my_str should be bark bark woof woof"));
+	HLVM_ENSURE_F(my_str == "bark bark woof woof", TXT("my_str should be bark bark woof woof"));
 }
 
 // https://github.com/ThePhD/sol2/blob/develop/examples/source/tutorials/writing_overloaded_template_functions.cpp
@@ -57,8 +57,8 @@ RECORD(sol2_writing_overloaded_template_functions_test)
 		"my_str = my_combine('bark bark', ' woof woof')");
 	int			my_num = lua["my_num"];
 	std::string my_str = lua["my_str"];
-	HLVM_ENSURE(my_num == 3, TXT("my_num should be 3"));
-	HLVM_ENSURE(my_str == "bark bark woof woof", TXT("my_str should be bark bark woof woof"));
+	HLVM_ENSURE_F(my_num == 3, TXT("my_num should be 3"));
+	HLVM_ENSURE_F(my_str == "bark bark woof woof", TXT("my_str should be bark bark woof woof"));
 }
 
 struct my_class
@@ -141,7 +141,7 @@ RECORD(sol2_writing_functions_test)
 	// Read out the global variable we stored in 'some_str' in
 	// the quick lua code we just executed
 	std::string some_str = lua["some_str"];
-	HLVM_ENSURE(some_str == "DaD", TXT("some_str should be DaD"));
+	HLVM_ENSURE_F(some_str == "DaD", TXT("some_str should be DaD"));
 }
 
 // https://github.com/ThePhD/sol2/blob/develop/examples/source/tutorials/write_variables_demo.cpp
@@ -202,7 +202,7 @@ config = {
 	bool isfullscreen = lua["config"]
 						   ["fullscreen"]; // can get nested variables
 	sol::table config = lua["config"];
-	HLVM_ENSURE(!isfullscreen, TXT("isfullscreen should be false"));
+	HLVM_ENSURE_F(!isfullscreen, TXT("isfullscreen should be false"));
 
 	// can also get it using the "get" member function
 	// auto replaces the unqualified type name
@@ -211,8 +211,8 @@ config = {
 	// table and state can have multiple things pulled out of it
 	// too
 	std::tuple<int, int> xyresolutiontuple = resolution.get<int, int>("x", "y");
-	HLVM_ENSURE(std::get<0>(xyresolutiontuple) == 1024, TXT("xyresolutiontuple[0] should be 1024"));
-	HLVM_ENSURE(std::get<1>(xyresolutiontuple) == 768, TXT("xyresolutiontuple[1] should be 768"));
+	HLVM_ENSURE_F(std::get<0>(xyresolutiontuple) == 1024, TXT("xyresolutiontuple[0] should be 1024"));
+	HLVM_ENSURE_F(std::get<1>(xyresolutiontuple) == 768, TXT("xyresolutiontuple[1] should be 768"));
 
 	// test variable
 	auto bark = lua["config"]["bark"];
@@ -249,12 +249,12 @@ config = {
 	// (it tries to get a number, and fullscreen is
 	// not a number
 	int is_defaulted = lua["config"]["fullscreen"].get_or(24);
-	HLVM_ENSURE(is_defaulted == 24, TXT("is_defaulted should be 24"));
+	HLVM_ENSURE_F(is_defaulted == 24, TXT("is_defaulted should be 24"));
 
 	// This will result in the value of the config, which is
 	// 'false'
 	bool is_not_defaulted = lua["config"]["fullscreen"];
-	HLVM_ENSURE(!is_not_defaulted, TXT("is_not_defaulted should be false"));
+	HLVM_ENSURE_F(!is_not_defaulted, TXT("is_not_defaulted should be false"));
 }
 
 // https://github.com/ThePhD/sol2/blob/develop/examples/source/tutorials/reading_functions.cpp
@@ -270,17 +270,17 @@ RECORD(sol2_reading_functions_test)
 
 	// Get and immediately call
 	int x = lua["f"](30);
-	HLVM_ENSURE(x == 35, TXT("x should be 35"));
+	HLVM_ENSURE_F(x == 35, TXT("x should be 35"));
 
 	// Store it into a variable first, then call
 	sol::unsafe_function f = lua["f"];
 	int					 y = f(20);
-	HLVM_ENSURE(y == 25, TXT("y should be 25"));
+	HLVM_ENSURE_F(y == 25, TXT("y should be 25"));
 
 	// Store it into a variable first, then call
 	sol::protected_function safe_f = lua["f"];
 	int						z = safe_f(45);
-	HLVM_ENSURE(z == 50, TXT("z should be 50"));
+	HLVM_ENSURE_F(z == 50, TXT("z should be 50"));
 }
 
 struct my_type
@@ -418,15 +418,15 @@ RECORD(sol2_multiple_return_test)
 
 	std::tuple<int, int, int> result;
 	result = lua["f"](1, 2, 3);
-	HLVM_ENSURE(result == std::make_tuple(1, 2, 3), TXT("result should be 1, 2, 3"));
+	HLVM_ENSURE_F(result == std::make_tuple(1, 2, 3), TXT("result should be 1, 2, 3"));
 	int			a, b;
 	std::string c;
 	// NOTE: sol::tie, NOT std::tie
 	// (ESS OH ELL prefix, not ESS TEE DEE prefix)
 	sol::tie(a, b, c) = lua["f"](1, 2, "bark");
-	HLVM_ENSURE(a == 1, TXT("a should be 1"));
-	HLVM_ENSURE(b == 2, TXT("b should be 2"));
-	HLVM_ENSURE(c == "bark", TXT("c should be 'bark'"));
+	HLVM_ENSURE_F(a == 1, TXT("a should be 1"));
+	HLVM_ENSURE_F(b == 2, TXT("b should be 2"));
+	HLVM_ENSURE_F(c == "bark", TXT("c should be 'bark'"));
 }
 
 // https://github.com/ThePhD/sol2/blob/develop/examples/source/tutorials/lazy_demo.cpp
@@ -435,13 +435,13 @@ RECORD(sol2_lazy_demo_test)
 	HLVM_SOL_STATE(lua);
 
 	auto barkkey = lua["bark"];
-	HLVM_ENSURE(!barkkey.valid(), TXT("barkkey should not be valid"));
+	HLVM_ENSURE_F(!barkkey.valid(), TXT("barkkey should not be valid"));
 
 	barkkey = 50;
-	HLVM_ENSURE(barkkey.valid(), TXT("barkkey should be valid"));
+	HLVM_ENSURE_F(barkkey.valid(), TXT("barkkey should be valid"));
 
 	auto barkkey2 = lua["bark"];
-	HLVM_ENSURE(barkkey2.valid(), TXT("barkkey2 should be valid"));
+	HLVM_ENSURE_F(barkkey2.valid(), TXT("barkkey2 should be valid"));
 }
 
 // https://github.com/ThePhD/sol2/blob/develop/examples/source/tutorials/erase_demo.cpp
@@ -451,12 +451,12 @@ RECORD(sol2_erase_demo_test)
 	lua["bark"] = 50;
 	sol::optional<int> x = lua["bark"];
 	// x will have a value
-	HLVM_ENSURE(x, TXT("x should have a value"));
+	HLVM_ENSURE_F(x, TXT("x should have a value"));
 
 	lua["bark"] = sol::lua_nil;
 	sol::optional<int> y = lua["bark"];
 	// y will not have a value
-	HLVM_ENSURE(!y, TXT("y should not have a value"));
+	HLVM_ENSURE_F(!y, TXT("y should not have a value"));
 }
 
 struct Doge
@@ -522,11 +522,11 @@ RECORD(sol2_userdata_test)
 	Doge& lua_dog_move = lua["dog_move"];
 	Doge& lua_dog_unique_ptr = lua["dog_unique_ptr"];
 	Doge& lua_dog_shared_ptr = lua["dog_shared_ptr"];
-	HLVM_ENSURE(lua_dog.tailwag == 50, TXT("lua_dog should have 50 tailwags"));
-	HLVM_ENSURE(lua_dog_copy.tailwag == 30, TXT("lua_dog_copy should have 30 tailwags"));
-	HLVM_ENSURE(lua_dog_move.tailwag == 30, TXT("lua_dog_move should have 30 tailwags"));
-	HLVM_ENSURE(lua_dog_unique_ptr.tailwag == 25, TXT("lua_dog_unique_ptr should have 25 tailwags"));
-	HLVM_ENSURE(lua_dog_shared_ptr.tailwag == 31, TXT("lua_dog_shared_ptr should have 31 tailwags"));
+	HLVM_ENSURE_F(lua_dog.tailwag == 50, TXT("lua_dog should have 50 tailwags"));
+	HLVM_ENSURE_F(lua_dog_copy.tailwag == 30, TXT("lua_dog_copy should have 30 tailwags"));
+	HLVM_ENSURE_F(lua_dog_move.tailwag == 30, TXT("lua_dog_move should have 30 tailwags"));
+	HLVM_ENSURE_F(lua_dog_unique_ptr.tailwag == 25, TXT("lua_dog_unique_ptr should have 25 tailwags"));
+	HLVM_ENSURE_F(lua_dog_shared_ptr.tailwag == 31, TXT("lua_dog_shared_ptr should have 31 tailwags"));
 
 	// lua will treat these types as opaque, and you will be
 	// able to pass them around to C++ functions and Lua
@@ -644,7 +644,7 @@ RECORD(sol2_hlvm_refcount_test)
 		&FName::ToCharCStr);
 
 	FName name("test");
-	HLVM_ENSURE(name.RefCount() == 1, TXT("name should have 1 reference"));
+	HLVM_ENSURE_F(name.RefCount() == 1, TXT("name should have 1 reference"));
 
 	// Lua Only store rc-obj as a raw pointer, so rc remain 1
 	lua["name0"] = &(name);
@@ -706,7 +706,7 @@ RECORD(sol2_effil_test)
 		const auto DataDir = FString::Format(TXT("{}/{}_Data"), *GExecutablePath, *GExecutableName);
 		// const auto DataDir = FString::Format(TXT("{}/../../Test/{}_Data"), *GExecutablePath, *GExecutableName);
 		const bool bDataDirExist = FGenericPlatformFile::Get(EPlatformFileType::Disk)->Exists(DataDir);
-		// HLVM_ENSURE(bDataDirExist, TXT("Data dir not exist: {}"), *DataDir);
+		// HLVM_ENSURE_F(bDataDirExist, TXT("Data dir not exist: {}"), *DataDir);
 		if (bDataDirExist)
 		{
 			auto AllLuaFiles = FGenericPlatformFile::Get(EPlatformFileType::Disk)->Glob(DataDir, TXT(R"(.*run_tests\.lua$)"), true);

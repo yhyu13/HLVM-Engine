@@ -16,9 +16,9 @@ DECLARE_LOG_CATEGORY(LogPackedEntryHandle)
 #define PEH_HANDLE_EXCPETIONS() HandleException(Status_InOut, TO_TCHAR_CSTR(__FUNCTION__), Exception)
 #define PEH_HANDLE_EXCPETIONS2() HandleException2(Status_InOut, TO_TCHAR_CSTR(__FUNCTION__))
 
-#define PEH_HANDLE_ASSERT(x, ...) HLVM_ASSERT(x, TXT("File {} : {}"), *mFilePath, FString::Format(__VA_ARGS__))
-#define PEH_HANDLE_ENSURE(x, ...) HLVM_ENSURE(x, TXT("File {} : {}"), *mFilePath, FString::Format(__VA_ARGS__))
-#define PEH_HANDLE_ENSURE2(x, ...) HLVM_ENSURE(x, TXT("File {} : {}"), *FilePath, FString::Format(__VA_ARGS__))
+#define PEH_HANDLE_ASSERT(x, ...) HLVM_ASSERT_F(x, TXT("File {} : {}"), *mFilePath, FString::Format(__VA_ARGS__))
+#define PEH_HANDLE_ENSURE(x, ...) HLVM_ENSURE_F(x, TXT("File {} : {}"), *mFilePath, FString::Format(__VA_ARGS__))
+#define PEH_HANDLE_ENSURE2(x, ...) HLVM_ENSURE_F(x, TXT("File {} : {}"), *FilePath, FString::Format(__VA_ARGS__))
 #define PEH_VERBOSE_LOG(...)                                                                                      \
 	do                                                                                                            \
 	{                                                                                                             \
@@ -100,7 +100,7 @@ IFileHandle::OpRetType FPackedEntryHandle::Open(const FPath& FilePath, const FFi
 				case EEncryptType::Unkown:
 				case EEncryptType::HLVM_NUM:
 				{
-					HLVM_ENSURE(false, TXT("Unkown encrypt type"));
+					HLVM_ENSURE_F(false, TXT("Unkown encrypt type"));
 				}
 				break;
 			}
@@ -118,7 +118,7 @@ IFileHandle::OpRetType FPackedEntryHandle::Open(const FPath& FilePath, const FFi
 				case ECompressType::Unkown:
 				case ECompressType::HLVM_NUM:
 				{
-					HLVM_ENSURE(false, TXT("Unkown compress type"));
+					HLVM_ENSURE_F(false, TXT("Unkown compress type"));
 				}
 				break;
 			}

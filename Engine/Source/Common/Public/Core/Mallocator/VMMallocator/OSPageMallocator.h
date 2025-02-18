@@ -40,7 +40,7 @@ public:
 				std::destroy_at(Small);
 				try
 				{
-					HLVM_ENSURE(HLVM_LOW_GMALLOC_TLS.FreeAligned(Small, sizeof(FSmallHeapChain)) == EFreeRetType::Success,
+					HLVM_ENSURE_F(HLVM_LOW_GMALLOC_TLS.FreeAligned(Small, sizeof(FSmallHeapChain)) == EFreeRetType::Success,
 						TXT("~FOSPageMallocator small failed {}"), R_C(void*, Small));
 				}
 				catch (...)
@@ -57,7 +57,7 @@ public:
 				std::destroy_at(Large);
 				try
 				{
-					HLVM_ENSURE(HLVM_LOW_GMALLOC_TLS.Free(Large) == EFreeRetType::Success,
+					HLVM_ENSURE_F(HLVM_LOW_GMALLOC_TLS.Free(Large) == EFreeRetType::Success,
 						TXT("~FOSPageMallocator large failed {}"), R_C(void*, Large));
 				}
 				catch (...)
@@ -130,7 +130,7 @@ public:
 		{
 			if (Small->InlineMallocator.Owned(ptr))
 			{
-				HLVM_ENSURE(Small->InlineMallocator.Free(ptr) == EFreeRetType::Success,
+				HLVM_ENSURE_F(Small->InlineMallocator.Free(ptr) == EFreeRetType::Success,
 					TXT("FreeSmall failed {}"), R_C(void*, Small));
 				return;
 			}
@@ -170,7 +170,7 @@ public:
 		{
 			if (Large->Heap == ptr)
 			{
-				HLVM_ENSURE(HLVM_LOW_GMALLOC_TLS.FreeAligned(ptr, sizeof(FLargeHeapData)) == EFreeRetType::Success,
+				HLVM_ENSURE_F(HLVM_LOW_GMALLOC_TLS.FreeAligned(ptr, sizeof(FLargeHeapData)) == EFreeRetType::Success,
 					TXT("FreeLargeHeap failed {}"), R_C(void*, ptr));
 				Large->Heap = nullptr;
 				bFound = true;
@@ -224,7 +224,7 @@ private:
 
 		~FLargeHeapChain()
 		{
-			HLVM_ENSURE(HLVM_LOW_GMALLOC_TLS.FreeAligned(this->Heap, sizeof(FLargeHeapData)) == EFreeRetType::Success,
+			HLVM_ENSURE_F(HLVM_LOW_GMALLOC_TLS.FreeAligned(this->Heap, sizeof(FLargeHeapData)) == EFreeRetType::Success,
 				TXT("~FOSPageMallocator Heap failed {}"), R_C(void*, this->Heap));
 		}
 	};

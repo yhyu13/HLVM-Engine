@@ -43,6 +43,6 @@ HLVM_NODISCARD FConstByteBuffer FPackedContainerFragment::GetSubRegion(const FPa
 {
 	size_t	   Offset = Data.StartPos - FragmentStartPos;
 	const bool bValid = Region.get_size() > 0;
-	HLVM_ASSERT(bValid && Data.StartPos >= FragmentStartPos && Offset + Data.Size <= FragmentSize, TXT("Offset out of bounds"));
+	HLVM_ASSERT_F(bValid && Data.StartPos >= FragmentStartPos && Offset + Data.Size <= FragmentSize, TXT("Offset out of bounds"));
 	return FConstByteBuffer(R_C(const TBYTE*, Region.get_address()) + Offset, Data.Size);
 }

@@ -189,7 +189,7 @@ void* FVMHeap::Malloc(size_t _size)
 void FVMHeap::Free(void* p)
 {
 	HLVM_CONSTEXPR_ASSERT(bValidate, Owned(p));
-	HLVM_ASSERT(mHeap, TXT("calling free on nullptr heap with pointer {} to be free"), p);
+	HLVM_ASSERT_F(mHeap, TXT("calling free on nullptr heap with pointer {} to be free"), p);
 	if (!bManaged)
 		HLVM_UNLIKELY
 		{

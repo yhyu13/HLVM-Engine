@@ -30,7 +30,7 @@ FGLFW3Vulkan::FGLFW3Vulkan(const IWindow::FProperties& InProperties)
 		InProperties.Title,
 		nullptr,
 		nullptr); // 创建窗口
-	HLVM_ENSURE(Window, TXT("Failed to create GLFW window"));
+	HLVM_ENSURE_F(Window, TXT("Failed to create GLFW window"));
 }
 
 FGLFW3Vulkan::~FGLFW3Vulkan()

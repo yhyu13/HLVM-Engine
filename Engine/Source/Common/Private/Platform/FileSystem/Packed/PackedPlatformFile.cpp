@@ -10,7 +10,7 @@ static FPackedPlatformFile SPackedPlatformFile{};
 
 void FPackedPlatformFile::_Init()
 {
-	HLVM_ASSERT(!sPlatformFileRedirector[HLVM_ENUM_V(EPlatformFileType, Packed)], TXT("Packed Platform file is already registered"));
+	HLVM_ASSERT_F(!sPlatformFileRedirector[HLVM_ENUM_V(EPlatformFileType, Packed)], TXT("Packed Platform file is already registered"));
 	sPlatformFileRedirector[HLVM_ENUM_V(EPlatformFileType, Packed)] = FPackedPlatformFile::Get();
 	HLVM_LOG(LogPackedPlatformFile, debug, TXT("Init FPackedPlatformFile"));
 }
@@ -145,6 +145,6 @@ FPackedEntryQuickFind FPackedPlatformFile::QuickFindPackedEntry(const FPath& pat
 		}
 	}
 
-	HLVM_ENSURE(false, TXT("Fail to find content from packed file : {}"), *path);
+	HLVM_ENSURE_F(false, TXT("Fail to find content from packed file : {}"), *path);
 	return {};
 }

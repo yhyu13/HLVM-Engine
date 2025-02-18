@@ -609,7 +609,7 @@ private:
 	{
 		const auto DataDir = FString::Format(TXT("{}/../../Test/{}_Data"), *GExecutablePath, *GExecutableName);
 		const bool bDataDirExist = FGenericPlatformFile::Get(EPlatformFileType::Disk)->Exists(DataDir);
-		HLVM_ENSURE(bDataDirExist, TXT("Data directory not exist {}"), *DataDir);
+		HLVM_ENSURE_F(bDataDirExist, TXT("Data directory not exist {}"), *DataDir);
 
 		auto vertShaderCode = readFile(FPath::Combine(DataDir, TXT("vert.spv")).string());
 		auto fragShaderCode = readFile(FPath::Combine(DataDir, TXT("frag.spv")).string());

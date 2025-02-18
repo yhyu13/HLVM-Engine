@@ -185,5 +185,5 @@ RECORD(dylib_vulkan_test)
 
 	APPLY_PFN_DEF_VK_FUNCTIONS(GET_VK_FUNCTION_PROCADDR)
 
-	HLVM_ENSURE(vulkanlib.native_handle() != nullptr, TXT("Failed to load vulkan library"));
+	HLVM_ENSURE_F(vulkanlib.native_handle() != nullptr, TXT("Failed to load vulkan library"));
 };

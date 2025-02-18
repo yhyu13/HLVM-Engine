@@ -10,14 +10,14 @@
 bool FPackedTokenEntry::Serialize(FByteBuffer& Buffer) const
 {
 	const bool bValid = Buffer.size() == FPackedTokenEntry_SerializedSize;
-	HLVM_ASSERT(bValid, TXT("Buffer size {} is not enough for serialized data size {}"), Buffer.size(), FPackedTokenEntry_SerializedSize);
+	HLVM_ASSERT_F(bValid, TXT("Buffer size {} is not enough for serialized data size {}"), Buffer.size(), FPackedTokenEntry_SerializedSize);
 	return std::memcpy(Buffer.data(), this, FPackedTokenEntry_SerializedSize) == Buffer.data();
 }
 
 bool FPackedTokenEntry::Deserialize(const FConstByteBuffer& Buffer)
 {
 	const bool bValid = Buffer.size() == FPackedTokenEntry_SerializedSize;
-	HLVM_ASSERT(bValid, TXT("Buffer size {} is not enough for serialized data size {}"), Buffer.size(), FPackedTokenEntry_SerializedSize);
+	HLVM_ASSERT_F(bValid, TXT("Buffer size {} is not enough for serialized data size {}"), Buffer.size(), FPackedTokenEntry_SerializedSize);
 	return std::memcpy(this, Buffer.data(), FPackedTokenEntry_SerializedSize) == this;
 }
 

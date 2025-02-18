@@ -22,7 +22,7 @@ RECORD(excpetion_test)
 			HLVM_LOG(LogTest, warn, TXT("If there is a attached debugger, you will get debug pause after assertion failed. Press continue to finish this test."));
 		}
 		// Ensure runs in all build config
-		HLVM_ENSURE(1 != 1, TXT("1 != 1"));
+		HLVM_ENSURE_F(1 != 1, TXT("1 != 1"));
 	}
 	catch (const std::runtime_error& e)
 	{
@@ -31,7 +31,7 @@ RECORD(excpetion_test)
 	try
 	{
 		// Assert would be ignored in release build
-		HLVM_ASSERT(false, TXT("false"));
+		HLVM_ASSERT_F(false, TXT("false"));
 	}
 	catch (const std::runtime_error& e)
 	{

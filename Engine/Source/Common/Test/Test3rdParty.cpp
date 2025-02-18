@@ -110,7 +110,7 @@ RECORD(yalantinlibs_test)
 		auto task2 = [&task1]() -> async_simple::coro::Lazy<> {
 			auto t = task1(10);
 			auto x = co_await t;
-			HLVM_ENSURE(x == 10, TXT("task2 failed."));
+			HLVM_ENSURE_F(x == 10, TXT("task2 failed."));
 			HLVM_LOG(LogTest, info, TXT("task2 completed successfully."));
 		};
 		auto func = [&task2]() -> async_simple::coro::Lazy<> {
@@ -273,11 +273,11 @@ RECORD(test_ctre)
 {
 	HLVM_PROFILE_CPU_NAMED("test_ctre");
 
-	HLVM_ENSURE(match("h.h.cpp"), TXT("Failed"));
-	HLVM_ENSURE(match_functionCall("a()"), TXT("Failed"));
-	HLVM_ENSURE(!match_functionCall("(a)"), TXT("Failed"));
-	HLVM_ENSURE(match_assignment("a() = 1"), TXT("Failed"));
-	HLVM_ENSURE(!match_assignment("bool(a == 1)"), TXT("Failed"));
+	HLVM_ENSURE_F(match("h.h.cpp"), TXT("Failed"));
+	HLVM_ENSURE_F(match_functionCall("a()"), TXT("Failed"));
+	HLVM_ENSURE_F(!match_functionCall("(a)"), TXT("Failed"));
+	HLVM_ENSURE_F(match_assignment("a() = 1"), TXT("Failed"));
+	HLVM_ENSURE_F(!match_assignment("bool(a == 1)"), TXT("Failed"));
 };
 
 /**

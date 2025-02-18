@@ -19,7 +19,7 @@ FWorkStealThreadPool* FWorkStealThreadPool::Get()
 
 FWorkStealThreadPool::FWorkStealThreadPool(const FThreadAffinityMode& AffinityMode)
 {
-	HLVM_ENSURE(AffinityMode.Valid(), TXT("AffinityMode not valid {}"), AffinityMode.ToString());
+	HLVM_ENSURE_F(AffinityMode.Valid(), TXT("AffinityMode not valid {}"), AffinityMode.ToString());
 
 	// TODO : support other thread affinity mode
 	auto Config2 = S_C(const FThreadAffinityMode2*, AffinityMode);
@@ -89,7 +89,7 @@ FWorkStealThreadPool::FWorkStealThreadPool(const FThreadAffinityMode& AffinityMo
 						continue;
 					}
 				}
-				HLVM_ASSERT(task, TXT("Task is null"));
+				HLVM_ASSERT_F(task, TXT("Task is null"));
 
 				if constexpr (HLVM_DEBUG_THREAD_UTILITY)
 				{
@@ -104,12 +104,12 @@ FWorkStealThreadPool::FWorkStealThreadPool(const FThreadAffinityMode& AffinityMo
 		};
 
 		auto Thread = mThreads.create_thread(MoveTemp(Func));
-		HLVM_ENSURE(Thread, TXT("Thread init failed {}"), i);
+		HLVM_ENSURE_F(Thread, TXT("Thread init failed {}"), i);
 		Threads.emplace_back(Thread);
 	}
 	Threads.resize(mCount);
 
-	HLVM_ENSURE(FGenericPlatformThreadUtil::SetThreadsWithAffinity(Threads, AffinityMode), TXT("Thread affinity set failed with"));
+	HLVM_ENSURE_F(FGenericPlatformThreadUtil::SetThreadsWithAffinity(Threads, AffinityMode), TXT("Thread affinity set failed with"));
 }
 
 FWorkStealThreadPool::~FWorkStealThreadPool()

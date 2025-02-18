@@ -25,7 +25,7 @@ namespace hlvm_private
 				policy = THREAD_PRIORITY_BELOW_NORMAL;
 				break;
 			case EThreadPriority::HLVM_NUM:
-				HLVM_ASSERT(false, TXT("Unknown thread priority"));
+				HLVM_ASSERT_F(false, TXT("Unknown thread priority"));
 				break;
 		}
 		DWORD dwError, dwThreadPri;
@@ -77,7 +77,7 @@ protected:
 							}
 							else
 							{
-								HLVM_ASSERT(false, TXT("Unknown core type"));
+								HLVM_ASSERT_F(false, TXT("Unknown core type"));
 							}
 						}
 						DWORD_PTR dw = SetThreadAffinityMask(Thread->native_handle(), Mask);
@@ -122,7 +122,7 @@ protected:
 							}
 							else
 							{
-								HLVM_ASSERT(false, TXT("Unknown core type"));
+								HLVM_ASSERT_F(false, TXT("Unknown core type"));
 							}
 						}
 						DWORD_PTR dw = SetThreadAffinityMask(Thread->native_handle(), Mask);
@@ -172,7 +172,7 @@ protected:
 									}
 									else
 									{
-										HLVM_ASSERT(false, TXT("Unknown core type"));
+										HLVM_ASSERT_F(false, TXT("Unknown core type"));
 									}
 								}
 							}
@@ -191,7 +191,7 @@ protected:
 		}
 		else
 		{
-			HLVM_ASSERT(false, TXT("Unknown thread affinity mode"));
+			HLVM_ASSERT_F(false, TXT("Unknown thread affinity mode"));
 			bNoError = false;
 		}
 		return bNoError;

@@ -30,11 +30,11 @@ void VulkanLoader::LoadOnce()
 	std::call_once(flag, [&]() {
 		loader.vklib = new dylib(VULKAN_LIB, false);
 		auto& vulkanlib = *loader.vklib;
-		HLVM_ENSURE(vulkanlib.native_handle() != nullptr, TXT("Failed to load vulkan library"));
+		HLVM_ENSURE_F(vulkanlib.native_handle() != nullptr, TXT("Failed to load vulkan library"));
 
 #define GET_VK_FUNCTION_PROCADDR(function) \
 	function = reinterpret_cast<PFN_##function>(vulkanlib.get_function<PFN_##function>(#function)); \
-	HLVM_ENSURE(function != nullptr, TXT("Failed to load vulkan function: {}"), TXT(#function));
+	HLVM_ENSURE_F(function != nullptr, TXT("Failed to load vulkan function: {}"), TXT(#function));
 
 		APPLY_PFN_DEF_VK_FUNCTIONS_CORE(GET_VK_FUNCTION_PROCADDR)
 		APPLY_PFN_DEF_VK_FUNCTIONS_DISPLAY(GET_VK_FUNCTION_PROCADDR)

@@ -15,7 +15,7 @@ static FGenericPlatformFile SGenericPlatformFile{};
 
 void FGenericPlatformFile::_Init()
 {
-	HLVM_ASSERT(!sPlatformFileRedirector[HLVM_ENUM_V(EPlatformFileType, Unkown)], TXT("Unkown Platform file is already registered"));
+	HLVM_ASSERT_F(!sPlatformFileRedirector[HLVM_ENUM_V(EPlatformFileType, Unkown)], TXT("Unkown Platform file is already registered"));
 	sPlatformFileRedirector[HLVM_ENUM_V(EPlatformFileType, Unkown)] = &SGenericPlatformFile;
 	HLVM_LOG(LogGenericPlatformFile, debug, TXT("Init FGenericPlatformFile"));
 }

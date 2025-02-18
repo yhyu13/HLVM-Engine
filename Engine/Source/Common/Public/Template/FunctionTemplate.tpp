@@ -53,7 +53,7 @@ public:
 	{
 		if constexpr (std::is_convertible_v<decltype(TCallFunc(_Func1)), bool>)
 		{
-			HLVM_ENSURE(TCallFunc(_Func1), TXT("TScopedVariable constructor failed"));
+			HLVM_ENSURE_F(TCallFunc(_Func1), TXT("TScopedVariable constructor failed"));
 		}
 		else
 		{
@@ -67,7 +67,7 @@ public:
 		HLVM_ATOMIC_THREAD_FENCE();
 		if constexpr (std::is_convertible_v<decltype(TCallFunc(Func2)), bool>)
 		{
-			HLVM_ENSURE(TCallFunc(Func2), TXT("TScopedVariable constructor failed"));
+			HLVM_ENSURE_F(TCallFunc(Func2), TXT("TScopedVariable constructor failed"));
 		}
 		else
 		{

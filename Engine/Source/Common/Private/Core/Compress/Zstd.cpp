@@ -13,7 +13,7 @@ HLVM_NODISCARD TVector<TBYTE> FZstd::Compress(const FConstByteBuffer& data, int 
 	HLVM_SCOPED_TIMER_LOG(FString::Format(TXT("Zstd compress size {} level {}"), data.size(), compress_level));
 
 	size_t est_compress_size = ZSTD_compressBound(data.size());
-	HLVM_ENSURE(ZSTD_isError(est_compress_size) == 0, TXT("ZSTD_compressBound = {}, ErrMsg: {}"),
+	HLVM_ENSURE_F(ZSTD_isError(est_compress_size) == 0, TXT("ZSTD_compressBound = {}, ErrMsg: {}"),
 		est_compress_size, TO_TCHAR_CSTR(ZSTD_getErrorName(est_compress_size)));
 
 	TVector<TBYTE> comp_buffer;
@@ -37,9 +37,9 @@ HLVM_NODISCARD TVector<TBYTE> FZstd::Decompress(const FConstByteBuffer& data, bo
 	HLVM_SCOPED_TIMER_LOG(FString::Format(TXT("Zstd decompress size {}"), data.size()));
 
 	auto const est_decomp_size = ZSTD_getFrameContentSize(data.data(), data.size());
-	HLVM_ENSURE(est_decomp_size != ZSTD_CONTENTSIZE_UNKNOWN, TXT("ZSTD_getFrameContentSize = {}, ErrMsg: {}"),
+	HLVM_ENSURE_F(est_decomp_size != ZSTD_CONTENTSIZE_UNKNOWN, TXT("ZSTD_getFrameContentSize = {}, ErrMsg: {}"),
 		ZSTD_CONTENTSIZE_UNKNOWN, TXT("it's necessary to use streaming mode to decompress data"));
-	HLVM_ENSURE(est_decomp_size != ZSTD_CONTENTSIZE_ERROR, TXT("ZSTD_getFrameContentSize = {}, ErrMsg: {}"),
+	HLVM_ENSURE_F(est_decomp_size != ZSTD_CONTENTSIZE_ERROR, TXT("ZSTD_getFrameContentSize = {}, ErrMsg: {}"),
 		ZSTD_CONTENTSIZE_ERROR, TXT("an error occurred"));
 
 	TVector<TBYTE> decomp_buffer;
