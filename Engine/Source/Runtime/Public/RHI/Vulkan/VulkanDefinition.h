@@ -22,25 +22,26 @@
 	#define VMA_DYNAMIC_VULKAN_FUNCTIONS 0
 #endif
 
+/// @brief Enable validation layers
 #define VK_ENABLE_VALIDATION_LAYERS !HLVM_BUILD_RELEASE
 
 /// @brief Helper macro to convert VkResult to TCHAR string
 #define VK_RESULT_TO_TCHAR(x) TO_TCHAR_CSTR(string_VkResult(x))
 
 /// @brief Helper macro to test the result of Vulkan calls which can return an error. (HLVM_ENSURE_F)
-#define VK_ENSURE(x)                                                                                               \
-	do                                                                                                             \
-	{                                                                                                              \
-		VkResult _result = (x);                                                                                    \
-		HLVM_ENSURE_F(_result == VK_SUCCESS, TXT("Vulkan call failed with error: {}"), VK_RESULT_TO_TCHAR(_result)); \
-	}                                                                                                              \
+#define VK_ENSURE(x)                                                                                                                  \
+	do                                                                                                                                \
+	{                                                                                                                                 \
+		VkResult _result = (x);                                                                                                       \
+		HLVM_ENSURE_F(_result == VK_SUCCESS, TXT("Vulkan call {} failed with error: {}"), STRTIFY(x), VK_RESULT_TO_TCHAR(_result)); \
+	}                                                                                                                                 \
 	while (0)
 
 /// @brief Helper macro to test the result of Vulkan calls which can return an error. (HLVM_ASSERT_F)
-#define VK_ASSERT(x)                                                                                               \
-	do                                                                                                             \
-	{                                                                                                              \
-		VkResult _result = (x);                                                                                    \
-		HLVM_ASSERT_F(_result == VK_SUCCESS, TXT("Vulkan call failed with error: {}"), VK_RESULT_TO_TCHAR(_result)); \
-	}                                                                                                              \
+#define VK_ASSERT(x)                                                                                                                  \
+	do                                                                                                                                \
+	{                                                                                                                                 \
+		VkResult _result = (x);                                                                                                       \
+		HLVM_ASSERT_F(_result == VK_SUCCESS, TXT("Vulkan call {} failed with error: {}"), STRTIFY(x), VK_RESULT_TO_TCHAR(_result)); \
+	}                                                                                                                                 \
 	while (0)

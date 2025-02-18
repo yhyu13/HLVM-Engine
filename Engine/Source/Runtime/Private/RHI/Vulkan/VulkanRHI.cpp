@@ -21,7 +21,7 @@ namespace
 		/* requested during runtime */
 	};
 
-	HLVM_STATIC_FUNC std::vector<VkExtensionProperties> EnumerateInstanceExtensionProperties(const char* pLayerName)
+	HLVM_STATIC_FUNC TVector<VkExtensionProperties> EnumerateInstanceExtensionProperties(const char* pLayerName)
 	{
 		uint32_t extCount = 0;
 		VkResult result = vkEnumerateInstanceExtensionProperties(pLayerName, &extCount, nullptr);
@@ -31,7 +31,7 @@ namespace
 			return {};
 		}
 
-		std::vector<VkExtensionProperties> extensionProperties(extCount);
+		TVector<VkExtensionProperties> extensionProperties(extCount);
 		result = vkEnumerateInstanceExtensionProperties(pLayerName, &extCount, extensionProperties.data());
 		if (result != VK_SUCCESS)
 		{
@@ -48,17 +48,17 @@ namespace
 		return std::find_if(extProps.begin(), extProps.end(), compare) != extProps.end();
 	}
 
-	HLVM_STATIC_FUNC std::vector<VkLayerProperties> EnumerateInstanceLayerProperties()
+	HLVM_STATIC_FUNC TVector<VkLayerProperties> EnumerateInstanceLayerProperties()
 	{
 		uint32_t layerCount;
 		vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
 
-		std::vector<VkLayerProperties> availableLayers(layerCount);
+		TVector<VkLayerProperties> availableLayers(layerCount);
 		vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
 		return availableLayers;
 	}
 
-	HLVM_STATIC_FUNC std::vector<std::string> ValidateInstanceLayerNames(const std::vector<std::string>& names)
+	HLVM_STATIC_FUNC TVector<std::string> ValidateInstanceLayerNames(const TVector<std::string>& names)
 	{
 		if (names.empty())
 		{
@@ -67,7 +67,7 @@ namespace
 
 		auto availableLayers = EnumerateInstanceLayerProperties();
 
-		std::set<std::string> layerNames;
+		TSet<std::string> layerNames;
 		for (const auto& layer : availableLayers)
 		{
 			HLVM_LOG(LogVulkanRHI, debug, TXT("Available layer: {}"), TO_TCHAR_CSTR(layer.layerName));
@@ -75,7 +75,7 @@ namespace
 				layerNames.insert(layer.layerName);
 		}
 
-		std::vector<std::string> validatedNames;
+		TVector<std::string> validatedNames;
 		validatedNames.reserve(names.size());
 		for (const auto& requestedName : names)
 		{
@@ -187,11 +187,169 @@ namespace
 		}
 	}
 #pragma clang diagnostic pop
+
+	// 查询设备的可用队列族，-1代表无效
+	struct QueueFamilyIndices
+	{
+		// 支持图像绘制的队列
+		uint32_t graphicsFamily = std::numeric_limits<uint32_t>::max();
+
+		// 支持图像计算的队列
+		uint32_t computeFamily = std::numeric_limits<uint32_t>::max();
+
+		// 支持图像传输的队列
+		uint32_t transferFamily = std::numeric_limits<uint32_t>::max();
+
+		// 支持图形呈现的队列
+		uint32_t presentFamily = std::numeric_limits<uint32_t>::max();
+
+		bool isComplete()
+		{
+			return (graphicsFamily < std::numeric_limits<uint32_t>::max())
+				&& (presentFamily < std::numeric_limits<uint32_t>::max())
+				&& (computeFamily < std::numeric_limits<uint32_t>::max())
+				&& (transferFamily < std::numeric_limits<uint32_t>::max());
+		}
+	};
+	HLVM_STATIC_VAR QueueFamilyIndices deviceQueueFamilyIndices;
+
+	// 查询可用的图形队列和呈现队列
+	HLVM_STATIC_FUNC QueueFamilyIndices FindQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR surface)
+	{
+		QueueFamilyIndices indices;
+
+		uint32_t queueFamilyCount = 0;
+		vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
+		TVector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
+		vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
+
+		uint32_t index = 0;
+		for (const auto& queueFamily : queueFamilies)
+		{
+			if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT)
+			{
+				indices.graphicsFamily = index;
+			}
+			if (queueFamily.queueFlags & VK_QUEUE_COMPUTE_BIT)
+			{
+				indices.computeFamily = index;
+			}
+			if (queueFamily.queueFlags & VK_QUEUE_TRANSFER_BIT)
+			{
+				indices.transferFamily = index;
+			}
+
+			VkBool32 presentSupport = false;
+			vkGetPhysicalDeviceSurfaceSupportKHR(device, index, surface, &presentSupport);
+			if (presentSupport)
+			{
+				indices.presentFamily = index;
+			}
+
+			if (indices.isComplete())
+			{
+				break;
+			}
+			index++;
+		}
+
+		return indices;
+	}
+
+	HLVM_STATIC_FUNC bool CheckDeviceExtensionSupport(VkPhysicalDevice device)
+	{
+		uint32_t extensionCount;
+		vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr);
+
+		TVector<VkExtensionProperties> availableExtensions(extensionCount);
+		vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, availableExtensions.data());
+
+		TSet<std::string> requiredDeviceExtensions(deviceExtensions.begin(), deviceExtensions.end());
+
+		for (const auto& extension : availableExtensions)
+		{
+			requiredDeviceExtensions.erase(extension.extensionName);
+		}
+
+		return requiredDeviceExtensions.empty();
+	}
+
+	// 查询并记录交换链支持的细节
+	struct SwapChainSupportDetails
+	{
+		VkSurfaceCapabilitiesKHR	capabilities; // 基础表面特性
+		TVector<VkSurfaceFormatKHR> formats;	  // 像素格式、色彩空间
+		TVector<VkPresentModeKHR>	presentModes; // 可用的呈现模式
+	};
+
+	HLVM_STATIC_FUNC SwapChainSupportDetails QuerySwapChainSupport(VkPhysicalDevice device, VkSurfaceKHR surface)
+	{
+		SwapChainSupportDetails details;
+
+		// 与交换链相关的函数都需要device和surface这两个参数
+		// 查询基础表面特性
+		vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &details.capabilities);
+
+		// 查询表面支持格式
+		uint32_t formatCount;
+		vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, nullptr);
+		if (formatCount != 0)
+		{
+			details.formats.resize(formatCount);
+			vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, details.formats.data());
+		}
+
+		// 查询表面支持呈现模式
+		uint32_t presentModeCount;
+		vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, nullptr);
+
+		if (presentModeCount != 0)
+		{
+			details.presentModes.resize(presentModeCount);
+			vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, details.presentModes.data());
+		}
+
+		return details;
+	}
+
+	// 为了选择合适的设备，我们需要或许详细的设备信息。包括但不限于：名称、类型和支持Vulkan的版本。
+	HLVM_STATIC_FUNC bool IsDeviceSuitable(VkPhysicalDevice device, VkSurfaceKHR surface)
+	{
+		VkPhysicalDeviceProperties deviceProperties;
+		vkGetPhysicalDeviceProperties(device, &deviceProperties);
+
+		// 纹理压缩、64为浮点、多窗口渲染是否支持，通过下面函数查询
+		VkPhysicalDeviceFeatures deviceFeatures;
+		vkGetPhysicalDeviceFeatures(device, &deviceFeatures);
+
+		// 显卡支持集合着色器的判断条件
+		bool isSupportSetShader = (deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) && deviceFeatures.geometryShader;
+
+		QueueFamilyIndices indices = FindQueueFamilies(device, surface);
+		bool			   extensionsSupported = CheckDeviceExtensionSupport(device);
+
+		bool swapChainAdequate = false;
+		if (extensionsSupported)
+		{
+			SwapChainSupportDetails swapChainSupport = QuerySwapChainSupport(device, surface);
+			swapChainAdequate = !swapChainSupport.formats.empty() && !swapChainSupport.presentModes.empty();
+		}
+
+		return indices.isComplete() && extensionsSupported && swapChainAdequate && isSupportSetShader;
+	}
+
+	HLVM_STATIC_FUNC void ResetBeforeInit()
+	{
+		bUseValidationLayers = VK_ENABLE_VALIDATION_LAYERS;
+		requiredExtensions = {};
+		deviceQueueFamilyIndices = {};
+	}
 } // namespace
 
 FVulkanRHI::FVulkanRHI(const FVulkanRHI::FInitializer& Params)
 	: InitializerParam(Params)
 {
+	ResetBeforeInit();
 	for (const auto& extensions : Params.RequiredExtensions)
 	{
 		for (const auto& extension : extensions)
@@ -205,17 +363,18 @@ FVulkanRHI::FVulkanRHI(const FVulkanRHI::FInitializer& Params)
 void FVulkanRHI::Init()
 {
 	CreateVulkanInstance();
-	/**
-	 * Create Debug Messenger right after creating the instance
-	 */
+	// Create Debug Messenger right after creating the instance
 	if (bUseValidationLayers)
 	{
 		CreateDebugLayer();
 	}
 	CreateSurface();
-	CreateVulkanDevice();
+	CreateVulkanPhysicalDevice();
+	CreateVulkanLogicalDevice();
 	CreateVulkanQueues();
 	// TODO : Create Vulkan SwapChain and so on
+
+	// Lastly, create Vulkan Memory Allocator
 	CreateVulkanMemoryAllocator();
 }
 
@@ -503,39 +662,89 @@ void FVulkanRHI::CreateSurface()
 	HLVM_ENSURE(VulkanSurface != VK_NULL_HANDLE);
 }
 
-void FVulkanRHI::CreateVulkanDevice()
+void FVulkanRHI::CreateVulkanPhysicalDevice()
 {
+	// 1 Find suitable device
 	uint32_t DeviceCount = 0;
 	vkEnumeratePhysicalDevices(VulkanInstance, &DeviceCount, nullptr);
 	HLVM_ENSURE(DeviceCount > 0);
 
-	std::vector<VkPhysicalDevice> PhysicalDevices(DeviceCount);
+	TVector<VkPhysicalDevice> PhysicalDevices(DeviceCount);
 	vkEnumeratePhysicalDevices(VulkanInstance, &DeviceCount, PhysicalDevices.data());
 
-	VulkanPhysicalDevice = PhysicalDevices[0]; // Select the first device for simplicity
+	for (const auto& device : PhysicalDevices)
+	{
+		if (IsDeviceSuitable(device, VulkanSurface))
+		{
+			VulkanPhysicalDevice = device;
+			break;
+		}
+	}
+	HLVM_ENSURE(VulkanPhysicalDevice != VK_NULL_HANDLE);
+}
 
-	float					QueuePriority = 1.0f;
-	VkDeviceQueueCreateInfo QueueCreateInfo = {};
-	QueueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-	QueueCreateInfo.queueFamilyIndex = 0; // Assume graphics and compute are in the same queue family
-	QueueCreateInfo.queueCount = 1;
-	QueueCreateInfo.pQueuePriorities = &QueuePriority;
+void FVulkanRHI::CreateVulkanLogicalDevice()
+{
 
-	VkDeviceCreateInfo DeviceCreateInfo = {};
-	DeviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-	DeviceCreateInfo.queueCreateInfoCount = 1;
-	DeviceCreateInfo.pQueueCreateInfos = &QueueCreateInfo;
+	// 2 Create logical device
+	deviceQueueFamilyIndices = FindQueueFamilies(VulkanPhysicalDevice, VulkanSurface);
 
-	VkResult Result = vkCreateDevice(VulkanPhysicalDevice, &DeviceCreateInfo, nullptr, &VulkanDevice);
-	HLVM_ENSURE(Result == VK_SUCCESS);
+	TVector<VkDeviceQueueCreateInfo> queueCreateInfos;
+	TSet<uint32_t>					 uniqueQueueFamilies = {
+		  deviceQueueFamilyIndices.graphicsFamily,
+		  deviceQueueFamilyIndices.computeFamily,
+		  deviceQueueFamilyIndices.transferFamily,
+		  deviceQueueFamilyIndices.presentFamily
+	};
 
-	vkGetDeviceQueue(VulkanDevice, 0, 0, &GraphicsQueue);
-	vkGetDeviceQueue(VulkanDevice, 0, 0, &ComputeQueue);
+	float queuePriority = 1.0f;
+	for (uint32_t queueFamily : uniqueQueueFamilies)
+	{
+		VkDeviceQueueCreateInfo queueCreateInfo{};
+		queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+		queueCreateInfo.queueFamilyIndex = queueFamily;
+		queueCreateInfo.queueCount = 1;
+		queueCreateInfo.pQueuePriorities = &queuePriority;
+		queueCreateInfos.push_back(queueCreateInfo);
+	}
+
+	VkPhysicalDeviceFeatures deviceFeatures{};
+	deviceFeatures.geometryShader = true;
+	VkDeviceCreateInfo createInfo{};
+	createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+	createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
+	createInfo.pQueueCreateInfos = queueCreateInfos.data();
+	createInfo.pEnabledFeatures = &deviceFeatures;
+	createInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
+	createInfo.ppEnabledExtensionNames = deviceExtensions.data();
+
+	if (bUseValidationLayers)
+	{
+		createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
+		createInfo.ppEnabledLayerNames = validationLayers.data();
+	}
+	else
+	{
+		createInfo.enabledLayerCount = 0;
+	}
+
+	VK_ENSURE(vkCreateDevice(VulkanPhysicalDevice, &createInfo, nullptr, &VulkanDevice));
 }
 
 void FVulkanRHI::CreateVulkanQueues()
 {
 	// Queues are created during device creation
+	vkGetDeviceQueue(VulkanDevice, deviceQueueFamilyIndices.graphicsFamily, 0, &GraphicsQueue);
+	HLVM_ENSURE(GraphicsQueue != VK_NULL_HANDLE);
+
+	vkGetDeviceQueue(VulkanDevice, deviceQueueFamilyIndices.computeFamily, 0, &ComputeQueue);
+	HLVM_ENSURE(ComputeQueue != VK_NULL_HANDLE);
+
+	vkGetDeviceQueue(VulkanDevice, deviceQueueFamilyIndices.transferFamily, 0, &TransferQueue);
+	HLVM_ENSURE(TransferQueue != VK_NULL_HANDLE);
+
+	vkGetDeviceQueue(VulkanDevice, deviceQueueFamilyIndices.presentFamily, 0, &PresentQueue);
+	HLVM_ENSURE(PresentQueue != VK_NULL_HANDLE);
 }
 
 void FVulkanRHI::CreateVulkanMemoryAllocator()
@@ -875,7 +1084,7 @@ VkPipelineLayoutCreateInfo FVulkanRHI::GenerateVkPipelineLayoutCreateInfo(const 
 	PipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 
 	//	// Add descriptor set layouts
-	//	std::vector<VkDescriptorSetLayout> descriptorSetLayouts;
+	//	TVector<VkDescriptorSetLayout> descriptorSetLayouts;
 	//	for (const auto& layout : CreateDesc.DescriptorSetLayouts)
 	//	{
 	//		descriptorSetLayouts.push_back(layout);
@@ -884,7 +1093,7 @@ VkPipelineLayoutCreateInfo FVulkanRHI::GenerateVkPipelineLayoutCreateInfo(const 
 	//	PipelineLayoutCreateInfo.pDescriptorSetLayouts = descriptorSetLayouts.data();
 	//
 	//	// Add push constant ranges
-	//	std::vector<VkPushConstantRange> pushConstantRanges;
+	//	TVector<VkPushConstantRange> pushConstantRanges;
 	//	for (const auto& range : CreateDesc.PushConstantRanges)
 	//	{
 	//		pushConstantRanges.push_back(range);
@@ -902,7 +1111,7 @@ VkGraphicsPipelineCreateInfo FVulkanRHI::GenerateVkGraphicsPipelineCreateInfo(co
 	PipelineCreateInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
 
 	// Add shader stages
-	std::vector<VkPipelineShaderStageCreateInfo> shaderStages;
+	TVector<VkPipelineShaderStageCreateInfo> shaderStages;
 	for (const auto& shader : CreateDesc.Shaders)
 	{
 		VkPipelineShaderStageCreateInfo stageInfo = {};

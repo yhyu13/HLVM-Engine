@@ -49,10 +49,4 @@ public:
 
 	// Vulkan-specific memory management
 	virtual void FlushVulkanPendingDeletes() = 0;
-
-protected:
-	// Vulkan-specific initialization
-	virtual void CreateVulkanInstance() = 0;
-	virtual void CreateVulkanDevice() = 0;
-	virtual void CreateVulkanQueues() = 0;
 };

@@ -49,7 +49,7 @@ namespace hlvm_private
 			}                                                                                                                         \
 		}                                                                                                                             \
 		while (0)
-	#define HLVM_ASSERT(x) HLVM_ASSERT_F(x, TXT("condition failed: {}"), STRTIFY(x))
+	#define HLVM_ASSERT(x) HLVM_ASSERT_F(x, TXT("assertion failed"))
 #else
 	#if HLVM_ASSERT_ALWAYS_EVLUATE_EXPERSION
 		#define HLVM_ASSERT_F(x, ...)    \
@@ -58,7 +58,7 @@ namespace hlvm_private
 				static_cast<bool>((x)) \
 			}                          \
 			while (0)
-		#define HLVM_ASSERT(x) HLVM_ASSERT_F(x, TXT("condition failed: {}"), STRTIFY(x))
+		#define HLVM_ASSERT(x) HLVM_ASSERT_F(x, TXT("assertion failed"))
 	#else
 namespace hlvm_private
 {
@@ -91,4 +91,4 @@ namespace hlvm_private
 		}                                                                                                                         \
 	}                                                                                                                             \
 	while (0)
-#define HLVM_ENSURE(x) HLVM_ENSURE_F(x, TXT("condition failed: {}"), STRTIFY(x))
+#define HLVM_ENSURE(x) HLVM_ENSURE_F(x, TXT("ensure failed"))

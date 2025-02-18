@@ -12,7 +12,7 @@ class FVulkanRHI final : public IVulkanDynamicRHI
 public:
 	struct FInitializer
 	{
-		TVector<TVector<FString>> RequiredExtensions;
+		TVector<TVector<FString>>				RequiredExtensions;
 		std::function<VkSurfaceKHR(VkInstance)> CreateSurfaceFunc;
 	};
 
@@ -117,11 +117,12 @@ public:
 
 protected:
 	// Vulkan-specific initialization
-	void CreateVulkanInstance() override;
+	void CreateVulkanInstance();
 	void CreateDebugLayer();
 	void CreateSurface();
-	void CreateVulkanDevice() override;
-	void CreateVulkanQueues() override;
+	void CreateVulkanPhysicalDevice();
+	void CreateVulkanLogicalDevice();
+	void CreateVulkanQueues();
 
 	void CreateVulkanMemoryAllocator();
 
@@ -172,4 +173,7 @@ private:
 	VkPhysicalDevice		 VulkanPhysicalDevice;
 	VkQueue					 GraphicsQueue;
 	VkQueue					 ComputeQueue;
+	VkQueue					 TransferQueue;
+	VkQueue					 PresentQueue;
+	VkSwapchainKHR			 VulkanSwapChain;
 };
