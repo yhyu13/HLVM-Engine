@@ -1,10 +1,12 @@
+/**
+* Copyright (c) 2025. MIT License. All rights reserved.
+*/
+
 #include "RHI/Vulkan/VulkanRHI.h"
-// #include "VulkanRHIResource.h"
-// #include "VulkanRHIDefinition.h"
-// #include "VulkanUtils.h" // Helper functions for Vulkan operations
 
 DECLARE_LOG_CATEGORY(LogVulkanRHI)
 
+// TODO : Refactory these static method into each vulkan class
 namespace
 {
 	HLVM_STATIC_VAR bool bUseValidationLayers = VK_ENABLE_VALIDATION_LAYERS;
@@ -72,7 +74,9 @@ namespace
 		{
 			HLVM_LOG(LogVulkanRHI, debug, TXT("Available layer: {}"), TO_TCHAR_CSTR(layer.layerName));
 			if (layer.layerName[0] != 0)
+			{
 				layerNames.insert(layer.layerName);
+			}
 		}
 
 		TVector<std::string> validatedNames;
@@ -380,6 +384,7 @@ void FVulkanRHI::Init()
 
 void FVulkanRHI::Shutdown()
 {
+	// TODO : desotry every vulkan handle
 	vkDeviceWaitIdle(VulkanDevice);
 
 	// Cleanup Vulkan resources
@@ -535,26 +540,26 @@ void FVulkanRHI::RHIDispatchComputeShader(TUINT32 ThreadGroupCountX, TUINT32 Thr
 }
 
 // Query and Timestamp
-FRHIQueryRHIRef FVulkanRHI::CreateQuery(ERHIQueryType QueryType)
+FQueryRHIRef FVulkanRHI::CreateQuery(ERHIQueryType QueryType)
 {
-	return FRHIQueryRHIRef{};
+	return FQueryRHIRef{};
 	//	VkQueryPool QueryPool = CreateVulkanQueryPool(QueryType);
 	//	return new FVulkanQuery(QueryPool, 0, QueryType);
 }
 
-void FVulkanRHI::RHIBeginQuery(FRHIQueryRHIRef& Query)
+void FVulkanRHI::RHIBeginQuery(FQueryRHIRef& Query)
 {
 	//	FVulkanQuery* VulkanQuery = static_cast<FVulkanQuery*>(Query.GetReference());
 	//	BeginVulkanQuery(VulkanQuery->GetQueryPool(), VulkanQuery->GetQueryIndex());
 }
 
-void FVulkanRHI::RHIEndQuery(FRHIQueryRHIRef& Query)
+void FVulkanRHI::RHIEndQuery(FQueryRHIRef& Query)
 {
 	//	FVulkanQuery* VulkanQuery = static_cast<FVulkanQuery*>(Query.GetReference());
 	//	EndVulkanQuery(VulkanQuery->GetQueryPool(), VulkanQuery->GetQueryIndex());
 }
 
-void FVulkanRHI::RHIGetQueryResults(FRHIQueryRHIRef& Query, TUINT64& OutResult, bool bWait)
+void FVulkanRHI::RHIGetQueryResults(FQueryRHIRef& Query, TUINT64& OutResult, bool bWait)
 {
 	//	FVulkanQuery* VulkanQuery = static_cast<FVulkanQuery*>(Query.GetReference());
 	//	GetVulkanQueryResults(VulkanQuery->GetQueryPool(), VulkanQuery->GetQueryIndex(), OutResult, bWait);

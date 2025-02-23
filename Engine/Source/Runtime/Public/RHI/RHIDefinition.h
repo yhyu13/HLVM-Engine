@@ -197,6 +197,23 @@ enum class ECompareFunction : TUINT8
 	Always
 };
 
+// Enumeration of viewport types (e.g., windowed, fullscreen)
+enum class ERHIViewportType : TUINT8
+{
+	Windowed,
+	Fullscreen,
+	// Add other viewport types as needed
+};
+
+// Enumeration of swap chain flags
+enum class ESwapChainFlags : TUINT8
+{
+	None = 0,
+	AllowTearing = 1 << 0, // Allows tearing for adaptive sync (e.g., FreeSync, G-Sync)
+	Stereo = 1 << 1,       // Stereo rendering (e.g., VR)
+	HDR = 1 << 2,          // High Dynamic Range (HDR) support
+};
+
 // RHI Resource Types
 class FRHITexture;
 class FRHIBuffer;
@@ -207,6 +224,7 @@ class FRHISamplerState;
 class FRHIRenderTargetView;
 class FRHIDepthStencilView;
 class FRHIShaderParameterStruct;
+class FRHIViewport;
 
 // RHI Command List Types
 class FRHICommandListBase;
@@ -216,12 +234,6 @@ class FRHIComputeCommandList;
 // RHI Pipeline State Types
 class FRHIGraphicsPipelineState;
 class FRHIComputePipelineState;
-
-// RHI Viewport and Swap Chain Types
-class FViewportRHIRef;
-
-// RHI Query Types
-class FRHIQueryRHIRef;
 
 // Macros for RHI Debugging and Verification
 #define CHECK_RHI_RESOURCE(Resource) checkf(Resource != nullptr, TXT("Invalid RHI resource: %s"), TXT(#Resource))

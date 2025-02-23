@@ -45,3 +45,8 @@
 		HLVM_ASSERT_F(_result == VK_SUCCESS, TXT("Vulkan call {} failed with error: {}"), STRTIFY(x), VK_RESULT_TO_TCHAR(_result)); \
 	}                                                                                                                                 \
 	while (0)
+
+class FVulkanDevice;
+class FVulkanTexture;
+class FVulkanQueue;
+class FVulkanView;

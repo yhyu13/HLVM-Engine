@@ -1,4 +1,4 @@
-#include "RHI/Vulkan/VulkanRHIResourceDeclaration.h"
+#include "RHI/Vulkan/VulkanMisc.h"
 
 // Convert RHI pixel format to Vulkan format
 VkFormat VulkanFormatFromRHIFormat(EPixelFormat RHIFormat)
@@ -39,7 +39,7 @@ VkFormat VulkanFormatFromRHIFormat(EPixelFormat RHIFormat)
 			return VK_FORMAT_D32_SFLOAT;
 		case EPixelFormat::D32_Float_S8_UInt:
 			return VK_FORMAT_D32_SFLOAT_S8_UINT;
-		// Add more formats as needed
+			// Add more formats as needed
 	}
 }
 

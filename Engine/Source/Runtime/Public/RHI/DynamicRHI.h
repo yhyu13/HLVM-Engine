@@ -59,10 +59,10 @@ public:
 	virtual void RHIDispatchComputeShader(TUINT32 ThreadGroupCountX, TUINT32 ThreadGroupCountY, TUINT32 ThreadGroupCountZ) = 0;
 
 	// Query and Timestamp
-	virtual FRHIQueryRHIRef CreateQuery(ERHIQueryType QueryType) = 0;
-	virtual void RHIBeginQuery(FRHIQueryRHIRef& Query) = 0;
-	virtual void RHIEndQuery(FRHIQueryRHIRef& Query) = 0;
-	virtual void RHIGetQueryResults(FRHIQueryRHIRef& Query, TUINT64& OutResult, bool bWait) = 0;
+	virtual FQueryRHIRef CreateQuery(ERHIQueryType QueryType) = 0;
+	virtual void RHIBeginQuery(FQueryRHIRef& Query) = 0;
+	virtual void RHIEndQuery(FQueryRHIRef& Query) = 0;
+	virtual void RHIGetQueryResults(FQueryRHIRef& Query, TUINT64& OutResult, bool bWait) = 0;
 
 	// Debugging and Profiling
 	virtual void RHIPushEvent(const TCHAR* Name) = 0;
@@ -79,3 +79,18 @@ public:
 };
 
 HLVM_EXTERN_VAR FDynamicRHI* GDynamicRHI;
+
+template<typename T>
+HLVM_INLINE_FUNC void SetDynamicRHI(T* RHI)
+{
+	GDynamicRHI = D_C(FDynamicRHI*, RHI);
+	HLVM_ASSERT(GDynamicRHI);
+}
+
+template<typename T>
+HLVM_INLINE_FUNC T* GetDynamicRHI()
+{
+	auto RHI = D_C(T*, GDynamicRHI);
+	HLVM_ASSERT(RHI);
+	return RHI;
+}

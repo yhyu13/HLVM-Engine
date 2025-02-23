@@ -1,5 +1,5 @@
 /**
-* Copyright (c) 2025. MIT License. All rights reserved.
+ * Copyright (c) 2025. MIT License. All rights reserved.
  */
 
 #pragma once
@@ -22,6 +22,8 @@ enum class ERHIResourceType : TUINT8
 	PipelineState,
 	Query,
 	VertexDeclaration,
+	Viewport,
+	SwapChain,
 	// Add other resource types as needed
 };
 
@@ -159,6 +161,42 @@ public:
 	virtual ERHIResourceType GetType() const override { return ERHIResourceType::Query; }
 };
 
+// Base class for RHI viewports
+class FRHIViewport : virtual public FRHIResource
+{
+public:
+	// Constructor
+	FRHIViewport(const FRHIViewportCreateDesc& InCreateDesc)
+		: CreateDesc(InCreateDesc)
+	{
+	}
+
+	// Returns the type of the RHI resource
+	virtual ERHIResourceType GetType() const override { return ERHIResourceType::Viewport; }
+
+	// Returns the dimensions of the viewport
+	virtual FIntVec2 GetSize() const { return CreateDesc.Dimensions; }
+
+	// Returns the viewport type (e.g., windowed, fullscreen)
+	virtual ERHIViewportType GetViewportType() const { return CreateDesc.ViewportType; }
+
+	// Returns the associated swap chain (if any)
+	virtual void* GetSwapChain() const { return nullptr; }
+
+	// Resizes the viewport
+	virtual void Resize(const FIntVec2& NewDimensions)
+	{
+		CreateDesc.Dimensions = NewDimensions;
+		// Implement resize logic here (e.g., update swap chain, recreate resources)
+	}
+
+	// Presents the viewport (swaps the back buffer)
+	virtual void Present() = 0;
+
+protected:
+	FRHIViewportCreateDesc		CreateDesc; // Viewport creation description
+};
+
 // Smart pointer types for RHI resources
 using FTextureRHIRef = TRefCountPtr<FRHITexture>;
 using FBufferRHIRef = TRefCountPtr<FRHIBuffer>;
@@ -171,3 +209,4 @@ using FDepthStencilViewRHIRef = TRefCountPtr<FRHIDepthStencilView>;
 using FGraphicsPipelineStateRHIRef = TRefCountPtr<FRHIGraphicsPipelineState>;
 using FComputePipelineStateRHIRef = TRefCountPtr<FRHIComputePipelineState>;
 using FQueryRHIRef = TRefCountPtr<FRHIQuery>;
+using FViewportRHIRef = TRefCountPtr<FRHIViewport>;

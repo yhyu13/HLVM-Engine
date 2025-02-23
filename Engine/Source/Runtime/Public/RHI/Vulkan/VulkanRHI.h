@@ -17,6 +17,11 @@ public:
 	};
 
 public:
+	HLVM_STATIC_FUNC FVulkanRHI* Get()
+	{
+		return GetDynamicRHI<FVulkanRHI>();
+	}
+
 	explicit FVulkanRHI(const FInitializer& Params);
 
 	// Initialization and Shutdown
@@ -61,10 +66,10 @@ public:
 	virtual void RHIDispatchComputeShader(TUINT32 ThreadGroupCountX, TUINT32 ThreadGroupCountY, TUINT32 ThreadGroupCountZ) override;
 
 	// Query and Timestamp
-	virtual FRHIQueryRHIRef CreateQuery(ERHIQueryType QueryType) override;
-	virtual void			RHIBeginQuery(FRHIQueryRHIRef& Query) override;
-	virtual void			RHIEndQuery(FRHIQueryRHIRef& Query) override;
-	virtual void			RHIGetQueryResults(FRHIQueryRHIRef& Query, TUINT64& OutResult, bool bWait) override;
+	virtual FQueryRHIRef CreateQuery(ERHIQueryType QueryType) override;
+	virtual void			RHIBeginQuery(FQueryRHIRef& Query) override;
+	virtual void			RHIEndQuery(FQueryRHIRef& Query) override;
+	virtual void			RHIGetQueryResults(FQueryRHIRef& Query, TUINT64& OutResult, bool bWait) override;
 
 	// Debugging and Profiling
 	virtual void RHIPushEvent(const TCHAR* Name) override;
@@ -175,5 +180,4 @@ private:
 	VkQueue					 ComputeQueue;
 	VkQueue					 TransferQueue;
 	VkQueue					 PresentQueue;
-	VkSwapchainKHR			 VulkanSwapChain;
 };

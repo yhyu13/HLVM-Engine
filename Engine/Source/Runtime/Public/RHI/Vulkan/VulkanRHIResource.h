@@ -11,7 +11,6 @@
 class FVulkanRHIResource : virtual public FRHIResource
 {
 public:
-	virtual ~FVulkanRHIResource() override = default;
 	virtual ERHIInterfaceType GetInterfaceType() const override { return ERHIInterfaceType::Vulkan; }
 };
 
@@ -119,7 +118,7 @@ public:
 	VkBufferView GetBufferView() const { return BufferView; }
 
 private:
-	VkBufferView					  BufferView;
+	VkBufferView BufferView;
 };
 
 // Vulkan-specific RHI sampler state
@@ -220,6 +219,39 @@ private:
 	VkQueryPool	  QueryPool;
 	TUINT32		  QueryIndex;
 	ERHIQueryType QueryType;
+};
+
+class FVulkanViewport;
+class FVulkanBackBuffer : public FVulkanTexture
+{
+public:
+	FVulkanBackBuffer(VkImage InImage, const FRHITextureCreateDesc& InCreateDesc, FVulkanViewport* InViewport)
+		: FVulkanTexture(InImage, InCreateDesc), Viewport(InViewport)
+	{
+	}
+
+	~FVulkanBackBuffer() override
+	{
+		HLVM_ASSERT(Viewport);
+	}
+
+private:
+	FVulkanViewport* Viewport;
+};
+
+class FVulkanViewport : public FRHIViewport, public FVulkanRHIResource, public FVulkanMinimalContext
+{
+public:
+	FVulkanViewport(const FRHIViewportCreateDesc& InCreateDesc, const FVulkanMinimalContext& InContext)
+		: FRHIViewport(InCreateDesc), FVulkanMinimalContext(InContext)
+	{
+	}
+
+	// Returns the Vulkan swap chain handle
+	void* GetSwapChain() const override { return SwapChain; }
+
+private:
+	FVulkanSwapChain* SwapChain;
 };
 
 // Smart pointer types for Vulkan RHI resources

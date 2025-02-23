@@ -96,10 +96,3 @@ struct FClearValueBinding
 		return !(*this == Other);
 	}
 };
-
-// TODO
-class FViewportRHIRef
-{};
-// TODO
-class FRHIQueryRHIRef
-{};

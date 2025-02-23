@@ -11,6 +11,11 @@
 class IVulkanDynamicRHI : public FDynamicRHI
 {
 public:
+	HLVM_STATIC_FUNC IVulkanDynamicRHI* Get()
+	{
+		return GetDynamicRHI<IVulkanDynamicRHI>();
+	}
+
 	// RHI Interface Type
 	virtual ERHIInterfaceType GetInterfaceType() const override { return ERHIInterfaceType::Vulkan; }
 

@@ -32,3 +32,6 @@
 #define DP_C(type, value) dynamic_pointer_cast<type>((value))
 #define C_C(type, value) const_cast<type>((value))
 #define R_C(type, value) reinterpret_cast<type>((value))
+
+#define M_S(type, value) std::make_shared<type>((value))
+#define M_U(type, value) std::make_unique<type>((value))
