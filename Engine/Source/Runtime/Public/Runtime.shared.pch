@@ -1,0 +1,10 @@
+/**
+* Copyright (c) 2025. MIT License. All rights reserved.
+*/
+
+/**
+* @file Runtime.shared.pch
+* @brief This file is automatically included by cmake for .cpp. This file should be as static as possible, with mostly only std library or equivalent
+*/
+
+#include "Common.shared.pch"

@@ -378,6 +378,24 @@ void FVulkanRHI::Init()
 	CreateVulkanQueues();
 	// TODO : Create Vulkan SwapChain and so on
 
+	FRHIViewportCreateDesc ViewportDesc;
+	ViewportDesc.DebugName = "Main Viewport";
+	ViewportDesc.Dimensions = FUIntVec2{800, 600};
+	ViewportDesc.ViewportType = ERHIViewportType::Fullscreen;
+	ViewportDesc.Format = EPixelFormat::R8G8B8A8_UNorm;
+	ViewportDesc.NativeWindowHandle = nullptr;
+	FVulkanMinimalContext Context {
+		VulkanInstance,
+		PhysicalDevice.Get(),
+		LogicalDevice.Get()
+	};
+	VulkanViewport = new FVulkanViewport(ViewportDesc, Context);
+
+	FVulkanSwapChain::FRecreateInfo RecreateInfo;
+	RecreateInfo.OldSwapChain = nullptr;
+	RecreateInfo.Surface = VulkanSurface;
+	VulkanViewport->CreateSwapChain(RecreateInfo);
+
 	// Lastly, create Vulkan Memory Allocator
 	CreateVulkanMemoryAllocator();
 }
@@ -686,6 +704,7 @@ void FVulkanRHI::CreateVulkanPhysicalDevice()
 		}
 	}
 	HLVM_ENSURE(VulkanPhysicalDevice != VK_NULL_HANDLE);
+	PhysicalDevice = new FVulkanPhysicalDevice(VulkanPhysicalDevice);
 }
 
 void FVulkanRHI::CreateVulkanLogicalDevice()
@@ -734,6 +753,7 @@ void FVulkanRHI::CreateVulkanLogicalDevice()
 	}
 
 	VK_ENSURE(vkCreateDevice(VulkanPhysicalDevice, &createInfo, nullptr, &VulkanDevice));
+	LogicalDevice = new FVulkanLogicalDevice(VulkanDevice);
 }
 
 void FVulkanRHI::CreateVulkanQueues()

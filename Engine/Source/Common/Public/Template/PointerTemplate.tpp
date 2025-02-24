@@ -125,6 +125,7 @@ struct TNoNullPointer
 			HLVM_SEGFAULT_INLINE();
 		}
 	}
+	~TNoNullPointer() {}
 
 	T* operator->()
 	{
@@ -149,6 +150,11 @@ struct TNoNullPointer
 	operator bool() const
 	{
 		return pFileHandle != nullptr;
+	}
+
+	operator T*() const
+	{
+		return pFileHandle;
 	}
 
 	T* Get() const

@@ -5,16 +5,28 @@
 #pragma once
 
 #include "VulkanMisc.h"
-#include "VulkanSwapChain.h"
+#include "VulkanDevice.h"
 
 struct FVulkanMinimalContext
 {
-	FVulkanMinimalContext(VkInstance InInstance, VkDevice InDevice)
+	explicit FVulkanMinimalContext(VkInstance InInstance,
+		FVulkanPhysicalDevice* InPhysicalDevice,
+		FVulkanLogicalDevice* InDevice)
 		: Instance(InInstance)
-		, Device(InDevice)
+		, PhysicalDevice(InPhysicalDevice)
+		, LogicalDevice(InDevice)
 	{
 	}
 
-	VkInstance Instance;
-	VkDevice   Device;
+	VkInstance			  Instance;
+	TNoNullPointer<FVulkanPhysicalDevice> PhysicalDevice;
+	TNoNullPointer<FVulkanLogicalDevice>  LogicalDevice;
+};
+
+// Base class for all RHI resources
+class FVulkanResource : virtual public FRHIResource
+{
+public:
+	FVulkanResource() = default;
+	virtual ERHIInterfaceType GetInterfaceType() const override { return ERHIInterfaceType::Vulkan; }
 };

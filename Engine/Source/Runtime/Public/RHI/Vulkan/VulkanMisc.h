@@ -27,3 +27,5 @@ HLVM_EXTERN_FUNC VkCompareOp VulkanCompareOpFromRHICompareFunction(ECompareFunct
 
 // Helper function to convert RHI shader stage to Vulkan shader stage
 HLVM_EXTERN_FUNC VkShaderStageFlagBits VulkanShaderStageFromRHIStage(EShaderStage RHIShaderStage);
+
+

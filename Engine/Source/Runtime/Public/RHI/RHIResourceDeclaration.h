@@ -256,7 +256,7 @@ struct FRHISwapChainCreateDesc
 struct FRHIViewportCreateDesc
 {
 	FString			 DebugName;	   // Debug name for the viewport
-	FIntVec2		 Dimensions;   // Width and height of the viewport
+	FUIntVec2		 Dimensions;   // Width and height of the viewport
 	ERHIViewportType ViewportType; // Type of the viewport (e.g., windowed, fullscreen)
 	EPixelFormat	 Format;	   // Pixel format of the viewport's back buffer
 	IWindow*		 NativeWindowHandle;
@@ -267,7 +267,7 @@ struct FRHIViewportCreateDesc
 	// Constructor for easy initialization
 	FRHIViewportCreateDesc(
 		const FString&	 InDebugName,
-		const FIntVec2&	 InDimensions,
+		const FUIntVec2&	 InDimensions,
 		ERHIViewportType InViewportType = ERHIViewportType::Fullscreen,
 		EPixelFormat	 InFormat = EPixelFormat::R8G8B8A8_UNorm,
 		IWindow*		 InWindowHandle = nullptr)

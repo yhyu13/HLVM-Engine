@@ -1,3 +1,7 @@
+/**
+* Copyright (c) 2025. MIT License. All rights reserved.
+ */
+
 #include "RHI/Vulkan/VulkanMisc.h"
 
 // Convert RHI pixel format to Vulkan format

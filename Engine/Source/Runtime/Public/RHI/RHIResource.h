@@ -31,6 +31,7 @@ enum class ERHIResourceType : TUINT8
 class FRHIResource : public FRefCountable
 {
 public:
+	FRHIResource() = default;
 	virtual ~FRHIResource() = default;
 
 	// Returns the type of the RHI resource
@@ -175,20 +176,16 @@ public:
 	virtual ERHIResourceType GetType() const override { return ERHIResourceType::Viewport; }
 
 	// Returns the dimensions of the viewport
-	virtual FIntVec2 GetSize() const { return CreateDesc.Dimensions; }
+	virtual FUIntVec2 GetSize() const { return CreateDesc.Dimensions; }
 
 	// Returns the viewport type (e.g., windowed, fullscreen)
 	virtual ERHIViewportType GetViewportType() const { return CreateDesc.ViewportType; }
 
 	// Returns the associated swap chain (if any)
-	virtual void* GetSwapChain() const { return nullptr; }
+	virtual void* GetSwapChain() const = 0;
 
-	// Resizes the viewport
-	virtual void Resize(const FIntVec2& NewDimensions)
-	{
-		CreateDesc.Dimensions = NewDimensions;
-		// Implement resize logic here (e.g., update swap chain, recreate resources)
-	}
+	// Resizes the viewport and swap chain
+	virtual void Resize(const FUIntVec2& NewDimensions) = 0;
 
 	// Presents the viewport (swaps the back buffer)
 	virtual void Present() = 0;

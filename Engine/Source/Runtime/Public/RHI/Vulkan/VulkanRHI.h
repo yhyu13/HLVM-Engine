@@ -5,6 +5,7 @@
 #pragma once
 
 #include "IVulkanDynamicRHI.h"
+#include "VulkanRHIResource.h"
 #include <functional>
 
 class FVulkanRHI final : public IVulkanDynamicRHI
@@ -67,9 +68,9 @@ public:
 
 	// Query and Timestamp
 	virtual FQueryRHIRef CreateQuery(ERHIQueryType QueryType) override;
-	virtual void			RHIBeginQuery(FQueryRHIRef& Query) override;
-	virtual void			RHIEndQuery(FQueryRHIRef& Query) override;
-	virtual void			RHIGetQueryResults(FQueryRHIRef& Query, TUINT64& OutResult, bool bWait) override;
+	virtual void		 RHIBeginQuery(FQueryRHIRef& Query) override;
+	virtual void		 RHIEndQuery(FQueryRHIRef& Query) override;
+	virtual void		 RHIGetQueryResults(FQueryRHIRef& Query, TUINT64& OutResult, bool bWait) override;
 
 	// Debugging and Profiling
 	virtual void RHIPushEvent(const TCHAR* Name) override;
@@ -180,4 +181,8 @@ private:
 	VkQueue					 ComputeQueue;
 	VkQueue					 TransferQueue;
 	VkQueue					 PresentQueue;
+
+	FVulkanViewportRef		 VulkanViewport;
+	FVulkanPhysicalDeviceRef PhysicalDevice;
+	FVulkanLogicalDeviceRef	 LogicalDevice;
 };

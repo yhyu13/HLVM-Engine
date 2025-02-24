@@ -3,7 +3,7 @@
  */
 
 /**
- * @file Common.pch
+ * @file Common.shared.pch
  * @brief This file is automatically included by cmake for .cpp. This file should be as static as possible, with mostly only std library or equivalent
  */
 
