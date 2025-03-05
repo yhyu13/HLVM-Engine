@@ -6,13 +6,14 @@
 
 FVulkanPhysicalDevice::QueueFamilyIndices FVulkanPhysicalDevice::QueryQueueFamilyIndices(VkSurfaceKHR Surface)
 {
-	if (mQueueFamilyIndices.IsComplete())
+	if (auto iter = mSurfaceToQueueFamilyIndices.find(Surface);
+		iter != mSurfaceToQueueFamilyIndices.end() && iter->second.IsComplete())
 	{
-		return mQueueFamilyIndices;
+		return iter->second;
 	}
 
 	auto  device = Get();
-	auto& indices = mQueueFamilyIndices;
+	auto& indices = mSurfaceToQueueFamilyIndices[Surface];
 
 	uint32_t queueFamilyCount = 0;
 	vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
@@ -54,15 +55,15 @@ FVulkanPhysicalDevice::QueueFamilyIndices FVulkanPhysicalDevice::QueryQueueFamil
 
 FVulkanPhysicalDevice::SwapChainSupportDetails FVulkanPhysicalDevice::QuerySwapChainSupport(VkSurfaceKHR Surface)
 {
-	if (mSwapChainSupportDetails.IsComplete())
+	if (auto iter = mSurfaceToSwapChainSupportDetails.find(Surface);
+		iter != mSurfaceToSwapChainSupportDetails.end() && iter->second.IsComplete())
 	{
-		return mSwapChainSupportDetails;
+		return iter->second;
 	}
 
 	auto  device = Get();
 	auto& surface = Surface;
-
-	SwapChainSupportDetails details;
+	auto& details = mSurfaceToSwapChainSupportDetails[Surface];
 
 	// 与交换链相关的函数都需要device和surface这两个参数
 	// 查询基础表面特性

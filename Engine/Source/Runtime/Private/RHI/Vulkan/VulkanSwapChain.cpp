@@ -21,7 +21,7 @@ FVulkanSwapChain::~FVulkanSwapChain()
 
 void FVulkanSwapChain::CreateSwapChain(FRecreateInfo& InCreateInfo)
 {
-	FVulkanPhysicalDevice* physicalDevice = OwnerViewport->PhysicalDevice;
+	auto& physicalDevice = OwnerViewport->PhysicalDevice;
 	VkDevice device = OwnerViewport->LogicalDevice->Get();
 	VkSurfaceKHR surface = InCreateInfo.Surface;
 

@@ -182,7 +182,7 @@ private:
 	VkQueue					 TransferQueue;
 	VkQueue					 PresentQueue;
 
-	FVulkanViewportRef		 VulkanViewport;
 	FVulkanPhysicalDeviceRef PhysicalDevice;
 	FVulkanLogicalDeviceRef	 LogicalDevice;
+	FVulkanViewportRef		 VulkanViewport;
 };

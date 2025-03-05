@@ -70,8 +70,8 @@ public:
 
 private:
 	VkPhysicalDevice mDevice;
-	QueueFamilyIndices mQueueFamilyIndices;
-	SwapChainSupportDetails mSwapChainSupportDetails;
+	TMap<VkSurfaceKHR, QueueFamilyIndices> mSurfaceToQueueFamilyIndices;
+	TMap<VkSurfaceKHR, SwapChainSupportDetails> mSurfaceToSwapChainSupportDetails;
 };
 
 class FVulkanLogicalDevice : public FRefCountable

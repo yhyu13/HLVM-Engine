@@ -19,8 +19,8 @@ struct FVulkanMinimalContext
 	}
 
 	VkInstance			  Instance;
-	TNoNullPointer<FVulkanPhysicalDevice> PhysicalDevice;
-	TNoNullPointer<FVulkanLogicalDevice>  LogicalDevice;
+	FVulkanPhysicalDeviceRef PhysicalDevice;
+	FVulkanLogicalDeviceRef  LogicalDevice;
 };
 
 // Base class for all RHI resources

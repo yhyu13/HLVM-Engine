@@ -390,7 +390,6 @@ void FVulkanRHI::Init()
 		LogicalDevice.Get()
 	};
 	VulkanViewport = new FVulkanViewport(ViewportDesc, Context);
-
 	FVulkanSwapChain::FRecreateInfo RecreateInfo;
 	RecreateInfo.OldSwapChain = nullptr;
 	RecreateInfo.Surface = VulkanSurface;
@@ -402,6 +401,10 @@ void FVulkanRHI::Init()
 
 void FVulkanRHI::Shutdown()
 {
+	VulkanViewport.Reset();
+	LogicalDevice.Reset();
+	PhysicalDevice.Reset();
+
 	// TODO : desotry every vulkan handle
 	vkDeviceWaitIdle(VulkanDevice);
 

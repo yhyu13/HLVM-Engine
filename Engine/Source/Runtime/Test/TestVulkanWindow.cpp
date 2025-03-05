@@ -1252,17 +1252,17 @@ RECORD_BOOL(test_GLFW3VulkanWindow)
 	IWindow::FProperties Properties;
 	Properties.Resizable = false;
 	Properties.Mode = IWindow::EDisplayMode::Windowed;
-	FGLFW3Vulkan* Window = new FGLFW3Vulkan(Properties);
+	SharedCount<FGLFW3Vulkan> Window = M_S(FGLFW3Vulkan, Properties);
 
-	FVulkanRHI* VulkanRHI = nullptr;
+	UniqueCount<FVulkanRHI> VulkanRHI = nullptr;
 	{
 		// Vulkan rhi init
 		FVulkanRHI::FInitializer Initializer;
 		Initializer.RequiredExtensions = { Window->GetRequiredExtensions() };
 		Initializer.CreateSurfaceFunc = [&Window](VkInstance Instance){ return Window->CreateSurface(Instance); };
-		VulkanRHI = new FVulkanRHI(Initializer);
+		VulkanRHI = M_U(FVulkanRHI, Initializer);
 		// Set GDynamicRHI before init
-		SetDynamicRHI(VulkanRHI);
+		SetDynamicRHI(VulkanRHI.get());
 		VulkanRHI->Init();
 	}
 	VulkanRHI->Shutdown();
