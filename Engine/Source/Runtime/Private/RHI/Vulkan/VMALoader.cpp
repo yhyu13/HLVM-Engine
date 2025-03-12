@@ -10,7 +10,7 @@
 
 #include "RHI/Vulkan/VulkanDefinition.h"
 
-#if USE_VK_VMA
+#if VULKAN_USE_VMA
 // Reference to setup custom loading single header vma
 // https://gpuopen-librariesandsdks.github.io/VulkanMemoryAllocator/html/quick_start.html#quick_start_initialization
 	#define VMA_IMPLEMENTATION

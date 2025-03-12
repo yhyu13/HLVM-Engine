@@ -107,17 +107,16 @@ PACK(struct TOffsetPtr32 {
 
 /**
  * Template for non-null pointers
- * Useful for hold pointers that do not have ownership
  * @tparam T class type
  */
 template <typename T>
-struct TNoNullPointer
+struct TNoNullPtr
 {
 	using Type = T;
 	using ValueType = T*;
 
-	TNoNullPointer() = delete;
-	explicit TNoNullPointer(T* handle)
+	TNoNullPtr() = delete;
+	TNoNullPtr(T* handle)
 		: pFileHandle(handle)
 	{
 		if (pFileHandle == nullptr)
@@ -125,7 +124,7 @@ struct TNoNullPointer
 			HLVM_SEGFAULT_INLINE();
 		}
 	}
-	~TNoNullPointer() {}
+	~TNoNullPtr() {}
 
 	T* operator->()
 	{
@@ -137,12 +136,12 @@ struct TNoNullPointer
 		return pFileHandle;
 	}
 
-	bool operator==(const TNoNullPointer& other) const
+	bool operator==(const TNoNullPtr& other) const
 	{
 		return pFileHandle == other.pFileHandle;
 	}
 
-	bool operator!=(const TNoNullPointer& other) const
+	bool operator!=(const TNoNullPtr& other) const
 	{
 		return pFileHandle != other.pFileHandle;
 	}
@@ -162,8 +161,82 @@ struct TNoNullPointer
 		return pFileHandle;
 	}
 
-	friend T& operator*(const TNoNullPointer& handle)
+	friend T& operator*(const TNoNullPtr& handle)
 	{
+		return *(handle.pFileHandle);
+	}
+
+private:
+	T* pFileHandle = nullptr;
+};
+
+
+/**
+ * Template for nullable pointers
+ * @tparam T class type
+ */
+template <typename T>
+struct TNullablePtr
+{
+	using Type = T;
+	using ValueType = T*;
+
+	TNullablePtr() = delete;
+	TNullablePtr(T* handle)
+		: pFileHandle(handle)
+	{
+	}
+	~TNullablePtr() {}
+
+	T* operator->()
+	{
+		if (pFileHandle == nullptr)
+		{
+			HLVM_SEGFAULT_INLINE();
+		}
+		return pFileHandle;
+	}
+
+	const T* operator->() const
+	{
+		if (pFileHandle == nullptr)
+		{
+			HLVM_SEGFAULT_INLINE();
+		}
+		return pFileHandle;
+	}
+
+	bool operator==(const TNullablePtr& other) const
+	{
+		return pFileHandle == other.pFileHandle;
+	}
+
+	bool operator!=(const TNullablePtr& other) const
+	{
+		return pFileHandle != other.pFileHandle;
+	}
+
+	operator bool() const
+	{
+		return pFileHandle != nullptr;
+	}
+
+	operator T*() const
+	{
+		return pFileHandle;
+	}
+
+	T* Get() const
+	{
+		return pFileHandle;
+	}
+
+	friend T& operator*(const TNullablePtr& handle)
+	{
+		if (handle.pFileHandle == nullptr)
+		{
+			HLVM_SEGFAULT_INLINE();
+		}
 		return *(handle.pFileHandle);
 	}
 

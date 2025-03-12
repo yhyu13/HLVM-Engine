@@ -53,7 +53,13 @@ public:
 
 private:
 	FVulkanSwapChain* mSwapChain;
-	FVulkanSwapChain::FRecreateInfo mSwapChainCreateInfo;
+
+	TVector<VkImageView>   swapChainImageViews;	  // Vulkan对象，包括处于交换链，或者管线，都需要绑定一个VkImageView对象来访问它
+	TVector<VkFramebuffer> swapChainFramebuffers; // 添加一个集合存储帧缓冲对象
+
+	// TODO
+	//TUINT32 currentFrameIndex = 0;
+	//TUINT32 maxFramesInFlight = 2; // TODO: use console variable to control it, but modern driver suggest just implement double buffering
 };
 
 using FVulkanViewportRef = TRefCountPtr<FVulkanViewport>;

@@ -39,7 +39,7 @@ const vector<const char*> deviceExtensions = {
 	VK_KHR_SWAPCHAIN_EXTENSION_NAME // 交换链扩展集合
 };
 
-		#if VK_ENABLE_VALIDATION_LAYERS
+		#if VULKAN_ENABLE_VALIDATION_LAYERS
 const bool enableValidationLayers = true;
 		#else
 const bool enableValidationLayers = false;
@@ -1253,6 +1253,7 @@ RECORD_BOOL(test_GLFW3VulkanWindow)
 	Properties.Resizable = false;
 	Properties.Mode = IWindow::EDisplayMode::Windowed;
 	SharedCount<FGLFW3Vulkan> Window = M_S(FGLFW3Vulkan, Properties);
+	HLVM_LOG(LogTest, info, TXT("FGLFW3Vulkan created!"));
 
 	UniqueCount<FVulkanRHI> VulkanRHI = nullptr;
 	{
@@ -1261,11 +1262,14 @@ RECORD_BOOL(test_GLFW3VulkanWindow)
 		Initializer.RequiredExtensions = { Window->GetRequiredExtensions() };
 		Initializer.CreateSurfaceFunc = [&Window](VkInstance Instance){ return Window->CreateSurface(Instance); };
 		VulkanRHI = M_U(FVulkanRHI, Initializer);
+		HLVM_LOG(LogTest, info, TXT("VulkanRHI created!"));
 		// Set GDynamicRHI before init
 		SetDynamicRHI(VulkanRHI.get());
 		VulkanRHI->Init();
+		HLVM_LOG(LogTest, info, TXT("VulkanRHI Init!"));
 	}
 	VulkanRHI->Shutdown();
+	HLVM_LOG(LogTest, info, TXT("VulkanRHI Shutdown!"));
 
 	/*
 	 * initWindow();

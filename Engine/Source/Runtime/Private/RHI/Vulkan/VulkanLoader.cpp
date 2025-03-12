@@ -6,11 +6,11 @@
 #include <mutex>
 
 // Extern
-VmaAllocator VMAAllocator;
+VmaAllocator VULKAN_VMA_ALLOCATOR;
 // Extern
-VmaVulkanFunctions VMAVulkanFunctions;
+VmaVulkanFunctions VULKAN_VMA_FUNCTIONS;
 // Extern
-VkAllocationCallbacks* VkCPUAllocator = nullptr;
+VkAllocationCallbacks* VULKAN_CPU_ALLOCATOR = nullptr;
 
 #define DEFINE_VK_FUNCTION_MACRO(function) \
 	PFN_##function function = nullptr;
@@ -20,7 +20,7 @@ APPLY_PFN_DEF_VK_FUNCTIONS_VMA(DEFINE_VK_FUNCTION_MACRO)
 
 VulkanLoader::~VulkanLoader()
 {
-	vmaDestroyAllocator(VMAAllocator);
+	vmaDestroyAllocator(VULKAN_VMA_ALLOCATOR);
 }
 
 void VulkanLoader::LoadOnce()
@@ -40,7 +40,7 @@ void VulkanLoader::LoadOnce()
 		APPLY_PFN_DEF_VK_FUNCTIONS_DISPLAY(GET_VK_FUNCTION_PROCADDR)
 		APPLY_PFN_DEF_VK_FUNCTIONS_VMA(GET_VK_FUNCTION_PROCADDR)
 		{
-			auto& vulkanFunctions = VMAVulkanFunctions;
+			auto& vulkanFunctions = VULKAN_VMA_FUNCTIONS;
 			vulkanFunctions.vkGetInstanceProcAddr = vkGetInstanceProcAddr;
 			vulkanFunctions.vkGetDeviceProcAddr = vkGetDeviceProcAddr;
 			vulkanFunctions.vkGetPhysicalDeviceProperties = vkGetPhysicalDeviceProperties;
@@ -84,7 +84,7 @@ void VulkanLoader::LoadOnce()
 //			allocatorCreateInfo.instance = instance;
 //			allocatorCreateInfo.pVulkanFunctions = &vulkanFunctions;
 //
-//			vmaCreateAllocator(&allocatorCreateInfo, VMAAllocator);
+//			vmaCreateAllocator(&allocatorCreateInfo, VULKAN_VMA_ALLOCATOR);
 		}
 	});
 }

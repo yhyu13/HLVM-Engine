@@ -6,6 +6,7 @@
 
 #include "VulkanMisc.h"
 #include "VulkanDevice.h"
+#include "VulkanSyncObject.h"
 
 struct FVulkanMinimalContext
 {

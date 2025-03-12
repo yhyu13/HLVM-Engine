@@ -7,28 +7,49 @@
 
 FVulkanSwapChain::~FVulkanSwapChain()
 {
-	VkDevice device = OwnerViewport->LogicalDevice->Get();
-	for (auto framebuffer : swapChainFramebuffers)
+	if (OwnerViewport)
 	{
-		vkDestroyFramebuffer(device, framebuffer, nullptr);
+		DestroySwapChain(nullptr);
 	}
-	for (auto imageView : swapChainImageViews)
-	{
-		vkDestroyImageView(device, imageView, VkCPUAllocator);
-	}
-	vkDestroySwapchainKHR(device, swapChain, VkCPUAllocator);
 }
 
-void FVulkanSwapChain::CreateSwapChain(FRecreateInfo& InCreateInfo)
+void FVulkanSwapChain::DestroySwapChain(TNullablePtr<FRecreateInfo> OutCreateInfo)
 {
-	auto& physicalDevice = OwnerViewport->PhysicalDevice;
+	VkDevice   device = OwnerViewport->LogicalDevice->Get();
+	const bool bRecreate = OutCreateInfo && VULKAN_SWAPCHAIN_KEEP_OLD;
+	if (bRecreate)
+	{
+		OutCreateInfo->OldSwapChain = swapChain;
+		OutCreateInfo->Surface = surface;
+	}
+	else
+	{
+		vkDestroySwapchainKHR(device, swapChain, VULKAN_CPU_ALLOCATOR);
+	}
+
+	// Release fence, release semaphre
+#if VULKAN_SWAPCHAIN_USE_IMAGE_FENCE
+	imageAcquiredFences.clear();
+#endif
+	imageAcquiredSemaphores.clear();
+
+	// Destory surface? TODO : create a manger class for surface and remove ref count by 1 here
+	if (!bRecreate)
+	{
+		vkDestroySurfaceKHR(OwnerViewport->Instance, surface, VULKAN_CPU_ALLOCATOR);
+	}
+}
+
+void FVulkanSwapChain::CreateSwapChain(TNoNullPtr<FRecreateInfo> InCreateInfo)
+{
+	auto&	 physicalDevice = OwnerViewport->PhysicalDevice;
 	VkDevice device = OwnerViewport->LogicalDevice->Get();
-	VkSurfaceKHR surface = InCreateInfo.Surface;
+	surface = InCreateInfo->Surface;
 
 	FVulkanPhysicalDevice::SwapChainSupportDetails swapChainSupport = physicalDevice->QuerySwapChainSupport(surface);
-	VkSurfaceFormatKHR		surfaceFormat = ChooseSwapSurfaceFormat(swapChainSupport.formats);
-	VkPresentModeKHR		presentMode = ChooseSwapPresentMode(swapChainSupport.presentModes);
-	VkExtent2D				extent = ChooseSwapExtent(swapChainSupport.capabilities);
+	VkSurfaceFormatKHR							   surfaceFormat = ChooseSwapSurfaceFormat(swapChainSupport.formats);
+	VkPresentModeKHR							   presentMode = ChooseSwapPresentMode(swapChainSupport.presentModes);
+	VkExtent2D									   extent = ChooseSwapExtent(swapChainSupport.capabilities);
 
 	uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1; // 交换链支持的最小图像个数+1数量类实现三倍缓存
 	if (swapChainSupport.capabilities.maxImageCount > 0 && imageCount > swapChainSupport.capabilities.maxImageCount)
@@ -48,7 +69,7 @@ void FVulkanSwapChain::CreateSwapChain(FRecreateInfo& InCreateInfo)
 	createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT; // 指定我们在图像上的操作，此处我们将图像作为颜色来使用
 
 	FVulkanPhysicalDevice::QueueFamilyIndices indices = physicalDevice->QueryQueueFamilyIndices(surface);
-	uint32_t		   queueFamilyIndices[] = { indices.graphicsFamily, indices.presentFamily };
+	uint32_t								  queueFamilyIndices[] = { indices.graphicsFamily, indices.presentFamily };
 
 	// 判断图形绘制队列和呈现队列是不是同一个队列
 	if (indices.graphicsFamily != indices.presentFamily)
@@ -66,10 +87,12 @@ void FVulkanSwapChain::CreateSwapChain(FRecreateInfo& InCreateInfo)
 	createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR; // 忽略alpha通道
 	createInfo.presentMode = presentMode;
 	createInfo.clipped = VK_TRUE;
+	if (InCreateInfo->OldSwapChain)
+	{
+		createInfo.oldSwapchain = InCreateInfo->OldSwapChain;
+	}
 
-	createInfo.oldSwapchain = VK_NULL_HANDLE;
-
-	if (vkCreateSwapchainKHR(device, &createInfo, nullptr, &swapChain) != VK_SUCCESS)
+	if (vkCreateSwapchainKHR(device, &createInfo, VULKAN_CPU_ALLOCATOR, &swapChain) != VK_SUCCESS)
 	{
 		throw std::runtime_error("Failed to create swap chain!");
 	}
@@ -80,6 +103,23 @@ void FVulkanSwapChain::CreateSwapChain(FRecreateInfo& InCreateInfo)
 
 	swapChainImageFormat = surfaceFormat.format;
 	swapChainExtent = extent;
+
+	// init fense and semaphore
+	// Release fence, release semaphre
+#if VULKAN_SWAPCHAIN_USE_IMAGE_FENCE
+	HLVM_ASSERT(imageAcquiredFences.size() == 0);
+	imageAcquiredFences.resize(imageCount);
+	for (auto& fence : imageAcquiredFences)
+	{
+		fence = new FVulkanFence(OwnerViewport->LogicalDevice, true);
+	}
+#endif
+	HLVM_ASSERT(imageAcquiredSemaphores.size() == 0);
+	imageAcquiredSemaphores.resize(imageCount);
+	for (auto& semaphore : imageAcquiredSemaphores)
+	{
+		semaphore = new FVulkanSemaphore(OwnerViewport->LogicalDevice);
+	}
 }
 
 // 选择合适的表面格式

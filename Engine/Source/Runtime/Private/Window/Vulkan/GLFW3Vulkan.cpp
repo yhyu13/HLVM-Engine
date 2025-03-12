@@ -46,7 +46,7 @@ VkSurfaceKHR FGLFW3Vulkan::CreateSurface(VkInstance instance)
 	}
 
 	VkSurfaceKHR surface;
-	VK_ENSURE(glfwCreateWindowSurface(instance, Window, VkCPUAllocator, &surface));
+	VULKAN_ENSURE(glfwCreateWindowSurface(instance, Window, VULKAN_CPU_ALLOCATOR, &surface));
 	return surface;
 }
 

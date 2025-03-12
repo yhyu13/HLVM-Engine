@@ -6,7 +6,7 @@
 
 #include "VulkanDefinition.h"
 
-#if USE_VK_VMA
+#if VULKAN_USE_VMA
 	#include <vk_mem_alloc.h>
 #endif
 
@@ -171,7 +171,7 @@
 	PFN_DEF(vkCmdEndRenderPass)                             \
 	PFN_DEF(vkCmdExecuteCommands)
 
-#if USE_VK_DISPLAY
+#if VULKAN_USE_DISPLAY_KHR
 	#define APPLY_PFN_DEF_VK_FUNCTIONS_DISPLAY(PFN_DEF)       \
 		PFN_DEF(vkCreateDisplayModeKHR)                       \
 		PFN_DEF(vkCreateDisplayPlaneSurfaceKHR)               \
@@ -184,7 +184,7 @@
 	#define APPLY_PFN_DEF_VK_FUNCTIONS_DISPLAY(...)
 #endif /* defined(VK_KHR_display) */
 
-#if USE_VK_VMA
+#if VULKAN_USE_VMA
 	#if VMA_DEDICATED_ALLOCATION || VMA_VULKAN_VERSION >= 1001000
 		#define APPLY_PFN_DEF_VK_FUNCTIONS_VMA_1(PFN_DEF) \
 			PFN_DEF(vkGetBufferMemoryRequirements2)    \
@@ -219,7 +219,7 @@
 		APPLY_PFN_DEF_VK_FUNCTIONS_VMA_4(PFN_DEF)
 #else
 	#define APPLY_PFN_DEF_VK_FUNCTIONS_VMA(...)
-#endif /* USE_VK_VMA */
+#endif /* VULKAN_USE_VMA */
 
 #define DECLARE_VK_FUNCTION_MACRO(function) \
 	HLVM_EXTERN_FUNC PFN_##function function;
@@ -228,9 +228,9 @@ APPLY_PFN_DEF_VK_FUNCTIONS_DISPLAY(DECLARE_VK_FUNCTION_MACRO)
 APPLY_PFN_DEF_VK_FUNCTIONS_VMA(DECLARE_VK_FUNCTION_MACRO)
 
 // VK RHI Globals
-HLVM_EXTERN_VAR VmaAllocator		   VMAAllocator;
-HLVM_EXTERN_VAR VmaVulkanFunctions	   VMAVulkanFunctions;
-HLVM_EXTERN_VAR VkAllocationCallbacks* VkCPUAllocator;
+HLVM_EXTERN_VAR VmaAllocator		   VULKAN_VMA_ALLOCATOR;
+HLVM_EXTERN_VAR VmaVulkanFunctions	   VULKAN_VMA_FUNCTIONS;
+HLVM_EXTERN_VAR VkAllocationCallbacks* VULKAN_CPU_ALLOCATOR;
 
 class VulkanLoader
 {

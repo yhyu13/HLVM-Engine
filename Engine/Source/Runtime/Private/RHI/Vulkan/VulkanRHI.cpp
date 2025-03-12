@@ -9,7 +9,7 @@ DECLARE_LOG_CATEGORY(LogVulkanRHI)
 // TODO : Refactory these static method into each vulkan class
 namespace
 {
-	HLVM_STATIC_VAR bool bUseValidationLayers = VK_ENABLE_VALIDATION_LAYERS;
+	HLVM_STATIC_VAR bool bUseValidationLayers = VULKAN_ENABLE_VALIDATION_LAYERS;
 
 	HLVM_STATIC_VAR const TVector<const char*> validationLayers = {
 		"VK_LAYER_KHRONOS_validation" // 开启可用的校验层, extend if will
@@ -29,7 +29,7 @@ namespace
 		VkResult result = vkEnumerateInstanceExtensionProperties(pLayerName, &extCount, nullptr);
 		if (result != VK_SUCCESS)
 		{
-			HLVM_LOG(LogVulkanRHI, err, TXT("vkEnumerateInstanceExtensionProperties failed to get extension count. VkResult = {}"), VK_RESULT_TO_TCHAR(result));
+			HLVM_LOG(LogVulkanRHI, err, TXT("vkEnumerateInstanceExtensionProperties failed to get extension count. VkResult = {}"), VULKAN_RESULT_TO_TCHAR(result));
 			return {};
 		}
 
@@ -37,7 +37,7 @@ namespace
 		result = vkEnumerateInstanceExtensionProperties(pLayerName, &extCount, extensionProperties.data());
 		if (result != VK_SUCCESS)
 		{
-			HLVM_LOG(LogVulkanRHI, err, TXT("vkEnumerateInstanceExtensionProperties failed to get extension properties. VkResult = {}"), VK_RESULT_TO_TCHAR(result));
+			HLVM_LOG(LogVulkanRHI, err, TXT("vkEnumerateInstanceExtensionProperties failed to get extension properties. VkResult = {}"), VULKAN_RESULT_TO_TCHAR(result));
 			return {};
 		}
 		return extensionProperties;
@@ -344,7 +344,7 @@ namespace
 
 	HLVM_STATIC_FUNC void ResetBeforeInit()
 	{
-		bUseValidationLayers = VK_ENABLE_VALIDATION_LAYERS;
+		bUseValidationLayers = VULKAN_ENABLE_VALIDATION_LAYERS;
 		requiredExtensions = {};
 		deviceQueueFamilyIndices = {};
 	}
@@ -402,8 +402,12 @@ void FVulkanRHI::Init()
 void FVulkanRHI::Shutdown()
 {
 	VulkanViewport.Reset();
+	HLVM_LOG(LogTemp, info, TXT("VulkanViewport Shutdown!"));
+	// TODO manage VulkanSurface after viewport shutdown
 	LogicalDevice.Reset();
+	HLVM_LOG(LogTemp, info, TXT("LogicalDevice Shutdown!"));
 	PhysicalDevice.Reset();
+	HLVM_LOG(LogTemp, info, TXT("PhysicalDevice Shutdown!"));
 
 	// TODO : desotry every vulkan handle
 	vkDeviceWaitIdle(VulkanDevice);
@@ -411,13 +415,17 @@ void FVulkanRHI::Shutdown()
 	// Cleanup Vulkan resources
 	if (VulkanDevice)
 	{
-		vkDestroyDevice(VulkanDevice, nullptr);
+		vkDestroyDevice(VulkanDevice, VULKAN_CPU_ALLOCATOR);
 		VulkanDevice = VK_NULL_HANDLE;
 	}
-
+	if (bUseValidationLayers)
+	{
+		DestroyDebugUtilsMessengerEXT(VulkanInstance, DebugMessenger, VULKAN_CPU_ALLOCATOR);
+		DebugMessenger = VK_NULL_HANDLE;
+	}
 	if (VulkanInstance)
 	{
-		vkDestroyInstance(VulkanInstance, nullptr);
+		vkDestroyInstance(VulkanInstance, VULKAN_CPU_ALLOCATOR);
 		VulkanInstance = VK_NULL_HANDLE;
 	}
 }
@@ -755,7 +763,7 @@ void FVulkanRHI::CreateVulkanLogicalDevice()
 		createInfo.enabledLayerCount = 0;
 	}
 
-	VK_ENSURE(vkCreateDevice(VulkanPhysicalDevice, &createInfo, nullptr, &VulkanDevice));
+	VULKAN_ENSURE(vkCreateDevice(VulkanPhysicalDevice, &createInfo, nullptr, &VulkanDevice));
 	LogicalDevice = new FVulkanLogicalDevice(VulkanDevice);
 }
 
@@ -783,8 +791,8 @@ void FVulkanRHI::CreateVulkanMemoryAllocator()
 	allocatorCreateInfo.physicalDevice = VulkanPhysicalDevice;
 	allocatorCreateInfo.device = VulkanDevice;
 	allocatorCreateInfo.instance = VulkanInstance;
-	allocatorCreateInfo.pVulkanFunctions = &VMAVulkanFunctions;
-	vmaCreateAllocator(&allocatorCreateInfo, &VMAAllocator);
+	allocatorCreateInfo.pVulkanFunctions = &VULKAN_VMA_FUNCTIONS;
+	vmaCreateAllocator(&allocatorCreateInfo, &VULKAN_VMA_ALLOCATOR);
 }
 
 // Vulkan-specific resource creation
@@ -1218,7 +1226,7 @@ VkDeviceMemory FVulkanRHI::AllocateVulkanMemory(VkBuffer Buffer, EBufferUsageFla
 
 	VkBuffer	  buffer;
 	VmaAllocation allocation;
-	// vmaAllocateMemoryForBuffer(VMAAllocator, &bufferInfo, &allocInfo, &buffer, &allocation, nullptr);
+	// vmaAllocateMemoryForBuffer(VULKAN_VMA_ALLOCATOR, &bufferInfo, &allocInfo, &buffer, &allocation, nullptr);
 
 	VkDeviceMemory dm = nullptr;
 	return dm;
