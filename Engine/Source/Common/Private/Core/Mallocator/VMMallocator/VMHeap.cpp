@@ -262,7 +262,7 @@ void FVMHeap::Free(void* p)
 
 				if (CurrBlock->size < NextBlock->size)
 				{
-					// If we can should use cached free blocks, and add free block to cache blocks
+					// If we should use cached free blocks, and add free block to cache blocks
 					if (mCachedFreeBlocks.ShouldTryCachFreeBlock())
 					{
 						// Swap free head to next block so that we can put CurrBlock into cache block
@@ -294,7 +294,7 @@ void FVMHeap::Free(void* p)
 									mCachedFreeBlocks.bUseCachedFreeBlocks = true;
 								}
 
-								// Insert free block to right index
+								// Insert free block to the right index
 								auto	 size = CurrBlock->size;
 								FBlock** first = mCachedFreeBlocks.LowerBound(size);
 								mCachedFreeBlocks.Insert(first, CurrBlock);

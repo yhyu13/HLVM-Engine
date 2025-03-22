@@ -51,8 +51,8 @@ public:
 	 * @brief 泛型方法，返回从上次重置到现在的时间间隔，默认单位为秒
 	 * @return 时间间隔，单位为秒
 	 */
-	template <typename ratio = std::ratio<1>, typename ret_type = double>
-	inline ret_type Mark(bool reset = false) noexcept
+	template <typename Ratio = std::ratio<1>, typename RetType = double>
+	inline RetType Mark(bool reset = false) noexcept
 	{
 		auto now = std::chrono::steady_clock::now();
 		if (!m_init)
@@ -62,7 +62,7 @@ public:
 				m_init = true;
 				return 0;
 			}
-		ret_type ret = std::chrono::duration<ret_type, ratio>(now - m_last).count();
+		RetType ret = std::chrono::duration<RetType, Ratio>(now - m_last).count();
 		if (reset)
 			HLVM_UNLIKELY
 			{

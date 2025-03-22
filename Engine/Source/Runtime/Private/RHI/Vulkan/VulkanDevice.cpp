@@ -4,10 +4,10 @@
 
 #include "RHI/Vulkan/VulkanDevice.h"
 
-FVulkanPhysicalDevice::QueueFamilyIndices FVulkanPhysicalDevice::QueryQueueFamilyIndices(VkSurfaceKHR Surface)
+FVulkanPhysicalDevice::QueueFamilyIndices FVulkanPhysicalDevice::QueryQueueFamilyIndices(VkSurfaceKHR Surface, bool bFresh)
 {
 	if (auto iter = mSurfaceToQueueFamilyIndices.find(Surface);
-		iter != mSurfaceToQueueFamilyIndices.end() && iter->second.IsComplete())
+		!bFresh && iter != mSurfaceToQueueFamilyIndices.end() && iter->second.IsComplete())
 	{
 		return iter->second;
 	}
@@ -53,10 +53,10 @@ FVulkanPhysicalDevice::QueueFamilyIndices FVulkanPhysicalDevice::QueryQueueFamil
 	return indices;
 }
 
-FVulkanPhysicalDevice::SwapChainSupportDetails FVulkanPhysicalDevice::QuerySwapChainSupport(VkSurfaceKHR Surface)
+FVulkanPhysicalDevice::SwapChainSupportDetails FVulkanPhysicalDevice::QuerySwapChainSupport(VkSurfaceKHR Surface, bool bFresh)
 {
 	if (auto iter = mSurfaceToSwapChainSupportDetails.find(Surface);
-		iter != mSurfaceToSwapChainSupportDetails.end() && iter->second.IsComplete())
+		!bFresh && iter != mSurfaceToSwapChainSupportDetails.end() && iter->second.IsComplete())
 	{
 		return iter->second;
 	}

@@ -6,24 +6,24 @@
 
 FVulkanViewport::~FVulkanViewport()
 {
-	delete mSwapChain;
+	mSwapChain.Reset();
 }
 
 void FVulkanViewport::Resize(const FUIntVec2& NewDimensions)
 {
-	FVulkanSwapChain::FRecreateInfo InOutCreateInfo;
-	mSwapChain->DestroySwapChain(&InOutCreateInfo);
+	FVulkanSwapChain::FRecreateInfo ReCreateInfo;
+	mSwapChain->DestroySwapChain(&ReCreateInfo);
 	mSwapChain->OwnerViewport = nullptr; // Release ownership to prevent swapchain calling destroy twice
-	delete mSwapChain;
-	mSwapChain = nullptr;
+	mSwapChain.Reset();
 
 	CreateDesc.Dimensions = NewDimensions;
-	CreateSwapChain(InOutCreateInfo);
+	CreateSwapChain(ReCreateInfo);
 }
 
 void FVulkanViewport::Present()
 {
 }
+
 void FVulkanViewport::CreateSwapChain(FVulkanSwapChain::FRecreateInfo& InCreateInfo)
 {
 	HLVM_ASSERT(mSwapChain == nullptr);

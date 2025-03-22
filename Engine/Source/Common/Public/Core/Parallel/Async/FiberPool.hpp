@@ -1,5 +1,6 @@
 // FiberPool based on:
 // http://roar11.com/2016/01/a-platform-independent-thread-pool-using-c14/
+// Include just to test benchmark
 
 #pragma once
 
@@ -7,7 +8,6 @@
 
 namespace FiberPool
 {
-
 	inline auto
 	no_of_defualt_threads()
 	{

@@ -127,7 +127,7 @@ public:
 		else
 			HLVM_LIKELY
 			{
-				auto NewNode = std::construct_at(R_C(QueueNodeType*, Mallocator.allocate()), CopyTemp(item));
+				QueueNodeType* NewNode = std::construct_at(R_C(QueueNodeType*, Mallocator.allocate()), CopyTemp(item));
 				PushInternal(NewNode);
 				return true;
 			}
@@ -149,7 +149,7 @@ public:
 		else
 			HLVM_LIKELY
 			{
-				auto NewNode = std::construct_at(R_C(QueueNodeType*, Mallocator.allocate()), MoveTemp(item));
+				QueueNodeType* NewNode = std::construct_at(R_C(QueueNodeType*, Mallocator.allocate()), MoveTemp(item));
 				PushInternal(NewNode);
 				return true;
 			}

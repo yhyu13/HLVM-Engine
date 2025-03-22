@@ -161,29 +161,37 @@ public:
 
 	T* operator->() noexcept
 	{
-		auto bValid = Valid();
-		HLVM_ASSERT_F(bValid, TXT("TRefCountPtr nullptr error!"));
+		if constexpr (!HLVM_BUILD_RELEASE)
+		{
+			HLVM_ENSURE_F(Valid(), TXT("TRefCountPtr nullptr error!"));
+		}
 		return m_ptr;
 	}
 
 	T& operator*() noexcept
 	{
-		auto bValid = Valid();
-		HLVM_ASSERT_F(bValid, TXT("TRefCountPtr nullptr error!"));
+		if constexpr (!HLVM_BUILD_RELEASE)
+		{
+			HLVM_ENSURE_F(Valid(), TXT("TRefCountPtr nullptr error!"));
+		}
 		return *m_ptr;
 	}
 
 	const T* operator->() const noexcept
 	{
-		auto bValid = Valid();
-		HLVM_ASSERT_F(bValid, TXT("TRefCountPtr nullptr error!"));
+		if constexpr (!HLVM_BUILD_RELEASE)
+		{
+			HLVM_ENSURE_F(Valid(), TXT("TRefCountPtr nullptr error!"));
+		}
 		return m_ptr;
 	}
 
 	const T& operator*() const noexcept
 	{
-		auto bValid = Valid();
-		HLVM_ASSERT_F(bValid, TXT("TRefCountPtr nullptr error!"));
+		if constexpr (!HLVM_BUILD_RELEASE)
+		{
+			HLVM_ENSURE_F(Valid(), TXT("TRefCountPtr nullptr error!"));
+		}
 		return *m_ptr;
 	}
 
@@ -200,7 +208,7 @@ public:
 	}
 
 	template <bool bValidate = !HLVM_BUILD_RELEASE>
-	HLVM_NODISCARD const T* Get() const noexcept
+	HLVM_NODISCARD T* Get() const noexcept
 	{
 		if constexpr (bValidate)
 		{
@@ -215,6 +223,35 @@ public:
 	}
 
 	HLVM_NODISCARD bool Valid() const noexcept
+	{
+		return m_ptr != nullptr;
+	}
+
+	HLVM_NODISCARD operator bool() const noexcept
+	{
+		return Valid();
+	}
+
+	// compare opeartor
+	template <class U>
+	HLVM_NODISCARD bool operator==(const TRefCountPtr<U>& other) const noexcept
+	{
+		static_assert(std::is_same_v<T, U>, "TRefCountPtr Polymorphism Casting not allowed!");
+		return m_ptr == other.m_ptr;
+	}
+	template <class U>
+	HLVM_NODISCARD bool operator!=(const TRefCountPtr<U>& other) const noexcept
+	{
+		static_assert(std::is_same_v<T, U>, "TRefCountPtr Polymorphism Casting not allowed!");
+		return m_ptr != other.m_ptr;
+	}
+
+	// compare with nullptr
+	HLVM_NODISCARD bool operator==(std::nullptr_t) const noexcept
+	{
+		return m_ptr == nullptr;
+	}
+	HLVM_NODISCARD bool operator!=(std::nullptr_t) const noexcept
 	{
 		return m_ptr != nullptr;
 	}

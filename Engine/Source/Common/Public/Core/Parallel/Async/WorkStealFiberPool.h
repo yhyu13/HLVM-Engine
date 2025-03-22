@@ -7,7 +7,7 @@
 #ifndef HLVM_ENABLE_BOOST_FIBER_POOL
 	/**
 	 * Boost fiber pool segfaults on Ubuntu20.04 x64 with Mimalloc for no apparent reasons, so disable it
-	 * Also codes in this file maybe deprecated
+	 * Also codes in this file is deprecated
 	 */
 	#define HLVM_ENABLE_BOOST_FIBER_POOL 0
 #endif

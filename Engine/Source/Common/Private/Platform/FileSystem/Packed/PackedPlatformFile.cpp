@@ -121,7 +121,8 @@ FPackedEntryQuickFind FPackedPlatformFile::QuickFindPackedEntry(const FPath& pat
 	 */
 	{
 		ATOMIC_LOCK_GUARD(mPackedEntryQuickFindMapLock);
-		HLVM_MAP_FIND(mPackedEntryQuickFindMap, path.GetHash())
+		if (auto iter = mPackedEntryQuickFindMap.find(path.GetHash());
+			iter != mPackedEntryQuickFindMap.end())
 		{
 			return iter->second;
 		}
@@ -131,7 +132,8 @@ FPackedEntryQuickFind FPackedPlatformFile::QuickFindPackedEntry(const FPath& pat
 	 */
 	for (auto& packed_file_handle : mMountedPackedFileHandles)
 	{
-		HLVM_MAP_FIND(packed_file_handle->mTokenEntryFragmentMap, path.GetHash())
+		if (auto iter = packed_file_handle->mTokenEntryFragmentMap.find(path.GetHash());
+			iter != packed_file_handle->mTokenEntryFragmentMap.end())
 		{
 			auto Data = &(iter->second.Data);
 			auto RefCount = &(packed_file_handle->mPackedEntryRefCount);

@@ -18,7 +18,7 @@ public:
 
 	FDelegate() = default;
 
-	void Add(std::function<void(Args...)>&& func)
+	void Add(FuncType&& func)
 	{
 		functions.push_back(func);
 	}

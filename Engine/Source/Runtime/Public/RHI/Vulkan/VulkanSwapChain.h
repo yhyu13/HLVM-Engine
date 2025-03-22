@@ -9,7 +9,7 @@
 
 class FVulkanViewport;
 
-class FVulkanSwapChain
+class FVulkanSwapChain : public FRefCountable
 {
 public:
 	struct FRecreateInfo
@@ -23,6 +23,7 @@ public:
 		: OwnerViewport(InOwnerViewport)
 	{
 		CreateSwapChain(InCreateInfo);
+		CreateImageViews();
 	}
 	~FVulkanSwapChain();
 
@@ -32,6 +33,7 @@ private:
 	VkSurfaceFormatKHR ChooseSwapSurfaceFormat(const TVector<VkSurfaceFormatKHR>& availableFormats);
 	VkPresentModeKHR   ChooseSwapPresentMode(const TVector<VkPresentModeKHR>& availablePresentModes);
 	VkExtent2D		   ChooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities);
+	void			   CreateImageViews();
 
 private:
 	friend class FVulkanViewport;
@@ -40,9 +42,14 @@ private:
 	VkSwapchainKHR				swapChain;
 	VkFormat					swapChainImageFormat;
 	VkExtent2D					swapChainExtent;
-	TVector<VkImage>			swapChainImages;		 // 交换链图像句柄
+	TVector<VkImage>			swapChainImages;	   // 交换链图像句柄
+	TVector<VkImageView>		swapChainImageViews;   // Vulkan对象，包括处于交换链，或者管线，都需要绑定一个VkImageView对象来访问它
+	TVector<VkFramebuffer>		swapChainFrameBuffers; // 添加一个集合存储帧缓冲对象
+
 #if VULKAN_SWAPCHAIN_USE_IMAGE_FENCE
-	TVector<FVulkanFenceRef>			imageAcquiredFences;	 // 用于绘制的同步变量
+	TVector<FVulkanFenceRef> imageAcquiredFences; // 用于绘制的同步变量
 #endif
-	TVector<FVulkanSemaphoreRef>		imageAcquiredSemaphores; // 用于绘制的同步变量
+	TVector<FVulkanSemaphoreRef> imageAcquiredSemaphores; // 用于绘制的同步变量
 };
+
+using FVulkanSwapChainRef = TRefCountPtr<FVulkanSwapChain>;

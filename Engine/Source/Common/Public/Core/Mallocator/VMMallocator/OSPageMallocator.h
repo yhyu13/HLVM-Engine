@@ -32,31 +32,35 @@ public:
 
 	~FOSPageMallocator() noexcept
 	{
+		// Free all small heap
 		{
-			auto Small = mSmallHeapChainHead;
+			FSmallHeapChain* Small = mSmallHeapChainHead;
 			while (Small)
 			{
-				auto tmp = Small->Next;
+				FSmallHeapChain* Next = Small->Next;
 				std::destroy_at(Small);
 				try
 				{
+					// Since we are under no except, we have to catch exception thrown by ensure
 					HLVM_ENSURE_F(HLVM_LOW_GMALLOC_TLS.FreeAligned(Small, sizeof(FSmallHeapChain)) == EFreeRetType::Success,
 						TXT("~FOSPageMallocator small failed {}"), R_C(void*, Small));
 				}
 				catch (...)
 				{
 				}
-				Small = tmp;
+				Small = Next;
 			}
 		}
+		// Free all large heap
 		{
-			auto Large = mLargeHeapChainHead;
+			FLargeHeapChain* Large = mLargeHeapChainHead;
 			while (Large)
 			{
-				auto Next = Large->Next;
+				FLargeHeapChain* Next = Large->Next;
 				std::destroy_at(Large);
 				try
 				{
+					// Since we are under no except, we have to catch exception thrown by ensure
 					HLVM_ENSURE_F(HLVM_LOW_GMALLOC_TLS.Free(Large) == EFreeRetType::Success,
 						TXT("~FOSPageMallocator large failed {}"), R_C(void*, Large));
 				}
@@ -71,7 +75,7 @@ public:
 	bool Owned(void* ptr) const noexcept
 	{
 		{
-			auto Large = mLargeHeapChainHead;
+			FLargeHeapChain* Large = mLargeHeapChainHead;
 			while (Large)
 			{
 				if (Large->Heap->Owned(ptr))
@@ -82,7 +86,7 @@ public:
 			}
 		}
 		{
-			auto Small = mSmallHeapChainHead;
+			FSmallHeapChain* Small = mSmallHeapChainHead;
 			while (Small)
 			{
 				if (Small->InlineMallocator.Owned(ptr))
@@ -100,8 +104,8 @@ public:
 	 */
 	void* MallocSmall(size_t size)
 	{
-		void* p = nullptr;
-		auto  Small = mSmallHeapChainHead;
+		void*			 p = nullptr;
+		FSmallHeapChain* Small = mSmallHeapChainHead;
 		while (!p && Small)
 		{
 			p = Small->InlineMallocator.Malloc(size);
@@ -125,7 +129,7 @@ public:
 
 	void FreeSmall(void* ptr)
 	{
-		auto Small = mSmallHeapChainHead;
+		FSmallHeapChain* Small = mSmallHeapChainHead;
 		while (Small)
 		{
 			if (Small->InlineMallocator.Owned(ptr))
@@ -141,7 +145,7 @@ public:
 	void* MallocLargeHeap()
 	{
 		void* p = nullptr;
-		auto  Large = mLargeHeapChainHead;
+		FLargeHeapChain*  Large = mLargeHeapChainHead;
 		while (!p && Large)
 		{
 			if (!Large->Heap)
@@ -165,7 +169,7 @@ public:
 	void FreeLargeHeap(void* ptr)
 	{
 		bool bFound = false;
-		auto Large = mLargeHeapChainHead;
+		FLargeHeapChain* Large = mLargeHeapChainHead;
 		while (!bFound && Large)
 		{
 			if (Large->Heap == ptr)
@@ -198,7 +202,7 @@ private:
 	{
 		// 48 bytes offset so that FSmallHeapChain is equal to HLVM_VMA_OSPAGE_SMALL_HEAP_SIZE
 		TStackMallocator<HLVM_VMA_OSPAGE_SMALL_HEAP_SIZE - 48, true, false, false, true> InlineMallocator;
-		FSmallHeapChain*														  Next{ nullptr };
+		FSmallHeapChain*																 Next{ nullptr };
 	};
 	static_assert(sizeof(FSmallHeapChain) == HLVM_VMA_OSPAGE_SMALL_HEAP_SIZE, "SmallHeap size must be HLVM_VMA_OSPAGE_SMALL_HEAP_SIZE");
 	/**

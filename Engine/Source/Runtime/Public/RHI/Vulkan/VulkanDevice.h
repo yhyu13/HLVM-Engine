@@ -63,10 +63,10 @@ public:
 	}
 
 	// 查询并返回队列族索引
-	QueueFamilyIndices QueryQueueFamilyIndices(VkSurfaceKHR Surface);
+	QueueFamilyIndices QueryQueueFamilyIndices(VkSurfaceKHR Surface, bool bFresh = false);
 
 	// 查询交换链支持的详细信息
-	SwapChainSupportDetails QuerySwapChainSupport(VkSurfaceKHR Surface);
+	SwapChainSupportDetails QuerySwapChainSupport(VkSurfaceKHR Surface, bool bFresh = false);
 
 private:
 	VkPhysicalDevice mDevice;

@@ -53,7 +53,7 @@ using TSet = phmap::flat_hash_set<T, std::hash<T>, std::equal_to<T>, Allocator>;
 template <typename T, typename Allocator = std::allocator<T>>
 using TStableSet = phmap::node_hash_set<T, std::hash<T>, std::equal_to<T>, Allocator>;
 
-#define HLVM_MAP_FIND(map, key)        \
+#define HLVM_MAP_FIND_IF(map, key)        \
 	if (auto iter = (map).find((key)); \
 		iter != (map).end())
 

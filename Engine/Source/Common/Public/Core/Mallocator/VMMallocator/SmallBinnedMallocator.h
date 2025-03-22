@@ -76,16 +76,23 @@ public:
 			/**
 			 * Validate Block is within our owned
 			 */
-			auto Temp = mFirstBlocks32;
-			while (Temp != nullptr)
+			auto Iter = mFirstBlocks32;
+			while (Iter != nullptr)
 			{
-				if (Temp == Block)
+				if (Iter == Block)
 				{
 					break;
 				}
-				Temp = Temp->Next;
+				Iter = Iter->Next;
 			}
-			assert(Temp != nullptr);
+			try
+			{
+				// Since we are under no except, we have to catch exception thrown by ensure
+				HLVM_ENSURE(Iter != nullptr);
+			}
+			catch (...)
+			{
+			}
 		}
 		mLastFreedBlocks32 = Block;
 		// Mask free bit

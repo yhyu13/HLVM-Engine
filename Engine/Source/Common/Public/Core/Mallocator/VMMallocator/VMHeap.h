@@ -96,8 +96,14 @@ private:
 	HLVM_INLINE_VAR HLVM_STATIC_VAR constexpr SizeType Minimal_Block_Size = HLVM_VMA_SMALL_BINNED_ALLOC_THRESHOLD;
 
 	/**
-	 * Cached free blocks, used to reduce the number of internal malloc/free calls
-	 * (because we have to sort free list to find the best fit for internal malloc/free which cost time)
+	 * Cached free blocks for reuse in order to reduce the number of internal malloc/free calls introduced by sorting free list to find the best fit
+	 * This code defines a CachedFreeBlocks struct that manages a cache of free memory blocks. Key functionalities include:
+		ShouldTryCachFreeBlock: Determines if caching is enabled and if there's space in the cache.
+		Head/Tail/Num: Provide access to the start, end, and count of cached blocks.
+		LowerBound: Implements a binary search to find the best-fitting block for a given size.
+		Insert: Inserts a new block into the cache while maintaining sorted order.
+		Erase: Removes a block from the cache and updates the state.
+		Validate: Ensures structural integrity of the cache.
 	 */
 	struct CachedFreeBlocks
 	{
@@ -138,13 +144,13 @@ private:
 				TUINT8 step;
 				while (count > 0)
 				{
-					auto it = first;
+					FBlock** iter = first;
 					step = count / 2;
-					it += step;
-					HLVM_CONSTEXPR_ASSERT(bValidate, (*it)->size > 0);
-					if (size >= (*it)->size)
+					iter += step;
+					HLVM_CONSTEXPR_ASSERT(bValidate, (*iter)->size > 0);
+					if (size >= (*iter)->size)
 					{
-						first = it + 1;
+						first = iter + 1;
 						count -= step + 1;
 					}
 					else
@@ -197,7 +203,7 @@ private:
 		void Erase(FBlock** first)
 		{
 			// Remove the block;
-			auto block = *first;
+			FBlock* block = *first;
 			block->bCached = false;
 
 			auto index = S_C(TUINT8, first - CachedFreeBlocks);

@@ -81,7 +81,7 @@ struct FCoreDescription
 /**
  * One to One thread affinity mask
  * i.e. each thread is assigned to a single corresponding core
- * e.g. Number of threads is 4, and 4 cores are targeted, each thread is assigned to a corresponding targeted core
+ * e.g. Number of threads is 4, and 4 cores are targeted, each thread is assigned to a corresponding core, e.g. 0 to 0th core, 1 to 1th core
  */
 struct FThreadAffinityMode1
 {
@@ -105,7 +105,7 @@ struct FThreadAffinityMode1
 /**
  * Many to Many thread affinity mask
  * i.e. each thread can be assigned to any targeted core
- * e.g. Number of threads is 4, and 4 cores are targeted, each thread can be assigned to among all of the 4 cores on OS's command
+ * e.g. Number of threads is 4, and 4 cores are targeted, 0 1 2 3 threads can be assigned to 0th 1th 2th 3th cores in random order
  */
 struct FThreadAffinityMode2
 {
@@ -129,7 +129,7 @@ struct FThreadAffinityMode2
 /**
  * Specific thread ids to Specific thread affinity mask
  * i.e. each thread is assigned to a specific group of targeted cores
- * e.g. Number of threads is 4, and 4 cores are targeted, thread 0, 1 to 0th, 1th p1 cores, thread 2,3 thread to 2th, 3th m1 cores, etc
+ * e.g. Number of threads is 4, and 4 cores are targeted, thread 0, 1 to 0th, 1th cores, thread 2,3 thread to 2th, 3th cores, etc
  */
 struct FThreadAffinityMode3
 {

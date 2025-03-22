@@ -22,10 +22,6 @@ void FVulkanSwapChain::DestroySwapChain(TNullablePtr<FRecreateInfo> OutCreateInf
 		OutCreateInfo->OldSwapChain = swapChain;
 		OutCreateInfo->Surface = surface;
 	}
-	else
-	{
-		vkDestroySwapchainKHR(device, swapChain, VULKAN_CPU_ALLOCATOR);
-	}
 
 	// Release fence, release semaphre
 #if VULKAN_SWAPCHAIN_USE_IMAGE_FENCE
@@ -33,9 +29,25 @@ void FVulkanSwapChain::DestroySwapChain(TNullablePtr<FRecreateInfo> OutCreateInf
 #endif
 	imageAcquiredSemaphores.clear();
 
-	// Destory surface? TODO : create a manger class for surface and remove ref count by 1 here
+	// Destroy framebuffer
+	for (auto framebuffer : swapChainFrameBuffers)
+	{
+		vkDestroyFramebuffer(device, framebuffer, VULKAN_CPU_ALLOCATOR);
+	}
+	swapChainFrameBuffers.clear();
+	// Destroy image view
+	for (auto imageView : swapChainImageViews)
+	{
+		vkDestroyImageView(device, imageView, VULKAN_CPU_ALLOCATOR);
+	}
+	swapChainImageViews.clear();
+	swapChainImages.clear();
+
+	// Destroy surface not created by swapchain? The surface is actually created by GLFW3 vulkan window class
+	// TODO : create a manger class for surface and remove ref count by 1 here
 	if (!bRecreate)
 	{
+		vkDestroySwapchainKHR(device, swapChain, VULKAN_CPU_ALLOCATOR);
 		vkDestroySurfaceKHR(OwnerViewport->Instance, surface, VULKAN_CPU_ALLOCATOR);
 	}
 }
@@ -46,7 +58,7 @@ void FVulkanSwapChain::CreateSwapChain(TNoNullPtr<FRecreateInfo> InCreateInfo)
 	VkDevice device = OwnerViewport->LogicalDevice->Get();
 	surface = InCreateInfo->Surface;
 
-	FVulkanPhysicalDevice::SwapChainSupportDetails swapChainSupport = physicalDevice->QuerySwapChainSupport(surface);
+	FVulkanPhysicalDevice::SwapChainSupportDetails swapChainSupport = physicalDevice->QuerySwapChainSupport(surface, true);
 	VkSurfaceFormatKHR							   surfaceFormat = ChooseSwapSurfaceFormat(swapChainSupport.formats);
 	VkPresentModeKHR							   presentMode = ChooseSwapPresentMode(swapChainSupport.presentModes);
 	VkExtent2D									   extent = ChooseSwapExtent(swapChainSupport.capabilities);
@@ -83,6 +95,8 @@ void FVulkanSwapChain::CreateSwapChain(TNoNullPtr<FRecreateInfo> InCreateInfo)
 		createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE; // 如果相同，图像在同一时间只能被一个队列拥有，性能最佳
 	}
 
+	// TODO : 旋转屏幕 on android can be left for app to rotate the surface instead of leting vulkan driver do it
+	// which is an optimization for memory bandwidth on mobile devices, checkout UE5 Vulkan pretransform
 	createInfo.preTransform = swapChainSupport.capabilities.currentTransform;
 	createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR; // 忽略alpha通道
 	createInfo.presentMode = presentMode;
@@ -92,10 +106,7 @@ void FVulkanSwapChain::CreateSwapChain(TNoNullPtr<FRecreateInfo> InCreateInfo)
 		createInfo.oldSwapchain = InCreateInfo->OldSwapChain;
 	}
 
-	if (vkCreateSwapchainKHR(device, &createInfo, VULKAN_CPU_ALLOCATOR, &swapChain) != VK_SUCCESS)
-	{
-		throw std::runtime_error("Failed to create swap chain!");
-	}
+	VULKAN_ENSURE(vkCreateSwapchainKHR(device, &createInfo, VULKAN_CPU_ALLOCATOR, &swapChain));
 
 	vkGetSwapchainImagesKHR(device, swapChain, &imageCount, nullptr);
 	swapChainImages.resize(imageCount);
@@ -104,8 +115,7 @@ void FVulkanSwapChain::CreateSwapChain(TNoNullPtr<FRecreateInfo> InCreateInfo)
 	swapChainImageFormat = surfaceFormat.format;
 	swapChainExtent = extent;
 
-	// init fense and semaphore
-	// Release fence, release semaphre
+	// init fence and semaphore
 #if VULKAN_SWAPCHAIN_USE_IMAGE_FENCE
 	HLVM_ASSERT(imageAcquiredFences.size() == 0);
 	imageAcquiredFences.resize(imageCount);
@@ -170,5 +180,31 @@ VkExtent2D FVulkanSwapChain::ChooseSwapExtent(const VkSurfaceCapabilitiesKHR& ca
 		actualExtent.width = std::max(capabilities.minImageExtent.width, std::min(capabilities.maxImageExtent.width, actualExtent.width));
 		actualExtent.height = std::max(capabilities.minImageExtent.height, std::min(capabilities.maxImageExtent.height, actualExtent.height));
 		return actualExtent;
+	}
+}
+
+void FVulkanSwapChain::CreateImageViews()
+{
+	VkDevice   device = OwnerViewport->LogicalDevice->Get();
+	swapChainImageViews.resize(swapChainImages.size());
+	// 遍历创建ImageView---图像视图，该图像可以作为纹理使用，但是作为渲染目标，还需要帧缓冲对象
+	for (size_t i = 0; i < swapChainImages.size(); i++)
+	{
+		VkImageViewCreateInfo createInfo{};
+		createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+		createInfo.image = swapChainImages[i];
+		createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;			 // viewType和fromat成员变量用于指定图像数据的解释方式
+		createInfo.format = swapChainImageFormat;				 // 一维纹理、二维纹理、三维纹理或者立方体贴图
+		createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY; // 用于图像颜色通道映射，保持默认即可
+		createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+		createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+		createInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+		createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT; // 用于指定图像的用途和图像哪一部分可以被访问
+		createInfo.subresourceRange.baseMipLevel = 0;						// 此处图像用作渲染，没有细分级别，只存在一个图层
+		createInfo.subresourceRange.levelCount = 1;							// 不是VR应用，可以保持默认
+		createInfo.subresourceRange.baseArrayLayer = 0;
+		createInfo.subresourceRange.layerCount = 1;
+
+		VULKAN_ENSURE(vkCreateImageView(device, &createInfo, VULKAN_CPU_ALLOCATOR, &swapChainImageViews[i]));
 	}
 }

@@ -7,7 +7,7 @@
 #include "GlobalDefinition.h"
 
 #include "lua.hpp"
-static_assert(LUA_VERSION_NUM == 501, "hlvm_lua only support lua 5.1");
+static_assert(LUA_VERSION_NUM == 501, "hlvm only support lua 5.1");
 
 /**
  * Sol config and safety:
@@ -32,6 +32,9 @@ static_assert(SOL_LUA_VERSION == 501, "hlvm_lua only support lua 5.1");
 
 DECLARE_LOG_CATEGORY(LogLua)
 
+/**
+ * lua helper methods
+ */
 namespace hlvm_lua
 {
 	// TODO : use a lua specific memory allocator?
@@ -59,7 +62,7 @@ namespace hlvm_lua
 
 	HLVM_MAYBEUNUSED HLVM_INLINE_FUNC lua_State* lua_newstate_alloc()
 	{
-		auto L = lua_newstate(lua_alloc, nullptr);
+		lua_State*  L = lua_newstate(lua_alloc, nullptr);
 		if (L)
 		{
 			lua_atpanic(L, lua_panic);
