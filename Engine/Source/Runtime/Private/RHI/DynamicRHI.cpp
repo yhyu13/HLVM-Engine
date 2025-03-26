@@ -5,4 +5,4 @@
 #include "RHI/DynamicRHI.h"
 
 // Extern
-FDynamicRHI* GDynamicRHI = nullptr;
+TNoNullablePtr<FDynamicRHI> GDynamicRHI;

@@ -260,6 +260,7 @@ struct FRHIViewportCreateDesc
 	ERHIViewportType ViewportType; // Type of the viewport (e.g., windowed, fullscreen)
 	EPixelFormat	 Format;	   // Pixel format of the viewport's back buffer
 	IWindow*		 NativeWindowHandle;
+	bool			 bHeadlessRendering;
 
 	// Default constructor
 	FRHIViewportCreateDesc() = default;
@@ -267,15 +268,17 @@ struct FRHIViewportCreateDesc
 	// Constructor for easy initialization
 	FRHIViewportCreateDesc(
 		const FString&	 InDebugName,
-		const FUIntVec2&	 InDimensions,
+		const FUIntVec2& InDimensions,
 		ERHIViewportType InViewportType = ERHIViewportType::Fullscreen,
 		EPixelFormat	 InFormat = EPixelFormat::R8G8B8A8_UNorm,
-		IWindow*		 InWindowHandle = nullptr)
+		IWindow*		 InWindowHandle = nullptr,
+		bool             InHeadlessRendering = false)
 		: DebugName(InDebugName)
 		, Dimensions(InDimensions)
 		, ViewportType(InViewportType)
 		, Format(InFormat)
 		, NativeWindowHandle(InWindowHandle)
+		, bHeadlessRendering(InHeadlessRendering)
 	{
 	}
 };

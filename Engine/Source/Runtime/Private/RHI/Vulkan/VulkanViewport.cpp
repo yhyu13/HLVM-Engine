@@ -4,28 +4,69 @@
 
 #include "RHI/Vulkan/VulkanViewport.h"
 
+FVulkanBackBuffer::FVulkanBackBuffer(VkImage InImage, const FRHITextureCreateDesc& InCreateDesc, FVulkanViewport* InViewport)
+	: FVulkanTexture(InImage, InCreateDesc),
+	OwnerViewport(InViewport)
+{
+	// Vulkan back buffer holds a image from swapchain and we don't own it
+	OwnerShip = EOwnerShip::None;
+}
+
+FVulkanBackBuffer::~FVulkanBackBuffer()
+{
+	Image = VK_NULL_HANDLE;
+}
+
 FVulkanViewport::~FVulkanViewport()
 {
-	mSwapChain.Reset();
+	SwapChain.Reset();
 }
 
 void FVulkanViewport::Resize(const FUIntVec2& NewDimensions)
 {
-	FVulkanSwapChain::FRecreateInfo ReCreateInfo;
-	mSwapChain->DestroySwapChain(&ReCreateInfo);
-	mSwapChain->OwnerViewport = nullptr; // Release ownership to prevent swapchain calling destroy twice
-	mSwapChain.Reset();
+	// Reset back buffer
+	IntermediateBackBuffer.Reset();
+	RHIBackBuffer.Reset();
 
-	CreateDesc.Dimensions = NewDimensions;
-	CreateSwapChain(ReCreateInfo);
-}
+	// Recreate swapchain
+	if (ShouldUseStandardSwapChain())
+	{
+		HLVM_ASSERT(SwapChain != nullptr);
+		FVulkanSwapChain::FRecreateInfo ReCreateInfo;
+		SwapChain->DestroySwapChain(&ReCreateInfo);
+		SwapChain->OwnerViewport = nullptr; // Release ownership to prevent swapchain calling destroy twice
+		SwapChain.Reset();
 
-void FVulkanViewport::Present()
-{
+		CreateDesc.Dimensions = NewDimensions;
+		CreateSwapChain(ReCreateInfo);
+
+		HLVM_ASSERT(SwapChain->swapChainExtent.width == NewDimensions.x && SwapChain->swapChainExtent.height == NewDimensions.y);
+	}
 }
 
 void FVulkanViewport::CreateSwapChain(FVulkanSwapChain::FRecreateInfo& InCreateInfo)
 {
-	HLVM_ASSERT(mSwapChain == nullptr);
-	mSwapChain = new FVulkanSwapChain(this, &InCreateInfo);
+	if (ShouldUseStandardSwapChain())
+	{
+		HLVM_ASSERT(SwapChain == nullptr);
+		SwapChain = new FVulkanSwapChain(this, &InCreateInfo);
+	}
+}
+
+bool FVulkanViewport::ShouldUseStandardSwapChain() const
+{
+	return !CreateDesc.bHeadlessRendering;
+}
+
+bool FVulkanViewport::AcquireNextImageIndex()
+{
+	if (SwapChain)
+	{
+		if (!!SwapChain->AcquireNextImageIndex(SwapChainImageIndex, ImageAcquireSemaphore)
+			&& SwapChainImageIndex != TUINT32_MAX && ImageAcquireSemaphore)
+		{
+			return true;
+		}
+	}
+	return false;
 }

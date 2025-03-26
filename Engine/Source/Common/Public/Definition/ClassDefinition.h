@@ -33,11 +33,11 @@
 #define C_C(type, value) const_cast<type>((value))
 #define R_C(type, value) reinterpret_cast<type>((value))
 
-#define M_S(type, value) std::make_shared<type>((value))
-#define M_U(type, value) std::make_unique<type>((value))
+#define MAKE_SHARED(type, value) std::make_shared<type>((value))
+#define MAKE_UNIQUE(type, value) std::make_unique<type>((value))
 
 template<typename T>
-using SharedCount = std::shared_ptr<T>;
+using SharedRefCountPtr = std::shared_ptr<T>;
 
 template<typename T>
-using UniqueCount = std::unique_ptr<T>;
+using UniqueRefCountPtr = std::unique_ptr<T>;

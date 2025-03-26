@@ -1252,24 +1252,21 @@ RECORD_BOOL(test_GLFW3VulkanWindow)
 	IWindow::FProperties Properties;
 	Properties.Resizable = false;
 	Properties.Mode = IWindow::EDisplayMode::Windowed;
-	SharedCount<FGLFW3Vulkan> Window = M_S(FGLFW3Vulkan, Properties);
-	HLVM_LOG(LogTest, info, TXT("FGLFW3Vulkan created!"));
+	SharedRefCountPtr<FGLFW3Vulkan> Window = MAKE_SHARED(FGLFW3Vulkan, Properties);
+	HLVM_LOG(LogTest, debug, TXT("FGLFW3Vulkan created!"));
 
-	UniqueCount<FVulkanRHI> VulkanRHI = nullptr;
+	UniqueRefCountPtr<FVulkanRHI> VulkanRHI = nullptr;
 	{
 		// Vulkan rhi init
 		FVulkanRHI::FInitializer Initializer;
 		Initializer.RequiredExtensions = { Window->GetRequiredExtensions() };
 		Initializer.CreateSurfaceFunc = [&Window](VkInstance Instance){ return Window->CreateSurface(Instance); };
-		VulkanRHI = M_U(FVulkanRHI, Initializer);
-		HLVM_LOG(LogTest, info, TXT("VulkanRHI created!"));
+		VulkanRHI = MAKE_UNIQUE(FVulkanRHI, Initializer);
 		// Set GDynamicRHI before init
 		SetDynamicRHI(VulkanRHI.get());
 		VulkanRHI->Init();
-		HLVM_LOG(LogTest, info, TXT("VulkanRHI Init!"));
 	}
 	VulkanRHI->Shutdown();
-	HLVM_LOG(LogTest, info, TXT("VulkanRHI Shutdown!"));
 
 	/*
 	 * initWindow();

@@ -361,6 +361,7 @@ FVulkanRHI::FVulkanRHI(const FVulkanRHI::FInitializer& Params)
 			requiredExtensions.push_back(extension.ToCharCStr());
 		}
 	}
+	HLVM_LOG(LogVulkanRHI, debug, TXT("VulkanRHI created!"));
 }
 
 // Initialization and Shutdown
@@ -376,38 +377,23 @@ void FVulkanRHI::Init()
 	CreateVulkanPhysicalDevice();
 	CreateVulkanLogicalDevice();
 	CreateVulkanQueues();
-	// TODO : Create Vulkan SwapChain and so on
-
-	FRHIViewportCreateDesc ViewportDesc;
-	ViewportDesc.DebugName = "Main Viewport";
-	ViewportDesc.Dimensions = FUIntVec2{800, 600};
-	ViewportDesc.ViewportType = ERHIViewportType::Fullscreen;
-	ViewportDesc.Format = EPixelFormat::R8G8B8A8_UNorm;
-	ViewportDesc.NativeWindowHandle = nullptr;
-	FVulkanMinimalContext Context {
-		VulkanInstance,
-		PhysicalDevice.Get(),
-		LogicalDevice.Get()
-	};
-	VulkanViewport = new FVulkanViewport(ViewportDesc, Context);
-	FVulkanSwapChain::FRecreateInfo RecreateInfo;
-	RecreateInfo.OldSwapChain = nullptr;
-	RecreateInfo.Surface = VulkanSurface;
-	VulkanViewport->CreateSwapChain(RecreateInfo);
+	CreateVulkanViewPort();
 
 	// Lastly, create Vulkan Memory Allocator
 	CreateVulkanMemoryAllocator();
+
+	HLVM_LOG(LogVulkanRHI, debug, TXT("VulkanRHI Init!"));
 }
 
 void FVulkanRHI::Shutdown()
 {
 	VulkanViewport.Reset();
-	HLVM_LOG(LogTemp, info, TXT("VulkanViewport Shutdown!"));
+	HLVM_LOG(LogVulkanRHI, debug, TXT("VulkanViewport Shutdown!"));
 	// TODO manage VulkanSurface after viewport shutdown
 	LogicalDevice.Reset();
-	HLVM_LOG(LogTemp, info, TXT("LogicalDevice Shutdown!"));
+	HLVM_LOG(LogVulkanRHI, debug, TXT("LogicalDevice Shutdown!"));
 	PhysicalDevice.Reset();
-	HLVM_LOG(LogTemp, info, TXT("PhysicalDevice Shutdown!"));
+	HLVM_LOG(LogVulkanRHI, debug, TXT("PhysicalDevice Shutdown!"));
 
 	// TODO : desotry every vulkan handle
 	vkDeviceWaitIdle(VulkanDevice);
@@ -428,6 +414,8 @@ void FVulkanRHI::Shutdown()
 		vkDestroyInstance(VulkanInstance, VULKAN_CPU_ALLOCATOR);
 		VulkanInstance = VK_NULL_HANDLE;
 	}
+
+	HLVM_LOG(LogVulkanRHI, debug, TXT("VulkanRHI Shutdown!"));
 }
 
 // Resource Creation
@@ -781,6 +769,27 @@ void FVulkanRHI::CreateVulkanQueues()
 
 	vkGetDeviceQueue(VulkanDevice, deviceQueueFamilyIndices.presentFamily, 0, &PresentQueue);
 	HLVM_ENSURE(PresentQueue != VK_NULL_HANDLE);
+}
+
+void FVulkanRHI::CreateVulkanViewPort()
+{
+	FRHIViewportCreateDesc ViewportDesc;
+	ViewportDesc.DebugName = TXT("Vulkan Viewport");
+	ViewportDesc.Dimensions = FUIntVec2{800, 600};
+	ViewportDesc.ViewportType = ERHIViewportType::Fullscreen;
+	ViewportDesc.Format = EPixelFormat::R8G8B8A8_UNorm;
+	ViewportDesc.NativeWindowHandle = nullptr;
+	FVulkanMinimalContext Context {
+		VulkanInstance,
+		PhysicalDevice.Get(),
+		LogicalDevice.Get()
+	};
+	VulkanViewport = new FVulkanViewport(ViewportDesc, Context);
+
+	FVulkanSwapChain::FRecreateInfo RecreateInfo;
+	RecreateInfo.OldSwapChain = nullptr;
+	RecreateInfo.Surface = VulkanSurface;
+	VulkanViewport->CreateSwapChain(RecreateInfo);
 }
 
 void FVulkanRHI::CreateVulkanMemoryAllocator()

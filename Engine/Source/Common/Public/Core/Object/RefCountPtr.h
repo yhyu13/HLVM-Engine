@@ -25,7 +25,10 @@ public:
 	TRefCountPtr(T* obj)
 		: m_ptr(obj)
 	{
-		m_ptr->IncrementRef();
+		if (m_ptr)
+		{
+			m_ptr->IncrementRef();
+		}
 	}
 
 	template <class U>
@@ -38,7 +41,10 @@ public:
 		else
 		{
 			m_ptr = static_cast<T*>(obj);
-			m_ptr->IncrementRef();
+			if (m_ptr)
+			{
+				m_ptr->IncrementRef();
+			}
 		}
 	}
 

@@ -23,6 +23,7 @@ public:
 		return GetDynamicRHI<FVulkanRHI>();
 	}
 
+	FVulkanRHI() = delete;
 	explicit FVulkanRHI(const FInitializer& Params);
 
 	// Initialization and Shutdown
@@ -129,6 +130,7 @@ protected:
 	void CreateVulkanPhysicalDevice();
 	void CreateVulkanLogicalDevice();
 	void CreateVulkanQueues();
+	void CreateVulkanViewPort();
 
 	void CreateVulkanMemoryAllocator();
 
@@ -174,7 +176,7 @@ private:
 	// Vulkan-specific members and methods
 	VkInstance				 VulkanInstance;
 	VkDebugUtilsMessengerEXT DebugMessenger;
-	VkSurfaceKHR			 VulkanSurface; // 用于显示的窗口句柄
+	VkSurfaceKHR			 VulkanSurface; // 用于显示的窗口句柄 // TODO, we should only let swapchain manage surface
 	VkDevice				 VulkanDevice;
 	VkPhysicalDevice		 VulkanPhysicalDevice;
 	VkQueue					 GraphicsQueue;

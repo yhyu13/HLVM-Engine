@@ -222,7 +222,7 @@ struct TPMRCustom
 	}
 
 private:
-	TNoNullPtr<IMallocator> Mallocator;
+	TNoNullablePtr<IMallocator> Mallocator;
 };
 
 template <class W, class U>

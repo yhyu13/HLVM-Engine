@@ -78,19 +78,15 @@ public:
 	virtual void RHISetScissorRect(bool bEnable, TUINT32 MinX, TUINT32 MinY, TUINT32 MaxX, TUINT32 MaxY) = 0;
 };
 
-HLVM_EXTERN_VAR FDynamicRHI* GDynamicRHI;
-
+HLVM_EXTERN_VAR TNoNullablePtr<FDynamicRHI> GDynamicRHI;
 template<typename T>
 HLVM_INLINE_FUNC void SetDynamicRHI(T* RHI)
 {
 	GDynamicRHI = D_C(FDynamicRHI*, RHI);
-	HLVM_ASSERT(GDynamicRHI);
 }
 
 template<typename T>
-HLVM_INLINE_FUNC T* GetDynamicRHI()
+HLVM_INLINE_FUNC TNoNullablePtr<T> GetDynamicRHI()
 {
-	auto RHI = D_C(T*, GDynamicRHI);
-	HLVM_ASSERT(RHI);
-	return RHI;
+	return D_C(T*, GDynamicRHI.Get());
 }

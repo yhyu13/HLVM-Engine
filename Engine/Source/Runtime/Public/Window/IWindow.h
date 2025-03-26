@@ -44,7 +44,7 @@ public:
 
 	struct FProperties
 	{
-		FString Title = TXT("Nameless Window");
+		FString Title = TXT("HLVM Window");
 		EDisplayMode Mode = EDisplayMode::Default;
 		bool	Resizable = true;
 		EVsync	VSync = EVsync::Default;

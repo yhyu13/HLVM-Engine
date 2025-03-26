@@ -10,7 +10,6 @@ FVulkanFence::FVulkanFence(FVulkanLogicalDeviceRef InDevice, bool InSignaled)
 	VkFenceCreateInfo fenceCreateInfo = {};
 	fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
 	fenceCreateInfo.flags = InSignaled ? VK_FENCE_CREATE_SIGNALED_BIT : 0;
-
 	VULKAN_ENSURE(vkCreateFence(Device->Get(), &fenceCreateInfo, VULKAN_CPU_ALLOCATOR, &Fence));
 }
 
@@ -34,7 +33,6 @@ FVulkanSemaphore::FVulkanSemaphore(FVulkanLogicalDeviceRef InDevice)
 {
 	VkSemaphoreCreateInfo semaphoreCreateInfo = {};
 	semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-
 	VULKAN_ENSURE(vkCreateSemaphore(Device->Get(), &semaphoreCreateInfo, VULKAN_CPU_ALLOCATOR, &Semaphore));
 }
 
@@ -49,7 +47,6 @@ FVulkanEvent::FVulkanEvent(FVulkanLogicalDeviceRef InDevice)
 {
 	VkEventCreateInfo eventCreateInfo = {};
 	eventCreateInfo.sType = VK_STRUCTURE_TYPE_EVENT_CREATE_INFO;
-
 	VULKAN_ENSURE(vkCreateEvent(Device->Get(), &eventCreateInfo, VULKAN_CPU_ALLOCATOR, &Event));
 }
 

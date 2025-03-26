@@ -187,8 +187,8 @@ public:
 	// Resizes the viewport and swap chain
 	virtual void Resize(const FUIntVec2& NewDimensions) = 0;
 
-	// Presents the viewport (swaps the back buffer)
-	virtual void Present() = 0;
+//	// Presents the viewport (swaps the back buffer)
+//	virtual void Present() = 0;
 
 protected:
 	FRHIViewportCreateDesc		CreateDesc; // Viewport creation description

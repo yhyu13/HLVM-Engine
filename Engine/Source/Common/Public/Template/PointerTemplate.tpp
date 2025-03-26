@@ -110,13 +110,13 @@ PACK(struct TOffsetPtr32 {
  * @tparam T class type
  */
 template <typename T>
-struct TNoNullPtr
+struct TNoNullablePtr
 {
 	using Type = T;
 	using ValueType = T*;
 
-	TNoNullPtr() = delete;
-	TNoNullPtr(T* handle)
+	TNoNullablePtr() = default;
+	TNoNullablePtr(T* handle)
 		: pFileHandle(handle)
 	{
 		if (pFileHandle == nullptr)
@@ -124,7 +124,7 @@ struct TNoNullPtr
 			HLVM_SEGFAULT_INLINE();
 		}
 	}
-	~TNoNullPtr() {}
+	~TNoNullablePtr() = default;
 
 	T* operator->()
 	{
@@ -136,12 +136,12 @@ struct TNoNullPtr
 		return pFileHandle;
 	}
 
-	bool operator==(const TNoNullPtr& other) const
+	bool operator==(const TNoNullablePtr& other) const
 	{
 		return pFileHandle == other.pFileHandle;
 	}
 
-	bool operator!=(const TNoNullPtr& other) const
+	bool operator!=(const TNoNullablePtr& other) const
 	{
 		return pFileHandle != other.pFileHandle;
 	}
@@ -161,7 +161,7 @@ struct TNoNullPtr
 		return pFileHandle;
 	}
 
-	friend T& operator*(const TNoNullPtr& handle)
+	friend T& operator*(const TNoNullablePtr& handle)
 	{
 		return *(handle.pFileHandle);
 	}
@@ -181,28 +181,20 @@ struct TNullablePtr
 	using Type = T;
 	using ValueType = T*;
 
-	TNullablePtr() = delete;
+	TNullablePtr() = default;
 	TNullablePtr(T* handle)
 		: pFileHandle(handle)
 	{
 	}
-	~TNullablePtr() {}
+	~TNullablePtr() = default;
 
 	T* operator->()
 	{
-		if (pFileHandle == nullptr)
-		{
-			HLVM_SEGFAULT_INLINE();
-		}
 		return pFileHandle;
 	}
 
 	const T* operator->() const
 	{
-		if (pFileHandle == nullptr)
-		{
-			HLVM_SEGFAULT_INLINE();
-		}
 		return pFileHandle;
 	}
 

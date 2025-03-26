@@ -5,6 +5,14 @@
 #include "RHI/Vulkan/VulkanSwapChain.h"
 #include "RHI/Vulkan/VulkanRHIResource.h"
 
+FVulkanSwapChain::FVulkanSwapChain(FVulkanViewport* InOwnerViewport, FRecreateInfo* InCreateInfo)
+	: OwnerViewport(InOwnerViewport)
+{
+	HLVM_ENSURE(OwnerViewport);
+	CreateSwapChain(InCreateInfo);
+	CreateImageViews();
+}
+
 FVulkanSwapChain::~FVulkanSwapChain()
 {
 	if (OwnerViewport)
@@ -52,7 +60,7 @@ void FVulkanSwapChain::DestroySwapChain(TNullablePtr<FRecreateInfo> OutCreateInf
 	}
 }
 
-void FVulkanSwapChain::CreateSwapChain(TNoNullPtr<FRecreateInfo> InCreateInfo)
+void FVulkanSwapChain::CreateSwapChain(TNoNullablePtr<FRecreateInfo> InCreateInfo)
 {
 	auto&	 physicalDevice = OwnerViewport->PhysicalDevice;
 	VkDevice device = OwnerViewport->LogicalDevice->Get();
@@ -63,7 +71,7 @@ void FVulkanSwapChain::CreateSwapChain(TNoNullPtr<FRecreateInfo> InCreateInfo)
 	VkPresentModeKHR							   presentMode = ChooseSwapPresentMode(swapChainSupport.presentModes);
 	VkExtent2D									   extent = ChooseSwapExtent(swapChainSupport.capabilities);
 
-	uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1; // 交换链支持的最小图像个数+1数量类实现三倍缓存
+	TUINT32 imageCount = swapChainSupport.capabilities.minImageCount + 1; // 交换链支持的最小图像个数+1数量类实现三倍缓存
 	if (swapChainSupport.capabilities.maxImageCount > 0 && imageCount > swapChainSupport.capabilities.maxImageCount)
 	{
 		imageCount = swapChainSupport.capabilities.maxImageCount;
@@ -81,7 +89,7 @@ void FVulkanSwapChain::CreateSwapChain(TNoNullPtr<FRecreateInfo> InCreateInfo)
 	createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT; // 指定我们在图像上的操作，此处我们将图像作为颜色来使用
 
 	FVulkanPhysicalDevice::QueueFamilyIndices indices = physicalDevice->QueryQueueFamilyIndices(surface);
-	uint32_t								  queueFamilyIndices[] = { indices.graphicsFamily, indices.presentFamily };
+	TUINT32									  queueFamilyIndices[] = { indices.graphicsFamily, indices.presentFamily };
 
 	// 判断图形绘制队列和呈现队列是不是同一个队列
 	if (indices.graphicsFamily != indices.presentFamily)
@@ -105,13 +113,14 @@ void FVulkanSwapChain::CreateSwapChain(TNoNullPtr<FRecreateInfo> InCreateInfo)
 	{
 		createInfo.oldSwapchain = InCreateInfo->OldSwapChain;
 	}
-
 	VULKAN_ENSURE(vkCreateSwapchainKHR(device, &createInfo, VULKAN_CPU_ALLOCATOR, &swapChain));
 
 	vkGetSwapchainImagesKHR(device, swapChain, &imageCount, nullptr);
+	HLVM_ENSURE(imageCount > 0 && imageCount <= MAX_FRAMES_IN_FLIGHT);
 	swapChainImages.resize(imageCount);
 	vkGetSwapchainImagesKHR(device, swapChain, &imageCount, swapChainImages.data());
 
+	swapChainActualImageCount = imageCount;
 	swapChainImageFormat = surfaceFormat.format;
 	swapChainExtent = extent;
 
@@ -168,7 +177,8 @@ VkPresentModeKHR FVulkanSwapChain::ChooseSwapPresentMode(const TVector<VkPresent
 // 选择交换范围：交换链中的图像分辨率
 VkExtent2D FVulkanSwapChain::ChooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities)
 {
-	if (capabilities.currentExtent.width != TUINT32_MAX)
+	if (capabilities.currentExtent.width != TUINT32_MAX
+		&& capabilities.currentExtent.height != TUINT32_MAX)
 	{
 		return capabilities.currentExtent;
 	}
@@ -185,7 +195,7 @@ VkExtent2D FVulkanSwapChain::ChooseSwapExtent(const VkSurfaceCapabilitiesKHR& ca
 
 void FVulkanSwapChain::CreateImageViews()
 {
-	VkDevice   device = OwnerViewport->LogicalDevice->Get();
+	VkDevice device = OwnerViewport->LogicalDevice->Get();
 	swapChainImageViews.resize(swapChainImages.size());
 	// 遍历创建ImageView---图像视图，该图像可以作为纹理使用，但是作为渲染目标，还需要帧缓冲对象
 	for (size_t i = 0; i < swapChainImages.size(); i++)
@@ -207,4 +217,93 @@ void FVulkanSwapChain::CreateImageViews()
 
 		VULKAN_ENSURE(vkCreateImageView(device, &createInfo, VULKAN_CPU_ALLOCATOR, &swapChainImageViews[i]));
 	}
+}
+
+FVulkanSwapChain::ESurfaceStatus FVulkanSwapChain::AcquireNextImageIndex(TUINT32& OutImageIndex, VkSemaphore& OutImageAvailableSemaphore)
+{
+	// acquired image index need to be reset to TUINT32_MAX
+	HLVM_ASSERT(currentAcquiredImageIndex == TUINT32_MAX);
+	// Reset outputs
+	OutImageIndex = TUINT32_MAX;
+	OutImageAvailableSemaphore = VK_NULL_HANDLE;
+
+	VkDevice device = OwnerViewport->LogicalDevice->Get();
+
+	TUINT32 prevSyncObjectIndex = currentSyncObjectIndex;
+	currentSyncObjectIndex += 1;
+	currentSyncObjectIndex %= swapChainActualImageCount;
+	VkSemaphore imageAcquiredSemaphore = imageAcquiredSemaphores[currentSyncObjectIndex]->GetHandle();
+#if VULKAN_SWAPCHAIN_USE_IMAGE_FENCE
+	VkFence imageAcquiredFence = imageAcquiredFences[currentSyncObjectIndex]->GetHandle();
+#else
+	VkFence imageAcquiredFence = VK_NULL_HANDLE;
+#endif
+	// Acquire image
+	TUINT32 ImageIndex = swapChainActualImageCount;
+	VkResult Result = VK_SUCCESS;
+	{
+		// 循环等待获取图像
+		while ((Result == VK_SUCCESS || Result == VK_SUBOPTIMAL_KHR)
+			&& ImageIndex >= swapChainActualImageCount)
+		{
+			Result = vkAcquireNextImageKHR(device, swapChain, UINT64_MAX, imageAcquiredSemaphore, imageAcquiredFence, &ImageIndex);
+		}
+	}
+
+	if (Result == VK_ERROR_OUT_OF_DATE_KHR)
+	{
+		currentSyncObjectIndex = prevSyncObjectIndex;
+		return ESurfaceStatus::OutOfDate;
+	}
+	else if (Result == VK_ERROR_SURFACE_LOST_KHR)
+	{
+		currentSyncObjectIndex = prevSyncObjectIndex;
+		return ESurfaceStatus::SurfaceLost;
+	}
+	HLVM_ENSURE(Result == VK_SUCCESS || Result == VK_SUBOPTIMAL_KHR);
+
+	currentAcquiredImageIndex = ImageIndex;
+	OutImageIndex = currentAcquiredImageIndex;
+
+	OutImageAvailableSemaphore = imageAcquiredSemaphore;
+
+	// Wait for fence
+	if (imageAcquiredFence != VK_NULL_HANDLE)
+	{
+		imageAcquiredFences[currentSyncObjectIndex]->Wait();
+	}
+
+	return ESurfaceStatus::OK;
+}
+
+FVulkanSwapChain::ESurfaceStatus FVulkanSwapChain::Present(VkQueue PresentQueue, VkSemaphore RenderingDoneSemaphore)
+{
+	HLVM_ASSERT(currentAcquiredImageIndex != TUINT32_MAX);
+
+	VkPresentInfoKHR presentInfo{};
+	presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+	if (RenderingDoneSemaphore != VK_NULL_HANDLE)
+	{
+		presentInfo.waitSemaphoreCount = 1;
+		presentInfo.pWaitSemaphores = &RenderingDoneSemaphore;
+	}
+	presentInfo.swapchainCount = 1;
+	presentInfo.pSwapchains = &swapChain;
+	presentInfo.pImageIndices = &currentAcquiredImageIndex;
+
+	VkResult Result = vkQueuePresentKHR(PresentQueue, &presentInfo);
+	// Reset acquired image index
+	currentAcquiredImageIndex = TUINT32_MAX;
+
+	if (Result == VK_ERROR_OUT_OF_DATE_KHR)
+	{
+		return ESurfaceStatus::OutOfDate;
+	}
+	else if (Result == VK_ERROR_SURFACE_LOST_KHR)
+	{
+		return ESurfaceStatus::SurfaceLost;
+	}
+	HLVM_ENSURE(Result == VK_SUCCESS || Result == VK_SUBOPTIMAL_KHR);
+
+	return FVulkanSwapChain::ESurfaceStatus::OK;
 }
