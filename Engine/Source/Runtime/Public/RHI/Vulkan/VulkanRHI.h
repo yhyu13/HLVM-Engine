@@ -88,7 +88,8 @@ public:
 
 	// Vulkan-specific resource creation
 	VkImage		 CreateVulkanImage(const FRHITextureCreateDesc& CreateDesc) override;
-	VkBuffer	 CreateVulkanBuffer(const FRHIBufferCreateDesc& CreateDesc) override;
+	VkBuffer	 CreateVulkanBuffer(const FRHIBufferCreateDesc& CreateDesc, void** OutAllocation) override;
+	void		 DestoryVulkanBuffer(VkBuffer Buffer, void** InAllocation) override;
 	VkImageView	 CreateVulkanImageView(VkImage Image, const FRHIShaderResourceViewCreateInfo& CreateInfo) override;
 	VkBufferView CreateVulkanBufferView(VkBuffer Buffer, const FRHIUnorderedAccessViewCreateInfo& CreateInfo) override;
 
@@ -166,9 +167,6 @@ protected:
 
 	// Function to generate VkQueryPoolCreateInfo from FRHIQueryCreateInfo (assuming this struct exists)
 	VkQueryPoolCreateInfo GenerateVkQueryPoolCreateInfo(const FRHIQueryCreateInfo& CreateDesc);
-
-	// Function to allocate Vulkan memory for a given buffer and usage flags
-	VkDeviceMemory AllocateVulkanMemory(VkBuffer Buffer, EBufferUsageFlags UsageFlags);
 
 private:
 	FInitializer InitializerParam;

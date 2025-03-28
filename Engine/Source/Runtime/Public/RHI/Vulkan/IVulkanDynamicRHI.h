@@ -21,7 +21,8 @@ public:
 
 	// Vulkan-specific resource creation
 	virtual VkImage CreateVulkanImage(const FRHITextureCreateDesc& CreateDesc) = 0;
-	virtual VkBuffer CreateVulkanBuffer(const FRHIBufferCreateDesc& CreateDesc) = 0;
+	virtual VkBuffer CreateVulkanBuffer(const FRHIBufferCreateDesc& CreateDesc, void** OutAllocation) = 0;
+	virtual void DestoryVulkanBuffer(VkBuffer Buffer, void** InAllocation) = 0;
 	virtual VkImageView CreateVulkanImageView(VkImage Image, const FRHIShaderResourceViewCreateInfo& CreateInfo) = 0;
 	virtual VkBufferView CreateVulkanBufferView(VkBuffer Buffer, const FRHIUnorderedAccessViewCreateInfo& CreateInfo) = 0;
 

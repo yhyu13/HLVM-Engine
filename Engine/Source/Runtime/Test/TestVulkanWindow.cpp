@@ -1265,6 +1265,30 @@ RECORD_BOOL(test_GLFW3VulkanWindow)
 		// Set GDynamicRHI before init
 		SetDynamicRHI(VulkanRHI.get());
 		VulkanRHI->Init();
+
+		TVector<Vertex> vertices = {
+			{ { 0.0f, 0.8f, 0.0f }, { 1.0f, 0.0f, 0.0f } },
+			{ { -0.8f, -0.8f, 0.0f }, { 0.0f, 1.0f, 0.0f } },
+			{ { 0.8f, -0.8f, 0.0f }, { 0.0f, 0.0f, 1.0f } },
+		};
+		const VkDeviceSize vertexBufferSize = vertices.size() * sizeof(Vertex);
+
+		FRHIBufferCreateDesc VertexBufferCreateDesc;
+		VertexBufferCreateDesc.DebugName = TXT("Vertex Test");
+		VertexBufferCreateDesc.UsageFlags = EBufferUsageFlags::Vertex;
+		VertexBufferCreateDesc.Size = vertexBufferSize;
+		VertexBufferCreateDesc.MemoryPropertyFlags = EMemoryPropertyFlags::DeviceLocal;
+		auto VertexBuffer = VulkanRHI->CreateBuffer(VertexBufferCreateDesc);
+
+		TVector<uint32_t> indices = { 0, 1, 2 };
+		const VkDeviceSize indexBufferSize = indices.size() * sizeof(uint32_t);
+
+		FRHIBufferCreateDesc IndexBufferCreateDesc;
+		IndexBufferCreateDesc.DebugName = TXT("Index Test");
+		IndexBufferCreateDesc.UsageFlags = EBufferUsageFlags::Index;
+		IndexBufferCreateDesc.Size = indexBufferSize;
+		IndexBufferCreateDesc.MemoryPropertyFlags = EMemoryPropertyFlags::DeviceLocal;
+		auto IndexBuffer = VulkanRHI->CreateBuffer(IndexBufferCreateDesc);
 	}
 	VulkanRHI->Shutdown();
 

@@ -84,6 +84,45 @@ VkBufferUsageFlags VulkanBufferUsageFlagsFromRHIUsageFlags(EBufferUsageFlags RHI
 	return VulkanFlags;
 }
 
+VkMemoryPropertyFlags VulkanMemoryPropertyFlagsFromRHIMemoryPropertyFlags(EMemoryPropertyFlags RHIFlags)
+{
+		VkMemoryPropertyFlags VulkanFlags = 0;
+
+		if (RHIFlags & EMemoryPropertyFlags::DeviceLocal)
+		{
+			VulkanFlags |= VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+		}
+		if (RHIFlags & EMemoryPropertyFlags::HostVisible)
+		{
+			VulkanFlags |= VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+		}
+		if (RHIFlags & EMemoryPropertyFlags::HostCoherent)
+		{
+			VulkanFlags |= VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+		}
+		if (RHIFlags & EMemoryPropertyFlags::HostCached)
+		{
+			VulkanFlags |= VK_MEMORY_PROPERTY_HOST_CACHED_BIT;
+		}
+		if (RHIFlags & EMemoryPropertyFlags::DeviceCoherentAMD)
+		{
+			VulkanFlags |= VK_MEMORY_PROPERTY_DEVICE_COHERENT_BIT_AMD;
+		}
+		if (RHIFlags & EMemoryPropertyFlags::Protected)
+		{
+			VulkanFlags |= VK_MEMORY_PROPERTY_PROTECTED_BIT;
+		}
+		if (RHIFlags & EMemoryPropertyFlags::RDMACapableNV)
+		{
+			VulkanFlags |= VK_MEMORY_PROPERTY_RDMA_CAPABLE_BIT_NV;
+		}
+		if (RHIFlags & EMemoryPropertyFlags::LazilyAllocated)
+		{
+			VulkanFlags |= VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT;
+		}
+		return VulkanFlags;
+}
+
 // Convert RHI texture usage flags to Vulkan usage flags
 VkImageUsageFlags VulkanTextureUsageFlagsFromRHIUsageFlags(ETextureCreateFlags RHIFlags)
 {

@@ -20,7 +20,6 @@ APPLY_PFN_DEF_VK_FUNCTIONS_VMA(DEFINE_VK_FUNCTION_MACRO)
 
 VulkanLoader::~VulkanLoader()
 {
-	vmaDestroyAllocator(VULKAN_VMA_ALLOCATOR);
 }
 
 void VulkanLoader::LoadOnce()
@@ -75,16 +74,6 @@ void VulkanLoader::LoadOnce()
 			vulkanFunctions.vkGetDeviceBufferMemoryRequirements = vkGetDeviceBufferMemoryRequirements;
 			vulkanFunctions.vkGetDeviceImageMemoryRequirements = vkGetDeviceImageMemoryRequirements;
 #endif
-// TODO : move to RHI
-//			VmaAllocatorCreateInfo allocatorCreateInfo = {};
-//			allocatorCreateInfo.flags = VMA_ALLOCATOR_CREATE_EXT_MEMORY_BUDGET_BIT;
-//			allocatorCreateInfo.vulkanApiVersion = VK_API_VERSION_1_3;
-//			allocatorCreateInfo.physicalDevice = physicalDevice;
-//			allocatorCreateInfo.device = device;
-//			allocatorCreateInfo.instance = instance;
-//			allocatorCreateInfo.pVulkanFunctions = &vulkanFunctions;
-//
-//			vmaCreateAllocator(&allocatorCreateInfo, VULKAN_VMA_ALLOCATOR);
 		}
 	});
 }

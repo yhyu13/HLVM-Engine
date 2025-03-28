@@ -1,6 +1,6 @@
 /**
-* Copyright (c) 2025. MIT License. All rights reserved.
-*/
+ * Copyright (c) 2025. MIT License. All rights reserved.
+ */
 
 #include "RHI/Vulkan/VulkanRHI.h"
 
@@ -388,32 +388,20 @@ void FVulkanRHI::Init()
 void FVulkanRHI::Shutdown()
 {
 	VulkanViewport.Reset();
-	HLVM_LOG(LogVulkanRHI, debug, TXT("VulkanViewport Shutdown!"));
-	// TODO manage VulkanSurface after viewport shutdown
 	LogicalDevice.Reset();
-	HLVM_LOG(LogVulkanRHI, debug, TXT("LogicalDevice Shutdown!"));
 	PhysicalDevice.Reset();
-	HLVM_LOG(LogVulkanRHI, debug, TXT("PhysicalDevice Shutdown!"));
 
 	// TODO : desotry every vulkan handle
 	vkDeviceWaitIdle(VulkanDevice);
 
 	// Cleanup Vulkan resources
-	if (VulkanDevice)
-	{
-		vkDestroyDevice(VulkanDevice, VULKAN_CPU_ALLOCATOR);
-		VulkanDevice = VK_NULL_HANDLE;
-	}
+	vmaDestroyAllocator(VULKAN_VMA_ALLOCATOR);
+	vkDestroyDevice(VulkanDevice, VULKAN_CPU_ALLOCATOR);
 	if (bUseValidationLayers)
 	{
 		DestroyDebugUtilsMessengerEXT(VulkanInstance, DebugMessenger, VULKAN_CPU_ALLOCATOR);
-		DebugMessenger = VK_NULL_HANDLE;
 	}
-	if (VulkanInstance)
-	{
-		vkDestroyInstance(VulkanInstance, VULKAN_CPU_ALLOCATOR);
-		VulkanInstance = VK_NULL_HANDLE;
-	}
+	vkDestroyInstance(VulkanInstance, VULKAN_CPU_ALLOCATOR);
 
 	HLVM_LOG(LogVulkanRHI, debug, TXT("VulkanRHI Shutdown!"));
 }
@@ -427,9 +415,7 @@ FTextureRHIRef FVulkanRHI::CreateTexture(const FRHITextureCreateDesc& CreateDesc
 
 FBufferRHIRef FVulkanRHI::CreateBuffer(const FRHIBufferCreateDesc& CreateDesc)
 {
-	VkBuffer	   Buffer = CreateVulkanBuffer(CreateDesc);
-	VkDeviceMemory Memory = AllocateVulkanMemory(Buffer, CreateDesc.UsageFlags);
-	return new FVulkanBuffer(Buffer, Memory, CreateDesc);
+	return new FVulkanBuffer(CreateDesc);
 }
 
 FShaderResourceViewRHIRef FVulkanRHI::CreateShaderResourceView(FRHITexture* Texture, const FRHIShaderResourceViewCreateInfo& CreateInfo)
@@ -708,9 +694,8 @@ void FVulkanRHI::CreateVulkanPhysicalDevice()
 
 void FVulkanRHI::CreateVulkanLogicalDevice()
 {
-
 	// 2 Create logical device
-	deviceQueueFamilyIndices = FindQueueFamilies(VulkanPhysicalDevice, VulkanSurface);
+	deviceQueueFamilyIndices = FindQueueFamilies(PhysicalDevice->Get(), VulkanSurface);
 
 	TVector<VkDeviceQueueCreateInfo> queueCreateInfos;
 	TSet<uint32_t>					 uniqueQueueFamilies = {
@@ -775,14 +760,14 @@ void FVulkanRHI::CreateVulkanViewPort()
 {
 	FRHIViewportCreateDesc ViewportDesc;
 	ViewportDesc.DebugName = TXT("Vulkan Viewport");
-	ViewportDesc.Dimensions = FUIntVec2{800, 600};
+	ViewportDesc.Dimensions = FUIntVec2{ 800, 600 };
 	ViewportDesc.ViewportType = ERHIViewportType::Fullscreen;
 	ViewportDesc.Format = EPixelFormat::R8G8B8A8_UNorm;
 	ViewportDesc.NativeWindowHandle = nullptr;
-	FVulkanMinimalContext Context {
+	FVulkanMinimalContext Context{
 		VulkanInstance,
-		PhysicalDevice.Get(),
-		LogicalDevice.Get()
+		PhysicalDevice,
+		LogicalDevice
 	};
 	VulkanViewport = new FVulkanViewport(ViewportDesc, Context);
 
@@ -829,19 +814,33 @@ VkImage FVulkanRHI::CreateVulkanImage(const FRHITextureCreateDesc& CreateDesc)
 	return Image;
 }
 
-VkBuffer FVulkanRHI::CreateVulkanBuffer(const FRHIBufferCreateDesc& CreateDesc)
+VkBuffer FVulkanRHI::CreateVulkanBuffer(const FRHIBufferCreateDesc& CreateDesc, void** OutAllocation)
 {
-	VkBufferCreateInfo BufferInfo = {};
-	BufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-	BufferInfo.size = CreateDesc.SizeInBytes;
-	BufferInfo.usage = VulkanBufferUsageFlagsFromRHIUsageFlags(CreateDesc.UsageFlags);
-	BufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	VkBufferUsageFlags	  UsageFlags = VulkanBufferUsageFlagsFromRHIUsageFlags(CreateDesc.UsageFlags);
+	VkMemoryPropertyFlags MemoryPropertyFlags = VulkanMemoryPropertyFlagsFromRHIMemoryPropertyFlags(CreateDesc.MemoryPropertyFlags);
+	VkDeviceSize		  Size = CreateDesc.Size;
 
-	VkBuffer Buffer;
-	VkResult Result = vkCreateBuffer(VulkanDevice, &BufferInfo, nullptr, &Buffer);
-	HLVM_ENSURE(Result == VK_SUCCESS);
+	VkBufferCreateInfo bufferCreateInfo = {};
+	bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	bufferCreateInfo.size = Size;
+	bufferCreateInfo.usage = UsageFlags;
+	bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+	VmaAllocationCreateInfo allocCreateInfo = {};
+	allocCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
+	allocCreateInfo.requiredFlags = MemoryPropertyFlags;
+
+	VkBuffer	  Buffer;
+	VmaAllocation Allocation;
+	VULKAN_ENSURE(vmaCreateBuffer(VULKAN_VMA_ALLOCATOR, &bufferCreateInfo, &allocCreateInfo, &Buffer, &Allocation, nullptr));
+	*OutAllocation = Allocation;
 
 	return Buffer;
+}
+
+void FVulkanRHI::DestoryVulkanBuffer(VkBuffer Buffer, void** InAllocation)
+{
+	vmaDestroyBuffer(VULKAN_VMA_ALLOCATOR, Buffer, R_C(VmaAllocation, *InAllocation));
 }
 
 VkImageView FVulkanRHI::CreateVulkanImageView(VkImage Image, const FRHIShaderResourceViewCreateInfo& CreateInfo)
@@ -1029,7 +1028,7 @@ VkBufferCreateInfo FVulkanRHI::GenerateVkBufferCreateInfo(const FRHIBufferCreate
 {
 	VkBufferCreateInfo BufferCreateInfo = {};
 	BufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-	BufferCreateInfo.size = CreateDesc.SizeInBytes;
+	BufferCreateInfo.size = CreateDesc.Size;
 	BufferCreateInfo.usage = VulkanBufferUsageFlagsFromRHIUsageFlags(CreateDesc.UsageFlags); // Helper function to convert RHI usage flags to Vulkan usage flags
 	BufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
@@ -1223,21 +1222,4 @@ VkQueryPoolCreateInfo FVulkanRHI::GenerateVkQueryPoolCreateInfo(const FRHIQueryC
 	return QueryPoolCreateInfo;
 }
 
-VkDeviceMemory FVulkanRHI::AllocateVulkanMemory(VkBuffer Buffer, EBufferUsageFlags UsageFlags)
-{
-	VkBufferCreateInfo bufferInfo;
-	bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-	bufferInfo.size = 65536;
-	// bufferInfo.usage = UsageFlags;
-
-	VmaAllocationCreateInfo allocInfo = {};
-	allocInfo.usage = VMA_MEMORY_USAGE_AUTO;
-
-	VkBuffer	  buffer;
-	VmaAllocation allocation;
-	// vmaAllocateMemoryForBuffer(VULKAN_VMA_ALLOCATOR, &bufferInfo, &allocInfo, &buffer, &allocation, nullptr);
-
-	VkDeviceMemory dm = nullptr;
-	return dm;
-}
 #pragma clang diagnostic pop

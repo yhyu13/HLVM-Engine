@@ -1,25 +1,27 @@
 /**
-* Copyright (c) 2025. MIT License. All rights reserved.
-*/
+ * Copyright (c) 2025. MIT License. All rights reserved.
+ */
 
 #pragma once
 
 #include "RHI/RHIResource.h"
 #include "VulkanRHIResourceDeclaration.h"
 
-
 // Vulkan-specific RHI buffer
 class FVulkanBuffer : public FRHIBuffer, public FVulkanResource
 {
 public:
-	FVulkanBuffer(VkBuffer InBuffer, VkDeviceMemory InMemory, const FRHIBufferCreateDesc& InCreateDesc)
-		: Buffer(InBuffer), Memory(InMemory)
-	{
-		CreateDesc = InCreateDesc;
-	}
+	FVulkanBuffer(const FRHIBufferCreateDesc& InCreateDesc);
+	~FVulkanBuffer() override;
+
+	FVulkanBuffer(const FVulkanBuffer&) = delete;
+	FVulkanBuffer& operator=(const FVulkanBuffer&) = delete;
+
+	FVulkanBuffer(FVulkanBuffer&& Other);
+	FVulkanBuffer& operator=(FVulkanBuffer&& Other);
 
 	// Returns the size of the buffer in bytes
-	virtual TUINT32 GetSize() const override { return CreateDesc.SizeInBytes; }
+	virtual TUINT64 GetSize() const override { return CreateDesc.Size; }
 
 	// Returns the usage flags of the buffer
 	virtual EBufferUsageFlags GetUsageFlags() const override { return CreateDesc.UsageFlags; }
@@ -27,14 +29,14 @@ public:
 	// Returns the Vulkan buffer handle
 	VkBuffer GetBuffer() const { return Buffer; }
 
-	// Returns the Vulkan device memory handle
-	VkDeviceMemory GetMemory() const { return Memory; }
+private:
+	void CreateBuffer();
+	void DestroyBuffer();
 
 private:
-	VkBuffer	   Buffer;
-	VkDeviceMemory Memory;
+	VkBuffer	  Buffer;
+	VmaAllocation Allocation;
 };
-
 
 // Vulkan-specific RHI unordered access view
 class FVulkanUnorderedAccessView : public FRHIUnorderedAccessView, public FVulkanResource

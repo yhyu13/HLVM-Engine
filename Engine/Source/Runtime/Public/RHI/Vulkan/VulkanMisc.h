@@ -16,6 +16,9 @@ HLVM_EXTERN_FUNC VkImageUsageFlags VulkanTextureUsageFlagsFromRHIUsageFlags(ETex
 // Helper function to convert RHI buffer usage flags to Vulkan usage flags
 HLVM_EXTERN_FUNC VkBufferUsageFlags VulkanBufferUsageFlagsFromRHIUsageFlags(EBufferUsageFlags RHIFlags);
 
+// Helper function to convert RHI memory property flags to Vulkan memory property flags
+HLVM_EXTERN_FUNC VkMemoryPropertyFlags VulkanMemoryPropertyFlagsFromRHIMemoryPropertyFlags(EMemoryPropertyFlags RHIFlags);
+
 // Helper function to convert RHI texture filter to Vulkan filter
 HLVM_EXTERN_FUNC VkFilter VulkanFilterFromRHIFilter(ETextureFilter RHIFilter);
 

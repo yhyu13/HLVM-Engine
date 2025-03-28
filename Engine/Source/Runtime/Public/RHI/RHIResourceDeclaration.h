@@ -33,18 +33,19 @@ struct FRHITextureCreateDesc
 // Structure for describing buffer creation parameters
 struct FRHIBufferCreateDesc
 {
-	FString			  DebugName;   // Debug name for the buffer
-	TUINT32			  SizeInBytes; // Size of the buffer in bytes
-	EBufferUsageFlags UsageFlags;  // Buffer usage flags
-	TUINT32			  Stride;	   // Stride of the buffer (for structured buffers)
+	FString				 DebugName;			  // Debug name for the buffer
+	TUINT64				 Size;				  // Size of the buffer in bytes
+	EBufferUsageFlags	 UsageFlags;		  // Buffer usage flags
+	EMemoryPropertyFlags MemoryPropertyFlags; // Memory property flags
 
 	FRHIBufferCreateDesc() = default;
 	// Constructor for easy initialization
-	FRHIBufferCreateDesc(const FString& InDebugName, TUINT32 InSizeInBytes, EBufferUsageFlags InUsageFlags, TUINT32 InStride = 0)
+	FRHIBufferCreateDesc(const FString& InDebugName, TUINT64 InSize, EBufferUsageFlags InUsageFlags,
+		EMemoryPropertyFlags InMemoryPropertyFlags = EMemoryPropertyFlags::DeviceLocal)
 		: DebugName(InDebugName)
-		, SizeInBytes(InSizeInBytes)
+		, Size(InSize)
 		, UsageFlags(InUsageFlags)
-		, Stride(InStride)
+		, MemoryPropertyFlags(InMemoryPropertyFlags)
 	{
 	}
 };
@@ -259,7 +260,7 @@ struct FRHIViewportCreateDesc
 	FUIntVec2		 Dimensions;   // Width and height of the viewport
 	ERHIViewportType ViewportType; // Type of the viewport (e.g., windowed, fullscreen)
 	EPixelFormat	 Format;	   // Pixel format of the viewport's back buffer
-	IWindow*		 NativeWindowHandle;
+	void*			 NativeWindowHandle;
 	bool			 bHeadlessRendering;
 
 	// Default constructor
@@ -271,8 +272,8 @@ struct FRHIViewportCreateDesc
 		const FUIntVec2& InDimensions,
 		ERHIViewportType InViewportType = ERHIViewportType::Fullscreen,
 		EPixelFormat	 InFormat = EPixelFormat::R8G8B8A8_UNorm,
-		IWindow*		 InWindowHandle = nullptr,
-		bool             InHeadlessRendering = false)
+		void*			 InWindowHandle = nullptr,
+		bool			 InHeadlessRendering = false)
 		: DebugName(InDebugName)
 		, Dimensions(InDimensions)
 		, ViewportType(InViewportType)

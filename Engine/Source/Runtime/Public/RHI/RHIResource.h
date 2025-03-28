@@ -70,10 +70,13 @@ public:
 	FRHIBufferCreateDesc CreateDesc; // Declaration struct as a member
 
 	// Returns the size of the buffer in bytes
-	virtual TUINT32 GetSize() const { return CreateDesc.SizeInBytes; }
+	virtual TUINT64 GetSize() const { return CreateDesc.Size; }
 
 	// Returns the usage flags of the buffer
 	virtual EBufferUsageFlags GetUsageFlags() const { return CreateDesc.UsageFlags; }
+
+	// Returns the memory flags of the buffer
+	virtual EMemoryPropertyFlags GetMemoryFlags() const { return CreateDesc.MemoryPropertyFlags; }
 
 	// Returns the type of the RHI resource
 	virtual ERHIResourceType GetType() const override { return ERHIResourceType::Buffer; }

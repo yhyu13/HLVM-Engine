@@ -14,6 +14,8 @@ FGLFW3Window::FGLFW3Window(const FProperties& InProperties)
 
 FGLFW3Window::~FGLFW3Window()
 {
+	HLVM_LOG(LogGLFW3Window, debug, TXT("GLFW3Window Destroy"));
+	glfwDestroyWindow(Window); // 销毁窗口
 	glfwTerminate();
 }
 

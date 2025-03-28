@@ -7,6 +7,8 @@
 #include "GlobalDefinition.h"
 #include "Math/MathGLM.h"
 
+DECLARE_LOG_CATEGORY(LogRHI)
+
 // RHI Interface Types
 enum class ERHIInterfaceType : TUINT8
 {
@@ -49,7 +51,7 @@ enum class ETextureCreateFlags : TUINT8
 	Transient = 1 << 4,
 	// Add more flags as needed
 };
-HLVM_ENUM_FLAG_OPERATOR(ETextureCreateFlags, &)
+HLVM_ENUM_BITWISE_OPERATOR_DEFINE(ETextureCreateFlags, &)
 
 // Enumeration of buffer usage flags
 enum class EBufferUsageFlags : TUINT8
@@ -63,7 +65,23 @@ enum class EBufferUsageFlags : TUINT8
 	TransferSource = 1 << 5,     // Buffer is used as a transfer source
 	TransferDestination = 1 << 6 // Buffer is used as a transfer destination
 };
-HLVM_ENUM_FLAG_OPERATOR(EBufferUsageFlags, &)
+HLVM_ENUM_BITWISE_OPERATOR_DEFINE(EBufferUsageFlags, &)
+
+// Enumeration of memory property flags
+enum class EMemoryPropertyFlags : TUINT32
+{
+	None = 0,
+	DeviceLocal = 1 << 0,            // VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+	HostVisible = 1 << 1,            // VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
+	HostCoherent = 1 << 2,           // VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+	HostCached = 1 << 3,             // VK_MEMORY_PROPERTY_HOST_CACHED_BIT
+	LazilyAllocated = 1 << 4,        // VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT
+	Protected = 1 << 5,              // VK_MEMORY_PROPERTY_PROTECTED_BIT
+	DeviceCoherentAMD = 1 << 6,      // VK_MEMORY_PROPERTY_DEVICE_COHERENT_BIT_AMD
+	DeviceUncachedAMD = 1 << 7,      // VK_MEMORY_PROPERTY_DEVICE_UNCACHED_BIT_AMD
+	RDMACapableNV = 1 << 8           // VK_MEMORY_PROPERTY_RDMA_CAPABLE_BIT_NV
+};
+HLVM_ENUM_BITWISE_OPERATOR_DEFINE(EMemoryPropertyFlags, &)
 
 // Enumeration of shader stages
 enum class EShaderStage : TUINT8
