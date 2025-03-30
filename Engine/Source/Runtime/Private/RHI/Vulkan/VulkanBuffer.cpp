@@ -2,7 +2,7 @@
  * Copyright (c) 2025. MIT License. All rights reserved.
  */
 
-#include "RHI/Vulkan/VulkanBuffer.h"
+#include "VulkanBuffer.h"
 #include "RHI/Vulkan/IVulkanDynamicRHI.h"
 
 FVulkanBuffer::FVulkanBuffer(const FRHIBufferCreateDesc& InCreateDesc)
@@ -47,11 +47,7 @@ FVulkanBuffer& FVulkanBuffer::operator=(FVulkanBuffer&& Other)
 
 void FVulkanBuffer::CreateBuffer()
 {
-	VkBufferUsageFlags	  usage = VulkanBufferUsageFlagsFromRHIUsageFlags(CreateDesc.UsageFlags);
-	VkMemoryPropertyFlags memoryProperties = VulkanMemoryPropertyFlagsFromRHIMemoryPropertyFlags(CreateDesc.MemoryPropertyFlags);
-	VkDeviceSize		  size = CreateDesc.Size;
-
-	GetDynamicRHI<IVulkanDynamicRHI>()->CreateVulkanBuffer(CreateDesc, R_C(void**, &Allocation));
+	Buffer = GetDynamicRHI<IVulkanDynamicRHI>()->CreateVulkanBuffer(CreateDesc, R_C(void**, &Allocation));
 }
 
 void FVulkanBuffer::DestroyBuffer()

@@ -18,7 +18,7 @@ struct FRHITextureCreateDesc
 
 	FRHITextureCreateDesc() = default;
 	// Constructor for easy initialization
-	FRHITextureCreateDesc(const FString& InDebugName, const FIntVec3& InDimensions, EPixelFormat InFormat, TUINT32 InNumMips = 1, TUINT32 InNumSamples = 1, ETextureCreateFlags InFlags = ETextureCreateFlags::None, const FClearValueBinding& InClearValue = FClearValueBinding::None())
+	FRHITextureCreateDesc(const FString& InDebugName, const FIntVec3& InDimensions, EPixelFormat InFormat, TUINT32 InNumMips = 1, TUINT32 InNumSamples = 1, ETextureCreateFlags InFlags = ETextureCreateFlag::None, const FClearValueBinding& InClearValue = FClearValueBinding::None())
 		: DebugName(InDebugName)
 		, Dimensions(InDimensions)
 		, Format(InFormat)
@@ -34,14 +34,14 @@ struct FRHITextureCreateDesc
 struct FRHIBufferCreateDesc
 {
 	FString				 DebugName;			  // Debug name for the buffer
-	TUINT64				 Size;				  // Size of the buffer in bytes
+	TSIZE				 Size;				  // Size of the buffer in bytes
 	EBufferUsageFlags	 UsageFlags;		  // Buffer usage flags
 	EMemoryPropertyFlags MemoryPropertyFlags; // Memory property flags
 
 	FRHIBufferCreateDesc() = default;
 	// Constructor for easy initialization
-	FRHIBufferCreateDesc(const FString& InDebugName, TUINT64 InSize, EBufferUsageFlags InUsageFlags,
-		EMemoryPropertyFlags InMemoryPropertyFlags = EMemoryPropertyFlags::DeviceLocal)
+	FRHIBufferCreateDesc(const FString& InDebugName, TSIZE InSize, EBufferUsageFlags InUsageFlags,
+		EMemoryPropertyFlags InMemoryPropertyFlags)
 		: DebugName(InDebugName)
 		, Size(InSize)
 		, UsageFlags(InUsageFlags)

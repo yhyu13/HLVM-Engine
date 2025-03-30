@@ -2,7 +2,7 @@
  * Copyright (c) 2025. MIT License. All rights reserved.
  */
 
-#include "RHI/Vulkan/VulkanSyncObject.h"
+#include "VulkanSyncObject.h"
 
 FVulkanFence::FVulkanFence(FVulkanLogicalDeviceRef InDevice, bool InSignaled)
 	: Device(InDevice)

@@ -2,8 +2,8 @@
  * Copyright (c) 2025. MIT License. All rights reserved.
  */
 
-#include "RHI/Vulkan/VulkanSwapChain.h"
-#include "RHI/Vulkan/VulkanRHIResource.h"
+#include "VulkanSwapChain.h"
+#include "VulkanRHIResource.h"
 
 FVulkanSwapChain::FVulkanSwapChain(FVulkanViewport* InOwnerViewport, FRecreateInfo* InCreateInfo)
 	: OwnerViewport(InOwnerViewport)

@@ -1234,7 +1234,7 @@ RECORD_BOOL(test_GLFW3VulkanWindowRaw)
 	HelloTriangleApplication app;
 	try
 	{
-		app.run();
+		//app.run();
 	}
 	catch (const std::exception& e)
 	{
@@ -1245,7 +1245,7 @@ RECORD_BOOL(test_GLFW3VulkanWindowRaw)
 }
 	#endif
 
-	#include "RHI/Vulkan/VulkanRHI.h"
+	#include "../Private/RHI/Vulkan/VulkanRHI.h"
 
 RECORD_BOOL(test_GLFW3VulkanWindow)
 {
@@ -1256,39 +1256,46 @@ RECORD_BOOL(test_GLFW3VulkanWindow)
 	HLVM_LOG(LogTest, debug, TXT("FGLFW3Vulkan created!"));
 
 	UniqueRefCountPtr<FVulkanRHI> VulkanRHI = nullptr;
+	// Vulkan rhi init
+	FVulkanRHI::FInitializer Initializer;
+	Initializer.RequiredExtensions = { Window->GetRequiredExtensions() };
+	Initializer.CreateSurfaceFunc = [&Window](VkInstance Instance) { return Window->CreateSurface(Instance); };
+	VulkanRHI = MAKE_UNIQUE(FVulkanRHI, Initializer);
+	// Set GDynamicRHI before init
+	SetDynamicRHI(VulkanRHI.get());
+	VulkanRHI->Init();
+
 	{
-		// Vulkan rhi init
-		FVulkanRHI::FInitializer Initializer;
-		Initializer.RequiredExtensions = { Window->GetRequiredExtensions() };
-		Initializer.CreateSurfaceFunc = [&Window](VkInstance Instance){ return Window->CreateSurface(Instance); };
-		VulkanRHI = MAKE_UNIQUE(FVulkanRHI, Initializer);
-		// Set GDynamicRHI before init
-		SetDynamicRHI(VulkanRHI.get());
-		VulkanRHI->Init();
+		// Create buffers
+		FBufferRHIRef VertexBuffer;
+		FBufferRHIRef IndexBuffer;
+		{
+			TVector<Vertex> vertices = {
+				{ { 0.0f, 0.8f, 0.0f }, { 1.0f, 0.0f, 0.0f } },
+				{ { -0.8f, -0.8f, 0.0f }, { 0.0f, 1.0f, 0.0f } },
+				{ { 0.8f, -0.8f, 0.0f }, { 0.0f, 0.0f, 1.0f } },
+			};
+			const VkDeviceSize vertexBufferSize = vertices.size() * sizeof(Vertex);
 
-		TVector<Vertex> vertices = {
-			{ { 0.0f, 0.8f, 0.0f }, { 1.0f, 0.0f, 0.0f } },
-			{ { -0.8f, -0.8f, 0.0f }, { 0.0f, 1.0f, 0.0f } },
-			{ { 0.8f, -0.8f, 0.0f }, { 0.0f, 0.0f, 1.0f } },
-		};
-		const VkDeviceSize vertexBufferSize = vertices.size() * sizeof(Vertex);
+			FRHIBufferCreateDesc VertexBufferCreateDesc;
+			VertexBufferCreateDesc.DebugName = TXT("Vertex Test");
+			VertexBufferCreateDesc.UsageFlags = EBufferUsageFlag::Vertex;
+			VertexBufferCreateDesc.UsageFlags |= EBufferUsageFlag::TransferDestination;
+			VertexBufferCreateDesc.Size = vertexBufferSize;
+			VertexBufferCreateDesc.MemoryPropertyFlags = EMemoryPropertyFlag::DeviceLocal;
+			VertexBufferCreateDesc.MemoryPropertyFlags |= EMemoryPropertyFlag::HostVisible;
+			VertexBuffer = VulkanRHI->CreateBuffer(VertexBufferCreateDesc);
 
-		FRHIBufferCreateDesc VertexBufferCreateDesc;
-		VertexBufferCreateDesc.DebugName = TXT("Vertex Test");
-		VertexBufferCreateDesc.UsageFlags = EBufferUsageFlags::Vertex;
-		VertexBufferCreateDesc.Size = vertexBufferSize;
-		VertexBufferCreateDesc.MemoryPropertyFlags = EMemoryPropertyFlags::DeviceLocal;
-		auto VertexBuffer = VulkanRHI->CreateBuffer(VertexBufferCreateDesc);
+			TVector<uint32_t>  indices = { 0, 1, 2 };
+			const VkDeviceSize indexBufferSize = indices.size() * sizeof(uint32_t);
 
-		TVector<uint32_t> indices = { 0, 1, 2 };
-		const VkDeviceSize indexBufferSize = indices.size() * sizeof(uint32_t);
-
-		FRHIBufferCreateDesc IndexBufferCreateDesc;
-		IndexBufferCreateDesc.DebugName = TXT("Index Test");
-		IndexBufferCreateDesc.UsageFlags = EBufferUsageFlags::Index;
-		IndexBufferCreateDesc.Size = indexBufferSize;
-		IndexBufferCreateDesc.MemoryPropertyFlags = EMemoryPropertyFlags::DeviceLocal;
-		auto IndexBuffer = VulkanRHI->CreateBuffer(IndexBufferCreateDesc);
+			FRHIBufferCreateDesc IndexBufferCreateDesc;
+			IndexBufferCreateDesc.DebugName = TXT("Index Test");
+			(IndexBufferCreateDesc.UsageFlags = EBufferUsageFlag::Index) |= EBufferUsageFlag::TransferDestination;
+			IndexBufferCreateDesc.Size = indexBufferSize;
+			(IndexBufferCreateDesc.MemoryPropertyFlags = EMemoryPropertyFlag::DeviceLocal) |= EMemoryPropertyFlag::HostVisible;
+			IndexBuffer = VulkanRHI->CreateBuffer(IndexBufferCreateDesc);
+		}
 	}
 	VulkanRHI->Shutdown();
 

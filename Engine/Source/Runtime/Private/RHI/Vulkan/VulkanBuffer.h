@@ -20,12 +20,6 @@ public:
 	FVulkanBuffer(FVulkanBuffer&& Other);
 	FVulkanBuffer& operator=(FVulkanBuffer&& Other);
 
-	// Returns the size of the buffer in bytes
-	virtual TUINT64 GetSize() const override { return CreateDesc.Size; }
-
-	// Returns the usage flags of the buffer
-	virtual EBufferUsageFlags GetUsageFlags() const override { return CreateDesc.UsageFlags; }
-
 	// Returns the Vulkan buffer handle
 	VkBuffer GetBuffer() const { return Buffer; }
 

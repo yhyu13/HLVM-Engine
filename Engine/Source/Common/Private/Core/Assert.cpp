@@ -48,7 +48,7 @@ namespace hlvm_private
 			auto Stack = new FStdString{ FGenericPlatformStackTrace::GetStackTrace(
 				SkipStackNum, MaxStackDepth) }; // Explicitly call stack trace here to get proper stack trace
 			auto LogMsg = new FString{
-				FString::Format(TXT("{1} with '{2}' at {3}:{4}\n{0}"), **Stack, Expression, **Message, File,
+				FString::Format(TXT("failed '{1}' with '{2}' at {3}:{4}\n{0}"), **Stack, Expression, **Message, File,
 					Line)
 			};
 

@@ -6,7 +6,7 @@
 
 #include "RHI/DynamicRHI.h"
 #include "VulkanLoader.h"
-#include "VulkanRHIResource.h"
+#include "../../../Private/RHI/Vulkan/VulkanRHIResource.h"
 
 class IVulkanDynamicRHI : public FDynamicRHI
 {
@@ -20,14 +20,14 @@ public:
 	virtual ERHIInterfaceType GetInterfaceType() const override { return ERHIInterfaceType::Vulkan; }
 
 	// Vulkan-specific resource creation
-	virtual VkImage CreateVulkanImage(const FRHITextureCreateDesc& CreateDesc) = 0;
-	virtual VkBuffer CreateVulkanBuffer(const FRHIBufferCreateDesc& CreateDesc, void** OutAllocation) = 0;
+	HLVM_NODISCARD virtual VkImage CreateVulkanImage(const FRHITextureCreateDesc& CreateDesc) = 0;
+	HLVM_NODISCARD virtual VkBuffer CreateVulkanBuffer(const FRHIBufferCreateDesc& CreateDesc, void** OutAllocation) = 0;
 	virtual void DestoryVulkanBuffer(VkBuffer Buffer, void** InAllocation) = 0;
-	virtual VkImageView CreateVulkanImageView(VkImage Image, const FRHIShaderResourceViewCreateInfo& CreateInfo) = 0;
-	virtual VkBufferView CreateVulkanBufferView(VkBuffer Buffer, const FRHIUnorderedAccessViewCreateInfo& CreateInfo) = 0;
+	HLVM_NODISCARD virtual VkImageView CreateVulkanImageView(VkImage Image, const FRHIShaderResourceViewCreateInfo& CreateInfo) = 0;
+	HLVM_NODISCARD virtual VkBufferView CreateVulkanBufferView(VkBuffer Buffer, const FRHIUnorderedAccessViewCreateInfo& CreateInfo) = 0;
 
 	// Vulkan-specific command list management
-	virtual VkCommandBuffer BeginVulkanCommandBuffer() = 0;
+	HLVM_NODISCARD virtual VkCommandBuffer BeginVulkanCommandBuffer() = 0;
 	virtual void EndVulkanCommandBuffer(VkCommandBuffer CommandBuffer) = 0;
 
 	// Vulkan-specific synchronization
@@ -44,7 +44,7 @@ public:
 	virtual void EndVulkanRenderPass() = 0;
 
 	// Vulkan-specific query and timestamp management
-	virtual VkQueryPool CreateVulkanQueryPool(ERHIQueryType QueryType) = 0;
+	HLVM_NODISCARD virtual VkQueryPool CreateVulkanQueryPool(ERHIQueryType QueryType) = 0;
 	virtual void BeginVulkanQuery(VkQueryPool QueryPool, TUINT32 QueryIndex) = 0;
 	virtual void EndVulkanQuery(VkQueryPool QueryPool, TUINT32 QueryIndex) = 0;
 	virtual void GetVulkanQueryResults(VkQueryPool QueryPool, TUINT32 QueryIndex, TUINT64& OutResult, bool bWait) = 0;

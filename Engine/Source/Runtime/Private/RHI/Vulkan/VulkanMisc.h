@@ -5,7 +5,7 @@
 #pragma once
 
 #include "RHI/RHIResourceDeclaration.h"
-#include "VulkanDefinition.h"
+#include "RHI/Vulkan/VulkanDefinition.h"
 
 // Helper function to convert RHI pixel format to Vulkan format
 HLVM_EXTERN_FUNC VkFormat VulkanFormatFromRHIFormat(EPixelFormat RHIFormat);

@@ -33,7 +33,7 @@ FGenericPlatformFile* FGenericPlatformFile::Get(EPlatformFileType PlatformFileTy
 			FGenericPlatformFile::_Init();
 		}
 	});
-	return sPlatformFileRedirector[HLVM_ENUM_SIZE_T(PlatformFileType)];
+	return sPlatformFileRedirector[HLVM_ENUM_V_T(size_t, PlatformFileType)];
 }
 
 bool FGenericPlatformFile::IsDirectory(const FPath& path)

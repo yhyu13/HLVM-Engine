@@ -82,11 +82,11 @@ HLVM_EXTERN_VAR TNoNullablePtr<FDynamicRHI> GDynamicRHI;
 template<typename T>
 HLVM_INLINE_FUNC void SetDynamicRHI(T* RHI)
 {
-	GDynamicRHI = D_C(FDynamicRHI*, RHI);
+	GDynamicRHI = S_C(FDynamicRHI*, RHI);
 }
 
 template<typename T>
 HLVM_INLINE_FUNC TNoNullablePtr<T> GetDynamicRHI()
 {
-	return D_C(T*, GDynamicRHI.Get());
+	return S_C(T*, GDynamicRHI.Get());
 }

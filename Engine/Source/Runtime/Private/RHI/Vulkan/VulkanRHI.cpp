@@ -2,7 +2,7 @@
  * Copyright (c) 2025. MIT License. All rights reserved.
  */
 
-#include "RHI/Vulkan/VulkanRHI.h"
+#include "VulkanRHI.h"
 
 DECLARE_LOG_CATEGORY(LogVulkanRHI)
 
@@ -840,6 +840,8 @@ VkBuffer FVulkanRHI::CreateVulkanBuffer(const FRHIBufferCreateDesc& CreateDesc, 
 
 void FVulkanRHI::DestoryVulkanBuffer(VkBuffer Buffer, void** InAllocation)
 {
+	HLVM_ENSURE(*InAllocation != nullptr);
+	HLVM_ENSURE(Buffer != VK_NULL_HANDLE);
 	vmaDestroyBuffer(VULKAN_VMA_ALLOCATOR, Buffer, R_C(VmaAllocation, *InAllocation));
 }
 

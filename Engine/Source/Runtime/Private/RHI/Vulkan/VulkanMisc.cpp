@@ -1,8 +1,8 @@
 /**
-* Copyright (c) 2025. MIT License. All rights reserved.
+ * Copyright (c) 2025. MIT License. All rights reserved.
  */
 
-#include "RHI/Vulkan/VulkanMisc.h"
+#include "VulkanMisc.h"
 
 // Convert RHI pixel format to Vulkan format
 VkFormat VulkanFormatFromRHIFormat(EPixelFormat RHIFormat)
@@ -52,31 +52,31 @@ VkBufferUsageFlags VulkanBufferUsageFlagsFromRHIUsageFlags(EBufferUsageFlags RHI
 {
 	VkBufferUsageFlags VulkanFlags = 0;
 
-	if (RHIFlags & EBufferUsageFlags::Vertex)
+	if (RHIFlags & EBufferUsageFlag::Vertex)
 	{
 		VulkanFlags |= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
 	}
-	if (RHIFlags & EBufferUsageFlags::Index)
+	if (RHIFlags & EBufferUsageFlag::Index)
 	{
 		VulkanFlags |= VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
 	}
-	if (RHIFlags & EBufferUsageFlags::Uniform)
+	if (RHIFlags & EBufferUsageFlag::Uniform)
 	{
 		VulkanFlags |= VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
 	}
-	if (RHIFlags & EBufferUsageFlags::Storage)
+	if (RHIFlags & EBufferUsageFlag::Storage)
 	{
 		VulkanFlags |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
 	}
-	if (RHIFlags & EBufferUsageFlags::ShaderResource)
+	if (RHIFlags & EBufferUsageFlag::ShaderResource)
 	{
 		VulkanFlags |= VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
 	}
-	if (RHIFlags & EBufferUsageFlags::TransferSource)
+	if (RHIFlags & EBufferUsageFlag::TransferSource)
 	{
 		VulkanFlags |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 	}
-	if (RHIFlags & EBufferUsageFlags::TransferDestination)
+	if (RHIFlags & EBufferUsageFlag::TransferDestination)
 	{
 		VulkanFlags |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 	}
@@ -86,41 +86,41 @@ VkBufferUsageFlags VulkanBufferUsageFlagsFromRHIUsageFlags(EBufferUsageFlags RHI
 
 VkMemoryPropertyFlags VulkanMemoryPropertyFlagsFromRHIMemoryPropertyFlags(EMemoryPropertyFlags RHIFlags)
 {
-		VkMemoryPropertyFlags VulkanFlags = 0;
+	VkMemoryPropertyFlags VulkanFlags = 0;
 
-		if (RHIFlags & EMemoryPropertyFlags::DeviceLocal)
-		{
-			VulkanFlags |= VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-		}
-		if (RHIFlags & EMemoryPropertyFlags::HostVisible)
-		{
-			VulkanFlags |= VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
-		}
-		if (RHIFlags & EMemoryPropertyFlags::HostCoherent)
-		{
-			VulkanFlags |= VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-		}
-		if (RHIFlags & EMemoryPropertyFlags::HostCached)
-		{
-			VulkanFlags |= VK_MEMORY_PROPERTY_HOST_CACHED_BIT;
-		}
-		if (RHIFlags & EMemoryPropertyFlags::DeviceCoherentAMD)
-		{
-			VulkanFlags |= VK_MEMORY_PROPERTY_DEVICE_COHERENT_BIT_AMD;
-		}
-		if (RHIFlags & EMemoryPropertyFlags::Protected)
-		{
-			VulkanFlags |= VK_MEMORY_PROPERTY_PROTECTED_BIT;
-		}
-		if (RHIFlags & EMemoryPropertyFlags::RDMACapableNV)
-		{
-			VulkanFlags |= VK_MEMORY_PROPERTY_RDMA_CAPABLE_BIT_NV;
-		}
-		if (RHIFlags & EMemoryPropertyFlags::LazilyAllocated)
-		{
-			VulkanFlags |= VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT;
-		}
-		return VulkanFlags;
+	if (RHIFlags & EMemoryPropertyFlag::DeviceLocal)
+	{
+		VulkanFlags |= VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+	}
+	if (RHIFlags & EMemoryPropertyFlag::HostVisible)
+	{
+		VulkanFlags |= VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+	}
+	if (RHIFlags & EMemoryPropertyFlag::HostCoherent)
+	{
+		VulkanFlags |= VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+	}
+	if (RHIFlags & EMemoryPropertyFlag::HostCached)
+	{
+		VulkanFlags |= VK_MEMORY_PROPERTY_HOST_CACHED_BIT;
+	}
+	if (RHIFlags & EMemoryPropertyFlag::DeviceCoherentAMD)
+	{
+		VulkanFlags |= VK_MEMORY_PROPERTY_DEVICE_COHERENT_BIT_AMD;
+	}
+	if (RHIFlags & EMemoryPropertyFlag::Protected)
+	{
+		VulkanFlags |= VK_MEMORY_PROPERTY_PROTECTED_BIT;
+	}
+	if (RHIFlags & EMemoryPropertyFlag::RDMACapableNV)
+	{
+		VulkanFlags |= VK_MEMORY_PROPERTY_RDMA_CAPABLE_BIT_NV;
+	}
+	if (RHIFlags & EMemoryPropertyFlag::LazilyAllocated)
+	{
+		VulkanFlags |= VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT;
+	}
+	return VulkanFlags;
 }
 
 // Convert RHI texture usage flags to Vulkan usage flags
@@ -128,30 +128,29 @@ VkImageUsageFlags VulkanTextureUsageFlagsFromRHIUsageFlags(ETextureCreateFlags R
 {
 	VkImageUsageFlags VulkanFlags = 0;
 
-	if (RHIFlags & ETextureCreateFlags::RenderTarget)
+	if (RHIFlags & ETextureCreateFlag::RenderTarget)
 	{
 		VulkanFlags |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 	}
-	if (RHIFlags & ETextureCreateFlags::DepthStencil)
+	if (RHIFlags & ETextureCreateFlag::DepthStencil)
 	{
 		VulkanFlags |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
 	}
-	if (RHIFlags & ETextureCreateFlags::ShaderResource)
+	if (RHIFlags & ETextureCreateFlag::ShaderResource)
 	{
 		VulkanFlags |= VK_IMAGE_USAGE_SAMPLED_BIT;
 	}
-	if (RHIFlags & ETextureCreateFlags::ShaderWrite)
+	if (RHIFlags & ETextureCreateFlag::ShaderWrite)
 	{
 		VulkanFlags |= VK_IMAGE_USAGE_STORAGE_BIT;
 	}
-	if (RHIFlags & ETextureCreateFlags::Transient)
+	if (RHIFlags & ETextureCreateFlag::Transient)
 	{
 		VulkanFlags |= VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT;
 	}
 
 	return VulkanFlags;
 }
-
 
 // Helper function to convert RHI texture filter to Vulkan filter
 VkFilter VulkanFilterFromRHIFilter(ETextureFilter RHIFilter)

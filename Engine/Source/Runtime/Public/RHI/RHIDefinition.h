@@ -10,7 +10,7 @@
 DECLARE_LOG_CATEGORY(LogRHI)
 
 // RHI Interface Types
-enum class ERHIInterfaceType : TUINT8
+enum class ERHIInterfaceType : TUINT32
 {
 	Vulkan,
 	Null,
@@ -18,7 +18,7 @@ enum class ERHIInterfaceType : TUINT8
 };
 
 // Enumeration of pixel formats
-enum class EPixelFormat : TUINT8
+enum class EPixelFormat : TUINT32
 {
 	Unknown,
 	R8_UNorm,
@@ -41,7 +41,7 @@ enum class EPixelFormat : TUINT8
 };
 
 // Enumeration of texture creation flags
-enum class ETextureCreateFlags : TUINT8
+enum class ETextureCreateFlag : TUINT32
 {
 	None = 0,
 	RenderTarget = 1 << 0,
@@ -51,10 +51,10 @@ enum class ETextureCreateFlags : TUINT8
 	Transient = 1 << 4,
 	// Add more flags as needed
 };
-HLVM_ENUM_BITWISE_OPERATOR_DEFINE(ETextureCreateFlags, &)
+HLVM_DECLARE_ENMU_FLAGS(ETextureCreateFlag, ETextureCreateFlags)
 
 // Enumeration of buffer usage flags
-enum class EBufferUsageFlags : TUINT8
+enum class EBufferUsageFlag : TUINT32
 {
 	None = 0,
 	Vertex = 1 << 0,             // Buffer is used as a vertex buffer
@@ -65,10 +65,10 @@ enum class EBufferUsageFlags : TUINT8
 	TransferSource = 1 << 5,     // Buffer is used as a transfer source
 	TransferDestination = 1 << 6 // Buffer is used as a transfer destination
 };
-HLVM_ENUM_BITWISE_OPERATOR_DEFINE(EBufferUsageFlags, &)
+HLVM_DECLARE_ENMU_FLAGS(EBufferUsageFlag, EBufferUsageFlags)
 
 // Enumeration of memory property flags
-enum class EMemoryPropertyFlags : TUINT32
+enum class EMemoryPropertyFlag : TUINT32
 {
 	None = 0,
 	DeviceLocal = 1 << 0,            // VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
@@ -81,10 +81,11 @@ enum class EMemoryPropertyFlags : TUINT32
 	DeviceUncachedAMD = 1 << 7,      // VK_MEMORY_PROPERTY_DEVICE_UNCACHED_BIT_AMD
 	RDMACapableNV = 1 << 8           // VK_MEMORY_PROPERTY_RDMA_CAPABLE_BIT_NV
 };
-HLVM_ENUM_BITWISE_OPERATOR_DEFINE(EMemoryPropertyFlags, &)
+HLVM_DECLARE_ENMU_FLAGS(EMemoryPropertyFlag, EMemoryPropertyFlags)
+
 
 // Enumeration of shader stages
-enum class EShaderStage : TUINT8
+enum class EShaderStage : TUINT32
 {
 	Vertex,
 	Pixel, // Also known as Fragment in Vulkan
@@ -101,7 +102,7 @@ enum class EShaderStage : TUINT8
 };
 
 // Query Types
-enum class ERHIQueryType : TUINT8
+enum class ERHIQueryType : TUINT32
 {
 	Occlusion,
 	Timestamp,
@@ -110,7 +111,7 @@ enum class ERHIQueryType : TUINT8
 };
 
 // Enumeration of texture filter modes
-enum class ETextureFilter : TUINT8
+enum class ETextureFilter : TUINT32
 {
 	None,
 	Point,
@@ -119,7 +120,7 @@ enum class ETextureFilter : TUINT8
 };
 
 // Enumeration of texture address modes
-enum class ETextureAddressMode : TUINT8
+enum class ETextureAddressMode : TUINT32
 {
 	None,
 	Wrap,
@@ -129,7 +130,7 @@ enum class ETextureAddressMode : TUINT8
 };
 
 // Enumeration of primitive topologies
-enum class EPrimitiveTopology : TUINT8
+enum class EPrimitiveTopology : TUINT32
 {
 	Undefined,
 	PointList,
@@ -141,7 +142,7 @@ enum class EPrimitiveTopology : TUINT8
 };
 
 // Enumeration of polygon modes
-enum class EPolygonMode : TUINT8
+enum class EPolygonMode : TUINT32
 {
 	Fill,
 	Line,
@@ -149,14 +150,14 @@ enum class EPolygonMode : TUINT8
 };
 
 // Enumeration of front face orientations
-enum class EFrontFace : TUINT8
+enum class EFrontFace : TUINT32
 {
 	Clockwise,
 	CounterClockwise
 };
 
 // Enumeration of cull modes
-enum class ECullMode : TUINT8
+enum class ECullMode : TUINT32
 {
 	None,
 	Front,
@@ -165,7 +166,7 @@ enum class ECullMode : TUINT8
 };
 
 // Enumeration of depth test modes
-enum class EDepthTest : TUINT8
+enum class EDepthTest : TUINT32
 {
 	Never,
 	Less,
@@ -178,7 +179,7 @@ enum class EDepthTest : TUINT8
 };
 
 // Enumeration of stencil test modes
-enum class EStencilTest : TUINT8
+enum class EStencilTest : TUINT32
 {
 	Never,
 	Less,
@@ -191,7 +192,7 @@ enum class EStencilTest : TUINT8
 };
 
 // Enumeration of blend modes
-enum class EBlendMode : TUINT8
+enum class EBlendMode : TUINT32
 {
 	Opaque,
 	Masked,
@@ -203,7 +204,7 @@ enum class EBlendMode : TUINT8
 };
 
 // Enumeration of comparison functions
-enum class ECompareFunction : TUINT8
+enum class ECompareFunction : TUINT32
 {
 	Never,
 	Less,
@@ -216,7 +217,7 @@ enum class ECompareFunction : TUINT8
 };
 
 // Enumeration of viewport types (e.g., windowed, fullscreen)
-enum class ERHIViewportType : TUINT8
+enum class ERHIViewportType : TUINT32
 {
 	Windowed,
 	Fullscreen,
@@ -224,7 +225,7 @@ enum class ERHIViewportType : TUINT8
 };
 
 // Enumeration of swap chain flags
-enum class ESwapChainFlags : TUINT8
+enum class ESwapChainFlags : TUINT32
 {
 	None = 0,
 	AllowTearing = 1 << 0, // Allows tearing for adaptive sync (e.g., FreeSync, G-Sync)

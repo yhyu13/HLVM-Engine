@@ -2,7 +2,7 @@
  * Copyright (c) 2025. MIT License. All rights reserved.
  */
 
-#include "RHI/Vulkan/VulkanViewport.h"
+#include "VulkanViewport.h"
 
 FVulkanBackBuffer::FVulkanBackBuffer(VkImage InImage, const FRHITextureCreateDesc& InCreateDesc, FVulkanViewport* InViewport)
 	: FVulkanTexture(InImage, InCreateDesc),

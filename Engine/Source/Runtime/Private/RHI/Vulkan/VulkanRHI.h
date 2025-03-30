@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "IVulkanDynamicRHI.h"
+#include "RHI/Vulkan/IVulkanDynamicRHI.h"
 #include "VulkanRHIResource.h"
 #include <functional>
 
