@@ -51,10 +51,10 @@ IFileHandle::OpRetType FPackedEntryHandle::Open(const FPath& FilePath, const FFi
 	PEH_HANDLE_STATUS(Status_InOut);
 	PEH_HANDLE_ENSURE(*Status_InOut, TXT("File operation continue with failed status"));
 	PEH_HANDLE_ASSERT(!mOpened, TXT("File operation begin with another already open file"));
-	PEH_HANDLE_ASSERT(Options.eFileMode == sDefaultEntryOptions.eFileMode, TXT("File option eFileMode invalid {}"), HLVM_ENUM_TCHAR_STR(Options.eFileMode));
-	PEH_HANDLE_ASSERT(Options.eFileMapped == sDefaultEntryOptions.eFileMapped, TXT("File option eFileMapped invalid {}"), HLVM_ENUM_TCHAR_STR(Options.eFileMapped));
-	PEH_HANDLE_ASSERT(Options.eFileAsync == sDefaultEntryOptions.eFileAsync, TXT("File option eFileAsync invalid {}"), HLVM_ENUM_TCHAR_STR(Options.eFileAsync));
-	PEH_HANDLE_ASSERT(Options.eFileLock == sDefaultEntryOptions.eFileLock, TXT("File option eFileLock invalid {}"), HLVM_ENUM_TCHAR_STR(Options.eFileLock));
+	PEH_HANDLE_ASSERT(Options.eFileMode == sDefaultEntryOptions.eFileMode, TXT("File option eFileMode invalid {}"), HLVM_ENUM_VALUE_TO_TCHAR(Options.eFileMode));
+	PEH_HANDLE_ASSERT(Options.eFileMapped == sDefaultEntryOptions.eFileMapped, TXT("File option eFileMapped invalid {}"), HLVM_ENUM_VALUE_TO_TCHAR(Options.eFileMapped));
+	PEH_HANDLE_ASSERT(Options.eFileAsync == sDefaultEntryOptions.eFileAsync, TXT("File option eFileAsync invalid {}"), HLVM_ENUM_VALUE_TO_TCHAR(Options.eFileAsync));
+	PEH_HANDLE_ASSERT(Options.eFileLock == sDefaultEntryOptions.eFileLock, TXT("File option eFileLock invalid {}"), HLVM_ENUM_VALUE_TO_TCHAR(Options.eFileLock));
 
 	mFileOptions = Options;
 	mFilePath = FilePath;
@@ -97,10 +97,10 @@ IFileHandle::OpRetType FPackedEntryHandle::Open(const FPath& FilePath, const FFi
 					std::memcpy(DecryptedBuffer.data(), RawBuffer.data(), RawBuffer.size());
 				}
 				break;
-				case EEncryptType::Unkown:
+				case EEncryptType::Unknow:
 				case EEncryptType::HLVM_NUM:
 				{
-					HLVM_ENSURE_F(false, TXT("Unkown encrypt type"));
+					HLVM_ENSURE_F(false, TXT("Unknow encrypt type"));
 				}
 				break;
 			}
@@ -115,10 +115,10 @@ IFileHandle::OpRetType FPackedEntryHandle::Open(const FPath& FilePath, const FFi
 				case ECompressType::No:
 					mContentBuffer = MoveTemp(DecryptedBuffer);
 					break;
-				case ECompressType::Unkown:
+				case ECompressType::Unknow:
 				case ECompressType::HLVM_NUM:
 				{
-					HLVM_ENSURE_F(false, TXT("Unkown compress type"));
+					HLVM_ENSURE_F(false, TXT("Unknow compress type"));
 				}
 				break;
 			}

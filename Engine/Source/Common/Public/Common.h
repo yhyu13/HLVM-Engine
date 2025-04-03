@@ -44,3 +44,8 @@
 #define BOOST_STACKTRACE_USE_BACKTRACE
 #include <boost/stacktrace.hpp>
 #include <boost/filesystem.hpp>
+
+/*
+ * Core
+ */
+#include "Core/CoreMinimal.h"

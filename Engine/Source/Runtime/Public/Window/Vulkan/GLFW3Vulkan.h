@@ -6,6 +6,7 @@
 
 #include "RHI/Vulkan/VulkanLoader.h"
 #include "Window/GLFW3/GLFW3Window.h"
+
 // Only include when HLVM_WINDOW_USE_VULKAN is true
 static_assert(HLVM_WINDOW_USE_VULKAN);
 

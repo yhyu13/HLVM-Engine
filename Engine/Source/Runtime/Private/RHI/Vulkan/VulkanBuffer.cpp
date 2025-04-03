@@ -10,14 +10,12 @@ FVulkanBuffer::FVulkanBuffer(const FRHIBufferCreateDesc& InCreateDesc)
 {
 	CreateDesc = InCreateDesc;
 	CreateBuffer();
-
 	HLVM_LOG(LogRHI, trace, TXT("Create buffer: {}"), *CreateDesc.DebugName);
 }
 
 FVulkanBuffer::~FVulkanBuffer()
 {
 	DestroyBuffer();
-
 	HLVM_LOG(LogRHI, trace, TXT("Destroy buffer: {}"), *CreateDesc.DebugName);
 }
 
@@ -52,5 +50,9 @@ void FVulkanBuffer::CreateBuffer()
 
 void FVulkanBuffer::DestroyBuffer()
 {
+	if (Buffer == VK_NULL_HANDLE)
+	{
+		return;
+	}
 	GetDynamicRHI<IVulkanDynamicRHI>()->DestoryVulkanBuffer(Buffer, R_C(void**, &Allocation));
 }

@@ -9,7 +9,7 @@
 class FVulkanFence : public FRefCountable
 {
 public:
-	FVulkanFence(FVulkanLogicalDeviceRef InDevice, bool InSignaled);
+	FVulkanFence(const FVulkanLogicalDeviceRef& InDevice, bool InSignaled);
 	~FVulkanFence();
 
 	VkFence GetHandle() const { return Fence; }
@@ -25,7 +25,7 @@ private:
 class FVulkanSemaphore : public FRefCountable
 {
 public:
-	FVulkanSemaphore(FVulkanLogicalDeviceRef InDevice);
+	FVulkanSemaphore(const FVulkanLogicalDeviceRef& InDevice);
 	~FVulkanSemaphore();
 
 	VkSemaphore GetHandle() const { return Semaphore; }
@@ -38,7 +38,7 @@ private:
 class FVulkanEvent : public FRefCountable
 {
 public:
-	FVulkanEvent(FVulkanLogicalDeviceRef InDevice);
+	FVulkanEvent(const FVulkanLogicalDeviceRef& InDevice);
 	~FVulkanEvent();
 
 	VkEvent GetHandle() const { return Event; }

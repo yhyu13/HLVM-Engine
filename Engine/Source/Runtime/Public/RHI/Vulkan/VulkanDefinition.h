@@ -7,6 +7,8 @@
 #include "Core/Assert.h"
 #include "Core/Object/RefCountPtr.h"
 
+DECLARE_LOG_CATEGORY(LogVulkan)
+
 #define VK_NO_PROTOTYPES
 #include <vulkan/vulkan_core.h>
 #include <vulkan/vk_enum_string_helper.h>
@@ -31,22 +33,25 @@
 /// @brief Helper macro to convert VkResult to TCHAR string
 #define VULKAN_RESULT_TO_TCHAR(x) TO_TCHAR_CSTR(string_VkResult(x))
 
+#define VULKAN_TYPE_TO_FSTRING(Type, Value) FString::Format(TXT("{} {}"), TXT("Type"), S_C(TUINT32, Value))
+#define VULKAN_FLAGS_TO_FSTRING(Type, Value) FString::Format(TXT("{} {}"), TXT("Type"), S_C(TUINT32, Value))
+
 /// @brief Helper macro to test the result of Vulkan calls which can return an error. (HLVM_ENSURE_F)
-#define VULKAN_ENSURE(x)                                                                                                                  \
-	do                                                                                                                                \
-	{                                                                                                                                 \
-		VkResult _result = (x);                                                                                                       \
+#define VULKAN_ENSURE(x)                                                                                                                \
+	do                                                                                                                                  \
+	{                                                                                                                                   \
+		VkResult _result = (x);                                                                                                         \
 		HLVM_ENSURE_F(_result == VK_SUCCESS, TXT("Vulkan call {} failed with error: {}"), STRTIFY(x), VULKAN_RESULT_TO_TCHAR(_result)); \
-	}                                                                                                                                 \
+	}                                                                                                                                   \
 	while (0)
 
 /// @brief Helper macro to test the result of Vulkan calls which can return an error. (HLVM_ASSERT_F)
-#define VULKAN_ASSERT(x)                                                                                                                  \
-	do                                                                                                                                \
-	{                                                                                                                                 \
-		VkResult _result = (x);                                                                                                       \
+#define VULKAN_ASSERT(x)                                                                                                                \
+	do                                                                                                                                  \
+	{                                                                                                                                   \
+		VkResult _result = (x);                                                                                                         \
 		HLVM_ASSERT_F(_result == VK_SUCCESS, TXT("Vulkan call {} failed with error: {}"), STRTIFY(x), VULKAN_RESULT_TO_TCHAR(_result)); \
-	}                                                                                                                                 \
+	}                                                                                                                                   \
 	while (0)
 
 /// @brief whether to keep old swapchain when recreating it, might not work on android platform
@@ -55,6 +60,14 @@
 /// @brief whether to use image fence for swapchain, might not work on android platform
 #define VULKAN_SWAPCHAIN_USE_IMAGE_FENCE 1
 
-class FVulkanTexture;
-class FVulkanQueue;
-class FVulkanView;
+template <class T>
+void ZeroVulkanStruct(T* Struct, TINT32 VkStructureType)
+{
+	static_assert(!std::is_pointer_v<T>, "Don't use a pointer!");
+	static_assert(STRUCT_OFFSET(T, sType) == 0, "Assumes sType is the first member in the Vulkan type!");
+	static_assert(sizeof(T::sType) == sizeof(TINT32), "Assumed sType is compatible with int32!");
+	// Horrible way to coerce the compiler to not have to know what T::sType is so we can have this header not have to include vulkan.h
+	TINT32* Type = R_C(TINT32*, &Struct->sType);
+	*Type = VkStructureType;
+	std::memset(R_C(TUINT8*, Struct) + sizeof(TINT32), 0, sizeof(T) - sizeof(TINT32));
+};

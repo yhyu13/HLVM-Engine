@@ -14,8 +14,8 @@ static FBoostPlatformFile SBoostPlatformFile{};
 
 void FBoostPlatformFile::_Init()
 {
-	HLVM_ASSERT_F(!sPlatformFileRedirector[HLVM_ENUM_V(EPlatformFileType, Disk)], TXT("Local Platform file is already registered"));
-	sPlatformFileRedirector[HLVM_ENUM_V(EPlatformFileType, Disk)] = FBoostPlatformFile::Get();
+	HLVM_ASSERT_F(!sPlatformFileRedirector[HLVM_ENUM_VALUE(EPlatformFileType::Disk)], TXT("Local Platform file is already registered"));
+	sPlatformFileRedirector[HLVM_ENUM_VALUE(EPlatformFileType::Disk)] = FBoostPlatformFile::Get();
 	HLVM_LOG(LogBoostPlatformFile, debug, TXT("Init FBoostPlatformFile"));
 }
 

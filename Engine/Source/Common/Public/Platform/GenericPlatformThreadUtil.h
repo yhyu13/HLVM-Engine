@@ -14,7 +14,7 @@ class FGenericPlatformThreadUtil
 public:
 	virtual ~FGenericPlatformThreadUtil() noexcept = default;
 
-	HLVM_STATIC_FUNC bool SetThreadsWithAffinity(const TVector<boost::thread*>& Threads, const FThreadAffinityMode& AffinityMode)
+	HLVM_INLINE_FUNC HLVM_STATIC_FUNC bool SetThreadsWithAffinity(const TVector<boost::thread*>& Threads, const FThreadAffinityMode& AffinityMode)
 	{
 		return sInstance->InternalSetThreadsWithAffinity(Threads, AffinityMode);
 	}

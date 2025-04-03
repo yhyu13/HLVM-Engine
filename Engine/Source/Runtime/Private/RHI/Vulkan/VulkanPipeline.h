@@ -7,8 +7,6 @@
 #include "RHI/RHIResource.h"
 #include "VulkanRHIResourceDeclaration.h"
 
-
-
 // Vulkan-specific RHI depth-stencil view
 class FVulkanDepthStencilView : public FRHIDepthStencilView, public FVulkanResource
 {

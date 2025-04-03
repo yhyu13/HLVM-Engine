@@ -4,63 +4,63 @@
 
 #include "VulkanSyncObject.h"
 
-FVulkanFence::FVulkanFence(FVulkanLogicalDeviceRef InDevice, bool InSignaled)
+FVulkanFence::FVulkanFence(const FVulkanLogicalDeviceRef& InDevice, bool InSignaled)
 	: Device(InDevice)
 {
 	VkFenceCreateInfo fenceCreateInfo = {};
 	fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
 	fenceCreateInfo.flags = InSignaled ? VK_FENCE_CREATE_SIGNALED_BIT : 0;
-	VULKAN_ENSURE(vkCreateFence(Device->Get(), &fenceCreateInfo, VULKAN_CPU_ALLOCATOR, &Fence));
+	VULKAN_ENSURE(VulkanRHI::vkCreateFence(Device->GetHandle(), &fenceCreateInfo, VulkanRHI::VULKAN_CPU_ALLOCATOR, &Fence));
 }
 
 FVulkanFence::~FVulkanFence()
 {
-	vkDestroyFence(Device->Get(), Fence, VULKAN_CPU_ALLOCATOR);
+	VulkanRHI::vkDestroyFence(Device->GetHandle(), Fence, VulkanRHI::VULKAN_CPU_ALLOCATOR);
 }
 
 void FVulkanFence::Reset()
 {
-	vkResetFences(Device->Get(), 1, &Fence);
+	VulkanRHI::vkResetFences(Device->GetHandle(), 1, &Fence);
 }
 
 void FVulkanFence::Wait(uint64_t Timeout)
 {
-	vkWaitForFences(Device->Get(), 1, &Fence, VK_TRUE, Timeout);
+	VulkanRHI::vkWaitForFences(Device->GetHandle(), 1, &Fence, VK_TRUE, Timeout);
 }
 
-FVulkanSemaphore::FVulkanSemaphore(FVulkanLogicalDeviceRef InDevice)
+FVulkanSemaphore::FVulkanSemaphore(const FVulkanLogicalDeviceRef& InDevice)
 	: Device(InDevice)
 {
 	VkSemaphoreCreateInfo semaphoreCreateInfo = {};
 	semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-	VULKAN_ENSURE(vkCreateSemaphore(Device->Get(), &semaphoreCreateInfo, VULKAN_CPU_ALLOCATOR, &Semaphore));
+	VULKAN_ENSURE(VulkanRHI::vkCreateSemaphore(Device->GetHandle(), &semaphoreCreateInfo, VulkanRHI::VULKAN_CPU_ALLOCATOR, &Semaphore));
 }
 
 FVulkanSemaphore::~FVulkanSemaphore()
 {
-	vkDestroySemaphore(Device->Get(), Semaphore, VULKAN_CPU_ALLOCATOR);
+	VulkanRHI::vkDestroySemaphore(Device->GetHandle(), Semaphore, VulkanRHI::VULKAN_CPU_ALLOCATOR);
 }
 
 
-FVulkanEvent::FVulkanEvent(FVulkanLogicalDeviceRef InDevice)
+FVulkanEvent::FVulkanEvent(const FVulkanLogicalDeviceRef& InDevice)
 	: Device(InDevice)
 {
 	VkEventCreateInfo eventCreateInfo = {};
 	eventCreateInfo.sType = VK_STRUCTURE_TYPE_EVENT_CREATE_INFO;
-	VULKAN_ENSURE(vkCreateEvent(Device->Get(), &eventCreateInfo, VULKAN_CPU_ALLOCATOR, &Event));
+	VULKAN_ENSURE(VulkanRHI::vkCreateEvent(Device->GetHandle(), &eventCreateInfo, VulkanRHI::VULKAN_CPU_ALLOCATOR, &Event));
 }
 
 FVulkanEvent::~FVulkanEvent()
 {
-	vkDestroyEvent(Device->Get(), Event, VULKAN_CPU_ALLOCATOR);
+	VulkanRHI::vkDestroyEvent(Device->GetHandle(), Event, VulkanRHI::VULKAN_CPU_ALLOCATOR);
 }
 
 void FVulkanEvent::Set()
 {
-	vkSetEvent(Device->Get(), Event);
+	VulkanRHI::vkSetEvent(Device->GetHandle(), Event);
 }
 
 void FVulkanEvent::Reset()
 {
-	vkResetEvent(Device->Get(), Event);
+	VulkanRHI::vkResetEvent(Device->GetHandle(), Event);
 }

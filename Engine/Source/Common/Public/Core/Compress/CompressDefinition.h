@@ -10,7 +10,7 @@ HLVM_ENUM(ECompressType, TUINT8,
 	ZSTD_1,
 	ZSTD_4,
 	No,
-	Unkown);
+	Unknow);
 
 /**
  * https://github.com/facebook/zstd

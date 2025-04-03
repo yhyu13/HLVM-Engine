@@ -17,7 +17,7 @@
 HLVM_ENUM(EPackedFileType, TUINT8,
 	Base,
 	Patch,
-	Unkown);
+	Unknow);
 
 /**
  * mapped region https://live.boost.org/doc/libs/1_83_0/doc/html/boost/interprocess/mapped_region.html
@@ -69,5 +69,5 @@ private:
 	// Mounting order, the larger the prior when searching for files
 	uint64_t mMountOrder{ 0 };
 	// Identify packed file type
-	EPackedFileType mPackedFileType{ EPackedFileType::Unkown };
+	EPackedFileType mPackedFileType{ EPackedFileType::Unknow };
 };

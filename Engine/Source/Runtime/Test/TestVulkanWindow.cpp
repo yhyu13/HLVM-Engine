@@ -10,6 +10,8 @@ DECLARE_LOG_CATEGORY(LogTest)
 #if HLVM_WINDOW_USE_VULKAN
 	#include "Window/Vulkan/GLFW3Vulkan.h"
 
+	using namespace VulkanRHI;
+
 	#if 1 // Test Vulkan triangle program with direct vulkan api calls
 		#pragma clang diagnostic push
 		#pragma clang diagnostic ignored "-Wdocumentation"
@@ -1234,7 +1236,7 @@ RECORD_BOOL(test_GLFW3VulkanWindowRaw)
 	HelloTriangleApplication app;
 	try
 	{
-		//app.run();
+		app.run();
 	}
 	catch (const std::exception& e)
 	{

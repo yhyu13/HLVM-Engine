@@ -52,7 +52,7 @@ public:
 		mDevice = InDevice;
 	}
 
-	HLVM_INLINE_FUNC VkPhysicalDevice Get() const
+	HLVM_INLINE_FUNC VkPhysicalDevice GetHandle() const
 	{
 		return mDevice;
 	}
@@ -82,7 +82,7 @@ public:
 		mDevice = InDevice;
 	}
 
-	HLVM_INLINE_FUNC VkDevice Get() const
+	HLVM_INLINE_FUNC VkDevice GetHandle() const
 	{
 		return mDevice;
 	}

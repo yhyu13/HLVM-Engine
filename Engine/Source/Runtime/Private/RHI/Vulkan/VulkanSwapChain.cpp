@@ -23,7 +23,7 @@ FVulkanSwapChain::~FVulkanSwapChain()
 
 void FVulkanSwapChain::DestroySwapChain(TNullablePtr<FRecreateInfo> OutCreateInfo)
 {
-	VkDevice   device = OwnerViewport->LogicalDevice->Get();
+	VkDevice   device = OwnerViewport->LogicalDevice->GetHandle();
 	const bool bRecreate = OutCreateInfo && VULKAN_SWAPCHAIN_KEEP_OLD;
 	if (bRecreate)
 	{
@@ -40,13 +40,13 @@ void FVulkanSwapChain::DestroySwapChain(TNullablePtr<FRecreateInfo> OutCreateInf
 	// Destroy framebuffer
 	for (auto framebuffer : swapChainFrameBuffers)
 	{
-		vkDestroyFramebuffer(device, framebuffer, VULKAN_CPU_ALLOCATOR);
+		VulkanRHI::vkDestroyFramebuffer(device, framebuffer, VulkanRHI::VULKAN_CPU_ALLOCATOR);
 	}
 	swapChainFrameBuffers.clear();
 	// Destroy image view
 	for (auto imageView : swapChainImageViews)
 	{
-		vkDestroyImageView(device, imageView, VULKAN_CPU_ALLOCATOR);
+		VulkanRHI::vkDestroyImageView(device, imageView, VulkanRHI::VULKAN_CPU_ALLOCATOR);
 	}
 	swapChainImageViews.clear();
 	swapChainImages.clear();
@@ -55,15 +55,15 @@ void FVulkanSwapChain::DestroySwapChain(TNullablePtr<FRecreateInfo> OutCreateInf
 	// TODO : create a manger class for surface and remove ref count by 1 here
 	if (!bRecreate)
 	{
-		vkDestroySwapchainKHR(device, swapChain, VULKAN_CPU_ALLOCATOR);
-		vkDestroySurfaceKHR(OwnerViewport->Instance, surface, VULKAN_CPU_ALLOCATOR);
+		VulkanRHI::vkDestroySwapchainKHR(device, swapChain, VulkanRHI::VULKAN_CPU_ALLOCATOR);
+		VulkanRHI::vkDestroySurfaceKHR(OwnerViewport->Instance, surface, VulkanRHI::VULKAN_CPU_ALLOCATOR);
 	}
 }
 
 void FVulkanSwapChain::CreateSwapChain(TNoNullablePtr<FRecreateInfo> InCreateInfo)
 {
 	auto&	 physicalDevice = OwnerViewport->PhysicalDevice;
-	VkDevice device = OwnerViewport->LogicalDevice->Get();
+	VkDevice device = OwnerViewport->LogicalDevice->GetHandle();
 	surface = InCreateInfo->Surface;
 
 	FVulkanPhysicalDevice::SwapChainSupportDetails swapChainSupport = physicalDevice->QuerySwapChainSupport(surface, true);
@@ -113,12 +113,12 @@ void FVulkanSwapChain::CreateSwapChain(TNoNullablePtr<FRecreateInfo> InCreateInf
 	{
 		createInfo.oldSwapchain = InCreateInfo->OldSwapChain;
 	}
-	VULKAN_ENSURE(vkCreateSwapchainKHR(device, &createInfo, VULKAN_CPU_ALLOCATOR, &swapChain));
+	VULKAN_ENSURE(VulkanRHI::vkCreateSwapchainKHR(device, &createInfo, VulkanRHI::VULKAN_CPU_ALLOCATOR, &swapChain));
 
-	vkGetSwapchainImagesKHR(device, swapChain, &imageCount, nullptr);
+	VulkanRHI::vkGetSwapchainImagesKHR(device, swapChain, &imageCount, nullptr);
 	HLVM_ENSURE(imageCount > 0 && imageCount <= MAX_FRAMES_IN_FLIGHT);
 	swapChainImages.resize(imageCount);
-	vkGetSwapchainImagesKHR(device, swapChain, &imageCount, swapChainImages.data());
+	VulkanRHI::vkGetSwapchainImagesKHR(device, swapChain, &imageCount, swapChainImages.data());
 
 	swapChainActualImageCount = imageCount;
 	swapChainImageFormat = surfaceFormat.format;
@@ -195,7 +195,7 @@ VkExtent2D FVulkanSwapChain::ChooseSwapExtent(const VkSurfaceCapabilitiesKHR& ca
 
 void FVulkanSwapChain::CreateImageViews()
 {
-	VkDevice device = OwnerViewport->LogicalDevice->Get();
+	VkDevice device = OwnerViewport->LogicalDevice->GetHandle();
 	swapChainImageViews.resize(swapChainImages.size());
 	// 遍历创建ImageView---图像视图，该图像可以作为纹理使用，但是作为渲染目标，还需要帧缓冲对象
 	for (size_t i = 0; i < swapChainImages.size(); i++)
@@ -215,7 +215,7 @@ void FVulkanSwapChain::CreateImageViews()
 		createInfo.subresourceRange.baseArrayLayer = 0;
 		createInfo.subresourceRange.layerCount = 1;
 
-		VULKAN_ENSURE(vkCreateImageView(device, &createInfo, VULKAN_CPU_ALLOCATOR, &swapChainImageViews[i]));
+		VULKAN_ENSURE(VulkanRHI::vkCreateImageView(device, &createInfo, VulkanRHI::VULKAN_CPU_ALLOCATOR, &swapChainImageViews[i]));
 	}
 }
 
@@ -227,7 +227,7 @@ FVulkanSwapChain::ESurfaceStatus FVulkanSwapChain::AcquireNextImageIndex(TUINT32
 	OutImageIndex = TUINT32_MAX;
 	OutImageAvailableSemaphore = VK_NULL_HANDLE;
 
-	VkDevice device = OwnerViewport->LogicalDevice->Get();
+	VkDevice device = OwnerViewport->LogicalDevice->GetHandle();
 
 	TUINT32 prevSyncObjectIndex = currentSyncObjectIndex;
 	currentSyncObjectIndex += 1;
@@ -246,7 +246,7 @@ FVulkanSwapChain::ESurfaceStatus FVulkanSwapChain::AcquireNextImageIndex(TUINT32
 		while ((Result == VK_SUCCESS || Result == VK_SUBOPTIMAL_KHR)
 			&& ImageIndex >= swapChainActualImageCount)
 		{
-			Result = vkAcquireNextImageKHR(device, swapChain, UINT64_MAX, imageAcquiredSemaphore, imageAcquiredFence, &ImageIndex);
+			Result = VulkanRHI::vkAcquireNextImageKHR(device, swapChain, UINT64_MAX, imageAcquiredSemaphore, imageAcquiredFence, &ImageIndex);
 		}
 	}
 
@@ -291,7 +291,7 @@ FVulkanSwapChain::ESurfaceStatus FVulkanSwapChain::Present(VkQueue PresentQueue,
 	presentInfo.pSwapchains = &swapChain;
 	presentInfo.pImageIndices = &currentAcquiredImageIndex;
 
-	VkResult Result = vkQueuePresentKHR(PresentQueue, &presentInfo);
+	VkResult Result = VulkanRHI::vkQueuePresentKHR(PresentQueue, &presentInfo);
 	// Reset acquired image index
 	currentAcquiredImageIndex = TUINT32_MAX;
 

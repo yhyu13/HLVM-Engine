@@ -26,7 +26,7 @@ namespace
 	HLVM_STATIC_FUNC TVector<VkExtensionProperties> EnumerateInstanceExtensionProperties(const char* pLayerName)
 	{
 		uint32_t extCount = 0;
-		VkResult result = vkEnumerateInstanceExtensionProperties(pLayerName, &extCount, nullptr);
+		VkResult result = VulkanRHI::vkEnumerateInstanceExtensionProperties(pLayerName, &extCount, nullptr);
 		if (result != VK_SUCCESS)
 		{
 			HLVM_LOG(LogVulkanRHI, err, TXT("vkEnumerateInstanceExtensionProperties failed to get extension count. VkResult = {}"), VULKAN_RESULT_TO_TCHAR(result));
@@ -34,7 +34,7 @@ namespace
 		}
 
 		TVector<VkExtensionProperties> extensionProperties(extCount);
-		result = vkEnumerateInstanceExtensionProperties(pLayerName, &extCount, extensionProperties.data());
+		result = VulkanRHI::vkEnumerateInstanceExtensionProperties(pLayerName, &extCount, extensionProperties.data());
 		if (result != VK_SUCCESS)
 		{
 			HLVM_LOG(LogVulkanRHI, err, TXT("vkEnumerateInstanceExtensionProperties failed to get extension properties. VkResult = {}"), VULKAN_RESULT_TO_TCHAR(result));
@@ -53,10 +53,10 @@ namespace
 	HLVM_STATIC_FUNC TVector<VkLayerProperties> EnumerateInstanceLayerProperties()
 	{
 		uint32_t layerCount;
-		vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
+		VulkanRHI::vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
 
 		TVector<VkLayerProperties> availableLayers(layerCount);
-		vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
+		VulkanRHI::vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
 		return availableLayers;
 	}
 
@@ -100,10 +100,10 @@ namespace
 	HLVM_STATIC_FUNC bool CheckValidationLayerSupport()
 	{
 		uint32_t layerCount = 0;
-		vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
+		VulkanRHI::vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
 
 		TVector<VkLayerProperties> availableLayers(layerCount);
-		vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
+		VulkanRHI::vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
 		for (const char* layerName : validationLayers)
 		{
 			bool layerFound = false;
@@ -168,10 +168,10 @@ namespace
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wcast-function-type-strict"
-	// 使用vkGetInstanceProcAddr获取某个api的函数指针
+	// 使用VulkanRHI::vkGetInstanceProcAddr获取某个api的函数指针
 	HLVM_STATIC_FUNC VkResult CreateDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDebugUtilsMessengerEXT* pDebugMessenger)
 	{
-		auto func = R_C(PFN_vkCreateDebugUtilsMessengerEXT, vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT"));
+		auto func = R_C(PFN_vkCreateDebugUtilsMessengerEXT, VulkanRHI::vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT"));
 		if (func != nullptr)
 		{
 			return func(instance, pCreateInfo, pAllocator, pDebugMessenger);
@@ -184,7 +184,7 @@ namespace
 
 	HLVM_STATIC_FUNC void DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger, const VkAllocationCallbacks* pAllocator)
 	{
-		auto func = R_C(PFN_vkDestroyDebugUtilsMessengerEXT, vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT"));
+		auto func = R_C(PFN_vkDestroyDebugUtilsMessengerEXT, VulkanRHI::vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT"));
 		if (func != nullptr)
 		{
 			func(instance, debugMessenger, pAllocator);
@@ -223,9 +223,9 @@ namespace
 		QueueFamilyIndices indices;
 
 		uint32_t queueFamilyCount = 0;
-		vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
+		VulkanRHI::vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
 		TVector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
-		vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
+		VulkanRHI::vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
 
 		uint32_t index = 0;
 		for (const auto& queueFamily : queueFamilies)
@@ -244,7 +244,7 @@ namespace
 			}
 
 			VkBool32 presentSupport = false;
-			vkGetPhysicalDeviceSurfaceSupportKHR(device, index, surface, &presentSupport);
+			VulkanRHI::vkGetPhysicalDeviceSurfaceSupportKHR(device, index, surface, &presentSupport);
 			if (presentSupport)
 			{
 				indices.presentFamily = index;
@@ -263,10 +263,10 @@ namespace
 	HLVM_STATIC_FUNC bool CheckDeviceExtensionSupport(VkPhysicalDevice device)
 	{
 		uint32_t extensionCount;
-		vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr);
+		VulkanRHI::vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr);
 
 		TVector<VkExtensionProperties> availableExtensions(extensionCount);
-		vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, availableExtensions.data());
+		VulkanRHI::vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, availableExtensions.data());
 
 		TSet<std::string> requiredDeviceExtensions(deviceExtensions.begin(), deviceExtensions.end());
 
@@ -292,25 +292,25 @@ namespace
 
 		// 与交换链相关的函数都需要device和surface这两个参数
 		// 查询基础表面特性
-		vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &details.capabilities);
+		VulkanRHI::vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &details.capabilities);
 
 		// 查询表面支持格式
 		uint32_t formatCount;
-		vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, nullptr);
+		VulkanRHI::vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, nullptr);
 		if (formatCount != 0)
 		{
 			details.formats.resize(formatCount);
-			vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, details.formats.data());
+			VulkanRHI::vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, details.formats.data());
 		}
 
 		// 查询表面支持呈现模式
 		uint32_t presentModeCount;
-		vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, nullptr);
+		VulkanRHI::vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, nullptr);
 
 		if (presentModeCount != 0)
 		{
 			details.presentModes.resize(presentModeCount);
-			vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, details.presentModes.data());
+			VulkanRHI::vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, details.presentModes.data());
 		}
 
 		return details;
@@ -320,11 +320,11 @@ namespace
 	HLVM_STATIC_FUNC bool IsDeviceSuitable(VkPhysicalDevice device, VkSurfaceKHR surface)
 	{
 		VkPhysicalDeviceProperties deviceProperties;
-		vkGetPhysicalDeviceProperties(device, &deviceProperties);
+		VulkanRHI::vkGetPhysicalDeviceProperties(device, &deviceProperties);
 
 		// 纹理压缩、64为浮点、多窗口渲染是否支持，通过下面函数查询
 		VkPhysicalDeviceFeatures deviceFeatures;
-		vkGetPhysicalDeviceFeatures(device, &deviceFeatures);
+		VulkanRHI::vkGetPhysicalDeviceFeatures(device, &deviceFeatures);
 
 		// 显卡支持集合着色器的判断条件
 		bool isSupportSetShader = (deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) && deviceFeatures.geometryShader;
@@ -392,16 +392,16 @@ void FVulkanRHI::Shutdown()
 	PhysicalDevice.Reset();
 
 	// TODO : desotry every vulkan handle
-	vkDeviceWaitIdle(VulkanDevice);
+	VulkanRHI::vkDeviceWaitIdle(VulkanDevice);
 
 	// Cleanup Vulkan resources
-	vmaDestroyAllocator(VULKAN_VMA_ALLOCATOR);
-	vkDestroyDevice(VulkanDevice, VULKAN_CPU_ALLOCATOR);
+	vmaDestroyAllocator(VulkanRHI::VULKAN_VMA_ALLOCATOR);
+	VulkanRHI::vkDestroyDevice(VulkanDevice, VulkanRHI::VULKAN_CPU_ALLOCATOR);
 	if (bUseValidationLayers)
 	{
-		DestroyDebugUtilsMessengerEXT(VulkanInstance, DebugMessenger, VULKAN_CPU_ALLOCATOR);
+		DestroyDebugUtilsMessengerEXT(VulkanInstance, DebugMessenger, VulkanRHI::VULKAN_CPU_ALLOCATOR);
 	}
-	vkDestroyInstance(VulkanInstance, VULKAN_CPU_ALLOCATOR);
+	VulkanRHI::vkDestroyInstance(VulkanInstance, VulkanRHI::VULKAN_CPU_ALLOCATOR);
 
 	HLVM_LOG(LogVulkanRHI, debug, TXT("VulkanRHI Shutdown!"));
 }
@@ -452,7 +452,7 @@ FShaderRHIRef FVulkanRHI::CreateShader(const FShaderCreateInfo& CreateInfo)
 void FVulkanRHI::ReleaseShader(FShaderRHIRef& Shader)
 {
 	//	FVulkanShader* VulkanShader = static_cast<FVulkanShader*>(Shader.GetReference());
-	//	vkDestroyShaderModule(VulkanDevice, VulkanShader->GetShaderModule(), nullptr);
+	//	VulkanRHI::vkDestroyShaderModule(VulkanDevice, VulkanShader->GetShaderModule(), nullptr);
 	//	Shader.SafeRelease();
 }
 
@@ -589,25 +589,25 @@ void FVulkanRHI::RHIFlushPendingDeletes()
 void FVulkanRHI::RHISetGraphicsPipelineState(FRHIGraphicsPipelineState* PipelineState)
 {
 	//	FVulkanGraphicsPipelineState* VulkanPipelineState = static_cast<FVulkanGraphicsPipelineState*>(PipelineState);
-	//	vkCmdBindPipeline(GetCurrentCommandBuffer(), VK_PIPELINE_BIND_POINT_GRAPHICS, VulkanPipelineState->GetPipeline());
+	//	VulkanRHI::vkCmdBindPipeline(GetCurrentCommandBuffer(), VK_PIPELINE_BIND_POINT_GRAPHICS, VulkanPipelineState->GetPipeline());
 }
 
 void FVulkanRHI::RHISetComputePipelineState(FRHIComputePipelineState* PipelineState)
 {
 	//	FVulkanComputePipelineState* VulkanPipelineState = static_cast<FVulkanComputePipelineState*>(PipelineState);
-	//	vkCmdBindPipeline(GetCurrentCommandBuffer(), VK_PIPELINE_BIND_POINT_COMPUTE, VulkanPipelineState->GetPipeline());
+	//	VulkanRHI::vkCmdBindPipeline(GetCurrentCommandBuffer(), VK_PIPELINE_BIND_POINT_COMPUTE, VulkanPipelineState->GetPipeline());
 }
 
 void FVulkanRHI::RHISetViewport(TUINT32 MinX, TUINT32 MinY, float MinZ, TUINT32 MaxX, TUINT32 MaxY, float MaxZ)
 {
 	//	VkViewport Viewport = { static_cast<float>(MinX), static_cast<float>(MinY), static_cast<float>(MaxX - MinX), static_cast<float>(MaxY - MinY), MinZ, MaxZ };
-	//	vkCmdSetViewport(GetCurrentCommandBuffer(), 0, 1, &Viewport);
+	//	VulkanRHI::vkCmdSetViewport(GetCurrentCommandBuffer(), 0, 1, &Viewport);
 }
 
 void FVulkanRHI::RHISetScissorRect(bool bEnable, TUINT32 MinX, TUINT32 MinY, TUINT32 MaxX, TUINT32 MaxY)
 {
 	//	VkRect2D Scissor = { { static_cast<int32_t>(MinX), static_cast<int32_t>(MinY) }, { MaxX - MinX, MaxY - MinY } };
-	//	vkCmdSetScissor(GetCurrentCommandBuffer(), 0, 1, &Scissor);
+	//	VulkanRHI::vkCmdSetScissor(GetCurrentCommandBuffer(), 0, 1, &Scissor);
 }
 
 // Vulkan-specific initialization
@@ -652,7 +652,7 @@ void FVulkanRHI::CreateVulkanInstance()
 		CreateInfo.pNext = nullptr;
 	}
 
-	VkResult Result = vkCreateInstance(&CreateInfo, nullptr, &VulkanInstance);
+	VkResult Result = VulkanRHI::vkCreateInstance(&CreateInfo, nullptr, &VulkanInstance);
 	HLVM_ENSURE(Result == VK_SUCCESS);
 }
 
@@ -674,11 +674,11 @@ void FVulkanRHI::CreateVulkanPhysicalDevice()
 {
 	// 1 Find suitable device
 	uint32_t DeviceCount = 0;
-	vkEnumeratePhysicalDevices(VulkanInstance, &DeviceCount, nullptr);
+	VulkanRHI::vkEnumeratePhysicalDevices(VulkanInstance, &DeviceCount, nullptr);
 	HLVM_ENSURE(DeviceCount > 0);
 
 	TVector<VkPhysicalDevice> PhysicalDevices(DeviceCount);
-	vkEnumeratePhysicalDevices(VulkanInstance, &DeviceCount, PhysicalDevices.data());
+	VulkanRHI::vkEnumeratePhysicalDevices(VulkanInstance, &DeviceCount, PhysicalDevices.data());
 
 	for (const auto& device : PhysicalDevices)
 	{
@@ -695,7 +695,7 @@ void FVulkanRHI::CreateVulkanPhysicalDevice()
 void FVulkanRHI::CreateVulkanLogicalDevice()
 {
 	// 2 Create logical device
-	deviceQueueFamilyIndices = FindQueueFamilies(PhysicalDevice->Get(), VulkanSurface);
+	deviceQueueFamilyIndices = FindQueueFamilies(PhysicalDevice->GetHandle(), VulkanSurface);
 
 	TVector<VkDeviceQueueCreateInfo> queueCreateInfos;
 	TSet<uint32_t>					 uniqueQueueFamilies = {
@@ -736,23 +736,23 @@ void FVulkanRHI::CreateVulkanLogicalDevice()
 		createInfo.enabledLayerCount = 0;
 	}
 
-	VULKAN_ENSURE(vkCreateDevice(VulkanPhysicalDevice, &createInfo, nullptr, &VulkanDevice));
+	VULKAN_ENSURE(VulkanRHI::vkCreateDevice(VulkanPhysicalDevice, &createInfo, nullptr, &VulkanDevice));
 	LogicalDevice = new FVulkanLogicalDevice(VulkanDevice);
 }
 
 void FVulkanRHI::CreateVulkanQueues()
 {
 	// Queues are created during device creation
-	vkGetDeviceQueue(VulkanDevice, deviceQueueFamilyIndices.graphicsFamily, 0, &GraphicsQueue);
+	VulkanRHI::vkGetDeviceQueue(VulkanDevice, deviceQueueFamilyIndices.graphicsFamily, 0, &GraphicsQueue);
 	HLVM_ENSURE(GraphicsQueue != VK_NULL_HANDLE);
 
-	vkGetDeviceQueue(VulkanDevice, deviceQueueFamilyIndices.computeFamily, 0, &ComputeQueue);
+	VulkanRHI::vkGetDeviceQueue(VulkanDevice, deviceQueueFamilyIndices.computeFamily, 0, &ComputeQueue);
 	HLVM_ENSURE(ComputeQueue != VK_NULL_HANDLE);
 
-	vkGetDeviceQueue(VulkanDevice, deviceQueueFamilyIndices.transferFamily, 0, &TransferQueue);
+	VulkanRHI::vkGetDeviceQueue(VulkanDevice, deviceQueueFamilyIndices.transferFamily, 0, &TransferQueue);
 	HLVM_ENSURE(TransferQueue != VK_NULL_HANDLE);
 
-	vkGetDeviceQueue(VulkanDevice, deviceQueueFamilyIndices.presentFamily, 0, &PresentQueue);
+	VulkanRHI::vkGetDeviceQueue(VulkanDevice, deviceQueueFamilyIndices.presentFamily, 0, &PresentQueue);
 	HLVM_ENSURE(PresentQueue != VK_NULL_HANDLE);
 }
 
@@ -785,8 +785,8 @@ void FVulkanRHI::CreateVulkanMemoryAllocator()
 	allocatorCreateInfo.physicalDevice = VulkanPhysicalDevice;
 	allocatorCreateInfo.device = VulkanDevice;
 	allocatorCreateInfo.instance = VulkanInstance;
-	allocatorCreateInfo.pVulkanFunctions = &VULKAN_VMA_FUNCTIONS;
-	vmaCreateAllocator(&allocatorCreateInfo, &VULKAN_VMA_ALLOCATOR);
+	allocatorCreateInfo.pVulkanFunctions = &VulkanRHI::VULKAN_VMA_FUNCTIONS;
+	vmaCreateAllocator(&allocatorCreateInfo, &VulkanRHI::VULKAN_VMA_ALLOCATOR);
 }
 
 // Vulkan-specific resource creation
@@ -800,7 +800,7 @@ VkImage FVulkanRHI::CreateVulkanImage(const FRHITextureCreateDesc& CreateDesc)
 	ImageInfo.extent.depth = CreateDesc.Dimensions.z;
 	ImageInfo.mipLevels = 1;
 	ImageInfo.arrayLayers = 1;
-	ImageInfo.format = VulkanFormatFromRHIFormat(CreateDesc.Format);
+	ImageInfo.format = VulkanRHI::VulkanFormatFromRHIFormat(CreateDesc.Format);
 	ImageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
 	ImageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 	ImageInfo.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
@@ -808,7 +808,7 @@ VkImage FVulkanRHI::CreateVulkanImage(const FRHITextureCreateDesc& CreateDesc)
 	ImageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
 
 	VkImage	 Image;
-	VkResult Result = vkCreateImage(VulkanDevice, &ImageInfo, nullptr, &Image);
+	VkResult Result = VulkanRHI::vkCreateImage(VulkanDevice, &ImageInfo, nullptr, &Image);
 	HLVM_ENSURE(Result == VK_SUCCESS);
 
 	return Image;
@@ -816,8 +816,8 @@ VkImage FVulkanRHI::CreateVulkanImage(const FRHITextureCreateDesc& CreateDesc)
 
 VkBuffer FVulkanRHI::CreateVulkanBuffer(const FRHIBufferCreateDesc& CreateDesc, void** OutAllocation)
 {
-	VkBufferUsageFlags	  UsageFlags = VulkanBufferUsageFlagsFromRHIUsageFlags(CreateDesc.UsageFlags);
-	VkMemoryPropertyFlags MemoryPropertyFlags = VulkanMemoryPropertyFlagsFromRHIMemoryPropertyFlags(CreateDesc.MemoryPropertyFlags);
+	VkBufferUsageFlags	  UsageFlags = VulkanRHI::VulkanBufferUsageFlagsFromRHIUsageFlags(CreateDesc.UsageFlags);
+	VkMemoryPropertyFlags MemoryPropertyFlags = VulkanRHI::VulkanMemoryPropertyFlagsFromRHIMemoryPropertyFlags(CreateDesc.MemoryPropertyFlags);
 	VkDeviceSize		  Size = CreateDesc.Size;
 
 	VkBufferCreateInfo bufferCreateInfo = {};
@@ -832,7 +832,7 @@ VkBuffer FVulkanRHI::CreateVulkanBuffer(const FRHIBufferCreateDesc& CreateDesc, 
 
 	VkBuffer	  Buffer;
 	VmaAllocation Allocation;
-	VULKAN_ENSURE(vmaCreateBuffer(VULKAN_VMA_ALLOCATOR, &bufferCreateInfo, &allocCreateInfo, &Buffer, &Allocation, nullptr));
+	VULKAN_ENSURE(vmaCreateBuffer(VulkanRHI::VULKAN_VMA_ALLOCATOR, &bufferCreateInfo, &allocCreateInfo, &Buffer, &Allocation, nullptr));
 	*OutAllocation = Allocation;
 
 	return Buffer;
@@ -842,7 +842,7 @@ void FVulkanRHI::DestoryVulkanBuffer(VkBuffer Buffer, void** InAllocation)
 {
 	HLVM_ENSURE(*InAllocation != nullptr);
 	HLVM_ENSURE(Buffer != VK_NULL_HANDLE);
-	vmaDestroyBuffer(VULKAN_VMA_ALLOCATOR, Buffer, R_C(VmaAllocation, *InAllocation));
+	vmaDestroyBuffer(VulkanRHI::VULKAN_VMA_ALLOCATOR, Buffer, R_C(VmaAllocation, *InAllocation));
 }
 
 VkImageView FVulkanRHI::CreateVulkanImageView(VkImage Image, const FRHIShaderResourceViewCreateInfo& CreateInfo)
@@ -851,7 +851,7 @@ VkImageView FVulkanRHI::CreateVulkanImageView(VkImage Image, const FRHIShaderRes
 	ViewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
 	ViewInfo.image = Image;
 	ViewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-	ViewInfo.format = VulkanFormatFromRHIFormat(CreateInfo.Format);
+	ViewInfo.format = VulkanRHI::VulkanFormatFromRHIFormat(CreateInfo.Format);
 	ViewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 	ViewInfo.subresourceRange.baseMipLevel = 0;
 	ViewInfo.subresourceRange.levelCount = 1;
@@ -859,7 +859,7 @@ VkImageView FVulkanRHI::CreateVulkanImageView(VkImage Image, const FRHIShaderRes
 	ViewInfo.subresourceRange.layerCount = 1;
 
 	VkImageView ImageView;
-	VkResult	Result = vkCreateImageView(VulkanDevice, &ViewInfo, nullptr, &ImageView);
+	VkResult	Result = VulkanRHI::vkCreateImageView(VulkanDevice, &ViewInfo, nullptr, &ImageView);
 	HLVM_ENSURE(Result == VK_SUCCESS);
 
 	return ImageView;
@@ -870,12 +870,12 @@ VkBufferView FVulkanRHI::CreateVulkanBufferView(VkBuffer Buffer, const FRHIUnord
 	VkBufferViewCreateInfo ViewInfo = {};
 	ViewInfo.sType = VK_STRUCTURE_TYPE_BUFFER_VIEW_CREATE_INFO;
 	ViewInfo.buffer = Buffer;
-	ViewInfo.format = VulkanFormatFromRHIFormat(CreateInfo.Format);
+	ViewInfo.format = VulkanRHI::VulkanFormatFromRHIFormat(CreateInfo.Format);
 	ViewInfo.offset = CreateInfo.Offset;
 	ViewInfo.range = CreateInfo.Size;
 
 	VkBufferView BufferView;
-	VkResult	 Result = vkCreateBufferView(VulkanDevice, &ViewInfo, nullptr, &BufferView);
+	VkResult	 Result = VulkanRHI::vkCreateBufferView(VulkanDevice, &ViewInfo, nullptr, &BufferView);
 	HLVM_ENSURE(Result == VK_SUCCESS);
 
 	return BufferView;
@@ -891,14 +891,14 @@ VkCommandBuffer FVulkanRHI::BeginVulkanCommandBuffer()
 	AllocInfo.commandBufferCount = 1;
 
 	VkCommandBuffer CommandBuffer;
-	VkResult		Result = vkAllocateCommandBuffers(VulkanDevice, &AllocInfo, &CommandBuffer);
+	VkResult		Result = VulkanRHI::vkAllocateCommandBuffers(VulkanDevice, &AllocInfo, &CommandBuffer);
 	HLVM_ENSURE(Result == VK_SUCCESS);
 
 	VkCommandBufferBeginInfo BeginInfo = {};
 	BeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 	BeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
-	Result = vkBeginCommandBuffer(CommandBuffer, &BeginInfo);
+	Result = VulkanRHI::vkBeginCommandBuffer(CommandBuffer, &BeginInfo);
 	HLVM_ENSURE(Result == VK_SUCCESS);
 
 	return CommandBuffer;
@@ -906,7 +906,7 @@ VkCommandBuffer FVulkanRHI::BeginVulkanCommandBuffer()
 
 void FVulkanRHI::EndVulkanCommandBuffer(VkCommandBuffer CommandBuffer)
 {
-	VkResult Result = vkEndCommandBuffer(CommandBuffer);
+	VkResult Result = VulkanRHI::vkEndCommandBuffer(CommandBuffer);
 	HLVM_ENSURE(Result == VK_SUCCESS);
 }
 
@@ -918,15 +918,15 @@ void FVulkanRHI::SubmitVulkanCommandsAndFlushGPU()
 	SubmitInfo.commandBufferCount = 1;
 	// SubmitInfo.pCommandBuffers = &GetCurrentCommandBuffer();
 
-	VkResult Result = vkQueueSubmit(GraphicsQueue, 1, &SubmitInfo, VK_NULL_HANDLE);
+	VkResult Result = VulkanRHI::vkQueueSubmit(GraphicsQueue, 1, &SubmitInfo, VK_NULL_HANDLE);
 	HLVM_ENSURE(Result == VK_SUCCESS);
 
-	vkQueueWaitIdle(GraphicsQueue);
+	VulkanRHI::vkQueueWaitIdle(GraphicsQueue);
 }
 
 void FVulkanRHI::FlushVulkanResources()
 {
-	vkDeviceWaitIdle(VulkanDevice);
+	VulkanRHI::vkDeviceWaitIdle(VulkanDevice);
 }
 
 // Vulkan-specific viewport and swap chain management
@@ -965,7 +965,7 @@ VkQueryPool FVulkanRHI::CreateVulkanQueryPool(ERHIQueryType QueryType)
 	PoolInfo.queryCount = 1;
 
 	VkQueryPool QueryPool;
-	VkResult	Result = vkCreateQueryPool(VulkanDevice, &PoolInfo, nullptr, &QueryPool);
+	VkResult	Result = VulkanRHI::vkCreateQueryPool(VulkanDevice, &PoolInfo, nullptr, &QueryPool);
 	HLVM_ENSURE(Result == VK_SUCCESS);
 
 	return QueryPool;
@@ -973,17 +973,17 @@ VkQueryPool FVulkanRHI::CreateVulkanQueryPool(ERHIQueryType QueryType)
 
 void FVulkanRHI::BeginVulkanQuery(VkQueryPool QueryPool, TUINT32 QueryIndex)
 {
-	// vkCmdBeginQuery(GetCurrentCommandBuffer(), QueryPool, QueryIndex, 0);
+	// VulkanRHI::vkCmdBeginQuery(GetCurrentCommandBuffer(), QueryPool, QueryIndex, 0);
 }
 
 void FVulkanRHI::EndVulkanQuery(VkQueryPool QueryPool, TUINT32 QueryIndex)
 {
-	// vkCmdEndQuery(GetCurrentCommandBuffer(), QueryPool, QueryIndex);
+	// VulkanRHI::vkCmdEndQuery(GetCurrentCommandBuffer(), QueryPool, QueryIndex);
 }
 
 void FVulkanRHI::GetVulkanQueryResults(VkQueryPool QueryPool, TUINT32 QueryIndex, TUINT64& OutResult, bool bWait)
 {
-	VkResult Result = vkGetQueryPoolResults(VulkanDevice, QueryPool, QueryIndex, 1, sizeof(OutResult), &OutResult, sizeof(OutResult), bWait ? VK_QUERY_RESULT_WAIT_BIT : 0);
+	VkResult Result = VulkanRHI::vkGetQueryPoolResults(VulkanDevice, QueryPool, QueryIndex, 1, sizeof(OutResult), &OutResult, sizeof(OutResult), bWait ? VK_QUERY_RESULT_WAIT_BIT : 0);
 	HLVM_ENSURE(Result == VK_SUCCESS);
 }
 
@@ -1015,10 +1015,10 @@ VkImageCreateInfo FVulkanRHI::GenerateVkImageCreateInfo(const FRHITextureCreateD
 	ImageCreateInfo.extent.depth = CreateDesc.Dimensions.z;
 	ImageCreateInfo.mipLevels = CreateDesc.NumMips;
 	ImageCreateInfo.arrayLayers = CreateDesc.NumSamples;
-	ImageCreateInfo.format = VulkanFormatFromRHIFormat(CreateDesc.Format); // Helper function to convert RHI format to Vulkan format
+	ImageCreateInfo.format = VulkanRHI::VulkanFormatFromRHIFormat(CreateDesc.Format); // Helper function to convert RHI format to Vulkan format
 	ImageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
 	ImageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	ImageCreateInfo.usage = VulkanTextureUsageFlagsFromRHIUsageFlags(CreateDesc.Flags); // Helper function to convert RHI usage flags to Vulkan usage flags
+	ImageCreateInfo.usage = VulkanRHI::VulkanTextureUsageFlagsFromRHIUsageFlags(CreateDesc.Flags); // Helper function to convert RHI usage flags to Vulkan usage flags
 	ImageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;									// Assuming single sample for simplicity
 	ImageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
@@ -1031,7 +1031,7 @@ VkBufferCreateInfo FVulkanRHI::GenerateVkBufferCreateInfo(const FRHIBufferCreate
 	VkBufferCreateInfo BufferCreateInfo = {};
 	BufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
 	BufferCreateInfo.size = CreateDesc.Size;
-	BufferCreateInfo.usage = VulkanBufferUsageFlagsFromRHIUsageFlags(CreateDesc.UsageFlags); // Helper function to convert RHI usage flags to Vulkan usage flags
+	BufferCreateInfo.usage = VulkanRHI::VulkanBufferUsageFlagsFromRHIUsageFlags(CreateDesc.UsageFlags); // Helper function to convert RHI usage flags to Vulkan usage flags
 	BufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
 	return BufferCreateInfo;
@@ -1055,7 +1055,7 @@ VkImageViewCreateInfo FVulkanRHI::GenerateVkImageViewCreateInfo(const FRHIShader
 	ImageViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
 	ImageViewCreateInfo.image = VK_NULL_HANDLE;								   // To be set later
 	ImageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;					   // Assuming 2D image view for simplicity
-	ImageViewCreateInfo.format = VulkanFormatFromRHIFormat(CreateDesc.Format); // Helper function to convert RHI format to Vulkan format
+	ImageViewCreateInfo.format = VulkanRHI::VulkanFormatFromRHIFormat(CreateDesc.Format); // Helper function to convert RHI format to Vulkan format
 	ImageViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 	ImageViewCreateInfo.subresourceRange.baseMipLevel = CreateDesc.MipLevel;
 	ImageViewCreateInfo.subresourceRange.levelCount = CreateDesc.NumMipLevels;
@@ -1071,7 +1071,7 @@ VkBufferViewCreateInfo FVulkanRHI::GenerateVkBufferViewCreateInfo(const FRHIUnor
 	VkBufferViewCreateInfo BufferViewCreateInfo = {};
 	BufferViewCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_VIEW_CREATE_INFO;
 	BufferViewCreateInfo.buffer = VK_NULL_HANDLE;								// To be set later
-	BufferViewCreateInfo.format = VulkanFormatFromRHIFormat(CreateDesc.Format); // Helper function to convert RHI format to Vulkan format
+	BufferViewCreateInfo.format = VulkanRHI::VulkanFormatFromRHIFormat(CreateDesc.Format); // Helper function to convert RHI format to Vulkan format
 	BufferViewCreateInfo.offset = 0;
 	BufferViewCreateInfo.range = VK_WHOLE_SIZE;
 
@@ -1085,13 +1085,13 @@ VkSamplerCreateInfo FVulkanRHI::GenerateVkSamplerCreateInfo(const FRHISamplerSta
 	SamplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
 
 	// Set filter modes
-	SamplerCreateInfo.magFilter = VulkanFilterFromRHIFilter(CreateDesc.Filter);
-	SamplerCreateInfo.minFilter = VulkanFilterFromRHIFilter(CreateDesc.Filter);
+	SamplerCreateInfo.magFilter = VulkanRHI::VulkanFilterFromRHIFilter(CreateDesc.Filter);
+	SamplerCreateInfo.minFilter = VulkanRHI::VulkanFilterFromRHIFilter(CreateDesc.Filter);
 
 	// Set address modes
-	SamplerCreateInfo.addressModeU = VulkanAddressModeFromRHIAddressMode(CreateDesc.AddressModeU);
-	SamplerCreateInfo.addressModeV = VulkanAddressModeFromRHIAddressMode(CreateDesc.AddressModeV);
-	SamplerCreateInfo.addressModeW = VulkanAddressModeFromRHIAddressMode(CreateDesc.AddressModeW);
+	SamplerCreateInfo.addressModeU = VulkanRHI::VulkanAddressModeFromRHIAddressMode(CreateDesc.AddressModeU);
+	SamplerCreateInfo.addressModeV = VulkanRHI::VulkanAddressModeFromRHIAddressMode(CreateDesc.AddressModeV);
+	SamplerCreateInfo.addressModeW = VulkanRHI::VulkanAddressModeFromRHIAddressMode(CreateDesc.AddressModeW);
 
 	// Set mip map level of detail bias
 	SamplerCreateInfo.mipLodBias = static_cast<float>(CreateDesc.MipMapLevelOfDetailBias);
@@ -1102,7 +1102,7 @@ VkSamplerCreateInfo FVulkanRHI::GenerateVkSamplerCreateInfo(const FRHISamplerSta
 
 	// Set comparison function
 	SamplerCreateInfo.compareEnable = VK_TRUE;
-	SamplerCreateInfo.compareOp = VulkanCompareOpFromRHICompareFunction(CreateDesc.ComparisonFunction);
+	SamplerCreateInfo.compareOp = VulkanRHI::VulkanCompareOpFromRHICompareFunction(CreateDesc.ComparisonFunction);
 
 	// Set border color
 	SamplerCreateInfo.borderColor = VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK;
@@ -1116,7 +1116,7 @@ VkPipelineShaderStageCreateInfo FVulkanRHI::GenerateVkPipelineShaderStageCreateI
 {
 	VkPipelineShaderStageCreateInfo ShaderStageCreateInfo = {};
 	ShaderStageCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-	ShaderStageCreateInfo.stage = VulkanShaderStageFromRHIStage(CreateDesc.Stage); // Convert RHI shader stage to Vulkan shader stage
+	ShaderStageCreateInfo.stage = VulkanRHI::VulkanShaderStageFromRHIStage(CreateDesc.Stage); // Convert RHI shader stage to Vulkan shader stage
 	ShaderStageCreateInfo.module = VK_NULL_HANDLE;								   // To be set later
 	ShaderStageCreateInfo.pName = TO_CHAR_CSTR(CreateDesc.EntryPoints[0].c_str());
 
@@ -1162,7 +1162,7 @@ VkGraphicsPipelineCreateInfo FVulkanRHI::GenerateVkGraphicsPipelineCreateInfo(co
 	{
 		VkPipelineShaderStageCreateInfo stageInfo = {};
 		stageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-		stageInfo.stage = VulkanShaderStageFromRHIStage(shader.Stage);
+		stageInfo.stage = VulkanRHI::VulkanShaderStageFromRHIStage(shader.Stage);
 		stageInfo.module = VK_NULL_HANDLE; // To be set later
 		stageInfo.pName = TO_CHAR_CSTR(shader.EntryPoints[0].c_str());
 		shaderStages.push_back(stageInfo);

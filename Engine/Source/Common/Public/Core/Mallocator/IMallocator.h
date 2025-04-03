@@ -14,7 +14,7 @@ HLVM_ENUM(EMallocator, TUINT8,
 	Mimalloc,
 	Stack,
 	VMArena,
-	Unkown);
+	Unknow);
 
 HLVM_ENUM(EFreeRetType, TUINT8,
 	Success,
@@ -42,7 +42,7 @@ public:
 	HLVM_NODISCARD virtual EFreeRetType FreeSizeAligned(void* ptr, size_t size, size_t alignment) noexcept = 0;
 
 public:
-	EMallocator Type = EMallocator::Unkown;
+	EMallocator Type = EMallocator::Unknow;
 };
 /**
  * Global mallocator

@@ -5,18 +5,21 @@
 #include "RHI/Vulkan/VulkanLoader.h"
 #include <mutex>
 
-// Extern
-VmaAllocator VULKAN_VMA_ALLOCATOR;
-// Extern
-VmaVulkanFunctions VULKAN_VMA_FUNCTIONS;
-// Extern
-VkAllocationCallbacks* VULKAN_CPU_ALLOCATOR = nullptr;
+namespace VulkanRHI
+{
+	// Extern
+	VmaAllocator VULKAN_VMA_ALLOCATOR;
+	// Extern
+	VmaVulkanFunctions VULKAN_VMA_FUNCTIONS;
+	// Extern
+	VkAllocationCallbacks* VULKAN_CPU_ALLOCATOR = nullptr;
 
 #define DEFINE_VK_FUNCTION_MACRO(function) \
 	PFN_##function function = nullptr;
-APPLY_PFN_DEF_VK_FUNCTIONS_CORE(DEFINE_VK_FUNCTION_MACRO)
-APPLY_PFN_DEF_VK_FUNCTIONS_DISPLAY(DEFINE_VK_FUNCTION_MACRO)
-APPLY_PFN_DEF_VK_FUNCTIONS_VMA(DEFINE_VK_FUNCTION_MACRO)
+	APPLY_PFN_DEF_VK_FUNCTIONS_CORE(DEFINE_VK_FUNCTION_MACRO)
+	APPLY_PFN_DEF_VK_FUNCTIONS_DISPLAY(DEFINE_VK_FUNCTION_MACRO)
+	APPLY_PFN_DEF_VK_FUNCTIONS_VMA(DEFINE_VK_FUNCTION_MACRO)
+}
 
 VulkanLoader::~VulkanLoader()
 {
@@ -24,6 +27,8 @@ VulkanLoader::~VulkanLoader()
 
 void VulkanLoader::LoadOnce()
 {
+	using namespace VulkanRHI;
+
 	static VulkanLoader   loader;
 	static std::once_flag flag;
 	std::call_once(flag, [&]() {

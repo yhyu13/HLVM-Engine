@@ -41,3 +41,10 @@ using SharedRefCountPtr = std::shared_ptr<T>;
 
 template<typename T>
 using UniqueRefCountPtr = std::unique_ptr<T>;
+
+// Offset of a struct member. (Copy from UE5)
+#ifdef __clang__
+	#define STRUCT_OFFSET( struc, member )  __builtin_offsetof(struc, member)
+#else
+	#define STRUCT_OFFSET( struc, member )  offsetof(struc, member)
+#endif

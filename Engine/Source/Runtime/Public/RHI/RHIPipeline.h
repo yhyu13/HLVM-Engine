@@ -32,7 +32,7 @@ struct FGraphicsPipelineStateInitializer
 		, NumRenderTargets(0)
 		, SampleCount(1)
 	{
-		std::memset(RenderTargetFormats, HLVM_ENUM_V(EPixelFormat, Unknown), sizeof(RenderTargetFormats));
+		std::memset(RenderTargetFormats, HLVM_ENUM_VALUE(EPixelFormat::Unknown), sizeof(RenderTargetFormats));
 	}
 };
 

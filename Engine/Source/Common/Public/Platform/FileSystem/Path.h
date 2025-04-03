@@ -13,7 +13,7 @@ HLVM_ENUM(EPlatformFileType, TUINT8,
 	Disk,
 	Packed,
 	Remote,
-	Unkown);
+	Unknow);
 
 /**
  * boost path usage : https://blog.csdn.net/toby54king/article/details/81334962
@@ -23,22 +23,22 @@ class FPath final : public boost::filesystem::path
 {
 public:
 	FPath() = default;
-	FPath(const char* str, EPlatformFileType FileType = EPlatformFileType::Unkown)
+	FPath(const char* str, EPlatformFileType FileType = EPlatformFileType::Unknow)
 		: boost::filesystem::path(str), mFileType(FileType)
 	{
 		ResolvePath();
 	}
-	FPath(const TCHAR* str, EPlatformFileType FileType = EPlatformFileType::Unkown)
+	FPath(const TCHAR* str, EPlatformFileType FileType = EPlatformFileType::Unknow)
 		: boost::filesystem::path(reinterpret_cast<const char*>(str)), mFileType(FileType)
 	{
 		ResolvePath();
 	}
-	FPath(const boost::filesystem::path& str, EPlatformFileType FileType = EPlatformFileType::Unkown)
+	FPath(const boost::filesystem::path& str, EPlatformFileType FileType = EPlatformFileType::Unknow)
 		: boost::filesystem::path(str), mFileType(FileType)
 	{
 		ResolvePath();
 	}
-	FPath(const FString& str, EPlatformFileType FileType = EPlatformFileType::Unkown)
+	FPath(const FString& str, EPlatformFileType FileType = EPlatformFileType::Unknow)
 		: boost::filesystem::path(str.ToCharCStr()), mFileType(FileType)
 	{
 		ResolvePath();
@@ -154,7 +154,7 @@ private:
 	FPathHash CalculateHash() const noexcept;
 
 	mutable FPathHash mHash{ 0 };
-	EPlatformFileType mFileType{ EPlatformFileType::Unkown };
+	EPlatformFileType mFileType{ EPlatformFileType::Unknow };
 };
 
 /*

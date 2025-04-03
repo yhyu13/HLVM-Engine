@@ -6,13 +6,15 @@
 
 FVulkanPhysicalDevice::QueueFamilyIndices FVulkanPhysicalDevice::QueryQueueFamilyIndices(VkSurfaceKHR Surface, bool bFresh)
 {
+	using namespace VulkanRHI;
+
 	if (auto iter = mSurfaceToQueueFamilyIndices.find(Surface);
 		!bFresh && iter != mSurfaceToQueueFamilyIndices.end() && iter->second.IsComplete())
 	{
 		return iter->second;
 	}
 
-	auto  device = Get();
+	auto  device = this->GetHandle();
 	auto& indices = mSurfaceToQueueFamilyIndices[Surface];
 
 	uint32_t queueFamilyCount = 0;
@@ -55,13 +57,15 @@ FVulkanPhysicalDevice::QueueFamilyIndices FVulkanPhysicalDevice::QueryQueueFamil
 
 FVulkanPhysicalDevice::SwapChainSupportDetails FVulkanPhysicalDevice::QuerySwapChainSupport(VkSurfaceKHR Surface, bool bFresh)
 {
+	using namespace VulkanRHI;
+
 	if (auto iter = mSurfaceToSwapChainSupportDetails.find(Surface);
 		!bFresh && iter != mSurfaceToSwapChainSupportDetails.end() && iter->second.IsComplete())
 	{
 		return iter->second;
 	}
 
-	auto  device = Get();
+	auto  device = this->GetHandle();
 	auto& surface = Surface;
 	auto& details = mSurfaceToSwapChainSupportDetails[Surface];
 

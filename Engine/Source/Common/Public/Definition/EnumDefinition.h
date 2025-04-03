@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include <magic_enum.hpp>
+
 #define HLVM_ENUM(enum_class, type, ...) \
 	enum class enum_class : type         \
 	{                                    \
@@ -12,11 +14,11 @@
 	};                                   \
 	HLVM_INLINE_VAR constexpr size_t enum_class##_NUM = static_cast<size_t>(enum_class::HLVM_NUM)
 
-#define HLVM_ENUM_T(enum_class) std::underlying_type_t<enum_class>
-#define HLVM_ENUM_V(enum_class, enum_value) static_cast<HLVM_ENUM_T(enum_class)>(enum_class::enum_value)
-#define HLVM_ENUM_V_T(type, enum_value) static_cast<type>((enum_value))
+#define HLVM_ENUM_UNDERLYING_T(enum_class) std::underlying_type_t<enum_class>
+#define HLVM_ENUM_VALUE(enum_value) magic_enum::enum_underlying(enum_value)
+#define HLVM_ENUM_VALUE_AS_TYPE(type, enum_value) static_cast<type>((enum_value))
 
-#define HLVM_ENUM_TCHAR_STR(value) TO_TCHAR_CSTR(magic_enum::enum_name((value)).data())
+#define HLVM_ENUM_VALUE_TO_TCHAR(enum_value) TO_TCHAR_CSTR(magic_enum::enum_name((enum_value)).data())
 
 // Reference https://www.reddit.com/r/cpp/comments/13psi6f/comment/jleje26/?utm_source=share&utm_medium=web3x&utm_name=web3xcss&utm_term=1&utm_content=share_button
 #define HLVM_DECLARE_FLAGS_OPERATOR(Flags, op)                            \
@@ -51,7 +53,7 @@
 	struct Flags                                                    \
 	{                                                               \
 		using EnumType = enum_class;                                \
-		using EnumValue = HLVM_ENUM_T(enum_class);                  \
+		using EnumValue = HLVM_ENUM_UNDERLYING_T(enum_class);                  \
 		EnumValue value;                                            \
 		inline constexpr Flags() {}                                 \
 		inline constexpr Flags(EnumType v) : value(EnumValue(v)) {} \

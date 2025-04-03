@@ -39,7 +39,29 @@ template <typename T, typename Allocator = boost::container::new_allocator<T>>
 using TSmallVector64 = boost::container::small_vector<T, 64, Allocator>;
 
 template <typename T, typename Allocator = boost::container::new_allocator<T>>
-using TVector = boost::container::vector<T, Allocator>;
+class TVector : public boost::container::vector<T, Allocator>
+{
+public:
+	// Inheriting constructors
+	// https://stackoverflow.com/a/434784
+	using boost::container::vector<T, Allocator>::vector;
+
+	TUINT32 Num() const
+	{
+		HLVM_ASSERT(this->size() <= S_C(size_t, TUINT32_MAX));
+		return S_C(TUINT32, this->size());
+	}
+
+	T* GetData() const
+	{
+		return this->data();
+	}
+
+	const T* GetDataConst() const
+	{
+		return this->data();
+	}
+};
 
 template <typename Key, typename Value, typename Allocator = std::allocator<std::pair<Key, Value>>>
 using TMap = phmap::flat_hash_map<Key, Value, std::hash<Key>, std::equal_to<Key>, Allocator>;
