@@ -4,22 +4,8 @@
 
 #pragma once
 
-#include "RHI/RHIResource.h"
+#include "RHI/RHIPipeline.h"
 #include "VulkanRHIResourceDeclaration.h"
-
-// Vulkan-specific RHI depth-stencil view
-class FVulkanDepthStencilView : public FRHIDepthStencilView, public FVulkanResource
-{
-public:
-	FVulkanDepthStencilView(VkImageView InImageView)
-		: ImageView(InImageView) {}
-
-	// Returns the Vulkan image view handle
-	VkImageView GetImageView() const { return ImageView; }
-
-private:
-	VkImageView ImageView;
-};
 
 // Vulkan-specific RHI graphics pipeline state
 class FVulkanGraphicsPipelineState : public FRHIGraphicsPipelineState, public FVulkanResource
@@ -79,7 +65,6 @@ private:
 	ERHIQueryType QueryType;
 };
 
-using FVulkanDepthStencilViewRef = TRefCountPtr<FVulkanDepthStencilView>;
 using FVulkanGraphicsPipelineStateRef = TRefCountPtr<FVulkanGraphicsPipelineState>;
 using FVulkanComputePipelineStateRef = TRefCountPtr<FVulkanComputePipelineState>;
 using FVulkanQueryRef = TRefCountPtr<FVulkanQuery>;

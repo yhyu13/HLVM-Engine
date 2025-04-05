@@ -6,6 +6,7 @@
 
 #include "Core/Assert.h"
 #include "Core/Object/RefCountPtr.h"
+#include "RHI/DynamicRHI.h"
 
 DECLARE_LOG_CATEGORY(LogVulkan)
 
@@ -15,8 +16,13 @@ DECLARE_LOG_CATEGORY(LogVulkan)
 
 #define VULKAN_API_VERSION VK_API_VERSION_1_3
 
+// vulkan feature definition start---------------------------------------------------------------------------------------------------------------------------------------
+
 /// @brief Since we used glfw, no need to use VK display api (unless we want to take over window management)
-#define VULKAN_USE_DISPLAY_KHR (VK_KHR_display && 0)
+#define VULKAN_DISPLAY_KHR (VK_KHR_display && 0)
+
+/// @brief Enable Vulkan renderpass 2 (vk api not supported in libvulkan.so.1 on linux platform)
+#define VULKAN_RENDERPASS2 (VK_KHR_create_renderpass2 && 0)
 
 /// @brief Use VMA for memory management
 #define VULKAN_USE_VMA 1
@@ -27,8 +33,21 @@ DECLARE_LOG_CATEGORY(LogVulkan)
 	#define VMA_DYNAMIC_VULKAN_FUNCTIONS 0
 #endif
 
+// vulkan option definition start---------------------------------------------------------------------------------------------------------------------------------------
+
 /// @brief Enable validation layers
 #define VULKAN_ENABLE_VALIDATION_LAYERS !HLVM_BUILD_RELEASE
+
+/// @brief whether to keep old swapchain when recreating it, might not work on android platform
+#define VULKAN_SWAPCHAIN_KEEP_OLD 1
+
+/// @brief whether to use image fence for swapchain, might not work on android platform
+#define VULKAN_SWAPCHAIN_USE_IMAGE_FENCE 1
+
+/// @brief whether to use input attachment shader read, might fix texture flickering on some device
+#define VULKAN_INPUT_ATTACHMENT_SHADER_READ 0
+
+// vulkan helper definition start---------------------------------------------------------------------------------------------------------------------------------------
 
 /// @brief Helper macro to convert VkResult to TCHAR string
 #define VULKAN_RESULT_TO_TCHAR(x) TO_TCHAR_CSTR(string_VkResult(x))
@@ -54,20 +73,17 @@ DECLARE_LOG_CATEGORY(LogVulkan)
 	}                                                                                                                                   \
 	while (0)
 
-/// @brief whether to keep old swapchain when recreating it, might not work on android platform
-#define VULKAN_SWAPCHAIN_KEEP_OLD 1
-
-/// @brief whether to use image fence for swapchain, might not work on android platform
-#define VULKAN_SWAPCHAIN_USE_IMAGE_FENCE 1
-
-template <class T>
-void ZeroVulkanStruct(T* Struct, TINT32 VkStructureType)
+namespace VulkanRHI
 {
-	static_assert(!std::is_pointer_v<T>, "Don't use a pointer!");
-	static_assert(STRUCT_OFFSET(T, sType) == 0, "Assumes sType is the first member in the Vulkan type!");
-	static_assert(sizeof(T::sType) == sizeof(TINT32), "Assumed sType is compatible with int32!");
-	// Horrible way to coerce the compiler to not have to know what T::sType is so we can have this header not have to include vulkan.h
-	TINT32* Type = R_C(TINT32*, &Struct->sType);
-	*Type = VkStructureType;
-	std::memset(R_C(TUINT8*, Struct) + sizeof(TINT32), 0, sizeof(T) - sizeof(TINT32));
-};
+	template <class T>
+	void ZeroVulkanStruct(T* Struct, TINT32 VkStructureType)
+	{
+		static_assert(!std::is_pointer_v<T>, "Don't use a pointer!");
+		static_assert(STRUCT_OFFSET(T, sType) == 0, "Assumes sType is the first member in the Vulkan type!");
+		static_assert(sizeof(T::sType) == sizeof(TINT32), "Assumed sType is compatible with int32!");
+		// Horrible way to coerce the compiler to not have to know what T::sType is so we can have this header not have to include vulkan.h
+		TINT32* Type = R_C(TINT32*, &Struct->sType);
+		*Type = VkStructureType;
+		FMemory::Memzero(R_C(TUINT8*, Struct) + sizeof(TINT32), sizeof(T) - sizeof(TINT32));
+	};
+}

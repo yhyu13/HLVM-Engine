@@ -92,6 +92,12 @@ public:
 		return mDevice;
 	}
 
+	// TODO : 暂时不支持并行渲染
+	bool SupportsParallelRendering() const
+	{
+		return false;
+	}
+
 private:
 	VkDevice mDevice;
 };

@@ -4,6 +4,10 @@
 
 #pragma once
 
+#define HLVM_MAJOR_VERSION 0
+#define HLVM_MINOR_VERSION 2
+#define HLVM_PATCH_VERSION 1
+
 #ifndef HLVM_BUILD_DEBUG
 	#define HLVM_BUILD_DEBUG 0
 #endif

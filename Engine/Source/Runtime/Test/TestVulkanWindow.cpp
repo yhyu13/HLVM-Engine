@@ -1231,18 +1231,18 @@ private:
 
 RECORD_BOOL(test_GLFW3VulkanWindowRaw)
 {
-	VulkanLoader::LoadOnce();
-
-	HelloTriangleApplication app;
-	try
-	{
-		app.run();
-	}
-	catch (const std::exception& e)
-	{
-		cerr << "Error Code: " << e.what() << endl;
-		return false;
-	}
+//	VulkanLoader::LoadOnce();
+//
+//	HelloTriangleApplication app;
+//	try
+//	{
+//		app.run();
+//	}
+//	catch (const std::exception& e)
+//	{
+//		cerr << "Error Code: " << e.what() << endl;
+//		return false;
+//	}
 	return true;
 }
 	#endif

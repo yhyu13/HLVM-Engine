@@ -16,7 +16,10 @@ namespace
 	};
 
 	HLVM_STATIC_VAR const TVector<const char*> deviceExtensions = {
-		VK_KHR_SWAPCHAIN_EXTENSION_NAME // 交换链扩展集合, extend if will
+		VK_KHR_SWAPCHAIN_EXTENSION_NAME, // 交换链扩展集合, extend if will
+#if VULKAN_RENDERPASS2
+		VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME,
+#endif
 	};
 
 	HLVM_STATIC_VAR TVector<std::string> requiredExtensions = {
@@ -616,9 +619,9 @@ void FVulkanRHI::CreateVulkanInstance()
 	VkApplicationInfo AppInfo = {};
 	AppInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
 	AppInfo.pApplicationName = "HLVM";
-	AppInfo.applicationVersion = VK_MAKE_VERSION(0, 2, 1);
+	AppInfo.applicationVersion = VK_MAKE_VERSION(HLVM_MAJOR_VERSION, HLVM_MINOR_VERSION, HLVM_PATCH_VERSION);
 	AppInfo.pEngineName = "HLVM";
-	AppInfo.engineVersion = VK_MAKE_VERSION(0, 2, 1);
+	AppInfo.engineVersion = VK_MAKE_VERSION(HLVM_MAJOR_VERSION, HLVM_MINOR_VERSION, HLVM_PATCH_VERSION);
 	AppInfo.apiVersion = VULKAN_API_VERSION;
 
 	VkInstanceCreateInfo CreateInfo = {};

@@ -17,6 +17,7 @@ public:
 	template<class T>
 	HLVM_STATIC_FUNC void* Memzero(T* Ptr)
 	{
-		return FGenericPlatformMemory::Memzero(Ptr, sizeof(T));
+		static_assert(!std::is_pointer_v<T>, "Don't use a pointer!");
+		return FGenericPlatformMemory::Memzero(&Ptr, sizeof(T));
 	}
 };

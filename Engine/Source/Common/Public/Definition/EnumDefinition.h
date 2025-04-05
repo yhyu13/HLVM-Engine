@@ -40,20 +40,38 @@
 	}
 
 #define HLVM_DECLARE_FLAGS_OPERATOR2(Flags, op)                    \
-	inline friend Flags& operator op(Flags a, Flags::EnumType b) \
+	inline friend Flags& operator op(Flags & a, Flags::EnumType b) \
 	{                                                              \
 		return a = Flags(a.value op EnumValue(b));                 \
 	}                                                              \
-	inline friend Flags& operator op(Flags a, Flags b)           \
+	inline friend Flags& operator op(Flags & a, Flags b)           \
 	{                                                              \
 		return a = Flags(a.value op b.value);                      \
+	}
+
+#define HLVM_DECLARE_FLAGS_OPERATOR3(Flags)                   \
+	inline friend bool operator==(Flags a, Flags::EnumType b) \
+	{                                                         \
+		return a.value == EnumValue(b);                       \
+	}                                                         \
+	inline friend bool operator==(Flags a, Flags b)           \
+	{                                                         \
+		return a.value == b.value;                            \
+	}                                                         \
+	inline friend bool operator!=(Flags a, Flags::EnumType b) \
+	{                                                         \
+		return a.value != EnumValue(b);                       \
+	}                                                         \
+	inline friend bool operator!=(Flags a, Flags b)           \
+	{                                                         \
+		return a.value != b.value;                            \
 	}
 
 #define HLVM_DECLARE_ENMU_FLAGS(enum_class, Flags)                  \
 	struct Flags                                                    \
 	{                                                               \
 		using EnumType = enum_class;                                \
-		using EnumValue = HLVM_ENUM_UNDERLYING_T(enum_class);                  \
+		using EnumValue = HLVM_ENUM_UNDERLYING_T(enum_class);       \
 		EnumValue value;                                            \
 		inline constexpr Flags() {}                                 \
 		inline constexpr Flags(EnumType v) : value(EnumValue(v)) {} \
@@ -63,7 +81,8 @@
 			return value;                                           \
 		}                                                           \
 		HLVM_DECLARE_FLAGS_OPERATOR(Flags, &)                       \
-		HLVM_DECLARE_FLAGS_OPERATOR2(Flags, &=)                      \
+		HLVM_DECLARE_FLAGS_OPERATOR2(Flags, &=)                     \
 		HLVM_DECLARE_FLAGS_OPERATOR(Flags, |)                       \
-		HLVM_DECLARE_FLAGS_OPERATOR2(Flags, |=)                      \
+		HLVM_DECLARE_FLAGS_OPERATOR2(Flags, |=)                     \
+		HLVM_DECLARE_FLAGS_OPERATOR3(Flags)                         \
 	};

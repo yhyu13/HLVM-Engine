@@ -204,7 +204,7 @@ enum class EBlendMode : TUINT32
 };
 
 // Enumeration of comparison functions
-enum class ECompareFunction : TUINT32
+enum class ERHICompare : TUINT32
 {
 	Never,
 	Less,
@@ -233,6 +233,115 @@ enum class ESwapChainFlags : TUINT32
 	HDR = 1 << 2,          // High Dynamic Range (HDR) support
 };
 
+enum class ESubpassType : TUINT32
+{
+	Default,
+	DepthReading,
+	DeferredShading,
+	CustomResolve,
+};
+
+enum class ERenderTargetLoadAction : TUINT32
+{
+	DontCare,
+	Load,
+	Clear,
+};
+
+enum class ERenderTargetStoreAction : TUINT32
+{
+	DontCare,
+	Store,
+	MultisampleResolve,
+};
+
+enum class ERHIAccessFlag : TUINT32
+{
+	// Used when the previous state of a resource is not known,
+	// which implies we have to flush all GPU caches etc.
+	Unknown = 0,
+
+	// Read states
+	CPURead                 = 1 <<  0,
+	Present                 = 1 <<  1,
+	IndirectArgs            = 1 <<  2,
+	VertexOrIndexBuffer     = 1 <<  3,
+	SRVCompute              = 1 <<  4,
+	SRVGraphicsPixel        = 1 <<  5,
+	SRVGraphicsNonPixel     = 1 <<  6,
+	CopySrc                 = 1 <<  7,
+	ResolveSrc              = 1 <<  8,
+	DSVRead                 = 1 <<  9,
+
+	// Read-write states
+	UAVCompute              = 1 << 10,
+	UAVGraphics             = 1 << 11,
+	RTV                     = 1 << 12,
+	CopyDest                = 1 << 13,
+	ResolveDst              = 1 << 14,
+	DSVWrite                = 1 << 15,
+
+	// Ray tracing acceleration structure states.
+	// Buffer that contains an AS must always be in either of these states.
+	// BVHRead -- required for AS inputs to build/update/copy/trace commands.
+	// BVHWrite -- required for AS outputs of build/update/copy commands.
+	BVHRead                  = 1 << 16,
+	BVHWrite                 = 1 << 17,
+
+	// Invalid released state (transient resources)
+	Discard                = 1 << 18,
+
+	// Shading Rate Source
+	ShadingRateSource  = 1 << 19,
+
+	Last = ShadingRateSource,
+	None = Unknown,
+	Mask = (Last << 1) - 1,
+
+	// Graphics is a combination of pixel and non-pixel
+	SRVGraphics = SRVGraphicsPixel | SRVGraphicsNonPixel,
+
+	// A mask of the two possible SRV states
+	SRVMask = SRVCompute | SRVGraphics,
+
+	// A mask of the two possible UAV states
+	UAVMask = UAVCompute | UAVGraphics,
+
+	// A mask of all bits representing read-only states which cannot be combined with other write states.
+	ReadOnlyExclusiveMask = CPURead | Present | IndirectArgs | VertexOrIndexBuffer | SRVGraphics | SRVCompute | CopySrc | ResolveSrc | BVHRead | ShadingRateSource,
+
+	// A mask of all bits representing read-only states on the compute pipe which cannot be combined with other write states.
+	ReadOnlyExclusiveComputeMask = CPURead | IndirectArgs | SRVCompute | CopySrc | BVHRead,
+
+	// A mask of all bits representing read-only states which may be combined with other write states.
+	ReadOnlyMask = ReadOnlyExclusiveMask | DSVRead | ShadingRateSource,
+
+	// A mask of all bits representing readable states which may also include writable states.
+	ReadableMask = ReadOnlyMask | UAVMask,
+
+	// A mask of all bits representing write-only states which cannot be combined with other read states.
+	WriteOnlyExclusiveMask = RTV | CopyDest | ResolveDst,
+
+	// A mask of all bits representing write-only states which may be combined with other read states.
+	WriteOnlyMask = WriteOnlyExclusiveMask | DSVWrite,
+
+	// A mask of all bits representing writable states which may also include readable states.
+	WritableMask = WriteOnlyMask | UAVMask | BVHWrite,
+
+	// A mask of all bits representing read-write states.
+	ReadWrite = DSVRead | DSVWrite,
+};
+HLVM_DECLARE_ENMU_FLAGS(ERHIAccessFlag, ERHIAccessFlags)
+
+enum class EVariableRateShadingCombiner : TUINT32
+{
+	Passthrough,
+	Override,
+	Min,
+	Max,
+	Sum
+};
+
 // RHI Resource Types
 class FRHITexture;
 class FRHIBuffer;
@@ -254,24 +363,6 @@ class FRHIComputeCommandList;
 class FRHIGraphicsPipelineState;
 class FRHIComputePipelineState;
 
-// Macros for RHI Debugging and Verification
-#define CHECK_RHI_RESOURCE(Resource) checkf(Resource != nullptr, TXT("Invalid RHI resource: %s"), TXT(#Resource))
-#define VERIFY_RHI_RESULT(Result) checkf(Result == true, TXT("RHI operation failed: %s"), TXT(#Result))
-
-// Macros for RHI Resource Creation
-#define CREATE_RHI_TEXTURE(Desc) GDynamicRHI->CreateTexture(Desc)
-#define CREATE_RHI_BUFFER(Desc) GDynamicRHI->CreateBuffer(Desc)
-
-// Macros for RHI Command List
-#define RHICmdList GDynamicRHI->GetImmediateCommandList()
-
-// Macros for RHI Synchronization
-#define FLUSH_RHI_COMMANDS() GDynamicRHI->RHISubmitCommandsAndFlushGPU()
-
-// Macros for RHI Debugging Events
-#define RHI_PUSH_EVENT(Name, Color) GDynamicRHI->RHIPushEvent(TXT(Name), Color)
-#define RHI_POP_EVENT() GDynamicRHI->RHIPopEvent()
-
 // Utility Functions
 inline const TCHAR* GetRHIName(ERHIInterfaceType Type)
 {
@@ -282,4 +373,7 @@ inline const TCHAR* GetRHIName(ERHIInterfaceType Type)
 	}
 };
 
-#define RHI_MAX_SIMULTANEOUS_RENDER_TARGETS 8
+namespace RHI
+{
+	constexpr TUINT32 RT_ATTACHMENT_MAX = 8;
+}

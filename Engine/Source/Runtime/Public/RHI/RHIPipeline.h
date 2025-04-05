@@ -15,7 +15,7 @@ struct FGraphicsPipelineStateInitializer
 	FRHIShader* GeometryShader; // Geometry shader (optional)
 	FRHIShader* HullShader; // Hull shader (optional)
 	FRHIShader* DomainShader; // Domain shader (optional)
-	EPixelFormat RenderTargetFormats[RHI_MAX_SIMULTANEOUS_RENDER_TARGETS]; // Formats of the render targets
+	EPixelFormat RenderTargetFormats[RHI::RT_ATTACHMENT_MAX]; // Formats of the render targets
 	EPixelFormat DepthStencilFormat; // Format of the depth-stencil target
 	TUINT32 NumRenderTargets; // Number of render targets
 	TUINT32 SampleCount; // Number of samples (for MSAA)

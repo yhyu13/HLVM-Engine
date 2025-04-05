@@ -189,25 +189,25 @@ namespace VulkanRHI
 	}
 
 	// Helper function to convert RHI compare function to Vulkan compare function
-	VkCompareOp VulkanCompareOpFromRHICompareFunction(ECompareFunction RHIFunction)
+	VkCompareOp VulkanCompareOpFromRHICompareFunction(ERHICompare RHIFunction)
 	{
 		switch (RHIFunction)
 		{
-			case ECompareFunction::Never:
+			case ERHICompare::Never:
 				return VK_COMPARE_OP_NEVER;
-			case ECompareFunction::Less:
+			case ERHICompare::Less:
 				return VK_COMPARE_OP_LESS;
-			case ECompareFunction::Equal:
+			case ERHICompare::Equal:
 				return VK_COMPARE_OP_EQUAL;
-			case ECompareFunction::LessEqual:
+			case ERHICompare::LessEqual:
 				return VK_COMPARE_OP_LESS_OR_EQUAL;
-			case ECompareFunction::Greater:
+			case ERHICompare::Greater:
 				return VK_COMPARE_OP_GREATER;
-			case ECompareFunction::NotEqual:
+			case ERHICompare::NotEqual:
 				return VK_COMPARE_OP_NOT_EQUAL;
-			case ECompareFunction::GreaterEqual:
+			case ERHICompare::GreaterEqual:
 				return VK_COMPARE_OP_GREATER_OR_EQUAL;
-			case ECompareFunction::Always:
+			case ERHICompare::Always:
 				return VK_COMPARE_OP_ALWAYS;
 		}
 	}

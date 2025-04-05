@@ -171,7 +171,7 @@
 	PFN_DEF(vkCmdEndRenderPass)                             \
 	PFN_DEF(vkCmdExecuteCommands)
 
-#if VULKAN_USE_DISPLAY_KHR
+#if VULKAN_DISPLAY_KHR
 	#define APPLY_PFN_DEF_VK_FUNCTIONS_DISPLAY(PFN_DEF)       \
 		PFN_DEF(vkCreateDisplayModeKHR)                       \
 		PFN_DEF(vkCreateDisplayPlaneSurfaceKHR)               \
@@ -182,7 +182,17 @@
 		PFN_DEF(vkGetPhysicalDeviceDisplayPropertiesKHR)
 #else
 	#define APPLY_PFN_DEF_VK_FUNCTIONS_DISPLAY(...)
-#endif /* defined(VK_KHR_display) */
+#endif /* VULKAN_DISPLAY_KHR */
+
+#if VULKAN_RENDERPASS2
+	#define APPLY_PFN_DEF_VK_FUNCTIONS_RENDERPASS2(PFN_DEF) \
+		PFN_DEF(vkCreateRenderPass2KHR)                     \
+		PFN_DEF(vkCmdBeginRenderPass2KHR)                   \
+		PFN_DEF(vkCmdNextSubpass2KHR)                       \
+		PFN_DEF(vkCmdEndRenderPass2KHR)
+#else
+	#define APPLY_PFN_DEF_VK_FUNCTIONS_RENDERPASS2(...)
+#endif /* VULKAN_RENDERPASS2 */
 
 #if VULKAN_USE_VMA
 	#if VMA_DEDICATED_ALLOCATION || VMA_VULKAN_VERSION >= 1001000
@@ -221,14 +231,18 @@
 	#define APPLY_PFN_DEF_VK_FUNCTIONS_VMA(...)
 #endif /* VULKAN_USE_VMA */
 
-#define DECLARE_VK_FUNCTION_MACRO(function) \
-	HLVM_EXTERN_FUNC PFN_##function function;
+#define APPLY_TO_ALL_PFN(macro)                   \
+	APPLY_PFN_DEF_VK_FUNCTIONS_CORE(macro)        \
+	APPLY_PFN_DEF_VK_FUNCTIONS_DISPLAY(macro)     \
+	APPLY_PFN_DEF_VK_FUNCTIONS_RENDERPASS2(macro) \
+	APPLY_PFN_DEF_VK_FUNCTIONS_VMA(macro)
 
 namespace VulkanRHI
 {
-	APPLY_PFN_DEF_VK_FUNCTIONS_CORE(DECLARE_VK_FUNCTION_MACRO)
-	APPLY_PFN_DEF_VK_FUNCTIONS_DISPLAY(DECLARE_VK_FUNCTION_MACRO)
-	APPLY_PFN_DEF_VK_FUNCTIONS_VMA(DECLARE_VK_FUNCTION_MACRO)
+#define DECLARE_VK_FUNCTION_MACRO(function) \
+	HLVM_EXTERN_FUNC PFN_##function function;
+
+	APPLY_TO_ALL_PFN(DECLARE_VK_FUNCTION_MACRO)
 
 	// VK RHI Globals
 	HLVM_EXTERN_VAR VmaAllocator		   VULKAN_VMA_ALLOCATOR;
