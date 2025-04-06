@@ -50,8 +50,9 @@ struct FComputePipelineStateInitializer
 // Structure for describing render pass initialization parameters
 struct FRHIRenderPassInfo
 {
-	TVector<FRHITexture*> RenderTargets; // Render targets
-	FRHITexture* DepthStencilTarget; // Depth-stencil target
+	FString DebugName;
+	TVector<FTextureRHIRef> RenderTargets; // Render targets
+	FTextureRHIRef DepthStencilTarget; // Depth-stencil target
 	FClearValueBinding ClearValue; // Clear value for the render targets and depth-stencil target
 
 	// Constructor for easy initialization

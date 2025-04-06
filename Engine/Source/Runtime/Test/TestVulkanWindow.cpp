@@ -1298,6 +1298,11 @@ RECORD_BOOL(test_GLFW3VulkanWindow)
 			(IndexBufferCreateDesc.MemoryPropertyFlags = EMemoryPropertyFlag::DeviceLocal) |= EMemoryPropertyFlag::HostVisible;
 			IndexBuffer = VulkanRHI->CreateBuffer(IndexBufferCreateDesc);
 		}
+
+
+		{
+			VulkanRHI->BeginVulkanRenderPass(FRHIRenderPassInfo{});
+		}
 	}
 	VulkanRHI->Shutdown();
 

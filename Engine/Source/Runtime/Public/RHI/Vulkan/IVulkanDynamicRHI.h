@@ -40,7 +40,7 @@ public:
 	virtual void PresentVulkanSwapChain(FViewportRHIRef& Viewport) = 0;
 
 	// Vulkan-specific render pass management
-	virtual void BeginVulkanRenderPass(const FRHIRenderPassInfo& RenderPassInfo, const TCHAR* Name) = 0;
+	virtual void BeginVulkanRenderPass(const FRHIRenderPassInfo& RenderPassInfo) = 0;
 	virtual void EndVulkanRenderPass() = 0;
 
 	// Vulkan-specific query and timestamp management

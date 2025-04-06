@@ -43,7 +43,8 @@ public:
 class FVulkanRenderTargetLayout
 {
 public:
-	FVulkanRenderTargetLayout(const FGraphicsPipelineStateInitializer& Initializer);
+	FVulkanRenderTargetLayout(const FGraphicsPipelineStateInitializer& /*Initializer*/)
+	{}
 	FVulkanRenderTargetLayout(FVulkanLogicalDeviceRef InDevice, const FRHISetRenderTargetsInfo& RTInfo);
 	FVulkanRenderTargetLayout(FVulkanLogicalDeviceRef InDevice, const FRHIRenderPassInfo& RPInfo, VkImageLayout CurrentDepthLayout, VkImageLayout CurrentStencilLayout);
 	

@@ -376,6 +376,10 @@ void FVulkanRHI::Init()
 	{
 		CreateDebugLayer();
 	}
+	else
+	{
+		HLVM_LOG(LogVulkanRHI, warn, TXT("VulkanRHI validation layer disabled!"));
+	}
 	CreateSurface();
 	CreateVulkanPhysicalDevice();
 	CreateVulkanLogicalDevice();
@@ -519,9 +523,9 @@ void FVulkanRHI::RHISwapBuffers(FViewportRHIRef& Viewport)
 }
 
 // Render Pass and Draw Commands
-void FVulkanRHI::RHIBeginRenderPass(const FRHIRenderPassInfo& RenderPassInfo, const TCHAR* Name)
+void FVulkanRHI::RHIBeginRenderPass(const FRHIRenderPassInfo& RenderPassInfo)
 {
-	BeginVulkanRenderPass(RenderPassInfo, Name);
+	BeginVulkanRenderPass(RenderPassInfo);
 }
 
 void FVulkanRHI::RHIEndRenderPass()
@@ -949,9 +953,11 @@ void FVulkanRHI::PresentVulkanSwapChain(FViewportRHIRef& Viewport)
 }
 
 // Vulkan-specific render pass management
-void FVulkanRHI::BeginVulkanRenderPass(const FRHIRenderPassInfo& RenderPassInfo, const TCHAR* Name)
+void FVulkanRHI::BeginVulkanRenderPass(const FRHIRenderPassInfo& RenderPassInfo)
 {
 	// Implement render pass begin
+	FVulkanRenderTargetLayout Layout{FGraphicsPipelineStateInitializer{}};
+	VulkanRHI::CreateVulkanRenderPass(LogicalDevice, Layout);
 }
 
 void FVulkanRHI::EndVulkanRenderPass()

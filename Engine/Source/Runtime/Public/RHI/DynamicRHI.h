@@ -50,7 +50,7 @@ public:
 	virtual void RHISwapBuffers(FViewportRHIRef& Viewport) = 0;
 
 	// Render Pass and Draw Commands
-	virtual void RHIBeginRenderPass(const FRHIRenderPassInfo& RenderPassInfo, const TCHAR* Name) = 0;
+	virtual void RHIBeginRenderPass(const FRHIRenderPassInfo& RenderPassInfo) = 0;
 	virtual void RHIEndRenderPass() = 0;
 	virtual void RHIDrawPrimitive(TUINT32 BaseVertexIndex, TUINT32 NumPrimitives, TUINT32 NumInstances) = 0;
 	virtual void RHIDrawIndexedPrimitive(FRHIBuffer* IndexBuffer, TUINT32 BaseVertexIndex, TUINT32 FirstInstance, TUINT32 NumVertices, TUINT32 StartIndex, TUINT32 NumPrimitives, TUINT32 NumInstances) = 0;

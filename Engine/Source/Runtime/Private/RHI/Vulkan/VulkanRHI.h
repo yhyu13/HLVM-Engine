@@ -59,7 +59,7 @@ public:
 	virtual void RHISwapBuffers(FViewportRHIRef& Viewport) override;
 
 	// Render Pass and Draw Commands
-	virtual void RHIBeginRenderPass(const FRHIRenderPassInfo& RenderPassInfo, const TCHAR* Name) override;
+	virtual void RHIBeginRenderPass(const FRHIRenderPassInfo& RenderPassInfo) override;
 	virtual void RHIEndRenderPass() override;
 	virtual void RHIDrawPrimitive(TUINT32 BaseVertexIndex, TUINT32 NumPrimitives, TUINT32 NumInstances) override;
 	virtual void RHIDrawIndexedPrimitive(FRHIBuffer* IndexBuffer, TUINT32 BaseVertexIndex, TUINT32 FirstInstance, TUINT32 NumVertices, TUINT32 StartIndex, TUINT32 NumPrimitives, TUINT32 NumInstances) override;
@@ -107,7 +107,7 @@ public:
 	void PresentVulkanSwapChain(FViewportRHIRef& Viewport) override;
 
 	// Vulkan-specific render pass management
-	void BeginVulkanRenderPass(const FRHIRenderPassInfo& RenderPassInfo, const TCHAR* Name) override;
+	void BeginVulkanRenderPass(const FRHIRenderPassInfo& RenderPassInfo) override;
 	void EndVulkanRenderPass() override;
 
 	// Vulkan-specific query and timestamp management

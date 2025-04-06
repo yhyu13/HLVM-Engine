@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include "Core/Container/ContainerDefinition.h"
 #include "RHI/RHIResource.h"
 #include "VulkanRHIResourceDeclaration.h"
 
@@ -143,13 +144,13 @@ struct FVulkanSubpassDescription<VkSubpassDescription> : public VkSubpassDescrip
 		pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
 	}
 
-	void SetColorAttachments(const TVector<FVulkanAttachmentReference<VkAttachmentReference>>& ColorAttachmentReferences, TUINT32 OverrideCount = 0)
+	void SetColorAttachments(const TVectorView<FVulkanAttachmentReference<VkAttachmentReference>>& ColorAttachmentReferences, TUINT32 OverrideCount = 0)
 	{
 		colorAttachmentCount = (OverrideCount == 0) ? ColorAttachmentReferences.Num() : OverrideCount;
 		pColorAttachments = ColorAttachmentReferences.GetDataConst();
 	}
 
-	void SetResolveAttachments(const TVector<FVulkanAttachmentReference<VkAttachmentReference>>& ResolveAttachmentReferences)
+	void SetResolveAttachments(const TVectorView<FVulkanAttachmentReference<VkAttachmentReference>>& ResolveAttachmentReferences)
 	{
 		if (ResolveAttachmentReferences.Num() > 0)
 		{
@@ -195,13 +196,13 @@ struct FVulkanSubpassDescription<VkSubpassDescription2> : public VkSubpassDescri
 		viewMask = 0;
 	}
 
-	void SetColorAttachments(const TVector<FVulkanAttachmentReference<VkAttachmentReference2>>& ColorAttachmentReferences, TUINT32 OverrideCount = 0)
+	void SetColorAttachments(const TVectorView<FVulkanAttachmentReference<VkAttachmentReference2>>& ColorAttachmentReferences, TUINT32 OverrideCount = 0)
 	{
 		colorAttachmentCount = (OverrideCount == 0) ? ColorAttachmentReferences.Num() : OverrideCount;
 		pColorAttachments = ColorAttachmentReferences.GetDataConst();
 	}
 
-	void SetResolveAttachments(const TVector<FVulkanAttachmentReference<VkAttachmentReference2>>& ResolveAttachmentReferences)
+	void SetResolveAttachments(const TVectorView<FVulkanAttachmentReference<VkAttachmentReference2>>& ResolveAttachmentReferences)
 	{
 		if (ResolveAttachmentReferences.Num() > 0)
 		{
@@ -370,7 +371,7 @@ struct FVulkanRenderPassCreateInfo<VkRenderPassCreateInfo> : public VkRenderPass
 
 	VkRenderPass Create(const FVulkanLogicalDeviceRef& Device)
 	{
-		VkRenderPass Handle = VK_NULL_HANDLE;
+		VkRenderPass Handle;
 		VULKAN_ENSURE(VulkanRHI::vkCreateRenderPass(Device->GetHandle(), this, VulkanRHI::VULKAN_CPU_ALLOCATOR, &Handle));
 		return Handle;
 	}
@@ -409,7 +410,7 @@ struct FVulkanRenderPassCreateInfo<VkRenderPassCreateInfo2> : public VkRenderPas
 
 	VkRenderPass Create(FVulkanLogicalDeviceRef Device)
 	{
-		VkRenderPass Handle = VK_NULL_HANDLE;
+		VkRenderPass Handle;
 		VULKAN_ENSURE(VulkanRHI::vkCreateRenderPass2KHR(Device->GetHandle(), this, VulkanRHI::VULKAN_CPU_ALLOCATOR, &Handle));
 		return Handle;
 	}
@@ -510,7 +511,7 @@ public:
 			NumColorAttachments--;
 		}
 
-		uint32_t		   DepthInputAttachment = VK_ATTACHMENT_UNUSED;
+		TUINT32		   DepthInputAttachment = VK_ATTACHMENT_UNUSED;
 		VkImageLayout	   DepthInputAttachmentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 		VkImageAspectFlags DepthInputAspectMask = 0;
 		if (bHasDepthStencilAttachmentReference)
@@ -731,11 +732,11 @@ public:
 				// Handle SceneDepthAux resolve:
 				// The depth read subpass has only a single color attachment (using more would not be compatible dual source blending), so make SceneDepthAux a resolve attachment of the first subpass instead
 				ResolveAttachmentReferences.Add(TAttachmentReferenceClass{});
-				ResolveAttachmentReferences.Last().attachment = VK_ATTACHMENT_UNUSED;
-				Swap(ResolveAttachmentReferences.Last(), ResolveAttachmentReferences[0]);
+				ResolveAttachmentReferences.LastData()->attachment = VK_ATTACHMENT_UNUSED;
+				ResolveAttachmentReferences.Swap(0, ResolveAttachmentReferences.Num() - 1);
 
-				SubpassDescriptions[0].SetResolveAttachments(TArrayView<TAttachmentReferenceClass>(ResolveAttachmentReferences.GetData(), ResolveAttachmentReferences.Num() - 1));
-				SubpassDescriptions[NumSubpasses - 1].SetResolveAttachments(TArrayView<TAttachmentReferenceClass>(&ResolveAttachmentReferences.Last(), 1));
+				SubpassDescriptions[0].SetResolveAttachments(TVectorView<TAttachmentReferenceClass>(ResolveAttachmentReferences.GetData(), ResolveAttachmentReferences.Num() - 1));
+				SubpassDescriptions[NumSubpasses - 1].SetResolveAttachments(TVectorView<TAttachmentReferenceClass>(ResolveAttachmentReferences.LastData(), 1));
 			}
 			else
 			{
@@ -813,10 +814,10 @@ public:
 		}
 	}
 
-	VkRenderPass Create(const FVulkanRenderTargetLayout& RTLayout)
+	VkRenderPass Create(const FVulkanRenderTargetLayout& /*RTLayout*/)
 	{
-		BuildCreateInfo(RTLayout);
-
+		//TODO
+		//BuildCreateInfo(RTLayout);
 		return CreateInfo.Create(Device);
 	}
 
@@ -864,7 +865,10 @@ private:
 	TUINT32 CorrelationMask;
 };
 
-VkRenderPass CreateVulkanRenderPass(FVulkanLogicalDeviceRef Device, const FVulkanRenderTargetLayout& RTLayout);
+namespace VulkanRHI
+{
+	HLVM_EXTERN_FUNC VkRenderPass CreateVulkanRenderPass(FVulkanLogicalDeviceRef Device, const FVulkanRenderTargetLayout& RTLayout);
+}
 
 // TODO
 //class FVulkanRenderPassManager : public FVulkanMinimalContext
