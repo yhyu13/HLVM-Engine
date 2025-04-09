@@ -5,7 +5,7 @@
 #pragma once
 
 #include "RHI/RHIResource.h"
-#include "VulkanRHIResourceDeclaration.h"
+#include "VulkanRHIResourcePre.h"
 #include "VulkanSwapChain.h"
 #include "VulkanTexture.h"
 
@@ -16,7 +16,7 @@ class FVulkanViewport;
 class FVulkanBackBuffer : public FVulkanTexture
 {
 public:
-	FVulkanBackBuffer(VkImage InImage, const FRHITextureCreateDesc& InCreateDesc, FVulkanViewport* InViewport);
+	FVulkanBackBuffer(VkImage InImage, const FRHITextureCreateInfo& InCreateInfo, FVulkanViewport* InViewport);
 	~FVulkanBackBuffer() override;
 
 private:
@@ -32,9 +32,9 @@ using FVulkanBackBufferRef = TRefCountPtr<FVulkanSwapChain>;
 class FVulkanViewport : public FRHIViewport, public FVulkanResource, public FVulkanMinimalContext
 {
 public:
-	FVulkanViewport(const FRHIViewportCreateDesc& InCreateDesc,
+	FVulkanViewport(const FRHIViewportCreateInfo& InCreateInfo,
 		const FVulkanMinimalContext&			  InContext)
-		: FRHIViewport(InCreateDesc), FVulkanMinimalContext(InContext)
+		: FRHIViewport(InCreateInfo), FVulkanMinimalContext(InContext)
 	{
 	}
 
@@ -65,7 +65,7 @@ private:
 
 	TUINT32 SwapChainImageIndex = TUINT32_MAX;
 	VkSemaphore ImageAcquireSemaphore = VK_NULL_HANDLE;
-	TFixedSizeVector<FVulkanSemaphoreRef, FVulkanSwapChain::MAX_FRAMES_IN_FLIGHT> RenderingDoneSemaphores;
+	TStaticVector<FVulkanSemaphoreRef, FVulkanSwapChain::MAX_FRAMES_IN_FLIGHT> RenderingDoneSemaphores;
 };
 
 using FVulkanViewportRef = TRefCountPtr<FVulkanViewport>;

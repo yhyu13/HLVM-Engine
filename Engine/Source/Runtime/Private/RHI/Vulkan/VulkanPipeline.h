@@ -5,7 +5,7 @@
 #pragma once
 
 #include "RHI/RHIPipeline.h"
-#include "VulkanRHIResourceDeclaration.h"
+#include "VulkanRHIResourcePre.h"
 
 // Vulkan-specific RHI graphics pipeline state
 class FVulkanGraphicsPipelineState : public FRHIGraphicsPipelineState, public FVulkanResource

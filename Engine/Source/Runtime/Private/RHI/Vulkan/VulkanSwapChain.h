@@ -53,14 +53,14 @@ private:
 	VkSwapchainKHR										  swapChain;
 	VkFormat											  swapChainImageFormat;
 	VkExtent2D											  swapChainExtent;
-	TFixedSizeVector<VkImage, MAX_FRAMES_IN_FLIGHT>		  swapChainImages;		 // 交换链图像句柄
-	TFixedSizeVector<VkImageView, MAX_FRAMES_IN_FLIGHT>	  swapChainImageViews;	 // Vulkan对象，包括处于交换链，或者管线，都需要绑定一个VkImageView对象来访问它
-	TFixedSizeVector<VkFramebuffer, MAX_FRAMES_IN_FLIGHT> swapChainFrameBuffers; // 添加一个集合存储帧缓冲对象
+	TStaticVector<VkImage, MAX_FRAMES_IN_FLIGHT>		  swapChainImages;		 // 交换链图像句柄
+	TStaticVector<VkImageView, MAX_FRAMES_IN_FLIGHT>	  swapChainImageViews;	 // Vulkan对象，包括处于交换链，或者管线，都需要绑定一个VkImageView对象来访问它
+	TStaticVector<VkFramebuffer, MAX_FRAMES_IN_FLIGHT> swapChainFrameBuffers; // 添加一个集合存储帧缓冲对象
 
 #if VULKAN_SWAPCHAIN_USE_IMAGE_FENCE
-	TFixedSizeVector<FVulkanFenceRef, MAX_FRAMES_IN_FLIGHT> imageAcquiredFences; // 用于绘制的同步变量
+	TStaticVector<FVulkanFenceRef, MAX_FRAMES_IN_FLIGHT> imageAcquiredFences; // 用于绘制的同步变量
 #endif
-	TFixedSizeVector<FVulkanSemaphoreRef, MAX_FRAMES_IN_FLIGHT> imageAcquiredSemaphores; // 用于绘制的同步变量
+	TStaticVector<FVulkanSemaphoreRef, MAX_FRAMES_IN_FLIGHT> imageAcquiredSemaphores; // 用于绘制的同步变量
 
 	TUINT32 swapChainActualImageCount;
 	TUINT32 currentSyncObjectIndex = 0;

@@ -20,8 +20,8 @@ public:
 	virtual ERHIInterfaceType GetInterfaceType() const override { return ERHIInterfaceType::Vulkan; }
 
 	// Vulkan-specific resource creation
-	HLVM_NODISCARD virtual VkImage CreateVulkanImage(const FRHITextureCreateDesc& CreateDesc) = 0;
-	HLVM_NODISCARD virtual VkBuffer CreateVulkanBuffer(const FRHIBufferCreateDesc& CreateDesc, void** OutAllocation) = 0;
+	HLVM_NODISCARD virtual VkImage CreateVulkanImage(const FRHITextureCreateInfo& CreateInfo) = 0;
+	HLVM_NODISCARD virtual VkBuffer CreateVulkanBuffer(const FRHIBufferCreateInfo& CreateInfo, void** OutAllocation) = 0;
 	virtual void DestoryVulkanBuffer(VkBuffer Buffer, void** InAllocation) = 0;
 	HLVM_NODISCARD virtual VkImageView CreateVulkanImageView(VkImage Image, const FRHIShaderResourceViewCreateInfo& CreateInfo) = 0;
 	HLVM_NODISCARD virtual VkBufferView CreateVulkanBufferView(VkBuffer Buffer, const FRHIUnorderedAccessViewCreateInfo& CreateInfo) = 0;

@@ -5,13 +5,13 @@
 #pragma once
 
 #include "RHI/RHIResource.h"
-#include "VulkanRHIResourceDeclaration.h"
+#include "VulkanRHIResourcePre.h"
 
 // Vulkan-specific RHI buffer
 class FVulkanBuffer : public FRHIBuffer, public FVulkanResource
 {
 public:
-	FVulkanBuffer(const FRHIBufferCreateDesc& InCreateDesc);
+	FVulkanBuffer(const FRHIBufferCreateInfo& InCreateInfo);
 	~FVulkanBuffer() override;
 
 	FVulkanBuffer(const FVulkanBuffer&) = delete;
@@ -36,10 +36,10 @@ private:
 class FVulkanUnorderedAccessView : public FRHIUnorderedAccessView, public FVulkanResource
 {
 public:
-	FVulkanUnorderedAccessView(VkBufferView InBufferView, const FRHIUnorderedAccessViewCreateInfo& InCreateDesc)
+	FVulkanUnorderedAccessView(VkBufferView InBufferView, const FRHIUnorderedAccessViewCreateInfo& InCreateInfo)
 		: BufferView(InBufferView)
 	{
-		CreateDesc = InCreateDesc;
+		CreateInfo = InCreateInfo;
 	}
 
 	// Returns the Vulkan buffer view handle

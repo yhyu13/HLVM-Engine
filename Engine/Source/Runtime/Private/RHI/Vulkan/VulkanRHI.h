@@ -31,8 +31,8 @@ public:
 	virtual void Shutdown() override;
 
 	// Resource Creation
-	virtual FTextureRHIRef			   CreateTexture(const FRHITextureCreateDesc& CreateDesc) override;
-	virtual FBufferRHIRef			   CreateBuffer(const FRHIBufferCreateDesc& CreateDesc) override;
+	virtual FRHITextureRef			   CreateTexture(const FRHITextureCreateInfo& CreateInfo) override;
+	virtual FBufferRHIRef			   CreateBuffer(const FRHIBufferCreateInfo& CreateInfo) override;
 	virtual FShaderResourceViewRHIRef  CreateShaderResourceView(FRHITexture* Texture, const FRHIShaderResourceViewCreateInfo& CreateInfo) override;
 	virtual FUnorderedAccessViewRHIRef CreateUnorderedAccessView(FRHIBuffer* Buffer, const FRHIUnorderedAccessViewCreateInfo& CreateInfo) override;
 	virtual FVertexDeclarationRHIRef   CreateVertexDeclaration(const FVertexDeclarationElementList& Elements) override;
@@ -87,8 +87,8 @@ public:
 	virtual void RHISetScissorRect(bool bEnable, TUINT32 MinX, TUINT32 MinY, TUINT32 MaxX, TUINT32 MaxY) override;
 
 	// Vulkan-specific resource creation
-	VkImage		 CreateVulkanImage(const FRHITextureCreateDesc& CreateDesc) override;
-	VkBuffer	 CreateVulkanBuffer(const FRHIBufferCreateDesc& CreateDesc, void** OutAllocation) override;
+	VkImage		 CreateVulkanImage(const FRHITextureCreateInfo& CreateInfo) override;
+	VkBuffer	 CreateVulkanBuffer(const FRHIBufferCreateInfo& CreateInfo, void** OutAllocation) override;
 	void		 DestoryVulkanBuffer(VkBuffer Buffer, void** InAllocation) override;
 	VkImageView	 CreateVulkanImageView(VkImage Image, const FRHIShaderResourceViewCreateInfo& CreateInfo) override;
 	VkBufferView CreateVulkanBufferView(VkBuffer Buffer, const FRHIUnorderedAccessViewCreateInfo& CreateInfo) override;
@@ -135,38 +135,38 @@ protected:
 
 	void CreateVulkanMemoryAllocator();
 
-	// Function to generate VkImageCreateInfo from FRHITextureCreateDesc
-	VkImageCreateInfo GenerateVkImageCreateInfo(const FRHITextureCreateDesc& CreateDesc);
+	// Function to generate VkImageCreateInfo from FRHITextureCreateInfo
+	VkImageCreateInfo GenerateVkImageCreateInfo(const FRHITextureCreateInfo& CreateInfo);
 
-	// Function to generate VkBufferCreateInfo from FRHIBufferCreateDesc
-	VkBufferCreateInfo GenerateVkBufferCreateInfo(const FRHIBufferCreateDesc& CreateDesc);
+	// Function to generate VkBufferCreateInfo from FRHIBufferCreateInfo
+	VkBufferCreateInfo GenerateVkBufferCreateInfo(const FRHIBufferCreateInfo& CreateInfo);
 
 	// Function to generate VkShaderModuleCreateInfo from FShaderCreateInfo
-	VkShaderModuleCreateInfo GenerateVkShaderModuleCreateInfo(const FShaderCreateInfo& CreateDesc);
+	VkShaderModuleCreateInfo GenerateVkShaderModuleCreateInfo(const FShaderCreateInfo& CreateInfo);
 
 	// Function to generate VkImageViewCreateInfo from FRHIShaderResourceViewCreateInfo
-	VkImageViewCreateInfo GenerateVkImageViewCreateInfo(const FRHIShaderResourceViewCreateInfo& CreateDesc);
+	VkImageViewCreateInfo GenerateVkImageViewCreateInfo(const FRHIShaderResourceViewCreateInfo& CreateInfo);
 
 	// Function to generate VkBufferViewCreateInfo from FRHIUnorderedAccessViewCreateInfo
-	VkBufferViewCreateInfo GenerateVkBufferViewCreateInfo(const FRHIUnorderedAccessViewCreateInfo& CreateDesc);
+	VkBufferViewCreateInfo GenerateVkBufferViewCreateInfo(const FRHIUnorderedAccessViewCreateInfo& CreateInfo);
 
 	// Function to generate VkSamplerCreateInfo from FRHISamplerStateCreateInfo (assuming this struct exists)
-	VkSamplerCreateInfo GenerateVkSamplerCreateInfo(const FRHISamplerStateCreateInfo& CreateDesc);
+	VkSamplerCreateInfo GenerateVkSamplerCreateInfo(const FRHISamplerStateCreateInfo& CreateInfo);
 
 	// Function to generate VkPipelineShaderStageCreateInfo from FShaderCreateInfo
-	VkPipelineShaderStageCreateInfo GenerateVkPipelineShaderStageCreateInfo(const FShaderCreateInfo& CreateDesc);
+	VkPipelineShaderStageCreateInfo GenerateVkPipelineShaderStageCreateInfo(const FShaderCreateInfo& CreateInfo);
 
 	// Function to generate VkPipelineLayoutCreateInfo from FRHIGraphicsPipelineStateCreateInfo (assuming this struct exists)
-	VkPipelineLayoutCreateInfo GenerateVkPipelineLayoutCreateInfo(const FRHIGraphicsPipelineLayoutCreateInfo& CreateDesc);
+	VkPipelineLayoutCreateInfo GenerateVkPipelineLayoutCreateInfo(const FRHIGraphicsPipelineLayoutCreateInfo& CreateInfo);
 
 	// Function to generate VkGraphicsPipelineCreateInfo from FRHIGraphicsPipelineStateCreateInfo (assuming this struct exists)
-	VkGraphicsPipelineCreateInfo GenerateVkGraphicsPipelineCreateInfo(const FRHIGraphicsPipelineStateCreateInfo& CreateDesc);
+	VkGraphicsPipelineCreateInfo GenerateVkGraphicsPipelineCreateInfo(const FRHIGraphicsPipelineStateCreateInfo& CreateInfo);
 
 	// Function to generate VkComputePipelineCreateInfo from FRHIComputePipelineStateCreateInfo (assuming this struct exists)
-	VkComputePipelineCreateInfo GenerateVkComputePipelineCreateInfo(const FRHIComputePipelineStateCreateInfo& CreateDesc);
+	VkComputePipelineCreateInfo GenerateVkComputePipelineCreateInfo(const FRHIComputePipelineStateCreateInfo& CreateInfo);
 
 	// Function to generate VkQueryPoolCreateInfo from FRHIQueryCreateInfo (assuming this struct exists)
-	VkQueryPoolCreateInfo GenerateVkQueryPoolCreateInfo(const FRHIQueryCreateInfo& CreateDesc);
+	VkQueryPoolCreateInfo GenerateVkQueryPoolCreateInfo(const FRHIQueryCreateInfo& CreateInfo);
 
 private:
 	FInitializer InitializerParam;

@@ -153,10 +153,6 @@ namespace
 		{
 			HLVM_LOG(LogVulkanRHI, warn, TXT("Warning : {}"), TO_TCHAR_CSTR(pCallbackData->pMessage));
 		}
-		else if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT)
-		{
-			HLVM_LOG(LogVulkanRHI, info, TXT("Info : {}"), TO_TCHAR_CSTR(pCallbackData->pMessage));
-		} // ignore verbose logs
 		return VK_FALSE;
 	}
 
@@ -164,7 +160,7 @@ namespace
 	{
 		createInfo = {};
 		createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
-		createInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+		createInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
 		createInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
 		createInfo.pfnUserCallback = DebugCallback;
 	}
@@ -414,15 +410,15 @@ void FVulkanRHI::Shutdown()
 }
 
 // Resource Creation
-FTextureRHIRef FVulkanRHI::CreateTexture(const FRHITextureCreateDesc& CreateDesc)
+FRHITextureRef FVulkanRHI::CreateTexture(const FRHITextureCreateInfo& CreateInfo)
 {
-	VkImage Image = CreateVulkanImage(CreateDesc);
-	return new FVulkanTexture(Image, CreateDesc);
+	VkImage Image = CreateVulkanImage(CreateInfo);
+	return new FVulkanTexture(Image, CreateInfo);
 }
 
-FBufferRHIRef FVulkanRHI::CreateBuffer(const FRHIBufferCreateDesc& CreateDesc)
+FBufferRHIRef FVulkanRHI::CreateBuffer(const FRHIBufferCreateInfo& CreateInfo)
 {
-	return new FVulkanBuffer(CreateDesc);
+	return new FVulkanBuffer(CreateInfo);
 }
 
 FShaderResourceViewRHIRef FVulkanRHI::CreateShaderResourceView(FRHITexture* Texture, const FRHIShaderResourceViewCreateInfo& CreateInfo)
@@ -525,6 +521,7 @@ void FVulkanRHI::RHISwapBuffers(FViewportRHIRef& Viewport)
 // Render Pass and Draw Commands
 void FVulkanRHI::RHIBeginRenderPass(const FRHIRenderPassInfo& RenderPassInfo)
 {
+	RenderPassInfo.Validate();
 	BeginVulkanRenderPass(RenderPassInfo);
 }
 
@@ -765,7 +762,7 @@ void FVulkanRHI::CreateVulkanQueues()
 
 void FVulkanRHI::CreateVulkanViewPort()
 {
-	FRHIViewportCreateDesc ViewportDesc;
+	FRHIViewportCreateInfo ViewportDesc;
 	ViewportDesc.DebugName = TXT("Vulkan Viewport");
 	ViewportDesc.Dimensions = FUIntVec2{ 800, 600 };
 	ViewportDesc.ViewportType = ERHIViewportType::Fullscreen;
@@ -797,17 +794,17 @@ void FVulkanRHI::CreateVulkanMemoryAllocator()
 }
 
 // Vulkan-specific resource creation
-VkImage FVulkanRHI::CreateVulkanImage(const FRHITextureCreateDesc& CreateDesc)
+VkImage FVulkanRHI::CreateVulkanImage(const FRHITextureCreateInfo& CreateInfo)
 {
 	VkImageCreateInfo ImageInfo = {};
 	ImageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 	ImageInfo.imageType = VK_IMAGE_TYPE_2D;
-	ImageInfo.extent.width = CreateDesc.Dimensions.x;
-	ImageInfo.extent.height = CreateDesc.Dimensions.y;
-	ImageInfo.extent.depth = CreateDesc.Dimensions.z;
+	ImageInfo.extent.width = CreateInfo.Dimensions.x;
+	ImageInfo.extent.height = CreateInfo.Dimensions.y;
+	ImageInfo.extent.depth = CreateInfo.Dimensions.z;
 	ImageInfo.mipLevels = 1;
 	ImageInfo.arrayLayers = 1;
-	ImageInfo.format = VulkanRHI::VulkanFormatFromRHIFormat(CreateDesc.Format);
+	ImageInfo.format = VulkanRHI::VulkanFormatFromRHIFormat(CreateInfo.Format);
 	ImageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
 	ImageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 	ImageInfo.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
@@ -821,11 +818,11 @@ VkImage FVulkanRHI::CreateVulkanImage(const FRHITextureCreateDesc& CreateDesc)
 	return Image;
 }
 
-VkBuffer FVulkanRHI::CreateVulkanBuffer(const FRHIBufferCreateDesc& CreateDesc, void** OutAllocation)
+VkBuffer FVulkanRHI::CreateVulkanBuffer(const FRHIBufferCreateInfo& CreateInfo, void** OutAllocation)
 {
-	VkBufferUsageFlags	  UsageFlags = VulkanRHI::VulkanBufferUsageFlagsFromRHIUsageFlags(CreateDesc.UsageFlags);
-	VkMemoryPropertyFlags MemoryPropertyFlags = VulkanRHI::VulkanMemoryPropertyFlagsFromRHIMemoryPropertyFlags(CreateDesc.MemoryPropertyFlags);
-	VkDeviceSize		  Size = CreateDesc.Size;
+	VkBufferUsageFlags	  UsageFlags = VulkanRHI::VulkanBufferUsageFlagsFromRHIUsageFlags(CreateInfo.UsageFlags);
+	VkMemoryPropertyFlags MemoryPropertyFlags = VulkanRHI::VulkanMemoryPropertyFlagsFromRHIMemoryPropertyFlags(CreateInfo.MemoryPropertyFlags);
+	VkDeviceSize		  Size = CreateInfo.Size;
 
 	VkBufferCreateInfo bufferCreateInfo = {};
 	bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -956,8 +953,7 @@ void FVulkanRHI::PresentVulkanSwapChain(FViewportRHIRef& Viewport)
 void FVulkanRHI::BeginVulkanRenderPass(const FRHIRenderPassInfo& RenderPassInfo)
 {
 	// Implement render pass begin
-	FVulkanRenderTargetLayout Layout{FGraphicsPipelineStateInitializer{}};
-	VulkanRHI::CreateVulkanRenderPass(LogicalDevice, Layout);
+	VulkanRHI::CreateVulkanRenderPass(LogicalDevice, {RenderPassInfo});
 }
 
 void FVulkanRHI::EndVulkanRenderPass()
@@ -1013,74 +1009,74 @@ void FVulkanRHI::FlushVulkanPendingDeletes()
 	// Implement pending resource deletion
 }
 
-// Generate VkImageCreateInfo from FRHITextureCreateDesc
-VkImageCreateInfo FVulkanRHI::GenerateVkImageCreateInfo(const FRHITextureCreateDesc& CreateDesc)
+// Generate VkImageCreateInfo from FRHITextureCreateInfo
+VkImageCreateInfo FVulkanRHI::GenerateVkImageCreateInfo(const FRHITextureCreateInfo& CreateInfo)
 {
 	VkImageCreateInfo ImageCreateInfo = {};
 	ImageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 	ImageCreateInfo.imageType = VK_IMAGE_TYPE_2D; // Assuming 2D texture for simplicity
-	ImageCreateInfo.extent.width = CreateDesc.Dimensions.x;
-	ImageCreateInfo.extent.height = CreateDesc.Dimensions.y;
-	ImageCreateInfo.extent.depth = CreateDesc.Dimensions.z;
-	ImageCreateInfo.mipLevels = CreateDesc.NumMips;
-	ImageCreateInfo.arrayLayers = CreateDesc.NumSamples;
-	ImageCreateInfo.format = VulkanRHI::VulkanFormatFromRHIFormat(CreateDesc.Format); // Helper function to convert RHI format to Vulkan format
+	ImageCreateInfo.extent.width = CreateInfo.Dimensions.x;
+	ImageCreateInfo.extent.height = CreateInfo.Dimensions.y;
+	ImageCreateInfo.extent.depth = CreateInfo.Dimensions.z;
+	ImageCreateInfo.mipLevels = CreateInfo.NumMips;
+	ImageCreateInfo.arrayLayers = CreateInfo.NumSamples;
+	ImageCreateInfo.format = VulkanRHI::VulkanFormatFromRHIFormat(CreateInfo.Format); // Helper function to convert RHI format to Vulkan format
 	ImageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
 	ImageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	ImageCreateInfo.usage = VulkanRHI::VulkanTextureUsageFlagsFromRHIUsageFlags(CreateDesc.Flags); // Helper function to convert RHI usage flags to Vulkan usage flags
+	ImageCreateInfo.usage = VulkanRHI::VulkanTextureUsageFlagsFromRHIUsageFlags(CreateInfo.Flags); // Helper function to convert RHI usage flags to Vulkan usage flags
 	ImageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;									// Assuming single sample for simplicity
 	ImageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
 	return ImageCreateInfo;
 }
 
-// Generate VkBufferCreateInfo from FRHIBufferCreateDesc
-VkBufferCreateInfo FVulkanRHI::GenerateVkBufferCreateInfo(const FRHIBufferCreateDesc& CreateDesc)
+// Generate VkBufferCreateInfo from FRHIBufferCreateInfo
+VkBufferCreateInfo FVulkanRHI::GenerateVkBufferCreateInfo(const FRHIBufferCreateInfo& CreateInfo)
 {
 	VkBufferCreateInfo BufferCreateInfo = {};
 	BufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-	BufferCreateInfo.size = CreateDesc.Size;
-	BufferCreateInfo.usage = VulkanRHI::VulkanBufferUsageFlagsFromRHIUsageFlags(CreateDesc.UsageFlags); // Helper function to convert RHI usage flags to Vulkan usage flags
+	BufferCreateInfo.size = CreateInfo.Size;
+	BufferCreateInfo.usage = VulkanRHI::VulkanBufferUsageFlagsFromRHIUsageFlags(CreateInfo.UsageFlags); // Helper function to convert RHI usage flags to Vulkan usage flags
 	BufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
 	return BufferCreateInfo;
 }
 
 // Generate VkShaderModuleCreateInfo from FShaderCreateInfo
-VkShaderModuleCreateInfo FVulkanRHI::GenerateVkShaderModuleCreateInfo(const FShaderCreateInfo& CreateDesc)
+VkShaderModuleCreateInfo FVulkanRHI::GenerateVkShaderModuleCreateInfo(const FShaderCreateInfo& CreateInfo)
 {
 	VkShaderModuleCreateInfo ShaderModuleCreateInfo = {};
 	ShaderModuleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-	ShaderModuleCreateInfo.codeSize = CreateDesc.Code.size();
-	ShaderModuleCreateInfo.pCode = reinterpret_cast<const uint32_t*>(CreateDesc.Code.data());
+	ShaderModuleCreateInfo.codeSize = CreateInfo.Code.size();
+	ShaderModuleCreateInfo.pCode = reinterpret_cast<const uint32_t*>(CreateInfo.Code.data());
 
 	return ShaderModuleCreateInfo;
 }
 
 // Generate VkImageViewCreateInfo from FRHIShaderResourceViewCreateInfo
-VkImageViewCreateInfo FVulkanRHI::GenerateVkImageViewCreateInfo(const FRHIShaderResourceViewCreateInfo& CreateDesc)
+VkImageViewCreateInfo FVulkanRHI::GenerateVkImageViewCreateInfo(const FRHIShaderResourceViewCreateInfo& CreateInfo)
 {
 	VkImageViewCreateInfo ImageViewCreateInfo = {};
 	ImageViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
 	ImageViewCreateInfo.image = VK_NULL_HANDLE;								   // To be set later
 	ImageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;					   // Assuming 2D image view for simplicity
-	ImageViewCreateInfo.format = VulkanRHI::VulkanFormatFromRHIFormat(CreateDesc.Format); // Helper function to convert RHI format to Vulkan format
+	ImageViewCreateInfo.format = VulkanRHI::VulkanFormatFromRHIFormat(CreateInfo.Format); // Helper function to convert RHI format to Vulkan format
 	ImageViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-	ImageViewCreateInfo.subresourceRange.baseMipLevel = CreateDesc.MipLevel;
-	ImageViewCreateInfo.subresourceRange.levelCount = CreateDesc.NumMipLevels;
-	ImageViewCreateInfo.subresourceRange.baseArrayLayer = CreateDesc.FirstArraySlice;
-	ImageViewCreateInfo.subresourceRange.layerCount = CreateDesc.NumArraySlices;
+	ImageViewCreateInfo.subresourceRange.baseMipLevel = CreateInfo.MipLevel;
+	ImageViewCreateInfo.subresourceRange.levelCount = CreateInfo.NumMipLevels;
+	ImageViewCreateInfo.subresourceRange.baseArrayLayer = CreateInfo.FirstArraySlice;
+	ImageViewCreateInfo.subresourceRange.layerCount = CreateInfo.NumArraySlices;
 
 	return ImageViewCreateInfo;
 }
 
 // Generate VkBufferViewCreateInfo from FRHIUnorderedAccessViewCreateInfo
-VkBufferViewCreateInfo FVulkanRHI::GenerateVkBufferViewCreateInfo(const FRHIUnorderedAccessViewCreateInfo& CreateDesc)
+VkBufferViewCreateInfo FVulkanRHI::GenerateVkBufferViewCreateInfo(const FRHIUnorderedAccessViewCreateInfo& CreateInfo)
 {
 	VkBufferViewCreateInfo BufferViewCreateInfo = {};
 	BufferViewCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_VIEW_CREATE_INFO;
 	BufferViewCreateInfo.buffer = VK_NULL_HANDLE;								// To be set later
-	BufferViewCreateInfo.format = VulkanRHI::VulkanFormatFromRHIFormat(CreateDesc.Format); // Helper function to convert RHI format to Vulkan format
+	BufferViewCreateInfo.format = VulkanRHI::VulkanFormatFromRHIFormat(CreateInfo.Format); // Helper function to convert RHI format to Vulkan format
 	BufferViewCreateInfo.offset = 0;
 	BufferViewCreateInfo.range = VK_WHOLE_SIZE;
 
@@ -1088,30 +1084,30 @@ VkBufferViewCreateInfo FVulkanRHI::GenerateVkBufferViewCreateInfo(const FRHIUnor
 }
 
 // Generate VkSamplerCreateInfo from FRHISamplerStateCreateInfo (assuming this struct exists)
-VkSamplerCreateInfo FVulkanRHI::GenerateVkSamplerCreateInfo(const FRHISamplerStateCreateInfo& CreateDesc)
+VkSamplerCreateInfo FVulkanRHI::GenerateVkSamplerCreateInfo(const FRHISamplerStateCreateInfo& CreateInfo)
 {
 	VkSamplerCreateInfo SamplerCreateInfo = {};
 	SamplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
 
 	// Set filter modes
-	SamplerCreateInfo.magFilter = VulkanRHI::VulkanFilterFromRHIFilter(CreateDesc.Filter);
-	SamplerCreateInfo.minFilter = VulkanRHI::VulkanFilterFromRHIFilter(CreateDesc.Filter);
+	SamplerCreateInfo.magFilter = VulkanRHI::VulkanFilterFromRHIFilter(CreateInfo.Filter);
+	SamplerCreateInfo.minFilter = VulkanRHI::VulkanFilterFromRHIFilter(CreateInfo.Filter);
 
 	// Set address modes
-	SamplerCreateInfo.addressModeU = VulkanRHI::VulkanAddressModeFromRHIAddressMode(CreateDesc.AddressModeU);
-	SamplerCreateInfo.addressModeV = VulkanRHI::VulkanAddressModeFromRHIAddressMode(CreateDesc.AddressModeV);
-	SamplerCreateInfo.addressModeW = VulkanRHI::VulkanAddressModeFromRHIAddressMode(CreateDesc.AddressModeW);
+	SamplerCreateInfo.addressModeU = VulkanRHI::VulkanAddressModeFromRHIAddressMode(CreateInfo.AddressModeU);
+	SamplerCreateInfo.addressModeV = VulkanRHI::VulkanAddressModeFromRHIAddressMode(CreateInfo.AddressModeV);
+	SamplerCreateInfo.addressModeW = VulkanRHI::VulkanAddressModeFromRHIAddressMode(CreateInfo.AddressModeW);
 
 	// Set mip map level of detail bias
-	SamplerCreateInfo.mipLodBias = static_cast<float>(CreateDesc.MipMapLevelOfDetailBias);
+	SamplerCreateInfo.mipLodBias = static_cast<float>(CreateInfo.MipMapLevelOfDetailBias);
 
 	// Set maximum anisotropy
 	SamplerCreateInfo.anisotropyEnable = VK_TRUE;
-	SamplerCreateInfo.maxAnisotropy = static_cast<float>(CreateDesc.MaxAnisotropy);
+	SamplerCreateInfo.maxAnisotropy = static_cast<float>(CreateInfo.MaxAnisotropy);
 
 	// Set comparison function
 	SamplerCreateInfo.compareEnable = VK_TRUE;
-	SamplerCreateInfo.compareOp = VulkanRHI::VulkanCompareOpFromRHICompareFunction(CreateDesc.ComparisonFunction);
+	SamplerCreateInfo.compareOp = VulkanRHI::VulkanCompareOpFromRHICompareFunction(CreateInfo.ComparisonFunction);
 
 	// Set border color
 	SamplerCreateInfo.borderColor = VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK;
@@ -1121,26 +1117,26 @@ VkSamplerCreateInfo FVulkanRHI::GenerateVkSamplerCreateInfo(const FRHISamplerSta
 }
 
 // Generate VkPipelineShaderStageCreateInfo from FShaderCreateInfo
-VkPipelineShaderStageCreateInfo FVulkanRHI::GenerateVkPipelineShaderStageCreateInfo(const FShaderCreateInfo& CreateDesc)
+VkPipelineShaderStageCreateInfo FVulkanRHI::GenerateVkPipelineShaderStageCreateInfo(const FShaderCreateInfo& CreateInfo)
 {
 	VkPipelineShaderStageCreateInfo ShaderStageCreateInfo = {};
 	ShaderStageCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-	ShaderStageCreateInfo.stage = VulkanRHI::VulkanShaderStageFromRHIStage(CreateDesc.Stage); // Convert RHI shader stage to Vulkan shader stage
+	ShaderStageCreateInfo.stage = VulkanRHI::VulkanShaderStageFromRHIStage(CreateInfo.Stage); // Convert RHI shader stage to Vulkan shader stage
 	ShaderStageCreateInfo.module = VK_NULL_HANDLE;								   // To be set later
-	ShaderStageCreateInfo.pName = TO_CHAR_CSTR(CreateDesc.EntryPoints[0].c_str());
+	ShaderStageCreateInfo.pName = TO_CHAR_CSTR(CreateInfo.EntryPoints[0].c_str());
 
 	return ShaderStageCreateInfo;
 }
 
 // Generate VkPipelineLayoutCreateInfo from FRHIGraphicsPipelineStateCreateInfo
-VkPipelineLayoutCreateInfo FVulkanRHI::GenerateVkPipelineLayoutCreateInfo(const FRHIGraphicsPipelineLayoutCreateInfo& CreateDesc)
+VkPipelineLayoutCreateInfo FVulkanRHI::GenerateVkPipelineLayoutCreateInfo(const FRHIGraphicsPipelineLayoutCreateInfo& CreateInfo)
 {
 	VkPipelineLayoutCreateInfo PipelineLayoutCreateInfo = {};
 	PipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 
 	//	// Add descriptor set layouts
 	//	TVector<VkDescriptorSetLayout> descriptorSetLayouts;
-	//	for (const auto& layout : CreateDesc.DescriptorSetLayouts)
+	//	for (const auto& layout : CreateInfo.DescriptorSetLayouts)
 	//	{
 	//		descriptorSetLayouts.push_back(layout);
 	//	}
@@ -1149,7 +1145,7 @@ VkPipelineLayoutCreateInfo FVulkanRHI::GenerateVkPipelineLayoutCreateInfo(const 
 	//
 	//	// Add push constant ranges
 	//	TVector<VkPushConstantRange> pushConstantRanges;
-	//	for (const auto& range : CreateDesc.PushConstantRanges)
+	//	for (const auto& range : CreateInfo.PushConstantRanges)
 	//	{
 	//		pushConstantRanges.push_back(range);
 	//	}
@@ -1160,14 +1156,14 @@ VkPipelineLayoutCreateInfo FVulkanRHI::GenerateVkPipelineLayoutCreateInfo(const 
 }
 
 // Generate VkGraphicsPipelineCreateInfo from FRHIGraphicsPipelineStateCreateInfo
-VkGraphicsPipelineCreateInfo FVulkanRHI::GenerateVkGraphicsPipelineCreateInfo(const FRHIGraphicsPipelineStateCreateInfo& CreateDesc)
+VkGraphicsPipelineCreateInfo FVulkanRHI::GenerateVkGraphicsPipelineCreateInfo(const FRHIGraphicsPipelineStateCreateInfo& CreateInfo)
 {
 	VkGraphicsPipelineCreateInfo PipelineCreateInfo = {};
 	PipelineCreateInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
 
 	// Add shader stages
 	TVector<VkPipelineShaderStageCreateInfo> shaderStages;
-	for (const auto& shader : CreateDesc.Shaders)
+	for (const auto& shader : CreateInfo.Shaders)
 	{
 		VkPipelineShaderStageCreateInfo stageInfo = {};
 		stageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -1180,28 +1176,28 @@ VkGraphicsPipelineCreateInfo FVulkanRHI::GenerateVkGraphicsPipelineCreateInfo(co
 	PipelineCreateInfo.pStages = shaderStages.data();
 
 	//	// Add vertex input state
-	//	PipelineCreateInfo.pVertexInputState = &CreateDesc.VertexInputState;
+	//	PipelineCreateInfo.pVertexInputState = &CreateInfo.VertexInputState;
 	//
 	//	// Add input assembly state
-	//	PipelineCreateInfo.pInputAssemblyState = &CreateDesc.InputAssemblyState;
+	//	PipelineCreateInfo.pInputAssemblyState = &CreateInfo.InputAssemblyState;
 	//
 	//	// Add viewport state
-	//	PipelineCreateInfo.pViewportState = &CreateDesc.ViewportState;
+	//	PipelineCreateInfo.pViewportState = &CreateInfo.ViewportState;
 	//
 	//	// Add rasterization state
-	//	PipelineCreateInfo.pRasterizationState = &CreateDesc.RasterizationState;
+	//	PipelineCreateInfo.pRasterizationState = &CreateInfo.RasterizationState;
 	//
 	//	// Add multisample state
-	//	PipelineCreateInfo.pMultisampleState = &CreateDesc.MultisampleState;
+	//	PipelineCreateInfo.pMultisampleState = &CreateInfo.MultisampleState;
 	//
 	//	// Add depth stencil state
-	//	PipelineCreateInfo.pDepthStencilState = &CreateDesc.DepthStencilState;
+	//	PipelineCreateInfo.pDepthStencilState = &CreateInfo.DepthStencilState;
 	//
 	//	// Add color blend state
-	//	PipelineCreateInfo.pColorBlendState = &CreateDesc.ColorBlendState;
+	//	PipelineCreateInfo.pColorBlendState = &CreateInfo.ColorBlendState;
 	//
 	//	// Add dynamic state
-	//	PipelineCreateInfo.pDynamicState = &CreateDesc.DynamicState;
+	//	PipelineCreateInfo.pDynamicState = &CreateInfo.DynamicState;
 
 	// Add pipeline layout
 	PipelineCreateInfo.layout = VK_NULL_HANDLE; // To be set later
@@ -1214,7 +1210,7 @@ VkGraphicsPipelineCreateInfo FVulkanRHI::GenerateVkGraphicsPipelineCreateInfo(co
 }
 
 // Generate VkComputePipelineCreateInfo from FRHIComputePipelineStateCreateInfo (assuming this struct exists)
-VkComputePipelineCreateInfo FVulkanRHI::GenerateVkComputePipelineCreateInfo(const FRHIComputePipelineStateCreateInfo& CreateDesc)
+VkComputePipelineCreateInfo FVulkanRHI::GenerateVkComputePipelineCreateInfo(const FRHIComputePipelineStateCreateInfo& CreateInfo)
 {
 	VkComputePipelineCreateInfo PipelineCreateInfo = {};
 	PipelineCreateInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
@@ -1223,12 +1219,12 @@ VkComputePipelineCreateInfo FVulkanRHI::GenerateVkComputePipelineCreateInfo(cons
 }
 
 // Generate VkQueryPoolCreateInfo from FRHIQueryCreateInfo (assuming this struct exists)
-VkQueryPoolCreateInfo FVulkanRHI::GenerateVkQueryPoolCreateInfo(const FRHIQueryCreateInfo& CreateDesc)
+VkQueryPoolCreateInfo FVulkanRHI::GenerateVkQueryPoolCreateInfo(const FRHIQueryCreateInfo& CreateInfo)
 {
 	VkQueryPoolCreateInfo QueryPoolCreateInfo = {};
 	QueryPoolCreateInfo.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
-	// QueryPoolCreateInfo.queryType = VulkanQueryTypeFromRHIQueryType(CreateDesc.QueryType); // Helper function to convert RHI query type to Vulkan query type
-	QueryPoolCreateInfo.queryCount = CreateDesc.NumQueries;
+	// QueryPoolCreateInfo.queryType = VulkanQueryTypeFromRHIQueryType(CreateInfo.QueryType); // Helper function to convert RHI query type to Vulkan query type
+	QueryPoolCreateInfo.queryCount = CreateInfo.NumQueries;
 
 	return QueryPoolCreateInfo;
 }

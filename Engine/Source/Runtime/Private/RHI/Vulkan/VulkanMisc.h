@@ -8,6 +8,9 @@
 
 namespace VulkanRHI
 {
+	HLVM_EXTERN_FUNC VkAttachmentLoadOp VulkanAttachmentLoadOpFromRHI(ERenderTargetLoadAction RHIState);
+	HLVM_EXTERN_FUNC VkAttachmentStoreOp VulkanAttachmentStoreOpFromRHI(ERenderTargetStoreAction RHIState);
+
 	// Helper function to convert RHI pixel format to Vulkan format
 	HLVM_EXTERN_FUNC VkFormat VulkanFormatFromRHIFormat(EPixelFormat RHIFormat);
 

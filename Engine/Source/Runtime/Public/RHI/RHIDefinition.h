@@ -41,7 +41,7 @@ enum class EPixelFormat : TUINT32
 };
 
 // Enumeration of texture creation flags
-enum class ETextureCreateFlag : TUINT32
+enum class ETextureCreateFlag : TUINT64
 {
 	None = 0,
 	RenderTarget = 1 << 0,
@@ -49,6 +49,8 @@ enum class ETextureCreateFlag : TUINT32
 	ShaderResource = 1 << 2,
 	ShaderWrite = 1 << 3,
 	Transient = 1 << 4,
+	InputAttachment = 1 << 5,
+	MemoryLess = 1 << 6,
 	// Add more flags as needed
 };
 HLVM_DECLARE_ENMU_FLAGS(ETextureCreateFlag, ETextureCreateFlags)
@@ -57,12 +59,12 @@ HLVM_DECLARE_ENMU_FLAGS(ETextureCreateFlag, ETextureCreateFlags)
 enum class EBufferUsageFlag : TUINT32
 {
 	None = 0,
-	Vertex = 1 << 0,             // Buffer is used as a vertex buffer
-	Index = 1 << 1,              // Buffer is used as an index buffer
-	Uniform = 1 << 2,            // Buffer is used as a uniform buffer
-	Storage = 1 << 3,            // Buffer is used as a storage buffer
-	ShaderResource = 1 << 4,     // Buffer is used as a shader resource
-	TransferSource = 1 << 5,     // Buffer is used as a transfer source
+	Vertex = 1 << 0,			 // Buffer is used as a vertex buffer
+	Index = 1 << 1,				 // Buffer is used as an index buffer
+	Uniform = 1 << 2,			 // Buffer is used as a uniform buffer
+	Storage = 1 << 3,			 // Buffer is used as a storage buffer
+	ShaderResource = 1 << 4,	 // Buffer is used as a shader resource
+	TransferSource = 1 << 5,	 // Buffer is used as a transfer source
 	TransferDestination = 1 << 6 // Buffer is used as a transfer destination
 };
 HLVM_DECLARE_ENMU_FLAGS(EBufferUsageFlag, EBufferUsageFlags)
@@ -71,18 +73,17 @@ HLVM_DECLARE_ENMU_FLAGS(EBufferUsageFlag, EBufferUsageFlags)
 enum class EMemoryPropertyFlag : TUINT32
 {
 	None = 0,
-	DeviceLocal = 1 << 0,            // VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
-	HostVisible = 1 << 1,            // VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
-	HostCoherent = 1 << 2,           // VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
-	HostCached = 1 << 3,             // VK_MEMORY_PROPERTY_HOST_CACHED_BIT
-	LazilyAllocated = 1 << 4,        // VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT
-	Protected = 1 << 5,              // VK_MEMORY_PROPERTY_PROTECTED_BIT
-	DeviceCoherentAMD = 1 << 6,      // VK_MEMORY_PROPERTY_DEVICE_COHERENT_BIT_AMD
-	DeviceUncachedAMD = 1 << 7,      // VK_MEMORY_PROPERTY_DEVICE_UNCACHED_BIT_AMD
-	RDMACapableNV = 1 << 8           // VK_MEMORY_PROPERTY_RDMA_CAPABLE_BIT_NV
+	DeviceLocal = 1 << 0,		// VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+	HostVisible = 1 << 1,		// VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
+	HostCoherent = 1 << 2,		// VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+	HostCached = 1 << 3,		// VK_MEMORY_PROPERTY_HOST_CACHED_BIT
+	LazilyAllocated = 1 << 4,	// VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT
+	Protected = 1 << 5,			// VK_MEMORY_PROPERTY_PROTECTED_BIT
+	DeviceCoherentAMD = 1 << 6, // VK_MEMORY_PROPERTY_DEVICE_COHERENT_BIT_AMD
+	DeviceUncachedAMD = 1 << 7, // VK_MEMORY_PROPERTY_DEVICE_UNCACHED_BIT_AMD
+	RDMACapableNV = 1 << 8		// VK_MEMORY_PROPERTY_RDMA_CAPABLE_BIT_NV
 };
 HLVM_DECLARE_ENMU_FLAGS(EMemoryPropertyFlag, EMemoryPropertyFlags)
-
 
 // Enumeration of shader stages
 enum class EShaderStage : TUINT32
@@ -91,7 +92,7 @@ enum class EShaderStage : TUINT32
 	Pixel, // Also known as Fragment in Vulkan
 	Compute,
 	Geometry,
-	Hull, // Also known as Tessellation Control in Vulkan
+	Hull,	// Also known as Tessellation Control in Vulkan
 	Domain, // Also known as Tessellation Evaluation in Vulkan
 	RayGeneration,
 	Intersection,
@@ -229,8 +230,8 @@ enum class ESwapChainFlags : TUINT32
 {
 	None = 0,
 	AllowTearing = 1 << 0, // Allows tearing for adaptive sync (e.g., FreeSync, G-Sync)
-	Stereo = 1 << 1,       // Stereo rendering (e.g., VR)
-	HDR = 1 << 2,          // High Dynamic Range (HDR) support
+	Stereo = 1 << 1,	   // Stereo rendering (e.g., VR)
+	HDR = 1 << 2,		   // High Dynamic Range (HDR) support
 };
 
 enum class ESubpassType : TUINT32
@@ -255,6 +256,80 @@ enum class ERenderTargetStoreAction : TUINT32
 	MultisampleResolve,
 };
 
+enum class ERenderTargetActions : TUINT32
+{
+	LoadOpMask = 2,
+#define RTACTION_MAKE_MASK(LoadAction, StoreAction) ((HLVM_ENUM_VALUE(ERenderTargetLoadAction::LoadAction) << LoadOpMask) | HLVM_ENUM_VALUE(ERenderTargetStoreAction::StoreAction))
+	DontLoad_DontStore = RTACTION_MAKE_MASK(DontCare, DontCare),
+	DontLoad_Store = RTACTION_MAKE_MASK(DontCare, Store),
+	Clear_Store = RTACTION_MAKE_MASK(Clear, Store),
+	Load_Store = RTACTION_MAKE_MASK(Load, Store),
+	Clear_DontStore = RTACTION_MAKE_MASK(Clear, DontCare),
+	Load_DontStore = RTACTION_MAKE_MASK(Load, DontCare),
+	Clear_Resolve = RTACTION_MAKE_MASK(Clear, MultisampleResolve),
+	Load_Resolve = RTACTION_MAKE_MASK(Load, MultisampleResolve),
+#undef RTACTION_MAKE_MASK
+};
+
+namespace RHI
+{
+	HLVM_INLINE_FUNC ERenderTargetActions MakeRenderTargetActions(ERenderTargetLoadAction Load, ERenderTargetStoreAction Store)
+	{
+		return S_C(ERenderTargetActions, (HLVM_ENUM_VALUE(Load) << HLVM_ENUM_VALUE(ERenderTargetActions::LoadOpMask)) | HLVM_ENUM_VALUE(Store));
+	}
+
+	HLVM_INLINE_FUNC ERenderTargetLoadAction GetLoadAction(ERenderTargetActions Action)
+	{
+		return S_C(ERenderTargetLoadAction, HLVM_ENUM_VALUE(Action) >> HLVM_ENUM_VALUE(ERenderTargetActions::LoadOpMask));
+	}
+
+	HLVM_INLINE_FUNC ERenderTargetStoreAction GetStoreAction(ERenderTargetActions Action)
+	{
+		return S_C(ERenderTargetStoreAction, HLVM_ENUM_VALUE(Action) & ((1 << HLVM_ENUM_VALUE(ERenderTargetActions::LoadOpMask)) - 1));
+	}
+}
+
+enum class EDepthStencilTargetActions : TUINT32
+{
+	DepthMask = 4,
+#define RTACTION_MAKE_MASK(DepthAction, StencilAction) ((HLVM_ENUM_VALUE(ERenderTargetActions::DepthAction) << DepthMask) | HLVM_ENUM_VALUE(ERenderTargetActions::StencilAction))
+	DontLoad_DontStore = RTACTION_MAKE_MASK(DontLoad_DontStore, DontLoad_DontStore),
+	DontLoad_StoreDepthStencil = RTACTION_MAKE_MASK(DontLoad_Store, DontLoad_Store),
+	DontLoad_StoreStencilNotDepth = RTACTION_MAKE_MASK(DontLoad_DontStore, DontLoad_Store),
+	ClearDepthStencil_StoreDepthStencil = RTACTION_MAKE_MASK(Clear_Store, Clear_Store),
+	LoadDepthStencil_StoreDepthStencil = RTACTION_MAKE_MASK(Load_Store, Load_Store),
+	LoadDepthNotStencil_StoreDepthNotStencil = RTACTION_MAKE_MASK(Load_Store, DontLoad_DontStore),
+	LoadDepthNotStencil_DontStore = RTACTION_MAKE_MASK(Load_DontStore, DontLoad_DontStore),
+	LoadDepthStencil_StoreStencilNotDepth = RTACTION_MAKE_MASK(Load_DontStore, Load_Store),
+	ClearDepthStencil_DontStoreDepthStencil = RTACTION_MAKE_MASK(Clear_DontStore, Clear_DontStore),
+	LoadDepthStencil_DontStoreDepthStencil = RTACTION_MAKE_MASK(Load_DontStore, Load_DontStore),
+	ClearDepthStencil_StoreDepthNotStencil = RTACTION_MAKE_MASK(Clear_Store, Clear_DontStore),
+	ClearDepthStencil_StoreStencilNotDepth = RTACTION_MAKE_MASK(Clear_DontStore, Clear_Store),
+	ClearDepthStencil_ResolveDepthNotStencil = RTACTION_MAKE_MASK(Clear_Resolve, Clear_DontStore),
+	ClearDepthStencil_ResolveStencilNotDepth = RTACTION_MAKE_MASK(Clear_DontStore, Clear_Resolve),
+	LoadDepthClearStencil_StoreDepthStencil = RTACTION_MAKE_MASK(Load_Store, Clear_Store),
+	ClearStencilDontLoadDepth_StoreStencilNotDepth = RTACTION_MAKE_MASK(DontLoad_DontStore, Clear_Store),
+#undef RTACTION_MAKE_MASK
+};
+
+namespace RHI
+{
+	HLVM_INLINE_FUNC EDepthStencilTargetActions MakeDepthStencilTargetActions(ERenderTargetLoadAction Depth, ERenderTargetStoreAction Stencil)
+	{
+		return S_C(EDepthStencilTargetActions, (HLVM_ENUM_VALUE(Depth) << HLVM_ENUM_VALUE(EDepthStencilTargetActions::DepthMask)) | HLVM_ENUM_VALUE(Stencil));
+	}
+
+	HLVM_INLINE_FUNC ERenderTargetActions GetDepthActions(EDepthStencilTargetActions Action)
+	{
+		return S_C(ERenderTargetActions, HLVM_ENUM_VALUE(Action) >> HLVM_ENUM_VALUE(EDepthStencilTargetActions::DepthMask));
+	}
+
+	HLVM_INLINE_FUNC ERenderTargetActions GetStencilActions(EDepthStencilTargetActions Action)
+	{
+		return S_C(ERenderTargetActions, HLVM_ENUM_VALUE(Action) & ((1 << HLVM_ENUM_VALUE(EDepthStencilTargetActions::DepthMask)) - 1));
+	}
+}
+
 enum class ERHIAccessFlag : TUINT32
 {
 	// Used when the previous state of a resource is not known,
@@ -262,37 +337,37 @@ enum class ERHIAccessFlag : TUINT32
 	Unknown = 0,
 
 	// Read states
-	CPURead                 = 1 <<  0,
-	Present                 = 1 <<  1,
-	IndirectArgs            = 1 <<  2,
-	VertexOrIndexBuffer     = 1 <<  3,
-	SRVCompute              = 1 <<  4,
-	SRVGraphicsPixel        = 1 <<  5,
-	SRVGraphicsNonPixel     = 1 <<  6,
-	CopySrc                 = 1 <<  7,
-	ResolveSrc              = 1 <<  8,
-	DSVRead                 = 1 <<  9,
+	CPURead = 1 << 0,
+	Present = 1 << 1,
+	IndirectArgs = 1 << 2,
+	VertexOrIndexBuffer = 1 << 3,
+	SRVCompute = 1 << 4,
+	SRVGraphicsPixel = 1 << 5,
+	SRVGraphicsNonPixel = 1 << 6,
+	CopySrc = 1 << 7,
+	ResolveSrc = 1 << 8,
+	DSVRead = 1 << 9,
 
 	// Read-write states
-	UAVCompute              = 1 << 10,
-	UAVGraphics             = 1 << 11,
-	RTV                     = 1 << 12,
-	CopyDest                = 1 << 13,
-	ResolveDst              = 1 << 14,
-	DSVWrite                = 1 << 15,
+	UAVCompute = 1 << 10,
+	UAVGraphics = 1 << 11,
+	RTV = 1 << 12,
+	CopyDest = 1 << 13,
+	ResolveDst = 1 << 14,
+	DSVWrite = 1 << 15,
 
 	// Ray tracing acceleration structure states.
 	// Buffer that contains an AS must always be in either of these states.
 	// BVHRead -- required for AS inputs to build/update/copy/trace commands.
 	// BVHWrite -- required for AS outputs of build/update/copy commands.
-	BVHRead                  = 1 << 16,
-	BVHWrite                 = 1 << 17,
+	BVHRead = 1 << 16,
+	BVHWrite = 1 << 17,
 
 	// Invalid released state (transient resources)
-	Discard                = 1 << 18,
+	Discard = 1 << 18,
 
 	// Shading Rate Source
-	ShadingRateSource  = 1 << 19,
+	ShadingRateSource = 1 << 19,
 
 	Last = ShadingRateSource,
 	None = Unknown,
@@ -364,12 +439,14 @@ class FRHIGraphicsPipelineState;
 class FRHIComputePipelineState;
 
 // Utility Functions
-inline const TCHAR* GetRHIName(ERHIInterfaceType Type)
+HLVM_INLINE_FUNC const TCHAR* GetRHIName(ERHIInterfaceType Type)
 {
 	switch (Type)
 	{
-		case ERHIInterfaceType::Vulkan: return TXT("Vulkan");
-		case ERHIInterfaceType::Null: return TXT("Null");
+		case ERHIInterfaceType::Vulkan:
+			return TXT("Vulkan");
+		case ERHIInterfaceType::Null:
+			return TXT("Null");
 	}
 };
 

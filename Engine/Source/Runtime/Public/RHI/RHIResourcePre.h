@@ -6,19 +6,19 @@
 #include "RHIMisc.h"
 
 // Structure for describing texture creation parameters
-struct FRHITextureCreateDesc
+struct FRHITextureCreateInfo
 {
 	FString				DebugName;	// Debug name for the texture
 	FUIntVec3			Dimensions; // Width, Height, Depth (or array size)
 	EPixelFormat		Format;		// Pixel format of the texture
-	TUINT32				NumMips;	// Number of mip levels
-	TUINT32				NumSamples; // Number of samples (for MSAA)
+	TUINT8				NumMips;	// Number of mip levels
+	TUINT8				NumSamples; // Number of samples (for MSAA)
 	ETextureCreateFlags Flags;		// Texture creation flags
 	FClearValueBinding	ClearValue; // Clear value for the texture
 
-	FRHITextureCreateDesc() = default;
+	FRHITextureCreateInfo() = default;
 	// Constructor for easy initialization
-	FRHITextureCreateDesc(const FString& InDebugName, const FIntVec3& InDimensions, EPixelFormat InFormat, TUINT32 InNumMips = 1, TUINT32 InNumSamples = 1, ETextureCreateFlags InFlags = ETextureCreateFlag::None, const FClearValueBinding& InClearValue = FClearValueBinding::None())
+	FRHITextureCreateInfo(const FString& InDebugName, const FIntVec3& InDimensions, EPixelFormat InFormat, TUINT8 InNumMips = 1, TUINT8 InNumSamples = 1, ETextureCreateFlags InFlags = ETextureCreateFlag::None, const FClearValueBinding& InClearValue = FClearValueBinding::None())
 		: DebugName(InDebugName)
 		, Dimensions(InDimensions)
 		, Format(InFormat)
@@ -31,16 +31,16 @@ struct FRHITextureCreateDesc
 };
 
 // Structure for describing buffer creation parameters
-struct FRHIBufferCreateDesc
+struct FRHIBufferCreateInfo
 {
 	FString				 DebugName;			  // Debug name for the buffer
 	TSIZE				 Size;				  // Size of the buffer in bytes
 	EBufferUsageFlags	 UsageFlags;		  // Buffer usage flags
 	EMemoryPropertyFlags MemoryPropertyFlags; // Memory property flags
 
-	FRHIBufferCreateDesc() = default;
+	FRHIBufferCreateInfo() = default;
 	// Constructor for easy initialization
-	FRHIBufferCreateDesc(const FString& InDebugName, TSIZE InSize, EBufferUsageFlags InUsageFlags,
+	FRHIBufferCreateInfo(const FString& InDebugName, TSIZE InSize, EBufferUsageFlags InUsageFlags,
 		EMemoryPropertyFlags InMemoryPropertyFlags)
 		: DebugName(InDebugName)
 		, Size(InSize)
@@ -220,7 +220,7 @@ struct FRHIQueryCreateInfo
 };
 
 // Structure for describing swap chain creation parameters
-struct FRHISwapChainCreateDesc
+struct FRHISwapChainCreateInfo
 {
 	FString			DebugName;	   // Debug name for the swap chain
 	FIntVec2		Dimensions;	   // Width and height of the swap chain buffers
@@ -231,10 +231,10 @@ struct FRHISwapChainCreateDesc
 	FRHIViewport*	OwnerViewport; // Associated viewport
 
 	// Default constructor
-	FRHISwapChainCreateDesc() = default;
+	FRHISwapChainCreateInfo() = default;
 
 	// Constructor for easy initialization
-	FRHISwapChainCreateDesc(
+	FRHISwapChainCreateInfo(
 		const FString&	InDebugName,
 		const FIntVec2& InDimensions,
 		EPixelFormat	InFormat = EPixelFormat::R8G8B8A8_UNorm,
@@ -254,7 +254,7 @@ struct FRHISwapChainCreateDesc
 };
 
 // Structure for describing viewport creation parameters
-struct FRHIViewportCreateDesc
+struct FRHIViewportCreateInfo
 {
 	FString			 DebugName;	   // Debug name for the viewport
 	FUIntVec2		 Dimensions;   // Width and height of the viewport
@@ -264,10 +264,10 @@ struct FRHIViewportCreateDesc
 	bool			 bHeadlessRendering;
 
 	// Default constructor
-	FRHIViewportCreateDesc() = default;
+	FRHIViewportCreateInfo() = default;
 
 	// Constructor for easy initialization
-	FRHIViewportCreateDesc(
+	FRHIViewportCreateInfo(
 		const FString&	 InDebugName,
 		const FUIntVec2& InDimensions,
 		ERHIViewportType InViewportType = ERHIViewportType::Fullscreen,

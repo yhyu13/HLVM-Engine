@@ -115,6 +115,59 @@ public:
 	}
 };
 
+
+template <typename T, std::size_t N>
+class TStaticVector : public boost::container::static_vector<T, N>
+{
+public:
+	using boost::container::static_vector<T, N>::static_vector;
+
+	TUINT32 Num() const
+	{
+		HLVM_ASSERT(this->size() <= S_C(size_t, TUINT32_MAX));
+		return S_C(TUINT32, this->size());
+	}
+
+	T* GetData() const
+	{
+		return C_C(T*, this->data());
+	}
+
+	const T* GetDataConst() const
+	{
+		return this->data();
+	}
+
+	TSIZE Add(const T& Value)
+	{
+		this->push_back(Value);
+		return this->size() - 1;
+	}
+
+	TSIZE Add(T&& Value)
+	{
+		this->push_back(Value);
+		return this->size() - 1;
+	}
+
+	T* LastData() const
+	{
+		HLVM_ASSERT(this->size() > 0);
+		return C_C(T*, &(this->back()));
+	}
+
+	void Swap(TSIZE Index1, TSIZE Index2)
+	{
+		HLVM_ASSERT(Index1 < this->size() && Index2 < this->size());
+		std::iter_swap(this->begin() + Index1, this->begin() + Index2);
+	}
+
+	operator TVectorView<T>() const
+	{
+		return TVectorView<T>(this->data(), this->size());
+	}
+};
+
 template <typename Key, typename Value, typename Allocator = std::allocator<std::pair<Key, Value>>>
 using TMap = phmap::flat_hash_map<Key, Value, std::hash<Key>, std::equal_to<Key>, Allocator>;
 
@@ -147,6 +200,3 @@ using FConstByteBuffer = std::span<const TBYTE>;
 
 template <typename T, typename Allocator = boost::container::new_allocator<T>>
 using TRingBuffer = boost::circular_buffer<T, Allocator>;
-
-template <typename T, std::size_t N>
-using TFixedSizeVector = boost::container::static_vector<T, N>;

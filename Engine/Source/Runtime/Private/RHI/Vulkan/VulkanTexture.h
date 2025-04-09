@@ -5,7 +5,7 @@
 #pragma once
 
 #include "RHI/RHIResource.h"
-#include "VulkanRHIResourceDeclaration.h"
+#include "VulkanRHIResourcePre.h"
 
 // Vulkan-specific RHI texture
 class FVulkanTexture : public FRHITexture, public FVulkanResource
@@ -20,20 +20,11 @@ public:
 	};
 
 public:
-	FVulkanTexture(VkImage InImage, const FRHITextureCreateDesc& InCreateDesc)
+	FVulkanTexture(VkImage InImage, const FRHITextureCreateInfo& InCreateInfo)
 		: Image(InImage)
 	{
-		CreateDesc = InCreateDesc;
+		CreateInfo = InCreateInfo;
 	}
-
-	// Returns the dimensions of the texture
-	virtual FIntVec3 GetSize() const override { return CreateDesc.Dimensions; }
-
-	// Returns the pixel format of the texture
-	virtual EPixelFormat GetFormat() const override { return CreateDesc.Format; }
-
-	// Returns the texture flags
-	virtual ETextureCreateFlags GetFlags() const override { return CreateDesc.Flags; }
 
 	// Returns the Vulkan image handle
 	VkImage GetImage() const { return Image; }
@@ -42,8 +33,6 @@ protected:
 	VkImage Image;
 	EOwnerShip OwnerShip;
 };
-
-
 
 // Vulkan-specific RHI sampler state
 class FVulkanSamplerState : public FRHISamplerState, public FVulkanResource

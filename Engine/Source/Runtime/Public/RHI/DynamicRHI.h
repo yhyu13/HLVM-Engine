@@ -5,7 +5,7 @@
 #pragma once
 
 #include "RHIDefinition.h"
-#include "RHIResource.h"
+#include "RHIResourcePost.h"
 #include "RHIPipeline.h"
 #include "RHICommand.h"
 
@@ -22,8 +22,8 @@ public:
 	virtual void Shutdown() = 0;
 
 	// Resource Creation
-	virtual FTextureRHIRef CreateTexture(const FRHITextureCreateDesc& CreateDesc) = 0;
-	virtual FBufferRHIRef CreateBuffer(const FRHIBufferCreateDesc& CreateDesc) = 0;
+	virtual FRHITextureRef CreateTexture(const FRHITextureCreateInfo& CreateInfo) = 0;
+	virtual FBufferRHIRef CreateBuffer(const FRHIBufferCreateInfo& CreateInfo) = 0;
 	virtual FShaderResourceViewRHIRef CreateShaderResourceView(FRHITexture* Texture, const FRHIShaderResourceViewCreateInfo& CreateInfo) = 0;
 	virtual FUnorderedAccessViewRHIRef CreateUnorderedAccessView(FRHIBuffer* Buffer, const FRHIUnorderedAccessViewCreateInfo& CreateInfo) = 0;
 	virtual FVertexDeclarationRHIRef CreateVertexDeclaration(const FVertexDeclarationElementList& Elements) = 0;
@@ -79,6 +79,7 @@ public:
 };
 
 HLVM_EXTERN_VAR TNoNullablePtr<FDynamicRHI> GDynamicRHI;
+
 template<typename T>
 HLVM_INLINE_FUNC void SetDynamicRHI(T* RHI)
 {

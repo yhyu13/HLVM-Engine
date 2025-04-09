@@ -18,6 +18,15 @@ public:
 	HLVM_STATIC_FUNC void* Memzero(T* Ptr)
 	{
 		static_assert(!std::is_pointer_v<T>, "Don't use a pointer!");
-		return FGenericPlatformMemory::Memzero(&Ptr, sizeof(T));
+		static_assert(!std::is_array_v<T>, "Don't use a array!");
+		return FGenericPlatformMemory::Memzero(Ptr, sizeof(T));
+	}
+
+	template<class T>
+	HLVM_STATIC_FUNC void* MemzeroArray(T* Ptr)
+	{
+		static_assert(!std::is_pointer_v<T>, "Don't use a pointer!");
+		static_assert(std::is_array_v<T>, "Use a array but not!");
+		return FGenericPlatformMemory::Memzero(Ptr, sizeof(Ptr));
 	}
 };

@@ -6,7 +6,7 @@
 
 #include "Core/Object/RefCountPtr.h"
 #include "RHIDefinition.h"
-#include "RHIResourceDeclaration.h"
+#include "RHIResourcePre.h"
 
 // Enumeration of RHI resource types
 enum class ERHIResourceType : TUINT8
@@ -45,58 +45,73 @@ public:
 class FRHITexture : virtual public FRHIResource
 {
 public:
-	FRHITextureCreateDesc CreateDesc; // Declaration struct as a member
+	const FRHITextureCreateInfo& GetCreateInfo() const { return CreateInfo; }
 
 	// Returns the dimensions of the texture
-	virtual FIntVec3 GetSize() const { return CreateDesc.Dimensions; }
+	FIntVec3 GetSize() const { return CreateInfo.Dimensions; }
 
 	// Returns the pixel format of the texture
-	virtual EPixelFormat GetFormat() const { return CreateDesc.Format; }
+	EPixelFormat GetFormat() const { return CreateInfo.Format; }
 
 	// Returns the texture flags
-	virtual ETextureCreateFlags GetFlags() const { return CreateDesc.Flags; }
+	ETextureCreateFlags GetFlags() const { return CreateInfo.Flags; }
+
+	// Returns whether the texture is multisampled
+	bool IsMultiSampled() const { return CreateInfo.NumSamples > 1; }
+
+	// Returns the number of samples in the texture
+	TUINT8 GetNumSamples() const { return CreateInfo.NumSamples; }
 
 	// Returns the type of the RHI resource
 	virtual ERHIResourceType GetType() const override { return ERHIResourceType::Texture; }
+
+protected:
+	FRHITextureCreateInfo CreateInfo; // Declaration struct as a member
 };
 
 // Base class for RHI buffers
 class FRHIBuffer : virtual public FRHIResource
 {
 public:
-	FRHIBufferCreateDesc CreateDesc; // Declaration struct as a member
+	const FRHIBufferCreateInfo& GetCreateInfo() const { return CreateInfo; }
 
 	// Returns the size of the buffer in bytes
-	virtual TSIZE GetSize() const { return CreateDesc.Size; }
+	virtual TSIZE GetSize() const { return CreateInfo.Size; }
 
 	// Returns the usage flags of the buffer
-	virtual EBufferUsageFlags GetUsageFlags() const { return CreateDesc.UsageFlags; }
+	virtual EBufferUsageFlags GetUsageFlags() const { return CreateInfo.UsageFlags; }
 
 	// Returns the memory flags of the buffer
-	virtual EMemoryPropertyFlags GetMemoryFlags() const { return CreateDesc.MemoryPropertyFlags; }
+	virtual EMemoryPropertyFlags GetMemoryFlags() const { return CreateInfo.MemoryPropertyFlags; }
 
 	// Returns the type of the RHI resource
 	virtual ERHIResourceType GetType() const override { return ERHIResourceType::Buffer; }
+
+protected:
+	FRHIBufferCreateInfo CreateInfo; // Declaration struct as a member
 };
 
 // Base class for RHI shaders
 class FRHIShader : virtual public FRHIResource
 {
 public:
-	FShaderCreateInfo CreateDesc; // Declaration struct as a member
+	const FShaderCreateInfo& GetCreateInfo() const { return CreateInfo; }
 
 	// Returns the shader stage (e.g., vertex, pixel, compute)
-	virtual EShaderStage GetStage() const { return CreateDesc.Stage; }
+	virtual EShaderStage GetStage() const { return CreateInfo.Stage; }
 
 	// Returns the type of the RHI resource
 	virtual ERHIResourceType GetType() const override { return ERHIResourceType::Shader; }
+
+protected:
+	FShaderCreateInfo CreateInfo; // Declaration struct as a member
 };
 
 // Base class for RHI shader resource views
 class FRHIShaderResourceView : virtual public FRHIResource
 {
 public:
-	FRHIShaderResourceViewCreateInfo CreateDesc; // Declaration struct as a member
+	FRHIShaderResourceViewCreateInfo CreateInfo; // Declaration struct as a member
 
 	// Returns the type of the RHI resource
 	virtual ERHIResourceType GetType() const override { return ERHIResourceType::ShaderResourceView; }
@@ -106,7 +121,7 @@ public:
 class FRHIUnorderedAccessView : virtual public FRHIResource
 {
 public:
-	FRHIUnorderedAccessViewCreateInfo CreateDesc; // Declaration struct as a member
+	FRHIUnorderedAccessViewCreateInfo CreateInfo; // Declaration struct as a member
 
 	// Returns the type of the RHI resource
 	virtual ERHIResourceType GetType() const override { return ERHIResourceType::UnorderedAccessView; }
@@ -151,8 +166,8 @@ class FRHIViewport : virtual public FRHIResource
 {
 public:
 	// Constructor
-	FRHIViewport(const FRHIViewportCreateDesc& InCreateDesc)
-		: CreateDesc(InCreateDesc)
+	FRHIViewport(const FRHIViewportCreateInfo& InCreateInfo)
+		: CreateInfo(InCreateInfo)
 	{
 	}
 
@@ -160,10 +175,10 @@ public:
 	virtual ERHIResourceType GetType() const override { return ERHIResourceType::Viewport; }
 
 	// Returns the dimensions of the viewport
-	virtual FUIntVec2 GetSize() const { return CreateDesc.Dimensions; }
+	virtual FUIntVec2 GetSize() const { return CreateInfo.Dimensions; }
 
 	// Returns the viewport type (e.g., windowed, fullscreen)
-	virtual ERHIViewportType GetViewportType() const { return CreateDesc.ViewportType; }
+	virtual ERHIViewportType GetViewportType() const { return CreateInfo.ViewportType; }
 
 	// Returns the associated swap chain (if any)
 	virtual void* GetSwapChain() const = 0;
@@ -175,11 +190,11 @@ public:
 	//	virtual void Present() = 0;
 
 protected:
-	FRHIViewportCreateDesc CreateDesc; // Viewport creation description
+	FRHIViewportCreateInfo CreateInfo; // Viewport creation description
 };
 
 // Smart pointer types for RHI resources
-using FTextureRHIRef = TRefCountPtr<FRHITexture>;
+using FRHITextureRef = TRefCountPtr<FRHITexture>;
 using FBufferRHIRef = TRefCountPtr<FRHIBuffer>;
 using FShaderRHIRef = TRefCountPtr<FRHIShader>;
 using FShaderResourceViewRHIRef = TRefCountPtr<FRHIShaderResourceView>;
@@ -189,162 +204,3 @@ using FGraphicsPipelineStateRHIRef = TRefCountPtr<FRHIGraphicsPipelineState>;
 using FComputePipelineStateRHIRef = TRefCountPtr<FRHIComputePipelineState>;
 using FQueryRHIRef = TRefCountPtr<FRHIQuery>;
 using FViewportRHIRef = TRefCountPtr<FRHIViewport>;
-
-class FRHIRenderTargetView
-{
-public:
-	FRHIRenderTargetView() = default;
-	FRHIRenderTargetView(FRHIRenderTargetView&&) = default;
-	FRHIRenderTargetView(const FRHIRenderTargetView&) = default;
-	FRHIRenderTargetView& operator=(FRHIRenderTargetView&&) = default;
-	FRHIRenderTargetView& operator=(const FRHIRenderTargetView&) = default;
-
-	// common case
-	explicit FRHIRenderTargetView(FTextureRHIRef InTexture, ERenderTargetLoadAction InLoadAction)
-		: Texture(InTexture), LoadAction(InLoadAction), StoreAction(ERenderTargetStoreAction::Store)
-	{
-	}
-
-	// common case
-	explicit FRHIRenderTargetView(FTextureRHIRef InTexture, ERenderTargetLoadAction InLoadAction, TUINT32 InMipIndex, TUINT32 InArraySliceIndex)
-		: Texture(InTexture), MipIndex(InMipIndex), ArraySliceIndex(InArraySliceIndex), LoadAction(InLoadAction), StoreAction(ERenderTargetStoreAction::Store)
-	{
-	}
-
-	explicit FRHIRenderTargetView(FTextureRHIRef InTexture, TUINT32 InMipIndex, TUINT32 InArraySliceIndex, ERenderTargetLoadAction InLoadAction, ERenderTargetStoreAction InStoreAction)
-		: Texture(InTexture), MipIndex(InMipIndex), ArraySliceIndex(InArraySliceIndex), LoadAction(InLoadAction), StoreAction(InStoreAction)
-	{
-	}
-
-	bool operator==(const FRHIRenderTargetView& Other) const
-	{
-		return Texture == Other.Texture && MipIndex == Other.MipIndex && ArraySliceIndex == Other.ArraySliceIndex && LoadAction == Other.LoadAction && StoreAction == Other.StoreAction;
-	}
-
-public:
-	FTextureRHIRef Texture = nullptr;
-	TUINT32		   MipIndex = 0;
-
-	/** Array slice or texture cube face.  Only valid if texture resource was created with TexCreate_TargetArraySlicesIndependently! */
-	TUINT32 ArraySliceIndex = TUINT32_MAX;
-
-	ERenderTargetLoadAction	 LoadAction = ERenderTargetLoadAction::DontCare;
-	ERenderTargetStoreAction StoreAction = ERenderTargetStoreAction::DontCare;
-};
-
-class FRHIDepthRenderTargetView
-{
-public:
-	// accessor to prevent write access to StencilStoreAction
-	ERenderTargetStoreAction GetStencilStoreAction() const { return StencilStoreAction; }
-	// accessor to prevent write access to DepthStencilAccess
-	FExclusiveDepthStencil GetDepthStencilAccess() const { return DepthStencilAccess; }
-
-	explicit FRHIDepthRenderTargetView()
-		: Texture(nullptr), DepthLoadAction(ERenderTargetLoadAction::DontCare), DepthStoreAction(ERenderTargetStoreAction::DontCare), StencilLoadAction(ERenderTargetLoadAction::DontCare), StencilStoreAction(ERenderTargetStoreAction::DontCare), DepthStencilAccess(FExclusiveDepthStencil::DepthNop_StencilNop)
-	{
-		Validate();
-	}
-
-	// common case
-	explicit FRHIDepthRenderTargetView(FTextureRHIRef InTexture, ERenderTargetLoadAction InLoadAction, ERenderTargetStoreAction InStoreAction)
-		: Texture(InTexture), DepthLoadAction(InLoadAction), DepthStoreAction(InStoreAction), StencilLoadAction(InLoadAction), StencilStoreAction(InStoreAction), DepthStencilAccess(FExclusiveDepthStencil::DepthWrite_StencilWrite)
-	{
-		Validate();
-	}
-
-	explicit FRHIDepthRenderTargetView(FTextureRHIRef InTexture, ERenderTargetLoadAction InLoadAction, ERenderTargetStoreAction InStoreAction, FExclusiveDepthStencil InDepthStencilAccess)
-		: Texture(InTexture), DepthLoadAction(InLoadAction), DepthStoreAction(InStoreAction), StencilLoadAction(InLoadAction), StencilStoreAction(InStoreAction), DepthStencilAccess(InDepthStencilAccess)
-	{
-		Validate();
-	}
-
-	explicit FRHIDepthRenderTargetView(FTextureRHIRef InTexture, ERenderTargetLoadAction InDepthLoadAction, ERenderTargetStoreAction InDepthStoreAction, ERenderTargetLoadAction InStencilLoadAction, ERenderTargetStoreAction InStencilStoreAction)
-		: Texture(InTexture), DepthLoadAction(InDepthLoadAction), DepthStoreAction(InDepthStoreAction), StencilLoadAction(InStencilLoadAction), StencilStoreAction(InStencilStoreAction), DepthStencilAccess(FExclusiveDepthStencil::DepthWrite_StencilWrite)
-	{
-		Validate();
-	}
-
-	explicit FRHIDepthRenderTargetView(FTextureRHIRef InTexture, ERenderTargetLoadAction InDepthLoadAction, ERenderTargetStoreAction InDepthStoreAction, ERenderTargetLoadAction InStencilLoadAction, ERenderTargetStoreAction InStencilStoreAction, FExclusiveDepthStencil InDepthStencilAccess)
-		: Texture(InTexture), DepthLoadAction(InDepthLoadAction), DepthStoreAction(InDepthStoreAction), StencilLoadAction(InStencilLoadAction), StencilStoreAction(InStencilStoreAction), DepthStencilAccess(InDepthStencilAccess)
-	{
-		Validate();
-	}
-
-	void Validate() const
-	{
-		// VK and Metal MAY leave the attachment in an undefined state if the StoreAction is DontCare. So we can't assume read-only implies it should be DontCare unless we know for sure it will never be used again.
-		// ensureMsgf(DepthStencilAccess.IsDepthWrite() || DepthStoreAction == ERenderTargetStoreAction::DontCare, TEXT("Depth is read-only, but we are performing a store.  This is a waste on mobile.  If depth can't change, we don't need to store it out again"));
-		/*ensureMsgf(DepthStencilAccess.IsStencilWrite() || StencilStoreAction == ERenderTargetStoreAction::DontCare, TEXT("Stencil is read-only, but we are performing a store.  This is a waste on mobile.  If stencil can't change, we don't need to store it out again"));*/
-	}
-
-	bool operator==(const FRHIDepthRenderTargetView& Other) const
-	{
-		return Texture == Other.Texture && DepthLoadAction == Other.DepthLoadAction && DepthStoreAction == Other.DepthStoreAction && StencilLoadAction == Other.StencilLoadAction && StencilStoreAction == Other.StencilStoreAction && DepthStencilAccess == Other.DepthStencilAccess;
-	}
-
-public:
-	FTextureRHIRef Texture;
-
-	ERenderTargetLoadAction	 DepthLoadAction;
-	ERenderTargetStoreAction DepthStoreAction;
-	ERenderTargetLoadAction	 StencilLoadAction;
-
-private:
-	ERenderTargetStoreAction StencilStoreAction;
-	FExclusiveDepthStencil	 DepthStencilAccess;
-};
-
-class FRHISetRenderTargetsInfo
-{
-public:
-	// Color Render Targets Info
-	FRHIRenderTargetView ColorRenderTarget[RHI::RT_ATTACHMENT_MAX];
-	TUINT32				 NumColorRenderTargets;
-	bool				 bClearColor;
-
-	// Color Render Targets Info
-	FRHIRenderTargetView ColorResolveRenderTarget[RHI::RT_ATTACHMENT_MAX];
-	bool				 bHasResolveAttachments;
-
-	// Depth/Stencil Render Target Info
-	FRHIDepthRenderTargetView DepthStencilRenderTarget;
-	// Used when depth resolve is enabled.
-	FRHIDepthRenderTargetView DepthStencilResolveRenderTarget;
-	bool					  bClearDepth;
-	bool					  bClearStencil;
-
-	FTextureRHIRef	 ShadingRateTexture;
-	EVariableRateShadingCombiner ShadingRateTextureCombiner;
-
-	TUINT8 MultiViewCount;
-
-	FRHISetRenderTargetsInfo()
-		: NumColorRenderTargets(0), bClearColor(false), bHasResolveAttachments(false), bClearDepth(false), ShadingRateTexture(nullptr), MultiViewCount(0)
-	{
-	}
-
-	FRHISetRenderTargetsInfo(TUINT32 InNumColorRenderTargets, const FRHIRenderTargetView* InColorRenderTargets, const FRHIDepthRenderTargetView& InDepthStencilRenderTarget)
-		: NumColorRenderTargets(InNumColorRenderTargets), bClearColor(InNumColorRenderTargets > 0 && InColorRenderTargets[0].LoadAction == ERenderTargetLoadAction::Clear), bHasResolveAttachments(false), DepthStencilRenderTarget(InDepthStencilRenderTarget), bClearDepth(InDepthStencilRenderTarget.Texture && InDepthStencilRenderTarget.DepthLoadAction == ERenderTargetLoadAction::Clear), ShadingRateTexture(nullptr), ShadingRateTextureCombiner(EVariableRateShadingCombiner::Passthrough)
-	{
-		HLVM_ASSERT(InNumColorRenderTargets == 0 || InColorRenderTargets);
-		for (TUINT32 Index = 0; Index < InNumColorRenderTargets; ++Index)
-		{
-			ColorRenderTarget[Index] = InColorRenderTargets[Index];
-		}
-	}
-
-	void SetClearDepthStencil(bool bInClearDepth, bool bInClearStencil = false)
-	{
-		if (bInClearDepth)
-		{
-			DepthStencilRenderTarget.DepthLoadAction = ERenderTargetLoadAction::Clear;
-		}
-		if (bInClearStencil)
-		{
-			DepthStencilRenderTarget.StencilLoadAction = ERenderTargetLoadAction::Clear;
-		}
-		bClearDepth = bInClearDepth;
-		bClearStencil = bInClearStencil;
-	}
-};

@@ -22,7 +22,7 @@ using FIntVec3 = glm::ivec3;
 using FUIntVec3 = glm::uvec3;
 
 // Define a mathematical structure using GLM types
-struct Transform {
+struct FTransform {
 	FVec3 position;
 	FVec3 scale;
 	FVec3 rotation; // Euler angles in radians
@@ -44,5 +44,13 @@ struct Transform {
 		transform = glm::scale(transform, scale);
 
 		return transform;
+	}
+};
+
+class FMath {
+public:
+	template <typename T>
+	static T Max(T a, T b) {
+		return a > b ? a : b;
 	}
 };

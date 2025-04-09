@@ -283,7 +283,7 @@ private:
 	{
 		createInfo = {};
 		createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
-		createInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+		createInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
 		createInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
 		createInfo.pfnUserCallback = debugCallback;
 	}
@@ -1231,18 +1231,18 @@ private:
 
 RECORD_BOOL(test_GLFW3VulkanWindowRaw)
 {
-//	VulkanLoader::LoadOnce();
-//
-//	HelloTriangleApplication app;
-//	try
-//	{
-//		app.run();
-//	}
-//	catch (const std::exception& e)
-//	{
-//		cerr << "Error Code: " << e.what() << endl;
-//		return false;
-//	}
+	VulkanLoader::LoadOnce();
+
+	HelloTriangleApplication app;
+	try
+	{
+		app.run();
+	}
+	catch (const std::exception& e)
+	{
+		cerr << "Error Code: " << e.what() << endl;
+		return false;
+	}
 	return true;
 }
 	#endif
@@ -1279,7 +1279,7 @@ RECORD_BOOL(test_GLFW3VulkanWindow)
 			};
 			const VkDeviceSize vertexBufferSize = vertices.size() * sizeof(Vertex);
 
-			FRHIBufferCreateDesc VertexBufferCreateDesc;
+			FRHIBufferCreateInfo VertexBufferCreateDesc;
 			VertexBufferCreateDesc.DebugName = TXT("Vertex Test");
 			VertexBufferCreateDesc.UsageFlags = EBufferUsageFlag::Vertex;
 			VertexBufferCreateDesc.UsageFlags |= EBufferUsageFlag::TransferDestination;
@@ -1291,7 +1291,7 @@ RECORD_BOOL(test_GLFW3VulkanWindow)
 			TVector<uint32_t>  indices = { 0, 1, 2 };
 			const VkDeviceSize indexBufferSize = indices.size() * sizeof(uint32_t);
 
-			FRHIBufferCreateDesc IndexBufferCreateDesc;
+			FRHIBufferCreateInfo IndexBufferCreateDesc;
 			IndexBufferCreateDesc.DebugName = TXT("Index Test");
 			(IndexBufferCreateDesc.UsageFlags = EBufferUsageFlag::Index) |= EBufferUsageFlag::TransferDestination;
 			IndexBufferCreateDesc.Size = indexBufferSize;
@@ -1301,7 +1301,7 @@ RECORD_BOOL(test_GLFW3VulkanWindow)
 
 
 		{
-			VulkanRHI->BeginVulkanRenderPass(FRHIRenderPassInfo{});
+			VulkanRHI->RHIBeginRenderPass(FRHIRenderPassInfo{});
 		}
 	}
 	VulkanRHI->Shutdown();

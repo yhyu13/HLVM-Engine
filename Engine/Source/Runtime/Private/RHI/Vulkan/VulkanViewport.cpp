@@ -4,8 +4,8 @@
 
 #include "VulkanViewport.h"
 
-FVulkanBackBuffer::FVulkanBackBuffer(VkImage InImage, const FRHITextureCreateDesc& InCreateDesc, FVulkanViewport* InViewport)
-	: FVulkanTexture(InImage, InCreateDesc),
+FVulkanBackBuffer::FVulkanBackBuffer(VkImage InImage, const FRHITextureCreateInfo& InCreateInfo, FVulkanViewport* InViewport)
+	: FVulkanTexture(InImage, InCreateInfo),
 	OwnerViewport(InViewport)
 {
 	// Vulkan back buffer holds a image from swapchain and we don't own it
@@ -37,7 +37,7 @@ void FVulkanViewport::Resize(const FUIntVec2& NewDimensions)
 		SwapChain->OwnerViewport = nullptr; // Release ownership to prevent swapchain calling destroy twice
 		SwapChain.Reset();
 
-		CreateDesc.Dimensions = NewDimensions;
+		CreateInfo.Dimensions = NewDimensions;
 		CreateSwapChain(ReCreateInfo);
 
 		HLVM_ASSERT(SwapChain->swapChainExtent.width == NewDimensions.x && SwapChain->swapChainExtent.height == NewDimensions.y);
@@ -55,7 +55,7 @@ void FVulkanViewport::CreateSwapChain(FVulkanSwapChain::FRecreateInfo& InCreateI
 
 bool FVulkanViewport::ShouldUseStandardSwapChain() const
 {
-	return !CreateDesc.bHeadlessRendering;
+	return !CreateInfo.bHeadlessRendering;
 }
 
 bool FVulkanViewport::AcquireNextImageIndex()

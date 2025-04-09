@@ -5,21 +5,20 @@
 #pragma once
 
 #include "RHI/RHIResource.h"
-#include "VulkanRHIResourceDeclaration.h"
-
+#include "VulkanRHIResourcePre.h"
 
 // Vulkan-specific RHI shader
 class FVulkanShader : public FRHIShader, public FVulkanResource
 {
 public:
-	FVulkanShader(VkShaderModule InShaderModule, const FShaderCreateInfo& InCreateDesc)
+	FVulkanShader(VkShaderModule InShaderModule, const FShaderCreateInfo& InCreateInfo)
 		: ShaderModule(InShaderModule)
 	{
-		CreateDesc = InCreateDesc;
+		CreateInfo = InCreateInfo;
 	}
 
 	// Returns the shader stage (e.g., vertex, pixel, compute)
-	virtual EShaderStage GetStage() const override { return CreateDesc.Stage; }
+	virtual EShaderStage GetStage() const override { return CreateInfo.Stage; }
 
 	// Returns the Vulkan shader module handle
 	VkShaderModule GetShaderModule() const { return ShaderModule; }
@@ -32,10 +31,10 @@ private:
 class FVulkanShaderResourceView : public FRHIShaderResourceView, public FVulkanResource
 {
 public:
-	FVulkanShaderResourceView(VkImageView InImageView, const FRHIShaderResourceViewCreateInfo& InCreateDesc)
+	FVulkanShaderResourceView(VkImageView InImageView, const FRHIShaderResourceViewCreateInfo& InCreateInfo)
 		: ImageView(InImageView)
 	{
-		CreateDesc = InCreateDesc;
+		CreateInfo = InCreateInfo;
 	}
 
 	// Returns the Vulkan image view handle

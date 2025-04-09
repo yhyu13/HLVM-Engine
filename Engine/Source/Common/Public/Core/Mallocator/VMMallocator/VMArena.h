@@ -81,11 +81,11 @@ private:
 	struct FPendingFreeLists
 	{
 		// pending free pointer that needs to be determined whether or not owned by this arena
-		TFixedSizeVector<void*, HLVM_VMA_GENERIC_PENDING_FREE_LIST_SIZE> GenericFreeList;
+		TStaticVector<void*, HLVM_VMA_GENERIC_PENDING_FREE_LIST_SIZE> GenericFreeList;
 		// pending free pointer owned by ths arena
-		TFixedSizeVector<void*, HLVM_VMA_LOCAL_PENDING_FREE_LIST_SIZE> LocalFreeList;
+		TStaticVector<void*, HLVM_VMA_LOCAL_PENDING_FREE_LIST_SIZE> LocalFreeList;
 		// pending free pointer not owned by ths arena
-		TFixedSizeVector<void*, HLVM_VMA_NONLOCAL_PENDING_FREE_LIST_SIZE> NonLocalFreeList;
+		TStaticVector<void*, HLVM_VMA_NONLOCAL_PENDING_FREE_LIST_SIZE> NonLocalFreeList;
 	};
 	static_assert(sizeof(FPendingFreeLists) >= sizeof(void*) * HLVM_VMA_GENERIC_PENDING_FREE_LIST_SIZE
 				+ sizeof(void*) * HLVM_VMA_LOCAL_PENDING_FREE_LIST_SIZE

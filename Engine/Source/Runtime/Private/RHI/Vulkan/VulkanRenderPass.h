@@ -6,7 +6,7 @@
 
 #include "Core/Container/ContainerDefinition.h"
 #include "RHI/RHIResource.h"
-#include "VulkanRHIResourceDeclaration.h"
+#include "VulkanRHIResourcePre.h"
 
 class FVulkanRenderPass
 {
@@ -27,9 +27,6 @@ public:
 	}
 
 private:
-	friend class FVulkanRenderPassManager;
-	friend class FVulkanPipelineStateCacheManager;
-
 	FVulkanRenderPass(FVulkanLogicalDeviceRef Device, const FVulkanRenderTargetLayout& RTLayout);
 	~FVulkanRenderPass();
 
@@ -371,7 +368,7 @@ struct FVulkanRenderPassCreateInfo<VkRenderPassCreateInfo> : public VkRenderPass
 
 	VkRenderPass Create(const FVulkanLogicalDeviceRef& Device)
 	{
-		VkRenderPass Handle;
+		VkRenderPass Handle = VK_NULL_HANDLE;
 		VULKAN_ENSURE(VulkanRHI::vkCreateRenderPass(Device->GetHandle(), this, VulkanRHI::VULKAN_CPU_ALLOCATOR, &Handle));
 		return Handle;
 	}
@@ -465,7 +462,7 @@ public:
 		TUINT32 NumDependencies = 0;
 
 		// 0b11 for 2, 0b1111 for 4, and so on
-		TUINT32 MultiviewMask = (0b1 << RTLayout.GetMultiViewCount()) - 1;
+		TUINT32 MultiviewMask = 0; // TODO : make render pass support multiview?
 
 		const bool bDeferredShadingSubpass = RTLayout.GetSubpassHint() == ESubpassType::DeferredShading;
 		//		const bool bApplyFragmentShadingRate = GRHISupportsAttachmentVariableRateShading
@@ -777,7 +774,8 @@ public:
 		*/
 		CorrelationMask = MultiviewMask;
 
-		if (RTLayout.GetIsMultiView())
+		//if (RTLayout.GetIsMultiView())
+		if (0)
 		{
 			// TODO
 			//if (Device.GetOptionalExtensions().HasKHRRenderPass2)
@@ -817,6 +815,7 @@ public:
 	VkRenderPass Create(const FVulkanRenderTargetLayout& /*RTLayout*/)
 	{
 		//TODO
+
 		//BuildCreateInfo(RTLayout);
 		return CreateInfo.Create(Device);
 	}

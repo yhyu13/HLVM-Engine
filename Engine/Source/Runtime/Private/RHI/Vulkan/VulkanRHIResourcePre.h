@@ -43,21 +43,8 @@ public:
 class FVulkanRenderTargetLayout
 {
 public:
-	FVulkanRenderTargetLayout(const FGraphicsPipelineStateInitializer& /*Initializer*/)
-	{}
-	FVulkanRenderTargetLayout(FVulkanLogicalDeviceRef InDevice, const FRHISetRenderTargetsInfo& RTInfo);
-	FVulkanRenderTargetLayout(FVulkanLogicalDeviceRef InDevice, const FRHIRenderPassInfo& RPInfo, VkImageLayout CurrentDepthLayout, VkImageLayout CurrentStencilLayout);
-	
-	inline TUINT32 GetRenderPassCompatibleHash() const
-	{
-		HLVM_ASSERT(bCalculatedHash);
-		return RenderPassCompatibleHash;
-	}
-	inline TUINT32 GetRenderPassFullHash() const
-	{
-		HLVM_ASSERT(bCalculatedHash);
-		return RenderPassFullHash;
-	}
+	FVulkanRenderTargetLayout(const FRHIRenderPassInfo& RPInfo);
+
 	inline const VkOffset2D& GetOffset2D() const { return Offset.Offset2D; }
 	inline const VkOffset3D& GetOffset3D() const { return Offset.Offset3D; }
 	inline const VkExtent2D& GetExtent2D() const { return Extent.Extent2D; }
@@ -71,8 +58,6 @@ public:
 	inline TUINT32 GetNumAttachmentDescriptions() const { return NumAttachmentDescriptions; }
 	inline TUINT32 GetNumSamples() const { return NumSamples; }
 	inline TUINT32 GetNumUsedClearValues() const { return NumUsedClearValues; }
-	inline bool GetIsMultiView() const { return MultiViewCount != 0; }
-	inline TUINT32 GetMultiViewCount() const { return MultiViewCount; }
 
 
 	inline const VkAttachmentReference* GetColorAttachmentReferences() const { return NumColorAttachments > 0 ? ColorReferences : nullptr; }
@@ -89,55 +74,14 @@ public:
 protected:
 	VkImageLayout GetVRSImageLayout() const;
 
-protected:
-	VkAttachmentReference ColorReferences[RHI::RT_ATTACHMENT_MAX];
-	VkAttachmentReference DepthReference;
-	VkAttachmentReferenceStencilLayout StencilReference;
-	VkAttachmentReference FragmentDensityReference;
-	VkAttachmentReference ResolveReferences[RHI::RT_ATTACHMENT_MAX];
-	VkAttachmentReference DepthStencilResolveReference;
-
-	// Depth goes in the "+1" slot, Depth resolve goes in the "+2 slot", and the Shading Rate texture goes in the "+3" slot.
-	VkAttachmentDescription Desc[RHI::RT_ATTACHMENT_MAX * 2 + 3];
-	VkAttachmentDescriptionStencilLayout StencilDesc;
-
-	TUINT8 NumAttachmentDescriptions;
-	TUINT8 NumColorAttachments;
-	TUINT8 NumInputAttachments = 0;
-	TUINT8 bHasDepthStencil;
-	TUINT8 bHasResolveAttachments;
-	TUINT8 bHasDepthStencilResolve;
-	TUINT8 bHasFragmentDensityAttachment;
-	TUINT8 NumSamples;
-	TUINT8 NumUsedClearValues;
-	ESubpassType SubpassHint = ESubpassType::Default;
-	TUINT8 MultiViewCount;
-
-	// Hash for a compatible RenderPass
-	TUINT32 RenderPassCompatibleHash = 0;
-	// Hash for the render pass including the load/store operations
-	TUINT32 RenderPassFullHash = 0;
-
-	union
+	void ResetAttachments()
 	{
-		VkOffset3D Offset3D;
-		VkOffset2D Offset2D;
-	} Offset;
-
-	union
-	{
-		VkExtent3D Extent3D;
-		VkExtent2D Extent2D;
-	} Extent;
-
-	inline void ResetAttachments()
-	{
-		FMemory::Memzero(&ColorReferences);
+		FMemory::MemzeroArray(&ColorReferences);
 		FMemory::Memzero(&DepthReference);
 		FMemory::Memzero(&FragmentDensityReference);
-		FMemory::Memzero(&ResolveReferences);
+		FMemory::MemzeroArray(&ResolveReferences);
 		FMemory::Memzero(&DepthStencilResolveReference);
-		FMemory::Memzero(&Desc);
+		FMemory::MemzeroArray(&Desc);
 		FMemory::Memzero(&Offset);
 		FMemory::Memzero(&Extent);
 
@@ -155,16 +99,43 @@ protected:
 		bHasFragmentDensityAttachment = 0;
 		NumSamples = 0;
 		NumUsedClearValues = 0;
-		MultiViewCount = 0;
 
 		ResetAttachments();
 	}
 
-	bool bCalculatedHash = false;
-	void CalculateRenderPassHashes(const FRHISetRenderTargetsInfo& RTInfo);
+protected:
+	VkAttachmentReference ColorReferences[RHI::RT_ATTACHMENT_MAX];
+	VkAttachmentReference DepthReference;
+	VkAttachmentReferenceStencilLayout StencilReference;
+	VkAttachmentReference FragmentDensityReference;
+	VkAttachmentReference ResolveReferences[RHI::RT_ATTACHMENT_MAX];
+	VkAttachmentReference DepthStencilResolveReference;
 
-	friend class FVulkanPipelineStateCacheManager;
-	friend struct FGfxPipelineDesc;
+	// Depth goes in the "+1" slot, Depth resolve goes in the "+2 slot", and the Shading Rate texture goes in the "+3" slot.
+	VkAttachmentDescription Desc[RHI::RT_ATTACHMENT_MAX * 2 + 3];
+	VkAttachmentDescriptionStencilLayout StencilDesc;
+
+	TUINT8 NumAttachmentDescriptions;
+	TUINT8 NumColorAttachments;
+	TUINT8 bHasDepthStencil;
+	TUINT8 bHasResolveAttachments;
+	TUINT8 bHasDepthStencilResolve;
+	TUINT8 bHasFragmentDensityAttachment;
+	TUINT8 NumSamples;
+	TUINT8 NumUsedClearValues;
+	ESubpassType SubpassHint = ESubpassType::Default;
+
+	union
+	{
+		VkOffset3D Offset3D;
+		VkOffset2D Offset2D;
+	} Offset;
+
+	union
+	{
+		VkExtent3D Extent3D;
+		VkExtent2D Extent2D;
+	} Extent;
 };
 
 //class FVulkanFramebuffer

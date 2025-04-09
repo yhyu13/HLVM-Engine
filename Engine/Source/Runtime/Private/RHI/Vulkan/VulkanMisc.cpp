@@ -6,6 +6,37 @@
 
 namespace VulkanRHI
 {
+	VkAttachmentLoadOp VulkanAttachmentLoadOpFromRHI(ERenderTargetLoadAction RHIState)
+	{
+		switch (RHIState)
+		{
+			case ERenderTargetLoadAction::Clear:
+				return VK_ATTACHMENT_LOAD_OP_CLEAR;
+			case ERenderTargetLoadAction::DontCare:
+				return VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+			case ERenderTargetLoadAction::Load:
+				return VK_ATTACHMENT_LOAD_OP_LOAD;
+			default:
+				HLVM_ASSERT_F(false, TXT("Unknown RHI load action"));
+				return VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		}
+	}
+
+	VkAttachmentStoreOp VulkanAttachmentStoreOpFromRHI(ERenderTargetStoreAction RHIState)
+	{
+		switch (RHIState)
+		{
+			case ERenderTargetStoreAction::Store:
+				return VK_ATTACHMENT_STORE_OP_STORE;
+			case ERenderTargetStoreAction::DontCare:
+			case ERenderTargetStoreAction::MultisampleResolve:
+				return VK_ATTACHMENT_STORE_OP_DONT_CARE;
+			default:
+				HLVM_ASSERT_F(false, TXT("Unknown RHI store action"));
+				return VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		}
+	}
+
 	// Convert RHI pixel format to Vulkan format
 	VkFormat VulkanFormatFromRHIFormat(EPixelFormat RHIFormat)
 	{
@@ -46,6 +77,9 @@ namespace VulkanRHI
 			case EPixelFormat::D32_Float_S8_UInt:
 				return VK_FORMAT_D32_SFLOAT_S8_UINT;
 				// Add more formats as needed
+			default:
+				HLVM_ASSERT_F(false, TXT("Unknown RHI format"));
+				return VK_FORMAT_UNDEFINED;
 		}
 	}
 
@@ -167,6 +201,10 @@ namespace VulkanRHI
 				return VK_FILTER_LINEAR;
 			case ETextureFilter::Anisotropic:
 				return VK_FILTER_LINEAR; // Vulkan does not have a direct anisotropic filter mode
+			// Add more cases as needed
+			default:
+				HLVM_ASSERT_F(false, TXT("Unknown RHI filter"));
+				return VK_FILTER_NEAREST;
 		}
 	}
 
@@ -185,6 +223,10 @@ namespace VulkanRHI
 				return VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
 			case ETextureAddressMode::Border:
 				return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+			// Add more cases as needed
+			default:
+				HLVM_ASSERT_F(false, TXT("Unknown RHI address mode"));
+				return VK_SAMPLER_ADDRESS_MODE_REPEAT;
 		}
 	}
 
@@ -209,6 +251,9 @@ namespace VulkanRHI
 				return VK_COMPARE_OP_GREATER_OR_EQUAL;
 			case ERHICompare::Always:
 				return VK_COMPARE_OP_ALWAYS;
+			default:
+				HLVM_ASSERT_F(false, TXT("Unknown RHI compare function"));
+				return VK_COMPARE_OP_NEVER;
 		}
 	}
 
@@ -241,6 +286,9 @@ namespace VulkanRHI
 				return VK_SHADER_STAGE_MISS_BIT_KHR;
 			case EShaderStage::Callable:
 				return VK_SHADER_STAGE_CALLABLE_BIT_KHR;
+			default:
+				HLVM_ASSERT_F(false, TXT("Unknown RHI shader stage"));
+				return VK_SHADER_STAGE_VERTEX_BIT;
 		}
 	}
 
@@ -333,4 +381,4 @@ namespace VulkanRHI
 		}
 #pragma clang diagnostic pop
 	}
-}
+} // namespace VulkanRHI

@@ -5,24 +5,24 @@
 #include "VulkanBuffer.h"
 #include "RHI/Vulkan/IVulkanDynamicRHI.h"
 
-FVulkanBuffer::FVulkanBuffer(const FRHIBufferCreateDesc& InCreateDesc)
+FVulkanBuffer::FVulkanBuffer(const FRHIBufferCreateInfo& InCreateInfo)
 	: Buffer(VK_NULL_HANDLE)
 {
-	CreateDesc = InCreateDesc;
+	CreateInfo = InCreateInfo;
 	CreateBuffer();
-	HLVM_LOG(LogRHI, trace, TXT("Create buffer: {}"), *CreateDesc.DebugName);
+	HLVM_LOG(LogRHI, trace, TXT("Create buffer: {}"), *CreateInfo.DebugName);
 }
 
 FVulkanBuffer::~FVulkanBuffer()
 {
 	DestroyBuffer();
-	HLVM_LOG(LogRHI, trace, TXT("Destroy buffer: {}"), *CreateDesc.DebugName);
+	HLVM_LOG(LogRHI, trace, TXT("Destroy buffer: {}"), *CreateInfo.DebugName);
 }
 
 FVulkanBuffer::FVulkanBuffer(FVulkanBuffer&& Other)
 	: Buffer(Other.Buffer), Allocation(Other.Allocation)
 {
-	CreateDesc = Other.CreateDesc;
+	CreateInfo = Other.CreateInfo;
 
 	Other.Buffer = VK_NULL_HANDLE;
 	Other.Allocation = VK_NULL_HANDLE;
@@ -35,7 +35,7 @@ FVulkanBuffer& FVulkanBuffer::operator=(FVulkanBuffer&& Other)
 		DestroyBuffer();
 		Buffer = Other.Buffer;
 		Allocation = Other.Allocation;
-		CreateDesc = Other.CreateDesc;
+		CreateInfo = Other.CreateInfo;
 
 		Other.Buffer = VK_NULL_HANDLE;
 		Other.Allocation = VK_NULL_HANDLE;
@@ -45,7 +45,7 @@ FVulkanBuffer& FVulkanBuffer::operator=(FVulkanBuffer&& Other)
 
 void FVulkanBuffer::CreateBuffer()
 {
-	Buffer = GetDynamicRHI<IVulkanDynamicRHI>()->CreateVulkanBuffer(CreateDesc, R_C(void**, &Allocation));
+	Buffer = GetDynamicRHI<IVulkanDynamicRHI>()->CreateVulkanBuffer(CreateInfo, R_C(void**, &Allocation));
 }
 
 void FVulkanBuffer::DestroyBuffer()
