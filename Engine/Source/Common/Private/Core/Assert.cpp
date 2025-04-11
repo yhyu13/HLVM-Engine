@@ -44,7 +44,8 @@ namespace hlvm_private
 			constexpr size_t SkipStackNum = 1;
 			constexpr size_t MaxStackDepth = HLVM_STACK_TRACE_DEPTH;
 #endif
-			// Deliberate use *new* here manually control lifetime
+			// Deliberate use *new* here manually control lifetime of Stack and LogMsg
+			// The new operator actually would allocate from our stack allocator
 			auto Stack = new FStdString{ FGenericPlatformStackTrace::GetStackTrace(
 				SkipStackNum, MaxStackDepth) }; // Explicitly call stack trace here to get proper stack trace
 			auto LogMsg = new FString{
@@ -52,11 +53,11 @@ namespace hlvm_private
 					Line)
 			};
 
-			// Free memory in order to leave more space before logging
+			// Free memory in order to leave more space on the stack allocator before logging which consume memory too
 			delete Stack;
 			delete Message;
 
-			// Log message
+			// Log critical message
 			HLVM_LOG(LogCrashDump, critical, **LogMsg);
 
 			delete LogMsg;
@@ -68,7 +69,8 @@ namespace hlvm_private
 		// Try to debug break if debugger attached for easier debugging
 		HLVM_TRY_DEBUG_BREAK();
 
-		// Use original GMallocator to copy stack allocated msg back to heap
+		// We need to swap back to the GMallocator to copy stack allocated msg back to heap (the throw message is on the heap),
+		// That's why we swap mallocator before throwing exception
 		throw std::runtime_error(TO_CHAR_CSTR(Expression));
 	}
 } // namespace hlvm_private

@@ -10,7 +10,7 @@ DECLARE_LOG_CATEGORY(LogTest)
 #if HLVM_WINDOW_USE_VULKAN
 	#include "Window/Vulkan/GLFW3Vulkan.h"
 
-	using namespace VulkanRHI;
+using namespace VulkanRHI;
 
 	#if 1 // Test Vulkan triangle program with direct vulkan api calls
 		#pragma clang diagnostic push
@@ -1251,23 +1251,26 @@ RECORD_BOOL(test_GLFW3VulkanWindowRaw)
 
 RECORD_BOOL(test_GLFW3VulkanWindow)
 {
-	IWindow::FProperties Properties;
+	IWindow::Properties Properties;
 	Properties.Resizable = false;
 	Properties.Mode = IWindow::EDisplayMode::Windowed;
-	SharedRefCountPtr<FGLFW3Vulkan> Window = MAKE_SHARED(FGLFW3Vulkan, Properties);
+	SharedRefPtr<FGLFW3Vulkan> Window = MAKE_SHARED(FGLFW3Vulkan, Properties);
 	HLVM_LOG(LogTest, debug, TXT("FGLFW3Vulkan created!"));
 
-	UniqueRefCountPtr<FVulkanRHI> VulkanRHI = nullptr;
+	UniqueRefPtr<FVulkanRHI> VulkanRHI = nullptr;
 	// Vulkan rhi init
 	FVulkanRHI::FInitializer Initializer;
 	Initializer.RequiredExtensions = { Window->GetRequiredExtensions() };
 	Initializer.CreateSurfaceFunc = [&Window](VkInstance Instance) { return Window->CreateSurface(Instance); };
+	Initializer.NativeWindowHandle = Window;
 	VulkanRHI = MAKE_UNIQUE(FVulkanRHI, Initializer);
 	// Set GDynamicRHI before init
 	SetDynamicRHI(VulkanRHI.get());
 	VulkanRHI->Init();
 
 	{
+		// TODO : Call begin frame in order to acquire next back buffer
+
 		// Create buffers
 		FBufferRHIRef VertexBuffer;
 		FBufferRHIRef IndexBuffer;
@@ -1299,9 +1302,9 @@ RECORD_BOOL(test_GLFW3VulkanWindow)
 			IndexBuffer = VulkanRHI->CreateBuffer(IndexBufferCreateDesc);
 		}
 
-
+		FVulkanTextureRef BackBuffer = VulkanRHI->GetBackBuffer().Get();
 		{
-			VulkanRHI->RHIBeginRenderPass(FRHIRenderPassInfo{});
+			VulkanRHI->RHIBeginRenderPass(FRHIRenderPassInfo{ BackBuffer, ERenderTargetActions::Clear_Store });
 		}
 	}
 	VulkanRHI->Shutdown();

@@ -4,5 +4,8 @@
 
 #pragma once
 
+#include "Core/CoreMinimal.h"
+#include "Math/MathGLM.h"
+
 /// @brief Enable Vulkan backend for window management.
 #define HLVM_WINDOW_USE_VULKAN 1

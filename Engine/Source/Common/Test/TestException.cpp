@@ -10,11 +10,14 @@
 
 DECLARE_LOG_CATEGORY(LogTest)
 
+#define SIMULATE_SEGFAULT 0
+
 /*
 	<test method>
 */
-RECORD(excpetion_test)
+RECORD_BOOL(excpetion_test)
 {
+	// Try to simulate exception
 	try
 	{
 		if (HLVM_IS_DEBUGGER_PRESENT())
@@ -28,13 +31,20 @@ RECORD(excpetion_test)
 	{
 		HLVM_LOG(LogTest, warn, TO_TCHAR_CSTR(e.what()));
 	}
+
+	// Assert would be ignored in release build
 	try
 	{
-		// Assert would be ignored in release build
 		HLVM_ASSERT_F(false, TXT("false"));
 	}
 	catch (const std::runtime_error& e)
 	{
 		HLVM_LOG(LogTest, warn, TO_TCHAR_CSTR(e.what()));
 	}
+
+#if SIMULATE_SEGFAULT
+	// SImulate segfault
+	HLVM_SEGFAULT_INLINE();
+#endif
+	return true;
 };

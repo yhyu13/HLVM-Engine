@@ -6,7 +6,7 @@
 
 DECLARE_LOG_CATEGORY(LogGLFW3Vulkan)
 
-FGLFW3Vulkan::FGLFW3Vulkan(const IWindow::FProperties& InProperties)
+FGLFW3Vulkan::FGLFW3Vulkan(const IWindow::Properties& InProperties)
 	: FGLFW3Window(InProperties)
 {
 	HLVM_LOG(LogGLFW3Vulkan, debug, TXT("GLFW3Vulkan Init"));
@@ -25,8 +25,8 @@ FGLFW3Vulkan::FGLFW3Vulkan(const IWindow::FProperties& InProperties)
 		glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE); // 禁止窗口拉伸，涉及SwapChain重建
 	}
 
-	Window = glfwCreateWindow(S_C(int, InProperties.Extent.Width),
-		S_C(int, InProperties.Extent.Height),
+	Window = glfwCreateWindow(S_C(int, InProperties.Extent.x),
+		S_C(int, InProperties.Extent.y),
 		InProperties.Title,
 		nullptr,
 		nullptr); // 创建窗口

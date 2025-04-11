@@ -13,21 +13,20 @@ class FVulkanTexture : public FRHITexture, public FVulkanResource
 public:
 	enum class EOwnerShip
 	{
-		None,
-		LocalOwner,
-		ExternalOwner,
+		Owner,
 		Alias
 	};
 
 public:
-	FVulkanTexture(VkImage InImage, const FRHITextureCreateInfo& InCreateInfo)
-		: Image(InImage)
-	{
-		CreateInfo = InCreateInfo;
-	}
+	FVulkanTexture(const FRHITextureCreateInfo& InCreateInfo);
+	FVulkanTexture(VkImage Image, const FRHITextureCreateInfo& InCreateInfo);
+
+	~FVulkanTexture() override;
 
 	// Returns the Vulkan image handle
 	VkImage GetImage() const { return Image; }
+
+	void SetOwnerShip(EOwnerShip InOwnerShip) { OwnerShip = InOwnerShip; }
 
 protected:
 	VkImage Image;

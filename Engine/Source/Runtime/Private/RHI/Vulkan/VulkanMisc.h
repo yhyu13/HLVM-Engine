@@ -13,6 +13,8 @@ namespace VulkanRHI
 
 	// Helper function to convert RHI pixel format to Vulkan format
 	HLVM_EXTERN_FUNC VkFormat VulkanFormatFromRHIFormat(EPixelFormat RHIFormat);
+	// Helper function to convert Vulkan format to RHI format
+	HLVM_EXTERN_FUNC EPixelFormat RHIFormatFromVulkanFormat(VkFormat VulkanFormat);
 
 	// Helper function to convert RHI texture usage flags to Vulkan usage flags
 	HLVM_EXTERN_FUNC VkImageUsageFlags VulkanTextureUsageFlagsFromRHIUsageFlags(ETextureCreateFlags RHIFlags);

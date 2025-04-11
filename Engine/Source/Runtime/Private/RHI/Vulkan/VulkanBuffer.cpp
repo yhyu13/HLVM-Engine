@@ -54,5 +54,5 @@ void FVulkanBuffer::DestroyBuffer()
 	{
 		return;
 	}
-	GetDynamicRHI<IVulkanDynamicRHI>()->DestoryVulkanBuffer(Buffer, R_C(void**, &Allocation));
+	GetDynamicRHI<IVulkanDynamicRHI>()->DestroyVulkanBuffer(Buffer, R_C(void**, &Allocation));
 }

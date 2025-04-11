@@ -15,6 +15,7 @@ public:
 	{
 		TVector<TVector<FString>>				RequiredExtensions;
 		std::function<VkSurfaceKHR(VkInstance)> CreateSurfaceFunc;
+		SharedRefPtr<IWindow>					NativeWindowHandle;
 	};
 
 public:
@@ -88,8 +89,9 @@ public:
 
 	// Vulkan-specific resource creation
 	VkImage		 CreateVulkanImage(const FRHITextureCreateInfo& CreateInfo) override;
+	void		 DestroyVulkanImage(VkImage Image) override;
 	VkBuffer	 CreateVulkanBuffer(const FRHIBufferCreateInfo& CreateInfo, void** OutAllocation) override;
-	void		 DestoryVulkanBuffer(VkBuffer Buffer, void** InAllocation) override;
+	void		 DestroyVulkanBuffer(VkBuffer Buffer, void** InAllocation) override;
 	VkImageView	 CreateVulkanImageView(VkImage Image, const FRHIShaderResourceViewCreateInfo& CreateInfo) override;
 	VkBufferView CreateVulkanBufferView(VkBuffer Buffer, const FRHIUnorderedAccessViewCreateInfo& CreateInfo) override;
 
@@ -105,6 +107,8 @@ public:
 	void CreateVulkanSwapChain(void* WindowHandle, TUINT32 Width, TUINT32 Height, bool bIsFullscreen, EPixelFormat PreferredPixelFormat, FViewportRHIRef& OutViewport) override;
 	void ResizeVulkanSwapChain(FViewportRHIRef& Viewport, TUINT32 Width, TUINT32 Height, bool bIsFullscreen, EPixelFormat PreferredPixelFormat) override;
 	void PresentVulkanSwapChain(FViewportRHIRef& Viewport) override;
+
+	TNoNullablePtr<FVulkanBackBuffer> GetBackBuffer() override;
 
 	// Vulkan-specific render pass management
 	void BeginVulkanRenderPass(const FRHIRenderPassInfo& RenderPassInfo) override;

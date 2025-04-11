@@ -16,7 +16,7 @@ public:
 	NOCOPYMOVE(FGLFW3Vulkan)
 
 	FGLFW3Vulkan() = delete;
-	explicit FGLFW3Vulkan(const FProperties& InProperties);
+	explicit FGLFW3Vulkan(const Properties& InProperties);
 	virtual ~FGLFW3Vulkan() override;
 
 	/**

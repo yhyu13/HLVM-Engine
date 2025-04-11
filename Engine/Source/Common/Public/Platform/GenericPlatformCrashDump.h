@@ -37,6 +37,7 @@ protected:
 
 public:
 	HLVM_STATIC_VAR FPath CrashDumpFilePath;
+	HLVM_STATIC_VAR FPath CrashStackFilePath;
 
 protected:
 	HLVM_STATIC_VAR FGenericPlatformCrashDump* sInstance;

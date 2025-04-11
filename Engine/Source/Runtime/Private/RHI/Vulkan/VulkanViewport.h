@@ -19,10 +19,12 @@ public:
 	FVulkanBackBuffer(VkImage InImage, const FRHITextureCreateInfo& InCreateInfo, FVulkanViewport* InViewport);
 	~FVulkanBackBuffer() override;
 
+	void UpdateImage(VkImage InImage);
+
 private:
 	TNoNullablePtr<FVulkanViewport> OwnerViewport;
 };
-using FVulkanBackBufferRef = TRefCountPtr<FVulkanSwapChain>;
+using FVulkanBackBufferRef = TRefCountPtr<FVulkanBackBuffer>;
 
 /**
  * @brief Viewport that holds a swap chain and a back buffer. Be able to present the viewport
@@ -46,8 +48,8 @@ public:
 	// Resizes the viewport and swap chain
 	virtual void Resize(const FUIntVec2& NewDimensions) override;
 
-//	// Presents the viewport (swaps the back buffer)
-//	virtual void Present() override;
+	//	// Presents the viewport (swaps the back buffer)
+	//	virtual void Present() override;
 
 	// Creates the swap chain
 	void CreateSwapChain(FVulkanSwapChain::FRecreateInfo& InCreateInfo);
@@ -55,16 +57,18 @@ public:
 	// Returns true if the swap chain should be created using standard Vulkan swap chain
 	bool ShouldUseStandardSwapChain() const;
 
+	FVulkanBackBufferRef GetBackBuffer() const { return RHIBackBuffer; }
+
 private:
 	bool AcquireNextImageIndex();
 
 private:
-	FVulkanSwapChainRef SwapChain;
-	FVulkanBackBufferRef RHIBackBuffer; // Normal back buffer to use
-	FVulkanTextureRef IntermediateBackBuffer; // Back buffer that handle surface lost where RHI back buffer is not available
+	FVulkanSwapChainRef	 SwapChain;
+	FVulkanBackBufferRef RHIBackBuffer;			 // Normal back buffer to use
+	FVulkanTextureRef	 IntermediateBackBuffer; // Back buffer that handle surface lost where RHI back buffer is not available
 
-	TUINT32 SwapChainImageIndex = TUINT32_MAX;
-	VkSemaphore ImageAcquireSemaphore = VK_NULL_HANDLE;
+	TUINT32																	   SwapChainImageIndex = TUINT32_MAX;
+	VkSemaphore																   ImageAcquireSemaphore = VK_NULL_HANDLE;
 	TStaticVector<FVulkanSemaphoreRef, FVulkanSwapChain::MAX_FRAMES_IN_FLIGHT> RenderingDoneSemaphores;
 };
 

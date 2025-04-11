@@ -412,8 +412,7 @@ void FVulkanRHI::Shutdown()
 // Resource Creation
 FRHITextureRef FVulkanRHI::CreateTexture(const FRHITextureCreateInfo& CreateInfo)
 {
-	VkImage Image = CreateVulkanImage(CreateInfo);
-	return new FVulkanTexture(Image, CreateInfo);
+	return new FVulkanTexture(CreateInfo);
 }
 
 FBufferRHIRef FVulkanRHI::CreateBuffer(const FRHIBufferCreateInfo& CreateInfo)
@@ -762,12 +761,15 @@ void FVulkanRHI::CreateVulkanQueues()
 
 void FVulkanRHI::CreateVulkanViewPort()
 {
+	SharedRefPtr<FGLFW3Vulkan> glfwWindow = SP_C(FGLFW3Vulkan, InitializerParam.NativeWindowHandle);
+	const IWindow::Properties& Property = glfwWindow->GetProperties();
+
 	FRHIViewportCreateInfo ViewportDesc;
-	ViewportDesc.DebugName = TXT("Vulkan Viewport");
-	ViewportDesc.Dimensions = FUIntVec2{ 800, 600 };
+	ViewportDesc.DebugName = Property.Title;
+	ViewportDesc.Dimensions = Property.Extent;
 	ViewportDesc.ViewportType = ERHIViewportType::Fullscreen;
 	ViewportDesc.Format = EPixelFormat::R8G8B8A8_UNorm;
-	ViewportDesc.NativeWindowHandle = nullptr;
+	ViewportDesc.NativeWindowHandle = glfwWindow.get();
 	FVulkanMinimalContext Context{
 		VulkanInstance,
 		PhysicalDevice,
@@ -802,7 +804,7 @@ VkImage FVulkanRHI::CreateVulkanImage(const FRHITextureCreateInfo& CreateInfo)
 	ImageInfo.extent.width = CreateInfo.Dimensions.x;
 	ImageInfo.extent.height = CreateInfo.Dimensions.y;
 	ImageInfo.extent.depth = CreateInfo.Dimensions.z;
-	ImageInfo.mipLevels = 1;
+	ImageInfo.mipLevels = CreateInfo.NumMips;
 	ImageInfo.arrayLayers = 1;
 	ImageInfo.format = VulkanRHI::VulkanFormatFromRHIFormat(CreateInfo.Format);
 	ImageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
@@ -812,10 +814,16 @@ VkImage FVulkanRHI::CreateVulkanImage(const FRHITextureCreateInfo& CreateInfo)
 	ImageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
 
 	VkImage	 Image;
-	VkResult Result = VulkanRHI::vkCreateImage(VulkanDevice, &ImageInfo, nullptr, &Image);
+	VkResult Result = VulkanRHI::vkCreateImage(VulkanDevice, &ImageInfo, VulkanRHI::VULKAN_CPU_ALLOCATOR, &Image);
 	HLVM_ENSURE(Result == VK_SUCCESS);
 
 	return Image;
+}
+
+void FVulkanRHI::DestroyVulkanImage(VkImage Image)
+{
+	HLVM_ENSURE(Image != VK_NULL_HANDLE);
+	VulkanRHI::vkDestroyImage(VulkanDevice, Image, VulkanRHI::VULKAN_CPU_ALLOCATOR);
 }
 
 VkBuffer FVulkanRHI::CreateVulkanBuffer(const FRHIBufferCreateInfo& CreateInfo, void** OutAllocation)
@@ -842,7 +850,7 @@ VkBuffer FVulkanRHI::CreateVulkanBuffer(const FRHIBufferCreateInfo& CreateInfo, 
 	return Buffer;
 }
 
-void FVulkanRHI::DestoryVulkanBuffer(VkBuffer Buffer, void** InAllocation)
+void FVulkanRHI::DestroyVulkanBuffer(VkBuffer Buffer, void** InAllocation)
 {
 	HLVM_ENSURE(*InAllocation != nullptr);
 	HLVM_ENSURE(Buffer != VK_NULL_HANDLE);
@@ -947,6 +955,11 @@ void FVulkanRHI::ResizeVulkanSwapChain(FViewportRHIRef& Viewport, TUINT32 Width,
 void FVulkanRHI::PresentVulkanSwapChain(FViewportRHIRef& Viewport)
 {
 	// Implement swap chain presentation
+}
+
+TNoNullablePtr<FVulkanBackBuffer> FVulkanRHI::GetBackBuffer()
+{
+	return VulkanViewport->GetBackBuffer().Get();
 }
 
 // Vulkan-specific render pass management

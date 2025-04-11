@@ -18,12 +18,6 @@ HLVM_ENUM(EWindowType, TUINT8,
 class IWindow
 {
 public:
-	struct FExtent
-	{
-		TUINT32 Width;
-		TUINT32 Height;
-	};
-
 	enum class EDisplayMode
 	{
 		NoRender,
@@ -42,29 +36,29 @@ public:
 		Default = Off
 	};
 
-	struct FProperties
+	struct Properties
 	{
 		FString Title = TXT("HLVM Window");
 		EDisplayMode Mode = EDisplayMode::Default;
 		bool	Resizable = true;
 		EVsync	VSync = EVsync::Default;
-		FExtent Extent = { 1280, 720 };
+		FUIntVec2 Extent = { 1280, 720 };
 		// Add more properties, e.g. monitor perference
 	};
 
-	struct FOptionalExtent
+	struct OptionalExtent
 	{
 		TOptional<TUINT32> Width;
 		TOptional<TUINT32> Height;
 	};
 
-	struct FOptionalProperties
+	struct OptionalProperties
 	{
 		TOptional<FString> Title;
 		TOptional<EDisplayMode>   Mode;
 		TOptional<bool>	   Resizable;
 		TOptional<EVsync>  VSync;
-		FOptionalExtent	   Extent;
+		OptionalExtent	   Extent;
 	};
 
 public:
@@ -103,28 +97,28 @@ public:
 	 * @param InExtent The preferred window extent
 	 * @return FExtent The new window extent
 	 */
-	HLVM_INLINE_FUNC FExtent Resize(const FExtent& InExtent)
+	HLVM_INLINE_FUNC FUIntVec2 Resize(const FUIntVec2& InExtent)
 	{
-		if (Properties.Resizable)
+		if (Property.Resizable)
 		{
-			Properties.Extent = InExtent;
+			Property.Extent = InExtent;
 		}
-		return Properties.Extent;
+		return Property.Extent;
 	}
 
-	HLVM_INLINE_FUNC const FExtent& GetExtent() const
+	HLVM_INLINE_FUNC const FUIntVec2& GetExtent() const
 	{
-		return Properties.Extent;
+		return Property.Extent;
 	}
 
 	HLVM_INLINE_FUNC EDisplayMode GetWindowMode() const
 	{
-		return Properties.Mode;
+		return Property.Mode;
 	}
 
-	HLVM_INLINE_FUNC const FProperties& GetProperties() const
+	HLVM_INLINE_FUNC const Properties& GetProperties() const
 	{
-		return Properties;
+		return Property;
 	}
 
 	HLVM_INLINE_FUNC EWindowType GetType() const
@@ -133,6 +127,6 @@ public:
 	}
 
 protected:
-	FProperties Properties;
+	Properties Property;
 	EWindowType Type;
 };

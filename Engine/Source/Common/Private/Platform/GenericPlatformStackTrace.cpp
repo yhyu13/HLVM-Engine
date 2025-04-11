@@ -69,4 +69,31 @@ FStdString FGenericPlatformStackTrace::GetStackTrace(size_t skip, size_t max_dep
 	return FStdString(MoveTemp(os.str()));
 }
 
+std::ostringstream FGenericPlatformStackTrace::GetStackTraceStream(size_t skip, size_t max_depth)
+{
+	std::ostringstream os;
+	// Skip the first frame of backward to get our frame
+	auto bt = boost::stacktrace::stacktrace(1 + skip, max_depth);
+	{
+		const std::streamsize w = os.width();
+		const std::size_t	  frames = bt.size();
+		for (std::size_t i = 0; i < frames; ++i)
+		{
+			os.width(2);
+			os << i;
+			os.width(w);
+			os << "# ";
+			os << bt[i].address();
+			os << " ";
+			os << bt[i].source_file();
+			os << ":";
+			os << bt[i].source_line();
+			os << " ";
+			os << bt[i].name();
+			os << '\n';
+		}
+	}
+	return MoveTemp(os);
+}
+
 #endif

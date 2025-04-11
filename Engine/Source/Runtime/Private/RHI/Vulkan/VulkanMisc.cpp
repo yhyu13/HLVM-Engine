@@ -37,12 +37,11 @@ namespace VulkanRHI
 		}
 	}
 
-	// Convert RHI pixel format to Vulkan format
 	VkFormat VulkanFormatFromRHIFormat(EPixelFormat RHIFormat)
 	{
 		switch (RHIFormat)
 		{
-			case EPixelFormat::Unknown:
+			case EPixelFormat::None:
 				return VK_FORMAT_UNDEFINED;
 			case EPixelFormat::R8_UNorm:
 				return VK_FORMAT_R8_UNORM;
@@ -50,6 +49,8 @@ namespace VulkanRHI
 				return VK_FORMAT_R8G8_UNORM;
 			case EPixelFormat::R8G8B8A8_UNorm:
 				return VK_FORMAT_R8G8B8A8_UNORM;
+			case EPixelFormat::B8G8R8A8_SRGB:
+				return VK_FORMAT_B8G8R8A8_SRGB;
 			case EPixelFormat::R16_UNorm:
 				return VK_FORMAT_R16_UNORM;
 			case EPixelFormat::R16G16_UNorm:
@@ -75,12 +76,62 @@ namespace VulkanRHI
 			case EPixelFormat::D32_Float:
 				return VK_FORMAT_D32_SFLOAT;
 			case EPixelFormat::D32_Float_S8_UInt:
-				return VK_FORMAT_D32_SFLOAT_S8_UINT;
-				// Add more formats as needed
+				return VK_FORMAT_D32_SFLOAT_S8_UINT; // Add more formats as needed
 			default:
-				HLVM_ASSERT_F(false, TXT("Unknown RHI format"));
+				HLVM_ASSERT_F(false, TXT("Unknown RHI format {}"), HLVM_ENUM_VALUE_TO_TCHAR(RHIFormat));
 				return VK_FORMAT_UNDEFINED;
 		}
+	}
+
+	// Convert RHI pixel format to Vulkan format
+	EPixelFormat RHIFormatFromVulkanFormat(VkFormat VulkanFormat)
+	{
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wswitch-enum"
+		switch (VulkanFormat)
+		{
+			case VK_FORMAT_UNDEFINED:
+				return EPixelFormat::None;
+			case VK_FORMAT_R8_UNORM:
+				return EPixelFormat::R8_UNorm;
+			case VK_FORMAT_R8G8_UNORM:
+				return EPixelFormat::R8G8_UNorm;
+			case VK_FORMAT_R8G8B8A8_UNORM:
+				return EPixelFormat::R8G8B8A8_UNorm;
+			case VK_FORMAT_B8G8R8A8_SRGB:
+				return EPixelFormat::B8G8R8A8_SRGB;
+			case VK_FORMAT_R16_UNORM:
+				return EPixelFormat::R16_UNorm;
+			case VK_FORMAT_R16G16_UNORM:
+				return EPixelFormat::R16G16_UNorm;
+			case VK_FORMAT_R16G16B16A16_UNORM:
+				return EPixelFormat::R16G16B16A16_UNorm;
+			case VK_FORMAT_R32_UINT:
+				return EPixelFormat::R32_UInt;
+			case VK_FORMAT_R32G32_UINT:
+				return EPixelFormat::R32G32_UInt;
+			case VK_FORMAT_R32G32B32A32_UINT:
+				return EPixelFormat::R32G32B32A32_UInt;
+			case VK_FORMAT_R32_SFLOAT:
+				return EPixelFormat::R32_Float;
+			case VK_FORMAT_R32G32_SFLOAT:
+				return EPixelFormat::R32G32_Float;
+			case VK_FORMAT_R32G32B32A32_SFLOAT:
+				return EPixelFormat::R32G32B32A32_Float;
+			case VK_FORMAT_D16_UNORM:
+				return EPixelFormat::D16_UNorm;
+			case VK_FORMAT_D24_UNORM_S8_UINT:
+				return EPixelFormat::D24_UNorm_S8_UInt;
+			case VK_FORMAT_D32_SFLOAT:
+				return EPixelFormat::D32_Float;
+			case VK_FORMAT_D32_SFLOAT_S8_UINT:
+				return EPixelFormat::D32_Float_S8_UInt;
+				// Add more formats as needed
+			default:
+				HLVM_ASSERT_F(false, TXT("Unknown Vulkan format {}"), VULKAN_FORMAT_TO_TCHAR(VulkanFormat));
+				return EPixelFormat::None;
+		}
+#pragma clang diagnostic pop
 	}
 
 	// Convert RHI buffer usage flags to Vulkan usage flags

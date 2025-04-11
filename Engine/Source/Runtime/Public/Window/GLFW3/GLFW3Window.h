@@ -29,7 +29,7 @@ class FGLFW3Window : public IWindow
 public:
 	NOCOPYMOVE(FGLFW3Window)
 	FGLFW3Window() = delete;
-	explicit FGLFW3Window(const FProperties& InProperties);
+	explicit FGLFW3Window(const Properties& InProperties);
 	virtual ~FGLFW3Window() override;
 
 	virtual bool ShouldClose() override;

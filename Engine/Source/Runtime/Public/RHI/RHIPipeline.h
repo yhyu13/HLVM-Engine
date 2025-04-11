@@ -28,11 +28,11 @@ struct FGraphicsPipelineStateInitializer
 		, GeometryShader(nullptr)
 		, HullShader(nullptr)
 		, DomainShader(nullptr)
-		, DepthStencilFormat(EPixelFormat::Unknown)
+		, DepthStencilFormat(EPixelFormat::None)
 		, NumRenderTargets(0)
 		, SampleCount(1)
 	{
-		std::memset(RenderTargetFormats, HLVM_ENUM_VALUE(EPixelFormat::Unknown), sizeof(RenderTargetFormats));
+		std::memset(RenderTargetFormats, HLVM_ENUM_VALUE(EPixelFormat::None), sizeof(RenderTargetFormats));
 	}
 };
 

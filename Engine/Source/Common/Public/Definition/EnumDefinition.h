@@ -72,7 +72,7 @@
 	{                                                               \
 		using EnumType = enum_class;                                \
 		using EnumValue = HLVM_ENUM_UNDERLYING_T(enum_class);       \
-		EnumValue value;                                            \
+		EnumValue value{ 0 };                                       \
 		inline constexpr Flags() {}                                 \
 		inline constexpr Flags(EnumType v) : value(EnumValue(v)) {} \
 		inline constexpr Flags(EnumValue v) : value(v) {}           \

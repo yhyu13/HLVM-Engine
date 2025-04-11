@@ -117,9 +117,9 @@ struct TNoNullablePtr
 
 	TNoNullablePtr() = default;
 	TNoNullablePtr(T* handle)
-		: pFileHandle(handle)
+		: m_ptr(handle)
 	{
-		if (pFileHandle == nullptr)
+		if (m_ptr == nullptr)
 		{
 			HLVM_SEGFAULT_INLINE();
 		}
@@ -128,46 +128,46 @@ struct TNoNullablePtr
 
 	T* operator->()
 	{
-		return pFileHandle;
+		return m_ptr;
 	}
 
 	const T* operator->() const
 	{
-		return pFileHandle;
+		return m_ptr;
 	}
 
 	bool operator==(const TNoNullablePtr& other) const
 	{
-		return pFileHandle == other.pFileHandle;
+		return m_ptr == other.m_ptr;
 	}
 
 	bool operator!=(const TNoNullablePtr& other) const
 	{
-		return pFileHandle != other.pFileHandle;
+		return m_ptr != other.m_ptr;
 	}
 
 	operator bool() const
 	{
-		return pFileHandle != nullptr;
+		return m_ptr != nullptr;
 	}
 
 	operator T*() const
 	{
-		return pFileHandle;
+		return m_ptr;
 	}
 
 	T* Get() const
 	{
-		return pFileHandle;
+		return m_ptr;
 	}
 
 	friend T& operator*(const TNoNullablePtr& handle)
 	{
-		return *(handle.pFileHandle);
+		return *(handle.m_ptr);
 	}
 
 private:
-	T* pFileHandle = nullptr;
+	T* m_ptr = nullptr;
 };
 
 
@@ -183,55 +183,55 @@ struct TNullablePtr
 
 	TNullablePtr() = default;
 	TNullablePtr(T* handle)
-		: pFileHandle(handle)
+		: m_ptr(handle)
 	{
 	}
 	~TNullablePtr() = default;
 
 	T* operator->()
 	{
-		return pFileHandle;
+		return m_ptr;
 	}
 
 	const T* operator->() const
 	{
-		return pFileHandle;
+		return m_ptr;
 	}
 
 	bool operator==(const TNullablePtr& other) const
 	{
-		return pFileHandle == other.pFileHandle;
+		return m_ptr == other.m_ptr;
 	}
 
 	bool operator!=(const TNullablePtr& other) const
 	{
-		return pFileHandle != other.pFileHandle;
+		return m_ptr != other.m_ptr;
 	}
 
 	operator bool() const
 	{
-		return pFileHandle != nullptr;
+		return m_ptr != nullptr;
 	}
 
 	operator T*() const
 	{
-		return pFileHandle;
+		return m_ptr;
 	}
 
 	T* Get() const
 	{
-		return pFileHandle;
+		return m_ptr;
 	}
 
 	friend T& operator*(const TNullablePtr& handle)
 	{
-		if (handle.pFileHandle == nullptr)
+		if (handle.m_ptr == nullptr)
 		{
 			HLVM_SEGFAULT_INLINE();
 		}
-		return *(handle.pFileHandle);
+		return *(handle.m_ptr);
 	}
 
 private:
-	T* pFileHandle = nullptr;
+	T* m_ptr = nullptr;
 };

@@ -59,7 +59,6 @@ public:
 	inline TUINT32 GetNumSamples() const { return NumSamples; }
 	inline TUINT32 GetNumUsedClearValues() const { return NumUsedClearValues; }
 
-
 	inline const VkAttachmentReference* GetColorAttachmentReferences() const { return NumColorAttachments > 0 ? ColorReferences : nullptr; }
 	inline const VkAttachmentReference* GetResolveAttachmentReferences() const { return bHasResolveAttachments ? ResolveReferences : nullptr; }
 	inline const VkAttachmentReference* GetDepthAttachmentReference() const { return bHasDepthStencil ? &DepthReference : nullptr; }

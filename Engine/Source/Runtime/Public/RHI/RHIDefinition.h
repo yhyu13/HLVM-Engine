@@ -12,18 +12,19 @@ DECLARE_LOG_CATEGORY(LogRHI)
 // RHI Interface Types
 enum class ERHIInterfaceType : TUINT32
 {
+	Null = 0,
 	Vulkan,
-	Null,
 	// Add other RHI types as needed
 };
 
 // Enumeration of pixel formats
 enum class EPixelFormat : TUINT32
 {
-	Unknown,
+	None = 0,
 	R8_UNorm,
 	R8G8_UNorm,
 	R8G8B8A8_UNorm,
+	B8G8R8A8_SRGB,
 	R16_UNorm,
 	R16G16_UNorm,
 	R16G16B16A16_UNorm,
@@ -105,6 +106,7 @@ enum class EShaderStage : TUINT32
 // Query Types
 enum class ERHIQueryType : TUINT32
 {
+	None = 0,
 	Occlusion,
 	Timestamp,
 	PipelineStatistics,
@@ -114,7 +116,7 @@ enum class ERHIQueryType : TUINT32
 // Enumeration of texture filter modes
 enum class ETextureFilter : TUINT32
 {
-	None,
+	None = 0,
 	Point,
 	Linear,
 	Anisotropic
@@ -123,7 +125,7 @@ enum class ETextureFilter : TUINT32
 // Enumeration of texture address modes
 enum class ETextureAddressMode : TUINT32
 {
-	None,
+	None = 0,
 	Wrap,
 	Clamp,
 	Mirror,
@@ -133,7 +135,6 @@ enum class ETextureAddressMode : TUINT32
 // Enumeration of primitive topologies
 enum class EPrimitiveTopology : TUINT32
 {
-	Undefined,
 	PointList,
 	LineList,
 	LineStrip,
@@ -160,7 +161,6 @@ enum class EFrontFace : TUINT32
 // Enumeration of cull modes
 enum class ECullMode : TUINT32
 {
-	None,
 	Front,
 	Back,
 	FrontAndBack
@@ -287,7 +287,7 @@ namespace RHI
 	{
 		return S_C(ERenderTargetStoreAction, HLVM_ENUM_VALUE(Action) & ((1 << HLVM_ENUM_VALUE(ERenderTargetActions::LoadOpMask)) - 1));
 	}
-}
+} // namespace RHI
 
 enum class EDepthStencilTargetActions : TUINT32
 {
@@ -328,13 +328,13 @@ namespace RHI
 	{
 		return S_C(ERenderTargetActions, HLVM_ENUM_VALUE(Action) & ((1 << HLVM_ENUM_VALUE(EDepthStencilTargetActions::DepthMask)) - 1));
 	}
-}
+} // namespace RHI
 
 enum class ERHIAccessFlag : TUINT32
 {
 	// Used when the previous state of a resource is not known,
 	// which implies we have to flush all GPU caches etc.
-	Unknown = 0,
+	None = 0,
 
 	// Read states
 	CPURead = 1 << 0,
@@ -370,7 +370,7 @@ enum class ERHIAccessFlag : TUINT32
 	ShadingRateSource = 1 << 19,
 
 	Last = ShadingRateSource,
-	None = Unknown,
+	Unknown = None,
 	Mask = (Last << 1) - 1,
 
 	// Graphics is a combination of pixel and non-pixel
@@ -447,6 +447,9 @@ HLVM_INLINE_FUNC const TCHAR* GetRHIName(ERHIInterfaceType Type)
 			return TXT("Vulkan");
 		case ERHIInterfaceType::Null:
 			return TXT("Null");
+		default:
+			HLVM_ASSERT_F(false, TXT("Unknown RHI Interface Type"));
+			return TXT("Unknown");
 	}
 };
 

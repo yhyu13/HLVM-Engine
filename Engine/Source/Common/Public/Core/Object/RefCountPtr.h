@@ -50,11 +50,7 @@ public:
 
 	~TRefCountPtr()
 	{
-		if (m_ptr && !m_ptr->DecrementRef())
-		{
-			delete m_ptr;
-		}
-		m_ptr = nullptr;
+		Reset();
 	}
 
 	TRefCountPtr(const TRefCountPtr& other)
@@ -108,7 +104,7 @@ public:
 		}
 		else
 		{
-			m_ptr = static_cast<T*>(other.m_ptr);
+			m_ptr = static_cast<T*>(other.template Get<false>());
 			if (m_ptr)
 			{
 				m_ptr->IncrementRef();
@@ -125,8 +121,15 @@ public:
 		}
 		else
 		{
-			m_ptr = static_cast<T*>(other.m_ptr);
-			other.m_ptr = nullptr;
+			m_ptr = static_cast<T*>(other.template Get<false>());
+			// In principle, we no need to change ref.
+			// But since we cannnot access U's m_ptr member,
+			// we have to increment ref in here and then decrement in other by Reset()
+			if (m_ptr)
+			{
+				m_ptr->IncrementRef();
+			}
+			other.Reset();
 		}
 	}
 
@@ -140,7 +143,7 @@ public:
 		else
 		{
 			Reset();
-			m_ptr = static_cast<T*>(other.m_ptr);
+			m_ptr = static_cast<T*>(other.template Get<false>());
 			if (m_ptr)
 			{
 				m_ptr->IncrementRef();
@@ -158,8 +161,15 @@ public:
 		else
 		{
 			Reset();
-			m_ptr = static_cast<T*>(other.m_ptr);
-			other.m_ptr = nullptr;
+			m_ptr = static_cast<T*>(other.template Get<false>());
+			// In principle, we no need to change ref.
+			// But since we cannnot access U's m_ptr member,
+			// we have to increment ref in here and then decrement in other by Reset()
+			if (m_ptr)
+			{
+				m_ptr->IncrementRef();
+			}
+			other.Reset();
 		}
 	}
 
@@ -206,26 +216,22 @@ public:
 	template <bool bValidate = !HLVM_BUILD_RELEASE>
 	HLVM_NODISCARD T* Get() noexcept
 	{
-		if constexpr (bValidate)
-		{
-			HLVM_ENSURE_F(Valid(), TXT("TRefCountPtr nullptr error!"));
-		}
 		return m_ptr;
 	}
 
 	template <bool bValidate = !HLVM_BUILD_RELEASE>
 	HLVM_NODISCARD T* Get() const noexcept
 	{
-		if constexpr (bValidate)
-		{
-			HLVM_ENSURE_F(Valid(), TXT("TRefCountPtr nullptr error!"));
-		}
 		return m_ptr;
 	}
 
 	void Reset() noexcept
 	{
-		this->~TRefCountPtr();
+		if (m_ptr && !m_ptr->DecrementRef())
+		{
+			delete m_ptr;
+		}
+		m_ptr = nullptr;
 	}
 
 	HLVM_NODISCARD bool Valid() const noexcept
@@ -243,13 +249,13 @@ public:
 	HLVM_NODISCARD bool operator==(const TRefCountPtr<U>& other) const noexcept
 	{
 		static_assert(std::is_same_v<T, U>, "TRefCountPtr Polymorphism Casting not allowed!");
-		return m_ptr == other.m_ptr;
+		return m_ptr == other.template Get<false>();
 	}
 	template <class U>
 	HLVM_NODISCARD bool operator!=(const TRefCountPtr<U>& other) const noexcept
 	{
 		static_assert(std::is_same_v<T, U>, "TRefCountPtr Polymorphism Casting not allowed!");
-		return m_ptr != other.m_ptr;
+		return m_ptr != other.template Get<false>();
 	}
 
 	// compare with nullptr

@@ -6,7 +6,8 @@
 
 #include "RHI/DynamicRHI.h"
 #include "VulkanLoader.h"
-#include "../../../Private/RHI/Vulkan/VulkanRHIResource.h"
+
+class FVulkanBackBuffer;
 
 class IVulkanDynamicRHI : public FDynamicRHI
 {
@@ -21,8 +22,9 @@ public:
 
 	// Vulkan-specific resource creation
 	HLVM_NODISCARD virtual VkImage CreateVulkanImage(const FRHITextureCreateInfo& CreateInfo) = 0;
+	virtual void DestroyVulkanImage(VkImage Image) = 0;
 	HLVM_NODISCARD virtual VkBuffer CreateVulkanBuffer(const FRHIBufferCreateInfo& CreateInfo, void** OutAllocation) = 0;
-	virtual void DestoryVulkanBuffer(VkBuffer Buffer, void** InAllocation) = 0;
+	virtual void DestroyVulkanBuffer(VkBuffer Buffer, void** InAllocation) = 0;
 	HLVM_NODISCARD virtual VkImageView CreateVulkanImageView(VkImage Image, const FRHIShaderResourceViewCreateInfo& CreateInfo) = 0;
 	HLVM_NODISCARD virtual VkBufferView CreateVulkanBufferView(VkBuffer Buffer, const FRHIUnorderedAccessViewCreateInfo& CreateInfo) = 0;
 
@@ -38,6 +40,8 @@ public:
 	virtual void CreateVulkanSwapChain(void* WindowHandle, TUINT32 Width, TUINT32 Height, bool bIsFullscreen, EPixelFormat PreferredPixelFormat, FViewportRHIRef& OutViewport) = 0;
 	virtual void ResizeVulkanSwapChain(FViewportRHIRef& Viewport, TUINT32 Width, TUINT32 Height, bool bIsFullscreen, EPixelFormat PreferredPixelFormat) = 0;
 	virtual void PresentVulkanSwapChain(FViewportRHIRef& Viewport) = 0;
+
+	virtual TNoNullablePtr<FVulkanBackBuffer> GetBackBuffer() = 0;
 
 	// Vulkan-specific render pass management
 	virtual void BeginVulkanRenderPass(const FRHIRenderPassInfo& RenderPassInfo) = 0;

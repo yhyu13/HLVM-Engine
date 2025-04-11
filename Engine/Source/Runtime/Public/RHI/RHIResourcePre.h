@@ -253,15 +253,16 @@ struct FRHISwapChainCreateInfo
 	}
 };
 
+class IWindow;
 // Structure for describing viewport creation parameters
 struct FRHIViewportCreateInfo
 {
-	FString			 DebugName;	   // Debug name for the viewport
-	FUIntVec2		 Dimensions;   // Width and height of the viewport
-	ERHIViewportType ViewportType; // Type of the viewport (e.g., windowed, fullscreen)
-	EPixelFormat	 Format;	   // Pixel format of the viewport's back buffer
-	void*			 NativeWindowHandle;
-	bool			 bHeadlessRendering;
+	FString					DebugName;	  // Debug name for the viewport
+	FUIntVec2				Dimensions;	  // Width and height of the viewport
+	ERHIViewportType		ViewportType; // Type of the viewport (e.g., windowed, fullscreen)
+	EPixelFormat			Format;		  // Pixel format of the viewport's back buffer
+	TNoNullablePtr<IWindow> NativeWindowHandle;
+	bool					bHeadlessRendering;
 
 	// Default constructor
 	FRHIViewportCreateInfo() = default;
@@ -270,9 +271,9 @@ struct FRHIViewportCreateInfo
 	FRHIViewportCreateInfo(
 		const FString&	 InDebugName,
 		const FUIntVec2& InDimensions,
+		IWindow*		 InWindowHandle,
 		ERHIViewportType InViewportType = ERHIViewportType::Fullscreen,
 		EPixelFormat	 InFormat = EPixelFormat::R8G8B8A8_UNorm,
-		void*			 InWindowHandle = nullptr,
 		bool			 InHeadlessRendering = false)
 		: DebugName(InDebugName)
 		, Dimensions(InDimensions)

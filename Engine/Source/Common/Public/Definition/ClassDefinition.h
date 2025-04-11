@@ -37,10 +37,10 @@
 #define MAKE_UNIQUE(type, value) std::make_unique<type>((value))
 
 template<typename T>
-using SharedRefCountPtr = std::shared_ptr<T>;
+using SharedRefPtr = std::shared_ptr<T>;
 
 template<typename T>
-using UniqueRefCountPtr = std::unique_ptr<T>;
+using UniqueRefPtr = std::unique_ptr<T>;
 
 // Offset of a struct member. (Copy from UE5)
 #ifdef __clang__

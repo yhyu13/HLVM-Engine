@@ -9,16 +9,24 @@ FVulkanBackBuffer::FVulkanBackBuffer(VkImage InImage, const FRHITextureCreateInf
 	OwnerViewport(InViewport)
 {
 	// Vulkan back buffer holds a image from swapchain and we don't own it
-	OwnerShip = EOwnerShip::None;
+	OwnerShip = EOwnerShip::Alias;
 }
 
 FVulkanBackBuffer::~FVulkanBackBuffer()
 {
+	// Just release handle, no need to destroy it since it is owned by swapchain
 	Image = VK_NULL_HANDLE;
+}
+
+void FVulkanBackBuffer::UpdateImage(VkImage InImage)
+{
+	Image = InImage;
 }
 
 FVulkanViewport::~FVulkanViewport()
 {
+	IntermediateBackBuffer.Reset();
+	RHIBackBuffer.Reset();
 	SwapChain.Reset();
 }
 
@@ -50,6 +58,13 @@ void FVulkanViewport::CreateSwapChain(FVulkanSwapChain::FRecreateInfo& InCreateI
 	{
 		HLVM_ASSERT(SwapChain == nullptr);
 		SwapChain = new FVulkanSwapChain(this, &InCreateInfo);
+
+		FRHITextureCreateInfo BackBufferCreateInfo;
+		BackBufferCreateInfo.Dimensions.x = SwapChain->swapChainExtent.width;
+		BackBufferCreateInfo.Dimensions.y = SwapChain->swapChainExtent.height;
+		BackBufferCreateInfo.Format = VulkanRHI::RHIFormatFromVulkanFormat(SwapChain->swapChainImageFormat);
+		BackBufferCreateInfo.Flags |= ETextureCreateFlag::RenderTarget; // TODO back buffer support mass resolve?
+		RHIBackBuffer = new FVulkanBackBuffer(VK_NULL_HANDLE, BackBufferCreateInfo, this);
 	}
 }
 
@@ -65,6 +80,7 @@ bool FVulkanViewport::AcquireNextImageIndex()
 		if (!!SwapChain->AcquireNextImageIndex(SwapChainImageIndex, ImageAcquireSemaphore)
 			&& SwapChainImageIndex != TUINT32_MAX && ImageAcquireSemaphore)
 		{
+			//RHIBackBuffer->UpdateImage(SwapChain->swapChainImages[SwapChainImageIndex]);
 			return true;
 		}
 	}

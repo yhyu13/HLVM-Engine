@@ -11,12 +11,13 @@
 		mov     rax, qword ptr [rbp - 8]
 		mov     dword ptr [rax], 0
  */
-#define HLVM_SEGFAULT_INLINE() \
-	do                         \
-	{                          \
-		int* _ = nullptr;      \
-		*_ = 0;                \
-	}                          \
+#define HLVM_SEGFAULT_INLINE()                \
+	do                                        \
+	{                                         \
+		int* _ = nullptr;                     \
+		*_ = 0;                               \
+		throw std::runtime_error("Segfault"); \
+	}                                         \
 	while (0)
 
 /**

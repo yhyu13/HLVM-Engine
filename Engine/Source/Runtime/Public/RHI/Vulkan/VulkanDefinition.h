@@ -52,6 +52,9 @@ DECLARE_LOG_CATEGORY(LogVulkan)
 /// @brief Helper macro to convert VkResult to TCHAR string
 #define VULKAN_RESULT_TO_TCHAR(x) TO_TCHAR_CSTR(string_VkResult(x))
 
+/// @brief Helper macro to convert VkFormat to TCHAR string
+#define VULKAN_FORMAT_TO_TCHAR(x) TO_TCHAR_CSTR(string_VkFormat(x))
+
 #define VULKAN_TYPE_TO_FSTRING(Type, Value) FString::Format(TXT("{} {}"), TXT("Type"), S_C(TUINT32, Value))
 #define VULKAN_FLAGS_TO_FSTRING(Type, Value) FString::Format(TXT("{} {}"), TXT("Type"), S_C(TUINT32, Value))
 
