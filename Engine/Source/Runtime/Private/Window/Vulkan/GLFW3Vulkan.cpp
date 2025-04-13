@@ -9,7 +9,6 @@ DECLARE_LOG_CATEGORY(LogGLFW3Vulkan)
 FGLFW3Vulkan::FGLFW3Vulkan(const IWindow::Properties& InProperties)
 	: FGLFW3Window(InProperties)
 {
-	HLVM_LOG(LogGLFW3Vulkan, debug, TXT("GLFW3Vulkan Init"));
 	Type = EWindowType::GLFW3Vulkan;
 
 	VulkanLoader::LoadOnce();
@@ -31,6 +30,7 @@ FGLFW3Vulkan::FGLFW3Vulkan(const IWindow::Properties& InProperties)
 		nullptr,
 		nullptr); // 创建窗口
 	HLVM_ENSURE_F(Window, TXT("Failed to create GLFW window"));
+	HLVM_LOG(LogGLFW3Vulkan, debug, TXT("GLFW3Vulkan Init"));
 }
 
 FGLFW3Vulkan::~FGLFW3Vulkan()

@@ -63,7 +63,7 @@ struct FVertexElement
 using FVertexDeclarationElementList = TVector<FVertexElement>;
 
 // Base class for RHI vertex declarations
-class FRHIVertexDeclaration : virtual public FRHIResource
+class FRHIVertexDeclaration : virtual public IRHIResource
 {
 public:
 	FRHIVertexDeclaration() = default;

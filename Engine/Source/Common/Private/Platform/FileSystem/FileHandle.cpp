@@ -17,8 +17,8 @@ void IFileHandle::HandleException(const OpStatusType& Status_InOut, const TCHAR*
 	FString Msg = FString::Format(TXT("File {}: calling '{}' return {} with errorNo {} and exception {}"),
 		*mFilePath,
 		Function,
-		HLVM_ENUM_VALUE_TO_TCHAR(Status_InOut->eFileOpStatus),
-		HLVM_ENUM_VALUE_TO_TCHAR(Status_InOut->eFileOpErrorNo),
+		HLVM_ENUM_TO_TCHAR(Status_InOut->eFileOpStatus),
+		HLVM_ENUM_TO_TCHAR(Status_InOut->eFileOpErrorNo),
 		TO_TCHAR_CSTR(Exception.what()));
 	if (!Status_InOut->bCancelByUser)
 	{
@@ -39,8 +39,8 @@ void IFileHandle::HandleException2(const OpStatusType& Status_InOut, const TCHAR
 	FString Msg = FString::Format(TXT("File {}: calling '{}' return {} with errorNo {}"),
 		*mFilePath,
 		Function,
-		HLVM_ENUM_VALUE_TO_TCHAR(Status_InOut->eFileOpStatus),
-		HLVM_ENUM_VALUE_TO_TCHAR(Status_InOut->eFileOpErrorNo));
+		HLVM_ENUM_TO_TCHAR(Status_InOut->eFileOpStatus),
+		HLVM_ENUM_TO_TCHAR(Status_InOut->eFileOpErrorNo));
 	if (!Status_InOut->bCancelByUser)
 	{
 		HLVM_LOG(LogIFileHandle, err, MoveTemp(Msg));

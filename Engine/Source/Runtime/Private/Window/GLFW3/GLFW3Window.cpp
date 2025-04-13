@@ -8,8 +8,8 @@ DECLARE_LOG_CATEGORY(LogGLFW3Window)
 
 FGLFW3Window::FGLFW3Window(const Properties& InProperties)
 {
-	HLVM_LOG(LogGLFW3Window, debug, TXT("GLFW3Window Init"));
 	Property = InProperties;
+	HLVM_LOG(LogGLFW3Window, debug, TXT("GLFW3Window Init"));
 }
 
 FGLFW3Window::~FGLFW3Window()

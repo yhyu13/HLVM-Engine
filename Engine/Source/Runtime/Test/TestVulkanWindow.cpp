@@ -1236,7 +1236,7 @@ RECORD_BOOL(test_GLFW3VulkanWindowRaw)
 	HelloTriangleApplication app;
 	try
 	{
-		app.run();
+		//app.run();
 	}
 	catch (const std::exception& e)
 	{
@@ -1270,10 +1270,12 @@ RECORD_BOOL(test_GLFW3VulkanWindow)
 
 	{
 		// TODO : Call begin frame in order to acquire next back buffer
+		FRHIViewportRef Viewport = VulkanRHI->GetRHIViewport();
+		Viewport->BeginFrame();
 
 		// Create buffers
-		FBufferRHIRef VertexBuffer;
-		FBufferRHIRef IndexBuffer;
+		FRHIBufferRef VertexBuffer;
+		FRHIBufferRef IndexBuffer;
 		{
 			TVector<Vertex> vertices = {
 				{ { 0.0f, 0.8f, 0.0f }, { 1.0f, 0.0f, 0.0f } },
@@ -1302,7 +1304,7 @@ RECORD_BOOL(test_GLFW3VulkanWindow)
 			IndexBuffer = VulkanRHI->CreateBuffer(IndexBufferCreateDesc);
 		}
 
-		FVulkanTextureRef BackBuffer = VulkanRHI->GetBackBuffer().Get();
+		FRHITextureRef BackBuffer = VulkanRHI->GetRHIBackBuffer();
 		{
 			VulkanRHI->RHIBeginRenderPass(FRHIRenderPassInfo{ BackBuffer, ERenderTargetActions::Clear_Store });
 		}

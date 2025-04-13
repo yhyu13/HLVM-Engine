@@ -58,6 +58,9 @@ void FVulkanSwapChain::DestroySwapChain(TNullablePtr<FRecreateInfo> OutCreateInf
 		VulkanRHI::vkDestroySwapchainKHR(device, swapChain, VulkanRHI::VULKAN_CPU_ALLOCATOR);
 		VulkanRHI::vkDestroySurfaceKHR(OwnerViewport->Instance, surface, VulkanRHI::VULKAN_CPU_ALLOCATOR);
 	}
+
+	// Release ownership to prevent swapchain calling destroy twice
+	OwnerViewport = nullptr;
 }
 
 void FVulkanSwapChain::CreateSwapChain(TNoNullablePtr<FRecreateInfo> InCreateInfo)
@@ -239,7 +242,7 @@ FVulkanSwapChain::ESurfaceStatus FVulkanSwapChain::AcquireNextImageIndex(TUINT32
 	VkFence imageAcquiredFence = VK_NULL_HANDLE;
 #endif
 	// Acquire image
-	TUINT32 ImageIndex = swapChainActualImageCount;
+	TUINT32	 ImageIndex = swapChainActualImageCount;
 	VkResult Result = VK_SUCCESS;
 	{
 		// 循环等待获取图像

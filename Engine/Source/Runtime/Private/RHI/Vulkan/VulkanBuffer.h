@@ -37,9 +37,8 @@ class FVulkanUnorderedAccessView : public FRHIUnorderedAccessView, public FVulka
 {
 public:
 	FVulkanUnorderedAccessView(VkBufferView InBufferView, const FRHIUnorderedAccessViewCreateInfo& InCreateInfo)
-		: BufferView(InBufferView)
+		: FRHIUnorderedAccessView(InCreateInfo), BufferView(InBufferView)
 	{
-		CreateInfo = InCreateInfo;
 	}
 
 	// Returns the Vulkan buffer view handle

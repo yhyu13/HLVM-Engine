@@ -12,9 +12,8 @@ class FVulkanShader : public FRHIShader, public FVulkanResource
 {
 public:
 	FVulkanShader(VkShaderModule InShaderModule, const FShaderCreateInfo& InCreateInfo)
-		: ShaderModule(InShaderModule)
+		: FRHIShader(InCreateInfo), ShaderModule(InShaderModule)
 	{
-		CreateInfo = InCreateInfo;
 	}
 
 	// Returns the shader stage (e.g., vertex, pixel, compute)
@@ -32,9 +31,8 @@ class FVulkanShaderResourceView : public FRHIShaderResourceView, public FVulkanR
 {
 public:
 	FVulkanShaderResourceView(VkImageView InImageView, const FRHIShaderResourceViewCreateInfo& InCreateInfo)
-		: ImageView(InImageView)
+		: FRHIShaderResourceView(InCreateInfo), ImageView(InImageView)
 	{
-		CreateInfo = InCreateInfo;
 	}
 
 	// Returns the Vulkan image view handle

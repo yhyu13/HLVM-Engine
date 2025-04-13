@@ -18,7 +18,7 @@
 #define HLVM_ENUM_VALUE(enum_value) magic_enum::enum_underlying(enum_value)
 #define HLVM_ENUM_VALUE_AS_TYPE(type, enum_value) static_cast<type>((enum_value))
 
-#define HLVM_ENUM_VALUE_TO_TCHAR(enum_value) TO_TCHAR_CSTR(magic_enum::enum_name((enum_value)).data())
+#define HLVM_ENUM_TO_TCHAR(enum_value) TO_TCHAR_CSTR(magic_enum::enum_name((enum_value)).data())
 
 // Reference https://www.reddit.com/r/cpp/comments/13psi6f/comment/jleje26/?utm_source=share&utm_medium=web3x&utm_name=web3xcss&utm_term=1&utm_content=share_button
 #define HLVM_DECLARE_FLAGS_OPERATOR(Flags, op)                            \

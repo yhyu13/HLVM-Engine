@@ -163,6 +163,10 @@ struct TNoNullablePtr
 
 	friend T& operator*(const TNoNullablePtr& handle)
 	{
+		if (handle.m_ptr == nullptr)
+		{
+			HLVM_SEGFAULT_INLINE();
+		}
 		return *(handle.m_ptr);
 	}
 

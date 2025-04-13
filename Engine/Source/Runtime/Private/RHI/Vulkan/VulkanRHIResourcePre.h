@@ -33,7 +33,7 @@ struct FVulkanMinimalContext
 };
 
 // Base class for all RHI resources
-class FVulkanResource : virtual public FRHIResource
+class FVulkanResource : virtual public IRHIResource
 {
 public:
 	FVulkanResource() = default;

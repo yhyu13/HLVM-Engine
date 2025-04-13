@@ -21,9 +21,10 @@ public:
 	virtual void Init() = 0;
 	virtual void Shutdown() = 0;
 
+
 	// Resource Creation
 	virtual FRHITextureRef CreateTexture(const FRHITextureCreateInfo& CreateInfo) = 0;
-	virtual FBufferRHIRef CreateBuffer(const FRHIBufferCreateInfo& CreateInfo) = 0;
+	virtual FRHIBufferRef CreateBuffer(const FRHIBufferCreateInfo& CreateInfo) = 0;
 	virtual FShaderResourceViewRHIRef CreateShaderResourceView(FRHITexture* Texture, const FRHIShaderResourceViewCreateInfo& CreateInfo) = 0;
 	virtual FUnorderedAccessViewRHIRef CreateUnorderedAccessView(FRHIBuffer* Buffer, const FRHIUnorderedAccessViewCreateInfo& CreateInfo) = 0;
 	virtual FVertexDeclarationRHIRef CreateVertexDeclaration(const FVertexDeclarationElementList& Elements) = 0;
@@ -45,9 +46,11 @@ public:
 	virtual void RHIFlushResources() = 0;
 
 	// Viewport and Swap Chain
-	virtual void RHICreateViewport(void* WindowHandle, TUINT32 Width, TUINT32 Height, bool bIsFullscreen, EPixelFormat PreferredPixelFormat, FViewportRHIRef& OutViewport) = 0;
-	virtual void RHIResizeViewport(FViewportRHIRef& Viewport, TUINT32 Width, TUINT32 Height, bool bIsFullscreen, EPixelFormat PreferredPixelFormat) = 0;
-	virtual void RHISwapBuffers(FViewportRHIRef& Viewport) = 0;
+	virtual void RHICreateViewport(void* WindowHandle, TUINT32 Width, TUINT32 Height, bool bIsFullscreen, EPixelFormat PreferredPixelFormat, FRHIViewportRef& OutViewport) = 0;
+	virtual void RHIResizeViewport(FRHIViewportRef& Viewport, TUINT32 Width, TUINT32 Height, bool bIsFullscreen, EPixelFormat PreferredPixelFormat) = 0;
+	virtual void RHISwapBuffers(FRHIViewportRef& Viewport) = 0;
+	virtual FRHITextureRef GetRHIBackBuffer() = 0;
+	virtual FRHIViewportRef GetRHIViewport() = 0;
 
 	// Render Pass and Draw Commands
 	virtual void RHIBeginRenderPass(const FRHIRenderPassInfo& RenderPassInfo) = 0;

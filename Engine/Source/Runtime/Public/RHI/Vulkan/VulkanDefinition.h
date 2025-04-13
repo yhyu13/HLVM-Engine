@@ -90,3 +90,5 @@ namespace VulkanRHI
 		FMemory::Memzero(R_C(TUINT8*, Struct) + sizeof(TINT32), sizeof(T) - sizeof(TINT32));
 	};
 }
+
+DECLARE_LOG_CATEGORY(LogVulkanRHI)

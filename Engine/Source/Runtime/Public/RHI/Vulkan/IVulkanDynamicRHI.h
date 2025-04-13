@@ -37,11 +37,9 @@ public:
 	virtual void FlushVulkanResources() = 0;
 
 	// Vulkan-specific viewport and swap chain management
-	virtual void CreateVulkanSwapChain(void* WindowHandle, TUINT32 Width, TUINT32 Height, bool bIsFullscreen, EPixelFormat PreferredPixelFormat, FViewportRHIRef& OutViewport) = 0;
-	virtual void ResizeVulkanSwapChain(FViewportRHIRef& Viewport, TUINT32 Width, TUINT32 Height, bool bIsFullscreen, EPixelFormat PreferredPixelFormat) = 0;
-	virtual void PresentVulkanSwapChain(FViewportRHIRef& Viewport) = 0;
-
-	virtual TNoNullablePtr<FVulkanBackBuffer> GetBackBuffer() = 0;
+	virtual void CreateVulkanSwapChain(void* WindowHandle, TUINT32 Width, TUINT32 Height, bool bIsFullscreen, EPixelFormat PreferredPixelFormat, FRHIViewportRef& OutViewport) = 0;
+	virtual void ResizeVulkanSwapChain(FRHIViewportRef& Viewport, TUINT32 Width, TUINT32 Height, bool bIsFullscreen, EPixelFormat PreferredPixelFormat) = 0;
+	virtual void PresentVulkanSwapChain(FRHIViewportRef& Viewport) = 0;
 
 	// Vulkan-specific render pass management
 	virtual void BeginVulkanRenderPass(const FRHIRenderPassInfo& RenderPassInfo) = 0;

@@ -78,7 +78,7 @@ namespace VulkanRHI
 			case EPixelFormat::D32_Float_S8_UInt:
 				return VK_FORMAT_D32_SFLOAT_S8_UINT; // Add more formats as needed
 			default:
-				HLVM_ASSERT_F(false, TXT("Unknown RHI format {}"), HLVM_ENUM_VALUE_TO_TCHAR(RHIFormat));
+				HLVM_ASSERT_F(false, TXT("Unknown RHI format {}"), HLVM_ENUM_TO_TCHAR(RHIFormat));
 				return VK_FORMAT_UNDEFINED;
 		}
 	}

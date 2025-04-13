@@ -48,8 +48,14 @@ public:
 	// Resizes the viewport and swap chain
 	virtual void Resize(const FUIntVec2& NewDimensions) override;
 
-	//	// Presents the viewport (swaps the back buffer)
-	//	virtual void Present() override;
+	// Begins a frame, acquire next back buffer
+	virtual void BeginFrame() override;
+
+	// Presents the viewport, swaps the back buffer
+	virtual void Present() override;
+
+	// Returns the back buffer
+	virtual FRHITextureRef GetBackBuffer() const override;
 
 	// Creates the swap chain
 	void CreateSwapChain(FVulkanSwapChain::FRecreateInfo& InCreateInfo);
@@ -57,7 +63,6 @@ public:
 	// Returns true if the swap chain should be created using standard Vulkan swap chain
 	bool ShouldUseStandardSwapChain() const;
 
-	FVulkanBackBufferRef GetBackBuffer() const { return RHIBackBuffer; }
 
 private:
 	bool AcquireNextImageIndex();

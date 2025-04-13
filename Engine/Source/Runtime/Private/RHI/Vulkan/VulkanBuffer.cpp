@@ -6,24 +6,21 @@
 #include "RHI/Vulkan/IVulkanDynamicRHI.h"
 
 FVulkanBuffer::FVulkanBuffer(const FRHIBufferCreateInfo& InCreateInfo)
-	: Buffer(VK_NULL_HANDLE)
+	: FRHIBuffer(InCreateInfo), Buffer(VK_NULL_HANDLE)
 {
-	CreateInfo = InCreateInfo;
 	CreateBuffer();
-	HLVM_LOG(LogRHI, trace, TXT("Create buffer: {}"), *CreateInfo.DebugName);
+	HLVM_LOG(LogVulkanRHI, trace, TXT("Create buffer: {}"), *GetName());
 }
 
 FVulkanBuffer::~FVulkanBuffer()
 {
 	DestroyBuffer();
-	HLVM_LOG(LogRHI, trace, TXT("Destroy buffer: {}"), *CreateInfo.DebugName);
+	HLVM_LOG(LogVulkanRHI, trace, TXT("Destroy buffer: {}"), *GetName());
 }
 
 FVulkanBuffer::FVulkanBuffer(FVulkanBuffer&& Other)
-	: Buffer(Other.Buffer), Allocation(Other.Allocation)
+	: FRHIBuffer(Other.CreateInfo), Buffer(Other.Buffer), Allocation(Other.Allocation)
 {
-	CreateInfo = Other.CreateInfo;
-
 	Other.Buffer = VK_NULL_HANDLE;
 	Other.Allocation = VK_NULL_HANDLE;
 }
@@ -35,7 +32,7 @@ FVulkanBuffer& FVulkanBuffer::operator=(FVulkanBuffer&& Other)
 		DestroyBuffer();
 		Buffer = Other.Buffer;
 		Allocation = Other.Allocation;
-		CreateInfo = Other.CreateInfo;
+		UpdateCreateInfo(Other.CreateInfo);
 
 		Other.Buffer = VK_NULL_HANDLE;
 		Other.Allocation = VK_NULL_HANDLE;

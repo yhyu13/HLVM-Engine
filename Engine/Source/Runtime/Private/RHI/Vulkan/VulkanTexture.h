@@ -13,8 +13,8 @@ class FVulkanTexture : public FRHITexture, public FVulkanResource
 public:
 	enum class EOwnerShip
 	{
-		Owner,
-		Alias
+		Owner, // Owns the image
+		Alias // Alias of another image
 	};
 
 public:

@@ -5,10 +5,24 @@
 #include "RHIDefinition.h"
 #include "RHIMisc.h"
 
-// Structure for describing texture creation parameters
-struct FRHITextureCreateInfo
+struct IRHICreateInfo
 {
-	FString				DebugName;	// Debug name for the texture
+	FString				DebugName;	// Debug name for the resource
+
+	IRHICreateInfo() = default;
+	IRHICreateInfo(const FString& InDebugName)
+	: DebugName(InDebugName)
+	{
+	}
+	virtual ~IRHICreateInfo() = default;
+
+	IRHICreateInfo(const IRHICreateInfo& InCreateInfo) = default;
+	IRHICreateInfo& operator=(const IRHICreateInfo& InCreateInfo) = default;
+};
+
+// Structure for describing texture creation parameters
+struct FRHITextureCreateInfo : public IRHICreateInfo
+{
 	FUIntVec3			Dimensions; // Width, Height, Depth (or array size)
 	EPixelFormat		Format;		// Pixel format of the texture
 	TUINT8				NumMips;	// Number of mip levels
@@ -19,7 +33,7 @@ struct FRHITextureCreateInfo
 	FRHITextureCreateInfo() = default;
 	// Constructor for easy initialization
 	FRHITextureCreateInfo(const FString& InDebugName, const FIntVec3& InDimensions, EPixelFormat InFormat, TUINT8 InNumMips = 1, TUINT8 InNumSamples = 1, ETextureCreateFlags InFlags = ETextureCreateFlag::None, const FClearValueBinding& InClearValue = FClearValueBinding::None())
-		: DebugName(InDebugName)
+		: IRHICreateInfo(InDebugName)
 		, Dimensions(InDimensions)
 		, Format(InFormat)
 		, NumMips(InNumMips)
@@ -31,9 +45,8 @@ struct FRHITextureCreateInfo
 };
 
 // Structure for describing buffer creation parameters
-struct FRHIBufferCreateInfo
+struct FRHIBufferCreateInfo : public IRHICreateInfo
 {
-	FString				 DebugName;			  // Debug name for the buffer
 	TSIZE				 Size;				  // Size of the buffer in bytes
 	EBufferUsageFlags	 UsageFlags;		  // Buffer usage flags
 	EMemoryPropertyFlags MemoryPropertyFlags; // Memory property flags
@@ -42,7 +55,7 @@ struct FRHIBufferCreateInfo
 	// Constructor for easy initialization
 	FRHIBufferCreateInfo(const FString& InDebugName, TSIZE InSize, EBufferUsageFlags InUsageFlags,
 		EMemoryPropertyFlags InMemoryPropertyFlags)
-		: DebugName(InDebugName)
+		: IRHICreateInfo(InDebugName)
 		, Size(InSize)
 		, UsageFlags(InUsageFlags)
 		, MemoryPropertyFlags(InMemoryPropertyFlags)
@@ -51,7 +64,7 @@ struct FRHIBufferCreateInfo
 };
 
 // Structure for describing shader resource view creation parameters
-struct FRHIShaderResourceViewCreateInfo
+struct FRHIShaderResourceViewCreateInfo : public IRHICreateInfo
 {
 	FRHITexture* Texture;		  // Texture to create the SRV for
 	EPixelFormat Format;		  // Format of the SRV
@@ -74,7 +87,7 @@ struct FRHIShaderResourceViewCreateInfo
 };
 
 // Structure for describing unordered access view creation parameters
-struct FRHIUnorderedAccessViewCreateInfo
+struct FRHIUnorderedAccessViewCreateInfo : public IRHICreateInfo
 {
 	FRHITexture* Texture;		  // Texture to create the UAV for
 	EPixelFormat Format;		  // Format of the UAV
@@ -97,9 +110,8 @@ struct FRHIUnorderedAccessViewCreateInfo
 };
 
 // Structure for describing shader creation parameters
-struct FShaderCreateInfo
+struct FShaderCreateInfo : public IRHICreateInfo
 {
-	FString			 DebugName;	  // Debug name for the shader
 	EShaderStage	 Stage;		  // Shader stage (e.g., vertex, pixel, compute)
 	TVector<TUINT8>	 Code;		  // Shader bytecode
 	TVector<FString> EntryPoints; // Entry points for the shader
@@ -107,7 +119,7 @@ struct FShaderCreateInfo
 	FShaderCreateInfo() = default;
 	// Constructor for easy initialization
 	FShaderCreateInfo(const FString& InDebugName, EShaderStage InStage, const TVector<TUINT8>& InCode, const TVector<FString>& InEntryPoints = { "Main" })
-		: DebugName(InDebugName)
+		: IRHICreateInfo(InDebugName)
 		, Stage(InStage)
 		, Code(InCode)
 		, EntryPoints(InEntryPoints)
@@ -116,9 +128,8 @@ struct FShaderCreateInfo
 };
 
 // Structure for describing sampler state creation parameters
-struct FRHISamplerStateCreateInfo
+struct FRHISamplerStateCreateInfo : public IRHICreateInfo
 {
-	FString				DebugName;				 // Debug name for the sampler state
 	ETextureFilter		Filter;					 // Filter mode
 	ETextureAddressMode AddressModeU;			 // Address mode for U coordinate
 	ETextureAddressMode AddressModeV;			 // Address mode for V coordinate
@@ -130,7 +141,7 @@ struct FRHISamplerStateCreateInfo
 
 	// Constructor for easy initialization
 	FRHISamplerStateCreateInfo(const FString& InDebugName, ETextureFilter InFilter, ETextureAddressMode InAddressModeU, ETextureAddressMode InAddressModeV, ETextureAddressMode InAddressModeW, TUINT32 InMipMapLevelOfDetailBias = 0, TUINT32 InMaxAnisotropy = 1, ERHICompare InComparisonFunction = ERHICompare::Never, const FVec4& InBorderColor = FVec4(0.0f, 0.0f, 0.0f, 0.0f))
-		: DebugName(InDebugName)
+		: IRHICreateInfo(InDebugName)
 		, Filter(InFilter)
 		, AddressModeU(InAddressModeU)
 		, AddressModeV(InAddressModeV)
@@ -144,16 +155,15 @@ struct FRHISamplerStateCreateInfo
 };
 
 // Structure for describing graphics pipeline layout creation parameters
-struct FRHIGraphicsPipelineLayoutCreateInfo
+struct FRHIGraphicsPipelineLayoutCreateInfo : public IRHICreateInfo
 {
-	FString									   DebugName;			 // Debug name for the pipeline layout
 	TVector<FRHIShaderResourceViewCreateInfo>  ShaderResourceViews;	 // Shader resource views
 	TVector<FRHIUnorderedAccessViewCreateInfo> UnorderedAccessViews; // Unordered access views
 	TVector<FRHISamplerStateCreateInfo>		   SamplerStates;		 // Sampler states
 
 	// Constructor for easy initialization
 	FRHIGraphicsPipelineLayoutCreateInfo(const FString& InDebugName, const TVector<FRHIShaderResourceViewCreateInfo>& InShaderResourceViews, const TVector<FRHIUnorderedAccessViewCreateInfo>& InUnorderedAccessViews, const TVector<FRHISamplerStateCreateInfo>& InSamplerStates)
-		: DebugName(InDebugName)
+		: IRHICreateInfo(InDebugName)
 		, ShaderResourceViews(InShaderResourceViews)
 		, UnorderedAccessViews(InUnorderedAccessViews)
 		, SamplerStates(InSamplerStates)
@@ -162,9 +172,8 @@ struct FRHIGraphicsPipelineLayoutCreateInfo
 };
 
 // Structure for describing graphics pipeline state creation parameters
-struct FRHIGraphicsPipelineStateCreateInfo
+struct FRHIGraphicsPipelineStateCreateInfo : public IRHICreateInfo
 {
-	FString					   DebugName;		  // Debug name for the pipeline state
 	EPrimitiveTopology		   PrimitiveTopology; // Primitive topology
 	EPolygonMode			   PolygonMode;		  // Polygon mode
 	EFrontFace				   FrontFace;		  // Front face
@@ -176,7 +185,7 @@ struct FRHIGraphicsPipelineStateCreateInfo
 
 	// Constructor for easy initialization
 	FRHIGraphicsPipelineStateCreateInfo(const FString& InDebugName, EPrimitiveTopology InPrimitiveTopology, EPolygonMode InPolygonMode, EFrontFace InFrontFace, ECullMode InCullMode, EDepthTest InDepthTest, EStencilTest InStencilTest, EBlendMode InBlendMode, const TVector<FShaderCreateInfo>& InShaders)
-		: DebugName(InDebugName)
+		: IRHICreateInfo(InDebugName)
 		, PrimitiveTopology(InPrimitiveTopology)
 		, PolygonMode(InPolygonMode)
 		, FrontFace(InFrontFace)
@@ -190,29 +199,27 @@ struct FRHIGraphicsPipelineStateCreateInfo
 };
 
 // Structure for describing compute pipeline state creation parameters
-struct FRHIComputePipelineStateCreateInfo
+struct FRHIComputePipelineStateCreateInfo : public IRHICreateInfo
 {
-	FString			  DebugName; // Debug name for the pipeline state
 	FShaderCreateInfo Shader;	 // Compute shader
 
 	// Constructor for easy initialization
 	FRHIComputePipelineStateCreateInfo(const FString& InDebugName, const FShaderCreateInfo& InShader)
-		: DebugName(InDebugName)
+		: IRHICreateInfo(InDebugName)
 		, Shader(InShader)
 	{
 	}
 };
 
 // Structure for describing query creation parameters
-struct FRHIQueryCreateInfo
+struct FRHIQueryCreateInfo : public IRHICreateInfo
 {
-	FString		  DebugName;  // Debug name for the query
 	ERHIQueryType QueryType;  // Type of the query (e.g., occlusion, timestamp)
 	TUINT32		  NumQueries; // Number of queries
 
 	// Constructor for easy initialization
 	FRHIQueryCreateInfo(const FString& InDebugName, ERHIQueryType InQueryType, TUINT32 InNumQueries = 1)
-		: DebugName(InDebugName)
+		: IRHICreateInfo(InDebugName)
 		, QueryType(InQueryType)
 		, NumQueries(InNumQueries)
 	{
@@ -220,9 +227,8 @@ struct FRHIQueryCreateInfo
 };
 
 // Structure for describing swap chain creation parameters
-struct FRHISwapChainCreateInfo
+struct FRHISwapChainCreateInfo : public IRHICreateInfo
 {
-	FString			DebugName;	   // Debug name for the swap chain
 	FIntVec2		Dimensions;	   // Width and height of the swap chain buffers
 	EPixelFormat	Format;		   // Pixel format of the swap chain buffers
 	TUINT32			NumBuffers;	   // Number of buffers in the swap chain (e.g., double or triple buffering)
@@ -242,7 +248,7 @@ struct FRHISwapChainCreateInfo
 		TUINT32			InNumSamples = 1, // Default to no MSAA
 		ESwapChainFlags InFlags = ESwapChainFlags::None,
 		FRHIViewport*	InViewport = nullptr)
-		: DebugName(InDebugName)
+		: IRHICreateInfo(InDebugName)
 		, Dimensions(InDimensions)
 		, Format(InFormat)
 		, NumBuffers(InNumBuffers)
@@ -255,9 +261,8 @@ struct FRHISwapChainCreateInfo
 
 class IWindow;
 // Structure for describing viewport creation parameters
-struct FRHIViewportCreateInfo
+struct FRHIViewportCreateInfo : public IRHICreateInfo
 {
-	FString					DebugName;	  // Debug name for the viewport
 	FUIntVec2				Dimensions;	  // Width and height of the viewport
 	ERHIViewportType		ViewportType; // Type of the viewport (e.g., windowed, fullscreen)
 	EPixelFormat			Format;		  // Pixel format of the viewport's back buffer
@@ -275,7 +280,7 @@ struct FRHIViewportCreateInfo
 		ERHIViewportType InViewportType = ERHIViewportType::Fullscreen,
 		EPixelFormat	 InFormat = EPixelFormat::R8G8B8A8_UNorm,
 		bool			 InHeadlessRendering = false)
-		: DebugName(InDebugName)
+		: IRHICreateInfo(InDebugName)
 		, Dimensions(InDimensions)
 		, ViewportType(InViewportType)
 		, Format(InFormat)

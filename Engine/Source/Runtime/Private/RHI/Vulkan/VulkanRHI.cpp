@@ -4,8 +4,6 @@
 
 #include "VulkanRHI.h"
 
-DECLARE_LOG_CATEGORY(LogVulkanRHI)
-
 // TODO : Refactory these static method into each vulkan class
 namespace
 {
@@ -415,7 +413,7 @@ FRHITextureRef FVulkanRHI::CreateTexture(const FRHITextureCreateInfo& CreateInfo
 	return new FVulkanTexture(CreateInfo);
 }
 
-FBufferRHIRef FVulkanRHI::CreateBuffer(const FRHIBufferCreateInfo& CreateInfo)
+FRHIBufferRef FVulkanRHI::CreateBuffer(const FRHIBufferCreateInfo& CreateInfo)
 {
 	return new FVulkanBuffer(CreateInfo);
 }
@@ -502,19 +500,29 @@ void FVulkanRHI::RHIFlushResources()
 }
 
 // Viewport and Swap Chain
-void FVulkanRHI::RHICreateViewport(void* WindowHandle, TUINT32 Width, TUINT32 Height, bool bIsFullscreen, EPixelFormat PreferredPixelFormat, FViewportRHIRef& OutViewport)
+void FVulkanRHI::RHICreateViewport(void* WindowHandle, TUINT32 Width, TUINT32 Height, bool bIsFullscreen, EPixelFormat PreferredPixelFormat, FRHIViewportRef& OutViewport)
 {
 	CreateVulkanSwapChain(WindowHandle, Width, Height, bIsFullscreen, PreferredPixelFormat, OutViewport);
 }
 
-void FVulkanRHI::RHIResizeViewport(FViewportRHIRef& Viewport, TUINT32 Width, TUINT32 Height, bool bIsFullscreen, EPixelFormat PreferredPixelFormat)
+void FVulkanRHI::RHIResizeViewport(FRHIViewportRef& Viewport, TUINT32 Width, TUINT32 Height, bool bIsFullscreen, EPixelFormat PreferredPixelFormat)
 {
 	ResizeVulkanSwapChain(Viewport, Width, Height, bIsFullscreen, PreferredPixelFormat);
 }
 
-void FVulkanRHI::RHISwapBuffers(FViewportRHIRef& Viewport)
+void FVulkanRHI::RHISwapBuffers(FRHIViewportRef& Viewport)
 {
 	PresentVulkanSwapChain(Viewport);
+}
+
+FRHITextureRef FVulkanRHI::GetRHIBackBuffer()
+{
+	return VulkanViewport->GetBackBuffer();
+}
+
+FRHIViewportRef FVulkanRHI::GetRHIViewport()
+{
+	return VulkanViewport;
 }
 
 // Render Pass and Draw Commands
@@ -770,6 +778,7 @@ void FVulkanRHI::CreateVulkanViewPort()
 	ViewportDesc.ViewportType = ERHIViewportType::Fullscreen;
 	ViewportDesc.Format = EPixelFormat::R8G8B8A8_UNorm;
 	ViewportDesc.NativeWindowHandle = glfwWindow.get();
+	ViewportDesc.bHeadlessRendering = false;
 	FVulkanMinimalContext Context{
 		VulkanInstance,
 		PhysicalDevice,
@@ -942,31 +951,26 @@ void FVulkanRHI::FlushVulkanResources()
 }
 
 // Vulkan-specific viewport and swap chain management
-void FVulkanRHI::CreateVulkanSwapChain(void* WindowHandle, TUINT32 Width, TUINT32 Height, bool bIsFullscreen, EPixelFormat PreferredPixelFormat, FViewportRHIRef& OutViewport)
+void FVulkanRHI::CreateVulkanSwapChain(void* WindowHandle, TUINT32 Width, TUINT32 Height, bool bIsFullscreen, EPixelFormat PreferredPixelFormat, FRHIViewportRef& OutViewport)
 {
 	// Implement swap chain creation
 }
 
-void FVulkanRHI::ResizeVulkanSwapChain(FViewportRHIRef& Viewport, TUINT32 Width, TUINT32 Height, bool bIsFullscreen, EPixelFormat PreferredPixelFormat)
+void FVulkanRHI::ResizeVulkanSwapChain(FRHIViewportRef& Viewport, TUINT32 Width, TUINT32 Height, bool bIsFullscreen, EPixelFormat PreferredPixelFormat)
 {
 	// Implement swap chain resizing
 }
 
-void FVulkanRHI::PresentVulkanSwapChain(FViewportRHIRef& Viewport)
+void FVulkanRHI::PresentVulkanSwapChain(FRHIViewportRef& Viewport)
 {
 	// Implement swap chain presentation
-}
-
-TNoNullablePtr<FVulkanBackBuffer> FVulkanRHI::GetBackBuffer()
-{
-	return VulkanViewport->GetBackBuffer().Get();
 }
 
 // Vulkan-specific render pass management
 void FVulkanRHI::BeginVulkanRenderPass(const FRHIRenderPassInfo& RenderPassInfo)
 {
 	// Implement render pass begin
-	VulkanRHI::CreateVulkanRenderPass(LogicalDevice, {RenderPassInfo});
+	VulkanRHI::CreateVulkanRenderPass(LogicalDevice, { RenderPassInfo });
 }
 
 void FVulkanRHI::EndVulkanRenderPass()
@@ -1037,7 +1041,7 @@ VkImageCreateInfo FVulkanRHI::GenerateVkImageCreateInfo(const FRHITextureCreateI
 	ImageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
 	ImageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 	ImageCreateInfo.usage = VulkanRHI::VulkanTextureUsageFlagsFromRHIUsageFlags(CreateInfo.Flags); // Helper function to convert RHI usage flags to Vulkan usage flags
-	ImageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;									// Assuming single sample for simplicity
+	ImageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;											   // Assuming single sample for simplicity
 	ImageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
 	return ImageCreateInfo;
@@ -1071,8 +1075,8 @@ VkImageViewCreateInfo FVulkanRHI::GenerateVkImageViewCreateInfo(const FRHIShader
 {
 	VkImageViewCreateInfo ImageViewCreateInfo = {};
 	ImageViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-	ImageViewCreateInfo.image = VK_NULL_HANDLE;								   // To be set later
-	ImageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;					   // Assuming 2D image view for simplicity
+	ImageViewCreateInfo.image = VK_NULL_HANDLE;											  // To be set later
+	ImageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;								  // Assuming 2D image view for simplicity
 	ImageViewCreateInfo.format = VulkanRHI::VulkanFormatFromRHIFormat(CreateInfo.Format); // Helper function to convert RHI format to Vulkan format
 	ImageViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 	ImageViewCreateInfo.subresourceRange.baseMipLevel = CreateInfo.MipLevel;
@@ -1088,7 +1092,7 @@ VkBufferViewCreateInfo FVulkanRHI::GenerateVkBufferViewCreateInfo(const FRHIUnor
 {
 	VkBufferViewCreateInfo BufferViewCreateInfo = {};
 	BufferViewCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_VIEW_CREATE_INFO;
-	BufferViewCreateInfo.buffer = VK_NULL_HANDLE;								// To be set later
+	BufferViewCreateInfo.buffer = VK_NULL_HANDLE;										   // To be set later
 	BufferViewCreateInfo.format = VulkanRHI::VulkanFormatFromRHIFormat(CreateInfo.Format); // Helper function to convert RHI format to Vulkan format
 	BufferViewCreateInfo.offset = 0;
 	BufferViewCreateInfo.range = VK_WHOLE_SIZE;
@@ -1135,7 +1139,7 @@ VkPipelineShaderStageCreateInfo FVulkanRHI::GenerateVkPipelineShaderStageCreateI
 	VkPipelineShaderStageCreateInfo ShaderStageCreateInfo = {};
 	ShaderStageCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 	ShaderStageCreateInfo.stage = VulkanRHI::VulkanShaderStageFromRHIStage(CreateInfo.Stage); // Convert RHI shader stage to Vulkan shader stage
-	ShaderStageCreateInfo.module = VK_NULL_HANDLE;								   // To be set later
+	ShaderStageCreateInfo.module = VK_NULL_HANDLE;											  // To be set later
 	ShaderStageCreateInfo.pName = TO_CHAR_CSTR(CreateInfo.EntryPoints[0].c_str());
 
 	return ShaderStageCreateInfo;

@@ -33,7 +33,7 @@ public:
 
 	// Resource Creation
 	virtual FRHITextureRef			   CreateTexture(const FRHITextureCreateInfo& CreateInfo) override;
-	virtual FBufferRHIRef			   CreateBuffer(const FRHIBufferCreateInfo& CreateInfo) override;
+	virtual FRHIBufferRef			   CreateBuffer(const FRHIBufferCreateInfo& CreateInfo) override;
 	virtual FShaderResourceViewRHIRef  CreateShaderResourceView(FRHITexture* Texture, const FRHIShaderResourceViewCreateInfo& CreateInfo) override;
 	virtual FUnorderedAccessViewRHIRef CreateUnorderedAccessView(FRHIBuffer* Buffer, const FRHIUnorderedAccessViewCreateInfo& CreateInfo) override;
 	virtual FVertexDeclarationRHIRef   CreateVertexDeclaration(const FVertexDeclarationElementList& Elements) override;
@@ -55,9 +55,11 @@ public:
 	virtual void RHIFlushResources() override;
 
 	// Viewport and Swap Chain
-	virtual void RHICreateViewport(void* WindowHandle, TUINT32 Width, TUINT32 Height, bool bIsFullscreen, EPixelFormat PreferredPixelFormat, FViewportRHIRef& OutViewport) override;
-	virtual void RHIResizeViewport(FViewportRHIRef& Viewport, TUINT32 Width, TUINT32 Height, bool bIsFullscreen, EPixelFormat PreferredPixelFormat) override;
-	virtual void RHISwapBuffers(FViewportRHIRef& Viewport) override;
+	virtual void RHICreateViewport(void* WindowHandle, TUINT32 Width, TUINT32 Height, bool bIsFullscreen, EPixelFormat PreferredPixelFormat, FRHIViewportRef& OutViewport) override;
+	virtual void RHIResizeViewport(FRHIViewportRef& Viewport, TUINT32 Width, TUINT32 Height, bool bIsFullscreen, EPixelFormat PreferredPixelFormat) override;
+	virtual void RHISwapBuffers(FRHIViewportRef& Viewport) override;
+	virtual FRHITextureRef GetRHIBackBuffer() override;
+	virtual FRHIViewportRef GetRHIViewport() override;
 
 	// Render Pass and Draw Commands
 	virtual void RHIBeginRenderPass(const FRHIRenderPassInfo& RenderPassInfo) override;
@@ -104,11 +106,9 @@ public:
 	void FlushVulkanResources() override;
 
 	// Vulkan-specific viewport and swap chain management
-	void CreateVulkanSwapChain(void* WindowHandle, TUINT32 Width, TUINT32 Height, bool bIsFullscreen, EPixelFormat PreferredPixelFormat, FViewportRHIRef& OutViewport) override;
-	void ResizeVulkanSwapChain(FViewportRHIRef& Viewport, TUINT32 Width, TUINT32 Height, bool bIsFullscreen, EPixelFormat PreferredPixelFormat) override;
-	void PresentVulkanSwapChain(FViewportRHIRef& Viewport) override;
-
-	TNoNullablePtr<FVulkanBackBuffer> GetBackBuffer() override;
+	void CreateVulkanSwapChain(void* WindowHandle, TUINT32 Width, TUINT32 Height, bool bIsFullscreen, EPixelFormat PreferredPixelFormat, FRHIViewportRef& OutViewport) override;
+	void ResizeVulkanSwapChain(FRHIViewportRef& Viewport, TUINT32 Width, TUINT32 Height, bool bIsFullscreen, EPixelFormat PreferredPixelFormat) override;
+	void PresentVulkanSwapChain(FRHIViewportRef& Viewport) override;
 
 	// Vulkan-specific render pass management
 	void BeginVulkanRenderPass(const FRHIRenderPassInfo& RenderPassInfo) override;
