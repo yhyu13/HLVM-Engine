@@ -28,3 +28,14 @@ namespace VulkanRHI
 		return RenderPass;
 	}
 } // namespace VulkanRHI
+
+FVulkanRenderPass::FVulkanRenderPass(FVulkanLogicalDeviceRef InDevice, const FVulkanRenderTargetLayout& InRTLayout)
+	: Device(InDevice), Layout(InRTLayout)
+{
+	RenderPass = VulkanRHI::CreateVulkanRenderPass(Device, Layout);
+}
+
+FVulkanRenderPass::~FVulkanRenderPass()
+{
+	VulkanRHI::vkDestroyRenderPass(Device->GetHandle(), RenderPass, VulkanRHI::VULKAN_CPU_ALLOCATOR);
+}

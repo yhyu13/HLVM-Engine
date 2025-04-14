@@ -392,6 +392,8 @@ void FVulkanRHI::Shutdown()
 	LogicalDevice.Reset();
 	PhysicalDevice.Reset();
 
+	PendingDestroyRenderPass.Empty();
+
 	// TODO : desotry every vulkan handle
 	VulkanRHI::vkDeviceWaitIdle(VulkanDevice);
 
@@ -969,13 +971,15 @@ void FVulkanRHI::PresentVulkanSwapChain(FRHIViewportRef& Viewport)
 // Vulkan-specific render pass management
 void FVulkanRHI::BeginVulkanRenderPass(const FRHIRenderPassInfo& RenderPassInfo)
 {
-	// Implement render pass begin
-	VulkanRHI::CreateVulkanRenderPass(LogicalDevice, { RenderPassInfo });
+	HLVM_ASSERT(ActiveRenderPass == nullptr);
+	ActiveRenderPass = new FVulkanRenderPass(LogicalDevice, {RenderPassInfo});
 }
 
 void FVulkanRHI::EndVulkanRenderPass()
 {
-	// Implement render pass end
+	HLVM_ASSERT(ActiveRenderPass != nullptr);
+    PendingDestroyRenderPass.Add(ActiveRenderPass);
+    ActiveRenderPass = nullptr;
 }
 
 // Vulkan-specific query and timestamp management
@@ -1036,12 +1040,11 @@ VkImageCreateInfo FVulkanRHI::GenerateVkImageCreateInfo(const FRHITextureCreateI
 	ImageCreateInfo.extent.height = CreateInfo.Dimensions.y;
 	ImageCreateInfo.extent.depth = CreateInfo.Dimensions.z;
 	ImageCreateInfo.mipLevels = CreateInfo.NumMips;
-	ImageCreateInfo.arrayLayers = CreateInfo.NumSamples;
+	ImageCreateInfo.samples = S_C(VkSampleCountFlagBits, CreateInfo.NumSamples);
 	ImageCreateInfo.format = VulkanRHI::VulkanFormatFromRHIFormat(CreateInfo.Format); // Helper function to convert RHI format to Vulkan format
 	ImageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
 	ImageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 	ImageCreateInfo.usage = VulkanRHI::VulkanTextureUsageFlagsFromRHIUsageFlags(CreateInfo.Flags); // Helper function to convert RHI usage flags to Vulkan usage flags
-	ImageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;											   // Assuming single sample for simplicity
 	ImageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
 	return ImageCreateInfo;

@@ -1307,6 +1307,10 @@ RECORD_BOOL(test_GLFW3VulkanWindow)
 		FRHITextureRef BackBuffer = VulkanRHI->GetRHIBackBuffer();
 		{
 			VulkanRHI->RHIBeginRenderPass(FRHIRenderPassInfo{ BackBuffer, ERenderTargetActions::Clear_Store });
+			{
+
+			}
+			VulkanRHI->RHIEndRenderPass();
 		}
 	}
 	VulkanRHI->Shutdown();

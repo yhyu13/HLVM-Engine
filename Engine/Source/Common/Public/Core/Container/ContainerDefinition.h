@@ -75,6 +75,11 @@ public:
 		return S_C(TUINT32, this->size());
 	}
 
+	TSIZE Size() const
+	{
+		return this->size();
+	}
+
 	T* GetData() const
 	{
 		return C_C(T*, this->data());
@@ -109,6 +114,23 @@ public:
 		std::iter_swap(this->begin() + Index1, this->begin() + Index2);
 	}
 
+	void Empty(TSIZE NewSize = 0)
+	{
+		this->clear();
+		this->resize(NewSize);
+	}
+
+	void Reset(TSIZE NewSize = 0)
+	{
+		TSIZE ReserveSize = this->size();
+		if (NewSize != 0)
+		{
+			ReserveSize = NewSize;
+		}
+		this->clear();
+		this->reserve(ReserveSize);
+	}
+
 	operator TVectorView<T>() const
 	{
 		return TVectorView<T>(this->data(), this->size());
@@ -126,6 +148,11 @@ public:
 	{
 		HLVM_ASSERT(this->size() <= S_C(size_t, TUINT32_MAX));
 		return S_C(TUINT32, this->size());
+	}
+
+	TSIZE Size() const
+	{
+		return this->size();
 	}
 
 	T* GetData() const

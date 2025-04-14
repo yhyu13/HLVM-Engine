@@ -27,10 +27,10 @@ FVulkanTexture::~FVulkanTexture()
 	if (OwnerShip == EOwnerShip::Owner)
 	{
 		GetDynamicRHI<IVulkanDynamicRHI>()->DestroyVulkanImage(Image);
-		HLVM_LOG(LogVulkanRHI, trace, TXT("Destroy Texture %s"), *GetName());
+		HLVM_LOG(LogVulkanRHI, trace, TXT("Destroy Texture {}"), *GetName());
 	}
 	else
 	{
-		HLVM_LOG(LogVulkanRHI, trace, TXT("No Destroy Texture %s since not owned"), *GetName());
+		HLVM_LOG(LogVulkanRHI, trace, TXT("No Destroy Texture {} since not owned"), *GetName());
 	}
 }

@@ -238,6 +238,10 @@ FVulkanSwapChain::ESurfaceStatus FVulkanSwapChain::AcquireNextImageIndex(TUINT32
 	VkSemaphore imageAcquiredSemaphore = imageAcquiredSemaphores[currentSyncObjectIndex]->GetHandle();
 #if VULKAN_SWAPCHAIN_USE_IMAGE_FENCE
 	VkFence imageAcquiredFence = imageAcquiredFences[currentSyncObjectIndex]->GetHandle();
+	if (imageAcquiredFence != VK_NULL_HANDLE)
+	{
+		imageAcquiredFences[currentSyncObjectIndex]->Reset();
+	}
 #else
 	VkFence imageAcquiredFence = VK_NULL_HANDLE;
 #endif

@@ -21,6 +21,7 @@ enum class ERHIResourceType : TUINT8
 	Query,
 	VertexDeclaration,
 	Viewport,
+	RenderPass
 	// Add other resource types as needed
 };
 
@@ -224,6 +225,13 @@ protected:
 	FRHIViewportCreateInfo CreateInfo; // Viewport creation description
 };
 
+class FRHIRenderPass : virtual public IRHIResource
+{
+public:
+	// Returns the type of the RHI resource
+	virtual ERHIResourceType GetType() const override { return ERHIResourceType::RenderPass; }
+};
+
 // Smart pointer types for RHI resources
 using FRHIBufferRef = TRefCountPtr<FRHIBuffer>;
 using FShaderRHIRef = TRefCountPtr<FRHIShader>;
@@ -234,5 +242,6 @@ using FGraphicsPipelineStateRHIRef = TRefCountPtr<FRHIGraphicsPipelineState>;
 using FComputePipelineStateRHIRef = TRefCountPtr<FRHIComputePipelineState>;
 using FQueryRHIRef = TRefCountPtr<FRHIQuery>;
 using FRHIViewportRef = TRefCountPtr<FRHIViewport>;
+using FRHIRenderPassRef = TRefCountPtr<FRHIRenderPass>;
 
 #undef DECLARE_RHI_RESOURCE

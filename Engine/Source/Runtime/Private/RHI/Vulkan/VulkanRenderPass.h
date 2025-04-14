@@ -8,34 +8,33 @@
 #include "RHI/RHIResource.h"
 #include "VulkanRHIResourcePre.h"
 
-class FVulkanRenderPass
+class FVulkanRenderPass : public FRHIRenderPass, public FVulkanResource
 {
 public:
-	inline const FVulkanRenderTargetLayout& GetLayout() const
+	FVulkanRenderPass(FVulkanLogicalDeviceRef Device, const FVulkanRenderTargetLayout& RTLayout);
+	~FVulkanRenderPass() override;
+
+	HLVM_INLINE_FUNC const FVulkanRenderTargetLayout& GetLayout() const
 	{
 		return Layout;
 	}
 
-	inline VkRenderPass GetHandle() const
+	HLVM_INLINE_FUNC VkRenderPass GetHandle() const
 	{
 		return RenderPass;
 	}
 
-	inline TUINT32 GetNumUsedClearValues() const
+	HLVM_INLINE_FUNC TUINT32 GetNumUsedClearValues() const
 	{
-		return NumUsedClearValues;
+		return Layout.GetNumUsedClearValues();
 	}
 
 private:
-	FVulkanRenderPass(FVulkanLogicalDeviceRef Device, const FVulkanRenderTargetLayout& RTLayout);
-	~FVulkanRenderPass();
-
-private:
+	FVulkanLogicalDeviceRef	  Device;
 	FVulkanRenderTargetLayout Layout;
 	VkRenderPass			  RenderPass;
-	TUINT32					  NumUsedClearValues;
-	FVulkanLogicalDeviceRef	  Device;
 };
+using FVulkanRenderPassRef = TRefCountPtr<FVulkanRenderPass>;
 
 template <typename TAttachmentReferenceType>
 struct FVulkanAttachmentReference : public TAttachmentReferenceType
@@ -50,32 +49,22 @@ struct FVulkanAttachmentReference : public TAttachmentReferenceType
 		SetAttachment(AttachmentReferenceIn, AspectMask);
 	}
 
-	inline void SetAttachment(const VkAttachmentReference& /*AttachmentReferenceIn*/, VkImageAspectFlags /*AspectMask*/) { HLVM_NOT_IMPLEMENTED(); }
-	inline void SetAttachment(const FVulkanAttachmentReference<TAttachmentReferenceType>& AttachmentReferenceIn, VkImageAspectFlags /*AspectMask*/) { *this = AttachmentReferenceIn; }
-	inline void SetDepthStencilAttachment(const VkAttachmentReference& /*AttachmentReferenceIn*/, const VkAttachmentReferenceStencilLayout* /*StencilReference*/, VkImageAspectFlags /*AspectMask*/, bool /*bSupportsParallelRendering*/) { HLVM_NOT_IMPLEMENTED(); }
-	inline void ZeroStruct() {}
-	inline void SetAspect(TUINT32 /*Aspect*/) {}
+	HLVM_INLINE_FUNC void SetAttachment(const VkAttachmentReference& /*AttachmentReferenceIn*/, VkImageAspectFlags /*AspectMask*/) { HLVM_NOT_IMPLEMENTED(); }
+	HLVM_INLINE_FUNC void SetAttachment(const FVulkanAttachmentReference<TAttachmentReferenceType>& AttachmentReferenceIn, VkImageAspectFlags /*AspectMask*/) { *this = AttachmentReferenceIn; }
+	HLVM_INLINE_FUNC void SetDepthStencilAttachment(const VkAttachmentReference& /*AttachmentReferenceIn*/, const VkAttachmentReferenceStencilLayout* /*StencilReference*/, VkImageAspectFlags /*AspectMask*/, bool /*bSupportsParallelRendering*/) { HLVM_NOT_IMPLEMENTED(); }
+	HLVM_INLINE_FUNC void ZeroStruct() {}
+	HLVM_INLINE_FUNC void SetAspect(TUINT32 /*Aspect*/) {}
 };
 
 template <>
-inline void FVulkanAttachmentReference<VkAttachmentReference>::SetAttachment(const VkAttachmentReference& AttachmentReferenceIn, VkImageAspectFlags /*AspectMask*/)
+HLVM_INLINE_FUNC void FVulkanAttachmentReference<VkAttachmentReference>::SetAttachment(const VkAttachmentReference& AttachmentReferenceIn, VkImageAspectFlags /*AspectMask*/)
 {
 	attachment = AttachmentReferenceIn.attachment;
 	layout = AttachmentReferenceIn.layout;
 }
 
 template <>
-inline void FVulkanAttachmentReference<VkAttachmentReference2>::SetAttachment(const VkAttachmentReference& AttachmentReferenceIn, VkImageAspectFlags AspectMask)
-{
-	sType = VK_STRUCTURE_TYPE_ATTACHMENT_REFERENCE_2;
-	pNext = nullptr;
-	attachment = AttachmentReferenceIn.attachment;
-	layout = AttachmentReferenceIn.layout;
-	aspectMask = AspectMask;
-}
-
-template <>
-inline void FVulkanAttachmentReference<VkAttachmentReference2>::SetAttachment(const FVulkanAttachmentReference<VkAttachmentReference2>& AttachmentReferenceIn, VkImageAspectFlags AspectMask)
+HLVM_INLINE_FUNC void FVulkanAttachmentReference<VkAttachmentReference2>::SetAttachment(const VkAttachmentReference& AttachmentReferenceIn, VkImageAspectFlags AspectMask)
 {
 	sType = VK_STRUCTURE_TYPE_ATTACHMENT_REFERENCE_2;
 	pNext = nullptr;
@@ -85,8 +74,18 @@ inline void FVulkanAttachmentReference<VkAttachmentReference2>::SetAttachment(co
 }
 
 template <>
-inline void FVulkanAttachmentReference<VkAttachmentReference>::SetDepthStencilAttachment(const VkAttachmentReference& AttachmentReferenceIn,
-	const VkAttachmentReferenceStencilLayout*																		  StencilReference, VkImageAspectFlags /*AspectMask*/, bool /*bSupportsParallelRendering*/)
+HLVM_INLINE_FUNC void FVulkanAttachmentReference<VkAttachmentReference2>::SetAttachment(const FVulkanAttachmentReference<VkAttachmentReference2>& AttachmentReferenceIn, VkImageAspectFlags AspectMask)
+{
+	sType = VK_STRUCTURE_TYPE_ATTACHMENT_REFERENCE_2;
+	pNext = nullptr;
+	attachment = AttachmentReferenceIn.attachment;
+	layout = AttachmentReferenceIn.layout;
+	aspectMask = AspectMask;
+}
+
+template <>
+HLVM_INLINE_FUNC void FVulkanAttachmentReference<VkAttachmentReference>::SetDepthStencilAttachment(const VkAttachmentReference& AttachmentReferenceIn,
+	const VkAttachmentReferenceStencilLayout*																					StencilReference, VkImageAspectFlags /*AspectMask*/, bool /*bSupportsParallelRendering*/)
 {
 	attachment = AttachmentReferenceIn.attachment;
 	const VkImageLayout StencilLayout = StencilReference ? StencilReference->stencilLayout : VK_IMAGE_LAYOUT_UNDEFINED;
@@ -94,7 +93,7 @@ inline void FVulkanAttachmentReference<VkAttachmentReference>::SetDepthStencilAt
 }
 
 template <>
-inline void FVulkanAttachmentReference<VkAttachmentReference2>::SetDepthStencilAttachment(const VkAttachmentReference& AttachmentReferenceIn,
+HLVM_INLINE_FUNC void FVulkanAttachmentReference<VkAttachmentReference2>::SetDepthStencilAttachment(const VkAttachmentReference& AttachmentReferenceIn,
 	const VkAttachmentReferenceStencilLayout* StencilReference, VkImageAspectFlags AspectMask, bool bSupportsParallelRendering)
 {
 	sType = VK_STRUCTURE_TYPE_ATTACHMENT_REFERENCE_2;
@@ -105,14 +104,14 @@ inline void FVulkanAttachmentReference<VkAttachmentReference2>::SetDepthStencilA
 }
 
 template <>
-inline void FVulkanAttachmentReference<VkAttachmentReference>::ZeroStruct()
+HLVM_INLINE_FUNC void FVulkanAttachmentReference<VkAttachmentReference>::ZeroStruct()
 {
 	attachment = 0;
 	layout = VK_IMAGE_LAYOUT_UNDEFINED;
 }
 
 template <>
-inline void FVulkanAttachmentReference<VkAttachmentReference2>::ZeroStruct()
+HLVM_INLINE_FUNC void FVulkanAttachmentReference<VkAttachmentReference2>::ZeroStruct()
 {
 	sType = VK_STRUCTURE_TYPE_ATTACHMENT_REFERENCE_2;
 	pNext = nullptr;
@@ -122,7 +121,7 @@ inline void FVulkanAttachmentReference<VkAttachmentReference2>::ZeroStruct()
 }
 
 template <>
-inline void FVulkanAttachmentReference<VkAttachmentReference2>::SetAspect(TUINT32 Aspect)
+HLVM_INLINE_FUNC void FVulkanAttachmentReference<VkAttachmentReference2>::SetAspect(TUINT32 Aspect)
 {
 	aspectMask = Aspect;
 }
@@ -508,7 +507,7 @@ public:
 			NumColorAttachments--;
 		}
 
-		TUINT32		   DepthInputAttachment = VK_ATTACHMENT_UNUSED;
+		TUINT32			   DepthInputAttachment = VK_ATTACHMENT_UNUSED;
 		VkImageLayout	   DepthInputAttachmentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 		VkImageAspectFlags DepthInputAspectMask = 0;
 		if (bHasDepthStencilAttachmentReference)
@@ -774,11 +773,11 @@ public:
 		*/
 		CorrelationMask = MultiviewMask;
 
-		//if (RTLayout.GetIsMultiView())
+		// if (RTLayout.GetIsMultiView())
 		if (0)
 		{
 			// TODO
-			//if (Device.GetOptionalExtensions().HasKHRRenderPass2)
+			// if (Device.GetOptionalExtensions().HasKHRRenderPass2)
 			if (0)
 			{
 				CreateInfo.SetCorrelationMask(&CorrelationMask);
@@ -786,7 +785,7 @@ public:
 			else
 			{
 				// TODO
-				//checkf(Device.GetOptionalExtensions().HasKHRMultiview, TEXT("Layout is multiview but extension is not supported!"));
+				// checkf(Device.GetOptionalExtensions().HasKHRMultiview, TEXT("Layout is multiview but extension is not supported!"));
 				MultiviewInfo.subpassCount = NumSubpasses;
 				MultiviewInfo.pViewMasks = ViewMask;
 				MultiviewInfo.dependencyCount = 0;
@@ -800,7 +799,7 @@ public:
 		}
 
 		// TODO
-		//if (Device.GetOptionalExtensions().HasEXTFragmentDensityMap && RTLayout.GetHasFragmentDensityAttachment())
+		// if (Device.GetOptionalExtensions().HasEXTFragmentDensityMap && RTLayout.GetHasFragmentDensityAttachment())
 		if (0)
 		{
 			FragDensityCreateInfo.fragmentDensityMapAttachment = *RTLayout.GetFragmentDensityAttachmentReference();
@@ -812,11 +811,9 @@ public:
 		}
 	}
 
-	VkRenderPass Create(const FVulkanRenderTargetLayout& /*RTLayout*/)
+	VkRenderPass Create(const FVulkanRenderTargetLayout& RTLayout)
 	{
-		//TODO
-
-		//BuildCreateInfo(RTLayout);
+		BuildCreateInfo(RTLayout);
 		return CreateInfo.Create(Device);
 	}
 
@@ -870,9 +867,9 @@ namespace VulkanRHI
 }
 
 // TODO
-//class FVulkanRenderPassManager : public FVulkanMinimalContext
+// class FVulkanRenderPassManager : public FVulkanMinimalContext
 //{
-//public:
+// public:
 //	FVulkanRenderPassManager(FVulkanLogicalDeviceRef InDevice)
 //		: VulkanRHI::FDeviceChild(InDevice) {}
 //	~FVulkanRenderPassManager();
@@ -913,7 +910,7 @@ namespace VulkanRHI
 //
 //	void NotifyDeletedRenderTarget(VkImage Image);
 //
-//private:
+// private:
 //	TMap<TUINT32, FVulkanRenderPass*> RenderPasses;
 //
 //	struct FFramebufferList

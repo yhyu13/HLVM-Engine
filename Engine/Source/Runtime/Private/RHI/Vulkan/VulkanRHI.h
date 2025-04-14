@@ -189,4 +189,7 @@ private:
 	FVulkanPhysicalDeviceRef PhysicalDevice;
 	FVulkanLogicalDeviceRef	 LogicalDevice;
 	FVulkanViewportRef		 VulkanViewport;
+
+	FVulkanRenderPassRef ActiveRenderPass;
+	TVector<FVulkanRenderPassRef> PendingDestroyRenderPass;
 };
