@@ -113,12 +113,12 @@ struct FRHIUnorderedAccessViewCreateInfo : public IRHICreateInfo
 struct FShaderCreateInfo : public IRHICreateInfo
 {
 	EShaderStage	 Stage;		  // Shader stage (e.g., vertex, pixel, compute)
-	TVector<TUINT8>	 Code;		  // Shader bytecode
+	TVector<TBYTE>	 Code;		  // Shader bytecode
 	TVector<FString> EntryPoints; // Entry points for the shader
 
 	FShaderCreateInfo() = default;
 	// Constructor for easy initialization
-	FShaderCreateInfo(const FString& InDebugName, EShaderStage InStage, const TVector<TUINT8>& InCode, const TVector<FString>& InEntryPoints = { "Main" })
+	FShaderCreateInfo(const FString& InDebugName, EShaderStage InStage, const TVector<TBYTE>& InCode, const TVector<FString>& InEntryPoints = { "Main" })
 		: IRHICreateInfo(InDebugName)
 		, Stage(InStage)
 		, Code(InCode)

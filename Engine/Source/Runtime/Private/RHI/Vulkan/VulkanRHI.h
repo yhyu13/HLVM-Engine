@@ -39,8 +39,7 @@ public:
 	virtual FVertexDeclarationRHIRef   CreateVertexDeclaration(const FVertexDeclarationElementList& Elements) override;
 
 	// Shader Management
-	virtual FShaderRHIRef CreateShader(const FShaderCreateInfo& CreateInfo) override;
-	virtual void		  ReleaseShader(FShaderRHIRef& Shader) override;
+	virtual FRHIShaderRef CreateShader(const FShaderCreateInfo& CreateInfo) override;
 
 	// Pipeline State Management
 	virtual FRHIGraphicsPipelineState* CreateGraphicsPipelineState(const FGraphicsPipelineStateInitializer& Initializer) override;
@@ -96,6 +95,9 @@ public:
 	void		 DestroyVulkanBuffer(VkBuffer Buffer, void** InAllocation) override;
 	VkImageView	 CreateVulkanImageView(VkImage Image, const FRHIShaderResourceViewCreateInfo& CreateInfo) override;
 	VkBufferView CreateVulkanBufferView(VkBuffer Buffer, const FRHIUnorderedAccessViewCreateInfo& CreateInfo) override;
+
+	VkShaderModule CreateVulkanShaderModule(const FShaderCreateInfo& CreateInfo) override;
+	void DestroyVulkanShaderModule(VkShaderModule ShaderModule) override;
 
 	// Vulkan-specific command list management
 	VkCommandBuffer BeginVulkanCommandBuffer() override;

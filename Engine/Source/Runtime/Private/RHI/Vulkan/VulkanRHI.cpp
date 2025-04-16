@@ -388,13 +388,13 @@ void FVulkanRHI::Init()
 
 void FVulkanRHI::Shutdown()
 {
-	VulkanViewport.Reset();
-	LogicalDevice.Reset();
-	PhysicalDevice.Reset();
+	// TODO : desotry every vulkan handle
+	VulkanViewport = nullptr;
+	LogicalDevice = nullptr;
+	PhysicalDevice = nullptr;
 
 	PendingDestroyRenderPass.Empty();
 
-	// TODO : desotry every vulkan handle
 	VulkanRHI::vkDeviceWaitIdle(VulkanDevice);
 
 	// Cleanup Vulkan resources
@@ -444,18 +444,9 @@ FVertexDeclarationRHIRef FVulkanRHI::CreateVertexDeclaration(const FVertexDeclar
 }
 
 // Shader Management
-FShaderRHIRef FVulkanRHI::CreateShader(const FShaderCreateInfo& CreateInfo)
+FRHIShaderRef FVulkanRHI::CreateShader(const FShaderCreateInfo& CreateInfo)
 {
-	return nullptr;
-	//	VkShaderModule ShaderModule = CreateVulkanShaderModule(CreateInfo);
-	//	return new FVulkanShader(ShaderModule, CreateInfo.Stage);
-}
-
-void FVulkanRHI::ReleaseShader(FShaderRHIRef& Shader)
-{
-	//	FVulkanShader* VulkanShader = static_cast<FVulkanShader*>(Shader.GetReference());
-	//	VulkanRHI::vkDestroyShaderModule(VulkanDevice, VulkanShader->GetShaderModule(), nullptr);
-	//	Shader.SafeRelease();
+	return new FVulkanShader(CreateInfo);
 }
 
 // Pipeline State Management
@@ -904,6 +895,26 @@ VkBufferView FVulkanRHI::CreateVulkanBufferView(VkBuffer Buffer, const FRHIUnord
 	return BufferView;
 }
 
+VkShaderModule FVulkanRHI::CreateVulkanShaderModule(const FShaderCreateInfo& CreateInfo)
+{
+	const TVector<TBYTE>& code = CreateInfo.Code;
+
+	VkShaderModuleCreateInfo createInfo{};
+	createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+	createInfo.codeSize = code.size();
+	createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
+
+	VkShaderModule shaderModule = VK_NULL_HANDLE;
+	VULKAN_ENSURE(VulkanRHI::vkCreateShaderModule(VulkanDevice, &createInfo, VulkanRHI::VULKAN_CPU_ALLOCATOR, &shaderModule));
+	return shaderModule;
+}
+
+void FVulkanRHI::DestroyVulkanShaderModule(VkShaderModule ShaderModule)
+{
+	HLVM_ASSERT(ShaderModule != VK_NULL_HANDLE);
+	VulkanRHI::vkDestroyShaderModule(VulkanDevice, ShaderModule, VulkanRHI::VULKAN_CPU_ALLOCATOR);
+}
+
 // Vulkan-specific command list management
 VkCommandBuffer FVulkanRHI::BeginVulkanCommandBuffer()
 {
@@ -972,14 +983,14 @@ void FVulkanRHI::PresentVulkanSwapChain(FRHIViewportRef& Viewport)
 void FVulkanRHI::BeginVulkanRenderPass(const FRHIRenderPassInfo& RenderPassInfo)
 {
 	HLVM_ASSERT(ActiveRenderPass == nullptr);
-	ActiveRenderPass = new FVulkanRenderPass(LogicalDevice, {RenderPassInfo});
+	ActiveRenderPass = new FVulkanRenderPass(LogicalDevice, { RenderPassInfo });
 }
 
 void FVulkanRHI::EndVulkanRenderPass()
 {
 	HLVM_ASSERT(ActiveRenderPass != nullptr);
-    PendingDestroyRenderPass.Add(ActiveRenderPass);
-    ActiveRenderPass = nullptr;
+	PendingDestroyRenderPass.Add(ActiveRenderPass);
+	ActiveRenderPass = nullptr;
 }
 
 // Vulkan-specific query and timestamp management

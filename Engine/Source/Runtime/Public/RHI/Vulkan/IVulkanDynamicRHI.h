@@ -28,6 +28,9 @@ public:
 	HLVM_NODISCARD virtual VkImageView CreateVulkanImageView(VkImage Image, const FRHIShaderResourceViewCreateInfo& CreateInfo) = 0;
 	HLVM_NODISCARD virtual VkBufferView CreateVulkanBufferView(VkBuffer Buffer, const FRHIUnorderedAccessViewCreateInfo& CreateInfo) = 0;
 
+	HLVM_NODISCARD virtual VkShaderModule CreateVulkanShaderModule(const FShaderCreateInfo& CreateInfo) = 0;
+	virtual void DestroyVulkanShaderModule(VkShaderModule ShaderModule) = 0;
+
 	// Vulkan-specific command list management
 	HLVM_NODISCARD virtual VkCommandBuffer BeginVulkanCommandBuffer() = 0;
 	virtual void EndVulkanCommandBuffer(VkCommandBuffer CommandBuffer) = 0;

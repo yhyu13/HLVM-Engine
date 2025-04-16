@@ -11,13 +11,8 @@
 class FVulkanShader : public FRHIShader, public FVulkanResource
 {
 public:
-	FVulkanShader(VkShaderModule InShaderModule, const FShaderCreateInfo& InCreateInfo)
-		: FRHIShader(InCreateInfo), ShaderModule(InShaderModule)
-	{
-	}
-
-	// Returns the shader stage (e.g., vertex, pixel, compute)
-	virtual EShaderStage GetStage() const override { return CreateInfo.Stage; }
+	FVulkanShader(const FShaderCreateInfo& InCreateInfo);
+	~FVulkanShader() override;
 
 	// Returns the Vulkan shader module handle
 	VkShaderModule GetShaderModule() const { return ShaderModule; }

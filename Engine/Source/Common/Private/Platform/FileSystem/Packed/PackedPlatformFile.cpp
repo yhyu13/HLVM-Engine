@@ -15,7 +15,7 @@ void FPackedPlatformFile::_Init()
 	HLVM_LOG(LogPackedPlatformFile, debug, TXT("Init FPackedPlatformFile"));
 }
 
-FPackedPlatformFile* FPackedPlatformFile::Get()
+TNoNullablePtr<FPackedPlatformFile> FPackedPlatformFile::Get()
 {
 	return &SPackedPlatformFile;
 }
@@ -149,4 +149,16 @@ FPackedEntryQuickFind FPackedPlatformFile::QuickFindPackedEntry(const FPath& pat
 
 	HLVM_ENSURE_F(false, TXT("Fail to find content from packed file : {}"), *path);
 	return {};
+}
+
+FString FPackedPlatformFile::ReadFile(const FPath& /*path*/)
+{
+	// TODO
+	return FString();
+}
+
+TVector<TBYTE> FPackedPlatformFile::ReadContent(const FPath& /*path*/)
+{
+	// TODO
+	return TVector<TBYTE>();
 }

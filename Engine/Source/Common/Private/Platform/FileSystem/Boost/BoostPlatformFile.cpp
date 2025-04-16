@@ -19,22 +19,22 @@ void FBoostPlatformFile::_Init()
 	HLVM_LOG(LogBoostPlatformFile, debug, TXT("Init FBoostPlatformFile"));
 }
 
-FBoostPlatformFile* FBoostPlatformFile::Get()
+TNoNullablePtr<FBoostPlatformFile> FBoostPlatformFile::Get()
 {
 	return &SBoostPlatformFile;
 }
 
 bool FBoostPlatformFile::IsDirectory(const FPath& path)
 {
-	std::shared_ptr<FBoostFileStat> _Stat = SP_C(FBoostFileStat, mFileHandle.Stat(path));
-	HLVM_ASSERT_F(mFileHandle, TXT("FBoostPlatformFile::IsDirectory() - Failed to stat file"));
+	std::shared_ptr<FBoostFileStat> _Stat = SP_C(FBoostFileStat, mDummyFileHandle.Stat(path));
+	HLVM_ASSERT_F(mDummyFileHandle, TXT("FBoostPlatformFile::IsDirectory() - Failed to stat file"));
 	return _Stat->IsDirectory();
 }
 
 bool FBoostPlatformFile::Exists(const FPath& path)
 {
-	std::shared_ptr<FBoostFileStat> _Stat = SP_C(FBoostFileStat, mFileHandle.Stat(path));
-	HLVM_ASSERT_F(mFileHandle, TXT("FBoostPlatformFile::Exists() - Failed to stat file"));
+	std::shared_ptr<FBoostFileStat> _Stat = SP_C(FBoostFileStat, mDummyFileHandle.Stat(path));
+	HLVM_ASSERT_F(mDummyFileHandle, TXT("FBoostPlatformFile::Exists() - Failed to stat file"));
 	return _Stat->Exists();
 }
 
@@ -72,4 +72,67 @@ TSmallVector32<FPath> FBoostPlatformFile::Glob(const FPath& root_dir, const FStr
 	}
 
 	return Result;
+}
+
+FString FBoostPlatformFile::ReadFile(const FPath& path)
+{
+	FBoostMapFileHandle mFileHandle;
+	if (mFileHandle.Open(path).IsOpen())
+	{
+		TINT64 size;
+		mFileHandle.Seek(0, EWhence::End)
+			.Tell(size)
+			.Seek(0, EWhence::Begin);
+		if (size > 0)
+		{
+			TSIZE		   size2 = static_cast<TSIZE>(size);
+			TVector<TBYTE> Result;
+			Result.resize(size2 + 1);
+			mFileHandle.Read(Result.GetData(), size2);
+			// Add null terminator
+			if (*Result.LastData() != TBYTE{ 0 })
+			{
+				Result[Result.Size()] = TBYTE{ 0 };
+			}
+			return FString{ TO_TCHAR_CSTR(Result.GetData()) };
+		}
+		else
+		{
+			HLVM_LOG(LogBoostPlatformFile, err, TXT("FBoostPlatformFile::ReadFile : {} is empty"), *path);
+		}
+	}
+	else
+	{
+		HLVM_LOG(LogBoostPlatformFile, err, TXT("FBoostPlatformFile::ReadFile : Failed to open file {}"), *path);
+	}
+	return FString();
+}
+
+TVector<TBYTE> FBoostPlatformFile::ReadContent(const FPath& path)
+{
+	FBoostMapFileHandle mFileHandle;
+	if (mFileHandle.Open(path).IsOpen())
+	{
+		TINT64 size;
+		mFileHandle.Seek(0, EWhence::End)
+			.Tell(size)
+			.Seek(0, EWhence::Begin);
+		if (size > 0)
+		{
+			TSIZE		   size2 = static_cast<TSIZE>(size);
+			TVector<TBYTE> Result;
+			Result.resize(size2);
+			mFileHandle.Read(Result.GetData(), size2);
+			return MoveTemp(Result);
+		}
+		else
+		{
+			HLVM_LOG(LogBoostPlatformFile, err, TXT("FBoostPlatformFile::ReadContent : {} is empty"), *path);
+		}
+	}
+	else
+	{
+		HLVM_LOG(LogBoostPlatformFile, err, TXT("FBoostPlatformFile::ReadContent : Failed to open file {}"), *path);
+	}
+	return TVector<TBYTE>();
 }

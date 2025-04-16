@@ -1308,7 +1308,33 @@ RECORD_BOOL(test_GLFW3VulkanWindow)
 		{
 			VulkanRHI->RHIBeginRenderPass(FRHIRenderPassInfo{ BackBuffer, ERenderTargetActions::Clear_Store });
 			{
+				const auto DataDir = FString::Format(TXT("{}/../../Test/{}_Data"), *GExecutablePath, *GExecutableName);
+				const bool bDataDirExist = FGenericPlatformFile::Get(EPlatformFileType::Disk)->Exists(DataDir);
+				HLVM_ENSURE_F(bDataDirExist, TXT("Data directory not exist {}"), *DataDir);
 
+				auto vertShaderCode = FGenericPlatformFile::Get()->ReadContent(FPath::Combine(DataDir, TXT("vert.spv")));
+				FShaderCreateInfo vertShaderCreateInfo;
+				vertShaderCreateInfo.DebugName = TXT("vert.spv");
+				vertShaderCreateInfo.Code = MoveTemp(vertShaderCode);
+				vertShaderCreateInfo.Stage = EShaderStage::Vertex;
+				vertShaderCreateInfo.EntryPoints = {TXT("main")};
+				FRHIShaderRef VertShader = VulkanRHI->CreateShader(vertShaderCreateInfo);
+
+				auto fragShaderCode = FGenericPlatformFile::Get()->ReadContent(FPath::Combine(DataDir, TXT("frag.spv")));
+				FShaderCreateInfo fragShaderCreateInfo;
+				fragShaderCreateInfo.DebugName = TXT("frag.spv");
+				fragShaderCreateInfo.Code = MoveTemp(fragShaderCode);
+				fragShaderCreateInfo.Stage = EShaderStage::Pixel;
+				fragShaderCreateInfo.EntryPoints = {TXT("main")};
+				FRHIShaderRef FragShader = VulkanRHI->CreateShader(fragShaderCreateInfo);
+
+				auto geomShaderCode = FGenericPlatformFile::Get()->ReadContent(FPath::Combine(DataDir, TXT("geom.spv")));
+				FShaderCreateInfo geomShaderCreateInfo;
+				geomShaderCreateInfo.DebugName = TXT("gemo.spv");
+				geomShaderCreateInfo.Code = MoveTemp(geomShaderCode);
+				geomShaderCreateInfo.Stage = EShaderStage::Pixel;
+				geomShaderCreateInfo.EntryPoints = {TXT("main")};
+				FRHIShaderRef GeomShader = VulkanRHI->CreateShader(geomShaderCreateInfo);
 			}
 			VulkanRHI->RHIEndRenderPass();
 		}

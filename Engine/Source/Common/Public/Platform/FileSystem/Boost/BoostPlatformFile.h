@@ -21,12 +21,14 @@ public:
 	 */
 	static void _Init();
 
-	static FBoostPlatformFile* Get();
+	static TNoNullablePtr<FBoostPlatformFile> Get();
 
 	virtual bool				  IsDirectory(const FPath& path) final override;
 	virtual bool				  Exists(const FPath& path) final override;
 	virtual TSmallVector32<FPath> Glob(const FPath& root_dir, const FString& regex, bool recursive = false) final override;
+	virtual FString				  ReadFile(const FPath& path) final override;
+	virtual TVector<TBYTE>		  ReadContent(const FPath& path) final override;
 
 private:
-	FBoostMapFileHandle mFileHandle; // Dummy file handle just to get file stat
+	FBoostMapFileHandle mDummyFileHandle; // Dummy file handle just to get file stat
 };

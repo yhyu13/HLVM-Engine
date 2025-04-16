@@ -18,8 +18,10 @@ public:
 	virtual bool				  IsDirectory(const FPath& path);
 	virtual bool				  Exists(const FPath& path);
 	virtual TSmallVector32<FPath> Glob(const FPath& root_dir, const FString& regex, bool recursive = false);
+	virtual FString				  ReadFile(const FPath& path);
+	virtual TVector<TBYTE>		  ReadContent(const FPath& path);
 
-	static FGenericPlatformFile* Get(EPlatformFileType PlatformFileType = EPlatformFileType::Unknow);
+	static TNoNullablePtr<FGenericPlatformFile> Get(EPlatformFileType PlatformFileType = EPlatformFileType::Unspecified);
 
 protected:
 	static FGenericPlatformFile* sPlatformFileRedirector[EPlatformFileType_NUM];

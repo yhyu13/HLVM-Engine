@@ -234,7 +234,7 @@ public:
 
 // Smart pointer types for RHI resources
 using FRHIBufferRef = TRefCountPtr<FRHIBuffer>;
-using FShaderRHIRef = TRefCountPtr<FRHIShader>;
+using FRHIShaderRef = TRefCountPtr<FRHIShader>;
 using FShaderResourceViewRHIRef = TRefCountPtr<FRHIShaderResourceView>;
 using FUnorderedAccessViewRHIRef = TRefCountPtr<FRHIUnorderedAccessView>;
 using FSamplerStateRHIRef = TRefCountPtr<FRHISamplerState>;

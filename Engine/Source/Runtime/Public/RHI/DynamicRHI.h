@@ -30,8 +30,7 @@ public:
 	virtual FVertexDeclarationRHIRef CreateVertexDeclaration(const FVertexDeclarationElementList& Elements) = 0;
 
 	// Shader Management
-	virtual FShaderRHIRef CreateShader(const FShaderCreateInfo& CreateInfo) = 0;
-	virtual void ReleaseShader(FShaderRHIRef& Shader) = 0;
+	virtual FRHIShaderRef CreateShader(const FShaderCreateInfo& CreateInfo) = 0;
 
 	// Pipeline State Management
 	virtual FRHIGraphicsPipelineState* CreateGraphicsPipelineState(const FGraphicsPipelineStateInitializer& Initializer) = 0;
