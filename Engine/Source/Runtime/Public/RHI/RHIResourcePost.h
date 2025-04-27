@@ -115,12 +115,12 @@ private:
 //{
 // public:
 //	// Color Render Targets Info
-//	FRHIRenderTargetView ColorRenderTarget[RHI::RT_ATTACHMENT_MAX];
+//	FRHIRenderTargetView ColorRenderTarget[RHI::MAX_RT_ATTACHMENTS];
 //	TUINT32				 NumColorRenderTargets;
 //	bool				 bClearColor;
 //
 //	// Color Render Targets Info
-//	FRHIRenderTargetView ColorResolveRenderTarget[RHI::RT_ATTACHMENT_MAX];
+//	FRHIRenderTargetView ColorResolveRenderTarget[RHI::MAX_RT_ATTACHMENTS];
 //	bool				 bHasResolveAttachments;
 //
 //	// Depth/Stencil Render Target Info
@@ -316,7 +316,7 @@ public:
 		DepthStencilRenderTarget.ResolveTarget = nullptr;
 		DepthStencilRenderTarget.Action = DepthActions;
 		DepthStencilRenderTarget.ExclusiveDepthStencil = InEDS;
-		FMemory::Memzero(&ColorRenderTargets[1], sizeof(ColorRTBinding) * (RHI::RT_ATTACHMENT_MAX - 1));
+		FMemory::Memzero(&ColorRenderTargets[1], sizeof(ColorRTBinding) * (RHI::MAX_RT_ATTACHMENTS - 1));
 	}
 
 	// Color and depth with resolve
@@ -336,7 +336,7 @@ public:
 		DepthStencilRenderTarget.ResolveTarget = ResolveDepthRT;
 		DepthStencilRenderTarget.Action = DepthActions;
 		DepthStencilRenderTarget.ExclusiveDepthStencil = InEDS;
-		FMemory::Memzero(&ColorRenderTargets[1], sizeof(ColorRTBinding) * (RHI::RT_ATTACHMENT_MAX - 1));
+		FMemory::Memzero(&ColorRenderTargets[1], sizeof(ColorRTBinding) * (RHI::MAX_RT_ATTACHMENTS - 1));
 	}
 
 	//	// Color and depth with resolve and optional sample density
@@ -359,13 +359,13 @@ public:
 	//		DepthStencilRenderTarget.Action = DepthActions;
 	//		DepthStencilRenderTarget.ExclusiveDepthStencil = InEDS;
 	//
-	//		FMemory::Memzero(&ColorRenderTargets[1], sizeof(ColorRTBinding) * (RHI::RT_ATTACHMENT_MAX - 1));
+	//		FMemory::Memzero(&ColorRenderTargets[1], sizeof(ColorRTBinding) * (RHI::MAX_RT_ATTACHMENTS - 1));
 	//	}
 
-	inline TUINT32 GetNumColorRenderTargets() const
+	TUINT32 GetNumColorRenderTargets() const
 	{
 		TUINT32 ColorIndex = 0;
-		for (; ColorIndex < RHI::RT_ATTACHMENT_MAX; ++ColorIndex)
+		for (; ColorIndex < RHI::MAX_RT_ATTACHMENTS; ++ColorIndex)
 		{
 			const ColorRTBinding& Entry = ColorRenderTargets[ColorIndex];
 			if (!Entry.RenderTarget)
@@ -384,7 +384,7 @@ public:
 	//		RenderTargetsInfo.NumSamples = 1;
 	//		TUINT32 RenderTargetIndex = 0;
 	//
-	//		for (; RenderTargetIndex < RHI::RT_ATTACHMENT_MAX; ++RenderTargetIndex)
+	//		for (; RenderTargetIndex < RHI::MAX_RT_ATTACHMENTS; ++RenderTargetIndex)
 	//		{
 	//			FRHITextureRef RenderTarget = ColorRenderTargets[RenderTargetIndex].RenderTarget;
 	//			if (!RenderTarget)
@@ -398,7 +398,7 @@ public:
 	//		}
 	//
 	//		RenderTargetsInfo.RenderTargetsEnabled = RenderTargetIndex;
-	//		for (; RenderTargetIndex < RHI::RT_ATTACHMENT_MAX; ++RenderTargetIndex)
+	//		for (; RenderTargetIndex < RHI::MAX_RT_ATTACHMENTS; ++RenderTargetIndex)
 	//		{
 	//			RenderTargetsInfo.RenderTargetFormats[RenderTargetIndex] = PF_Unknown;
 	//		}
@@ -431,10 +431,89 @@ public:
 
 public:
 	FString				  DebugName;
-	ColorRTBinding		  ColorRenderTargets[RHI::RT_ATTACHMENT_MAX]; // Render targets
+	ColorRTBinding		  ColorRenderTargets[RHI::MAX_RT_ATTACHMENTS]; // Render targets
 	DepthStencilRTBinding DepthStencilRenderTarget;					  // Depth-stencil target
 
-	ESubpassType SubpassType = ESubpassType::Default;
+	ESubpassHint SubpassHint = ESubpassHint::Default;
 
 	// TODO : occlusion query, multiview, variable shading rate support?
+};
+
+struct FBoundShaderStateInput
+{
+	FBoundShaderStateInput() = default;
+
+	FBoundShaderStateInput(
+		FRHIShaderRef InVertexDeclarationRHI, FRHIShaderRef InVertexShaderRHI, FRHIShaderRef InPixelShaderRHI
+#if PLATFORM_SUPPORTS_GEOMETRY_SHADERS
+		,
+		FRHIShaderRef InGeometryShaderRHI
+#endif
+		)
+		: VertexDeclarationRHI(InVertexDeclarationRHI)
+		, VertexShaderRHI(InVertexShaderRHI)
+		, PixelShaderRHI(InPixelShaderRHI)
+#if PLATFORM_SUPPORTS_GEOMETRY_SHADERS
+		, GeometryShaderRHI(InGeometryShaderRHI)
+#endif
+	{
+	}
+
+#if PLATFORM_SUPPORTS_MESH_SHADERS
+	FBoundShaderStateInput(
+		FRHIShaderRef InMeshShaderRHI,
+		FRHIShaderRef InAmplificationShader,
+		FRHIShaderRef InPixelShaderRHI)
+		: PixelShaderRHI(InPixelShaderRHI)
+		, MeshShaderRHI(InMeshShaderRHI)
+		, AmplificationShaderRHI(InAmplificationShader)
+	{
+	}
+#endif
+
+	void AddRefResources()
+	{
+		// TODO : ref count?
+	}
+
+	void ReleaseResources()
+	{
+		// TODO : ref count?
+	}
+
+	FRHIShaderRef GetVertexShader() const { return VertexShaderRHI; }
+	FRHIShaderRef GetPixelShader() const { return PixelShaderRHI; }
+
+#if PLATFORM_SUPPORTS_MESH_SHADERS
+	FRHIShaderRef GetMeshShader() const { return MeshShaderRHI; }
+	void		  SetMeshShader(FRHIShaderRef InMeshShader) { MeshShaderRHI = InMeshShader; }
+	FRHIShaderRef GetAmplificationShader() const { return AmplificationShaderRHI; }
+	void		  SetAmplificationShader(FRHIShaderRef InAmplificationShader) { AmplificationShaderRHI = InAmplificationShader; }
+#else
+	constexpr FRHIShaderRef GetMeshShader() const { return nullptr; }
+	void					SetMeshShader(FRHIShaderRef) {}
+	constexpr FRHIShaderRef GetAmplificationShader() const { return nullptr; }
+	void					SetAmplificationShader(FRHIShaderRef) {}
+#endif
+
+#if PLATFORM_SUPPORTS_GEOMETRY_SHADERS
+	FRHIShaderRef GetGeometryShader() const { return GeometryShaderRHI; }
+	void		  SetGeometryShader(FRHIShaderRef InGeometryShader) { GeometryShaderRHI = InGeometryShader; }
+#else
+	constexpr FRHIShaderRef GetGeometryShader() const { return nullptr; }
+	void					SetGeometryShader(FRHIShaderRef) {}
+#endif
+
+	FRHIShaderRef VertexDeclarationRHI = nullptr;
+	FRHIShaderRef VertexShaderRHI = nullptr;
+	FRHIShaderRef PixelShaderRHI = nullptr;
+
+private:
+#if PLATFORM_SUPPORTS_MESH_SHADERS
+	FRHIShaderRef MeshShaderRHI = nullptr;
+	FRHIShaderRef AmplificationShaderRHI = nullptr;
+#endif
+#if PLATFORM_SUPPORTS_GEOMETRY_SHADERS
+	FRHIShaderRef GeometryShaderRHI = nullptr;
+#endif
 };

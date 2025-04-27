@@ -125,6 +125,7 @@ RECORD(packed_test)
 			size_t _StartPos = 0;
 			for (size_t i = 0; i < NumEntries; ++i)
 			{
+				// Dummy file inside packed file system
 				FPath Path = FPath{ FString::Format(TXT("./test_{}.txt"), i), EPlatformFileType::Packed };
 				auto& Entry_Dev = get<0>(PackedData[i]);
 				auto& ContentBuffer = get<1>(PackedData[i]);
@@ -225,6 +226,7 @@ RECORD(packed_test)
 											  FPackedPlatformFile::Get()->Mount(PackedFileName);
 											  for (size_t i = 0; i < NumEntries; ++i)
 											  {
+												  // Open dummy files inside packed file system
 												  FPackedEntryHandle entryHandle;
 												  entryHandle.Open(FString::Format(TXT("./test_{}.txt"), i));
 											  }

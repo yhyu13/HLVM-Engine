@@ -3,6 +3,7 @@
  */
 
 #include "VulkanRHI.h"
+#include "Window/Vulkan/GLFW3Vulkan.h"
 
 // TODO : Refactory these static method into each vulkan class
 namespace
@@ -450,20 +451,20 @@ FRHIShaderRef FVulkanRHI::CreateShader(const FShaderCreateInfo& CreateInfo)
 }
 
 // Pipeline State Management
-FRHIGraphicsPipelineState* FVulkanRHI::CreateGraphicsPipelineState(const FGraphicsPipelineStateInitializer& Initializer)
+FRHIGraphicsPSO* FVulkanRHI::CreateGraphicsPSO(const FGraphicsPSOInitializer& Initializer)
 {
 	return nullptr;
 	//	VkPipeline		 Pipeline = CreateVulkanGraphicsPipeline(Initializer);
 	//	VkPipelineLayout PipelineLayout = CreateVulkanPipelineLayout(Initializer);
-	//	return new FVulkanGraphicsPipelineState(Pipeline, PipelineLayout);
+	//	return new FVulkanGraphicsPSO(Pipeline, PipelineLayout);
 }
 
-FRHIComputePipelineState* FVulkanRHI::CreateComputePipelineState(const FComputePipelineStateInitializer& Initializer)
+FRHIComputePSO* FVulkanRHI::CreateComputePSO(const FComputePSOInitializer& Initializer)
 {
 	return nullptr;
 	//	VkPipeline		 Pipeline = CreateVulkanComputePipeline(Initializer);
 	//	VkPipelineLayout PipelineLayout = CreateVulkanPipelineLayout(Initializer);
-	//	return new FVulkanComputePipelineState(Pipeline, PipelineLayout);
+	//	return new FVulkanComputePSO(Pipeline, PipelineLayout);
 }
 
 // Command List and Context
@@ -590,15 +591,15 @@ void FVulkanRHI::RHIFlushPendingDeletes()
 }
 
 // Misc
-void FVulkanRHI::RHISetGraphicsPipelineState(FRHIGraphicsPipelineState* PipelineState)
+void FVulkanRHI::RHISetGraphicsPSO(FRHIGraphicsPSO* PipelineState)
 {
-	//	FVulkanGraphicsPipelineState* VulkanPipelineState = static_cast<FVulkanGraphicsPipelineState*>(PipelineState);
+	//	FVulkanGraphicsPSO* VulkanPipelineState = static_cast<FVulkanGraphicsPSO*>(PipelineState);
 	//	VulkanRHI::vkCmdBindPipeline(GetCurrentCommandBuffer(), VK_PIPELINE_BIND_POINT_GRAPHICS, VulkanPipelineState->GetPipeline());
 }
 
-void FVulkanRHI::RHISetComputePipelineState(FRHIComputePipelineState* PipelineState)
+void FVulkanRHI::RHISetComputePSO(FRHIComputePSO* PipelineState)
 {
-	//	FVulkanComputePipelineState* VulkanPipelineState = static_cast<FVulkanComputePipelineState*>(PipelineState);
+	//	FVulkanComputePSO* VulkanPipelineState = static_cast<FVulkanComputePSO*>(PipelineState);
 	//	VulkanRHI::vkCmdBindPipeline(GetCurrentCommandBuffer(), VK_PIPELINE_BIND_POINT_COMPUTE, VulkanPipelineState->GetPipeline());
 }
 
@@ -1159,7 +1160,7 @@ VkPipelineShaderStageCreateInfo FVulkanRHI::GenerateVkPipelineShaderStageCreateI
 	return ShaderStageCreateInfo;
 }
 
-// Generate VkPipelineLayoutCreateInfo from FRHIGraphicsPipelineStateCreateInfo
+// Generate VkPipelineLayoutCreateInfo from FRHIGraphicsPSOCreateInfo
 VkPipelineLayoutCreateInfo FVulkanRHI::GenerateVkPipelineLayoutCreateInfo(const FRHIGraphicsPipelineLayoutCreateInfo& CreateInfo)
 {
 	VkPipelineLayoutCreateInfo PipelineLayoutCreateInfo = {};
@@ -1167,12 +1168,12 @@ VkPipelineLayoutCreateInfo FVulkanRHI::GenerateVkPipelineLayoutCreateInfo(const 
 
 	//	// Add descriptor set layouts
 	//	TVector<VkDescriptorSetLayout> descriptorSetLayouts;
-	//	for (const auto& layout : CreateInfo.DescriptorSetLayouts)
+	//	for (const auto& layout : CreateInfo.DescSetLayouts)
 	//	{
 	//		descriptorSetLayouts.push_back(layout);
 	//	}
 	//	PipelineLayoutCreateInfo.descriptorSetLayoutCount = static_cast<uint32_t>(descriptorSetLayouts.size());
-	//	PipelineLayoutCreateInfo.pDescriptorSetLayouts = descriptorSetLayouts.data();
+	//	PipelineLayoutCreateInfo.pDescSetLayouts = descriptorSetLayouts.data();
 	//
 	//	// Add push constant ranges
 	//	TVector<VkPushConstantRange> pushConstantRanges;
@@ -1186,8 +1187,8 @@ VkPipelineLayoutCreateInfo FVulkanRHI::GenerateVkPipelineLayoutCreateInfo(const 
 	return PipelineLayoutCreateInfo;
 }
 
-// Generate VkGraphicsPipelineCreateInfo from FRHIGraphicsPipelineStateCreateInfo
-VkGraphicsPipelineCreateInfo FVulkanRHI::GenerateVkGraphicsPipelineCreateInfo(const FRHIGraphicsPipelineStateCreateInfo& CreateInfo)
+// Generate VkGraphicsPipelineCreateInfo from FRHIGraphicsPSOCreateInfo
+VkGraphicsPipelineCreateInfo FVulkanRHI::GenerateVkGraphicsPipelineCreateInfo(const FRHIGraphicsPSOCreateInfo& CreateInfo)
 {
 	VkGraphicsPipelineCreateInfo PipelineCreateInfo = {};
 	PipelineCreateInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
@@ -1240,8 +1241,8 @@ VkGraphicsPipelineCreateInfo FVulkanRHI::GenerateVkGraphicsPipelineCreateInfo(co
 	return PipelineCreateInfo;
 }
 
-// Generate VkComputePipelineCreateInfo from FRHIComputePipelineStateCreateInfo (assuming this struct exists)
-VkComputePipelineCreateInfo FVulkanRHI::GenerateVkComputePipelineCreateInfo(const FRHIComputePipelineStateCreateInfo& CreateInfo)
+// Generate VkComputePipelineCreateInfo from FRHIComputePSOCreateInfo (assuming this struct exists)
+VkComputePipelineCreateInfo FVulkanRHI::GenerateVkComputePipelineCreateInfo(const FRHIComputePSOCreateInfo& CreateInfo)
 {
 	VkComputePipelineCreateInfo PipelineCreateInfo = {};
 	PipelineCreateInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;

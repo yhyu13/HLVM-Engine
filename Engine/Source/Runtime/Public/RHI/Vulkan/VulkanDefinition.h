@@ -14,6 +14,11 @@ DECLARE_LOG_CATEGORY(LogVulkan)
 #include <vulkan/vulkan_core.h>
 #include <vulkan/vk_enum_string_helper.h>
 
+// workaround for removed defines in sdk 141 (copy from UE5)
+#define VK_DESCRIPTOR_TYPE_BEGIN_RANGE (S_C(TUINT32, VkDescriptorType::VK_DESCRIPTOR_TYPE_SAMPLER))
+#define VK_DESCRIPTOR_TYPE_END_RANGE (S_C(TUINT32, VkDescriptorType::VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT))
+#define VK_DESCRIPTOR_TYPE_RANGE_SIZE (S_C(TUINT32, VkDescriptorType::VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT) - S_C(TUINT32, VkDescriptorType::VK_DESCRIPTOR_TYPE_SAMPLER) + 1)
+
 #define VULKAN_API_VERSION VK_API_VERSION_1_3
 
 // vulkan feature definition start---------------------------------------------------------------------------------------------------------------------------------------
@@ -46,6 +51,9 @@ DECLARE_LOG_CATEGORY(LogVulkan)
 
 /// @brief whether to use input attachment shader read, might fix texture flickering on some device
 #define VULKAN_INPUT_ATTACHMENT_SHADER_READ 0
+
+/// @brief whether to use shader keys for pipeline state
+#define VULKAN_USE_SHADERKEYS 1
 
 // vulkan helper definition start---------------------------------------------------------------------------------------------------------------------------------------
 
@@ -89,6 +97,6 @@ namespace VulkanRHI
 		*Type = VkStructureType;
 		FMemory::Memzero(R_C(TUINT8*, Struct) + sizeof(TINT32), sizeof(T) - sizeof(TINT32));
 	};
-}
+} // namespace VulkanRHI
 
 DECLARE_LOG_CATEGORY(LogVulkanRHI)

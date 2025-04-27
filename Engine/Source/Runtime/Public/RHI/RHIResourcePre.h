@@ -5,13 +5,16 @@
 #include "RHIDefinition.h"
 #include "RHIMisc.h"
 
+class FRHITexture;
+class FRHIViewport;
+
 struct IRHICreateInfo
 {
-	FString				DebugName;	// Debug name for the resource
+	FString DebugName; // Debug name for the resource
 
 	IRHICreateInfo() = default;
 	IRHICreateInfo(const FString& InDebugName)
-	: DebugName(InDebugName)
+		: DebugName(InDebugName)
 	{
 	}
 	virtual ~IRHICreateInfo() = default;
@@ -136,11 +139,11 @@ struct FRHISamplerStateCreateInfo : public IRHICreateInfo
 	ETextureAddressMode AddressModeW;			 // Address mode for W coordinate
 	TUINT32				MipMapLevelOfDetailBias; // Mip map level of detail bias
 	TUINT32				MaxAnisotropy;			 // Maximum anisotropy
-	ERHICompare			ComparisonFunction;		 // Comparison function
+	ECompareFunction	ComparisonFunction;		 // Comparison function
 	FVec4				BorderColor;			 // Border color
 
 	// Constructor for easy initialization
-	FRHISamplerStateCreateInfo(const FString& InDebugName, ETextureFilter InFilter, ETextureAddressMode InAddressModeU, ETextureAddressMode InAddressModeV, ETextureAddressMode InAddressModeW, TUINT32 InMipMapLevelOfDetailBias = 0, TUINT32 InMaxAnisotropy = 1, ERHICompare InComparisonFunction = ERHICompare::Never, const FVec4& InBorderColor = FVec4(0.0f, 0.0f, 0.0f, 0.0f))
+	FRHISamplerStateCreateInfo(const FString& InDebugName, ETextureFilter InFilter, ETextureAddressMode InAddressModeU, ETextureAddressMode InAddressModeV, ETextureAddressMode InAddressModeW, TUINT32 InMipMapLevelOfDetailBias = 0, TUINT32 InMaxAnisotropy = 1, ECompareFunction InComparisonFunction = ECompareFunction::Never, const FVec4& InBorderColor = FVec4(0.0f, 0.0f, 0.0f, 0.0f))
 		: IRHICreateInfo(InDebugName)
 		, Filter(InFilter)
 		, AddressModeU(InAddressModeU)
@@ -172,7 +175,7 @@ struct FRHIGraphicsPipelineLayoutCreateInfo : public IRHICreateInfo
 };
 
 // Structure for describing graphics pipeline state creation parameters
-struct FRHIGraphicsPipelineStateCreateInfo : public IRHICreateInfo
+struct FRHIGraphicsPSOCreateInfo : public IRHICreateInfo
 {
 	EPrimitiveTopology		   PrimitiveTopology; // Primitive topology
 	EPolygonMode			   PolygonMode;		  // Polygon mode
@@ -184,7 +187,7 @@ struct FRHIGraphicsPipelineStateCreateInfo : public IRHICreateInfo
 	TVector<FShaderCreateInfo> Shaders;			  // Shaders
 
 	// Constructor for easy initialization
-	FRHIGraphicsPipelineStateCreateInfo(const FString& InDebugName, EPrimitiveTopology InPrimitiveTopology, EPolygonMode InPolygonMode, EFrontFace InFrontFace, ECullMode InCullMode, EDepthTest InDepthTest, EStencilTest InStencilTest, EBlendMode InBlendMode, const TVector<FShaderCreateInfo>& InShaders)
+	FRHIGraphicsPSOCreateInfo(const FString& InDebugName, EPrimitiveTopology InPrimitiveTopology, EPolygonMode InPolygonMode, EFrontFace InFrontFace, ECullMode InCullMode, EDepthTest InDepthTest, EStencilTest InStencilTest, EBlendMode InBlendMode, const TVector<FShaderCreateInfo>& InShaders)
 		: IRHICreateInfo(InDebugName)
 		, PrimitiveTopology(InPrimitiveTopology)
 		, PolygonMode(InPolygonMode)
@@ -199,12 +202,12 @@ struct FRHIGraphicsPipelineStateCreateInfo : public IRHICreateInfo
 };
 
 // Structure for describing compute pipeline state creation parameters
-struct FRHIComputePipelineStateCreateInfo : public IRHICreateInfo
+struct FRHIComputePSOCreateInfo : public IRHICreateInfo
 {
-	FShaderCreateInfo Shader;	 // Compute shader
+	FShaderCreateInfo Shader; // Compute shader
 
 	// Constructor for easy initialization
-	FRHIComputePipelineStateCreateInfo(const FString& InDebugName, const FShaderCreateInfo& InShader)
+	FRHIComputePSOCreateInfo(const FString& InDebugName, const FShaderCreateInfo& InShader)
 		: IRHICreateInfo(InDebugName)
 		, Shader(InShader)
 	{
@@ -226,38 +229,38 @@ struct FRHIQueryCreateInfo : public IRHICreateInfo
 	}
 };
 
-// Structure for describing swap chain creation parameters
-struct FRHISwapChainCreateInfo : public IRHICreateInfo
-{
-	FIntVec2		Dimensions;	   // Width and height of the swap chain buffers
-	EPixelFormat	Format;		   // Pixel format of the swap chain buffers
-	TUINT32			NumBuffers;	   // Number of buffers in the swap chain (e.g., double or triple buffering)
-	TUINT32			NumSamples;	   // Number of samples (for MSAA)
-	ESwapChainFlags Flags;		   // Swap chain creation flags
-	FRHIViewport*	OwnerViewport; // Associated viewport
-
-	// Default constructor
-	FRHISwapChainCreateInfo() = default;
-
-	// Constructor for easy initialization
-	FRHISwapChainCreateInfo(
-		const FString&	InDebugName,
-		const FIntVec2& InDimensions,
-		EPixelFormat	InFormat = EPixelFormat::R8G8B8A8_UNorm,
-		TUINT32			InNumBuffers = 2, // Default to double buffering
-		TUINT32			InNumSamples = 1, // Default to no MSAA
-		ESwapChainFlags InFlags = ESwapChainFlags::None,
-		FRHIViewport*	InViewport = nullptr)
-		: IRHICreateInfo(InDebugName)
-		, Dimensions(InDimensions)
-		, Format(InFormat)
-		, NumBuffers(InNumBuffers)
-		, NumSamples(InNumSamples)
-		, Flags(InFlags)
-		, OwnerViewport(InViewport)
-	{
-	}
-};
+//// Structure for describing swap chain creation parameters
+// struct FRHISwapChainCreateInfo : public IRHICreateInfo
+//{
+//	FIntVec2		Dimensions;	   // Width and height of the swap chain buffers
+//	EPixelFormat	Format;		   // Pixel format of the swap chain buffers
+//	TUINT32			NumBuffers;	   // Number of buffers in the swap chain (e.g., double or triple buffering)
+//	TUINT32			NumSamples;	   // Number of samples (for MSAA)
+//	ESwapChainFlags Flags;		   // Swap chain creation flags
+//	FRHIViewport*	OwnerViewport; // Associated viewport
+//
+//	// Default constructor
+//	FRHISwapChainCreateInfo() = default;
+//
+//	// Constructor for easy initialization
+//	FRHISwapChainCreateInfo(
+//		const FString&	InDebugName,
+//		const FIntVec2& InDimensions,
+//		EPixelFormat	InFormat = EPixelFormat::R8G8B8A8_UNorm,
+//		TUINT32			InNumBuffers = 2, // Default to double buffering
+//		TUINT32			InNumSamples = 1, // Default to no MSAA
+//		ESwapChainFlags InFlags = ESwapChainFlags::None,
+//		FRHIViewport*	InViewport = nullptr)
+//		: IRHICreateInfo(InDebugName)
+//		, Dimensions(InDimensions)
+//		, Format(InFormat)
+//		, NumBuffers(InNumBuffers)
+//		, NumSamples(InNumSamples)
+//		, Flags(InFlags)
+//		, OwnerViewport(InViewport)
+//	{
+//	}
+// };
 
 class IWindow;
 // Structure for describing viewport creation parameters
@@ -516,4 +519,118 @@ private:
 	{
 		return S_C(Type, Value & StencilMask);
 	}
+};
+
+struct FRHIDepthStencilStateCreateInfo
+{
+	bool								bEnableDepthWrite;
+	TEnumAsUnderlying<ECompareFunction> DepthTest;
+
+	bool								bEnableFrontFaceStencil;
+	TEnumAsUnderlying<ECompareFunction> FrontFaceStencilTest;
+	TEnumAsUnderlying<EStencilOp>		FrontFaceStencilFailStencilOp;
+	TEnumAsUnderlying<EStencilOp>		FrontFaceDepthFailStencilOp;
+	TEnumAsUnderlying<EStencilOp>		FrontFacePassStencilOp;
+	bool								bEnableBackFaceStencil;
+	TEnumAsUnderlying<ECompareFunction> BackFaceStencilTest;
+	TEnumAsUnderlying<EStencilOp>		BackFaceStencilFailStencilOp;
+	TEnumAsUnderlying<EStencilOp>		BackFaceDepthFailStencilOp;
+	TEnumAsUnderlying<EStencilOp>		BackFacePassStencilOp;
+	TUINT8								StencilReadMask;
+	TUINT8								StencilWriteMask;
+
+	FRHIDepthStencilStateCreateInfo(
+		bool			 bInEnableDepthWrite = true,
+		ECompareFunction InDepthTest = ECompareFunction::DepthFartherOrEqual,
+		bool			 bInEnableFrontFaceStencil = false,
+		ECompareFunction InFrontFaceStencilTest = ECompareFunction::Always,
+		EStencilOp		 InFrontFaceStencilFailStencilOp = EStencilOp::Keep,
+		EStencilOp		 InFrontFaceDepthFailStencilOp = EStencilOp::Keep,
+		EStencilOp		 InFrontFacePassStencilOp = EStencilOp::Keep,
+		bool			 bInEnableBackFaceStencil = false,
+		ECompareFunction InBackFaceStencilTest = ECompareFunction::Always,
+		EStencilOp		 InBackFaceStencilFailStencilOp = EStencilOp::Keep,
+		EStencilOp		 InBackFaceDepthFailStencilOp = EStencilOp::Keep,
+		EStencilOp		 InBackFacePassStencilOp = EStencilOp::Keep,
+		TUINT8			 InStencilReadMask = 0xFF,
+		TUINT8			 InStencilWriteMask = 0xFF)
+		: bEnableDepthWrite(bInEnableDepthWrite)
+		, DepthTest(InDepthTest)
+		, bEnableFrontFaceStencil(bInEnableFrontFaceStencil)
+		, FrontFaceStencilTest(InFrontFaceStencilTest)
+		, FrontFaceStencilFailStencilOp(InFrontFaceStencilFailStencilOp)
+		, FrontFaceDepthFailStencilOp(InFrontFaceDepthFailStencilOp)
+		, FrontFacePassStencilOp(InFrontFacePassStencilOp)
+		, bEnableBackFaceStencil(bInEnableBackFaceStencil)
+		, BackFaceStencilTest(InBackFaceStencilTest)
+		, BackFaceStencilFailStencilOp(InBackFaceStencilFailStencilOp)
+		, BackFaceDepthFailStencilOp(InBackFaceDepthFailStencilOp)
+		, BackFacePassStencilOp(InBackFacePassStencilOp)
+		, StencilReadMask(InStencilReadMask)
+		, StencilWriteMask(InStencilWriteMask)
+	{
+	}
+};
+
+class FRHIBlendStateCreateInfo
+{
+public:
+	struct FRenderTarget
+	{
+		enum
+		{
+			NUM_STRING_FIELDS = 7
+		};
+		TEnumAsUnderlying<EBlendOperation> ColorBlendOp;
+		TEnumAsUnderlying<EBlendFactor>	   ColorSrcBlend;
+		TEnumAsUnderlying<EBlendFactor>	   ColorDestBlend;
+		TEnumAsUnderlying<EBlendOperation> AlphaBlendOp;
+		TEnumAsUnderlying<EBlendFactor>	   AlphaSrcBlend;
+		TEnumAsUnderlying<EBlendFactor>	   AlphaDestBlend;
+		TEnumAsUnderlying<EColorWriteMask> ColorWriteMask;
+
+		FRenderTarget(
+			EBlendOperation InColorBlendOp = EBlendOperation::Add,
+			EBlendFactor	InColorSrcBlend = EBlendFactor::One,
+			EBlendFactor	InColorDestBlend = EBlendFactor::Zero,
+			EBlendOperation InAlphaBlendOp = EBlendOperation::Add,
+			EBlendFactor	InAlphaSrcBlend = EBlendFactor::One,
+			EBlendFactor	InAlphaDestBlend = EBlendFactor::Zero,
+			EColorWriteMask InColorWriteMask = EColorWriteMask::RGBA)
+			: ColorBlendOp(InColorBlendOp)
+			, ColorSrcBlend(InColorSrcBlend)
+			, ColorDestBlend(InColorDestBlend)
+			, AlphaBlendOp(InAlphaBlendOp)
+			, AlphaSrcBlend(InAlphaSrcBlend)
+			, AlphaDestBlend(InAlphaDestBlend)
+			, ColorWriteMask(InColorWriteMask)
+		{
+		}
+	};
+
+	FRHIBlendStateCreateInfo() {}
+
+	FRHIBlendStateCreateInfo(const FRenderTarget& InRenderTargetBlendState, bool bInUseAlphaToCoverage = false)
+		: bUseIndependentRenderTargetBlendStates(false)
+		, bUseAlphaToCoverage(bInUseAlphaToCoverage)
+	{
+		RenderTargets[0] = InRenderTargetBlendState;
+	}
+
+	template <TUINT32 NumRenderTargets>
+	FRHIBlendStateCreateInfo(const TStaticVector<FRenderTarget, NumRenderTargets>& InRenderTargetBlendStates, bool bInUseAlphaToCoverage = false)
+		: bUseIndependentRenderTargetBlendStates(NumRenderTargets > 1)
+		, bUseAlphaToCoverage(bInUseAlphaToCoverage)
+	{
+		static_assert(NumRenderTargets <= RHI::MAX_RT_ATTACHMENTS, "Too many render target blend states.");
+
+		for (TUINT32 RenderTargetIndex = 0; RenderTargetIndex < NumRenderTargets; ++RenderTargetIndex)
+		{
+			RenderTargets[RenderTargetIndex] = InRenderTargetBlendStates[RenderTargetIndex];
+		}
+	}
+
+	TStaticVector<FRenderTarget, RHI::MAX_RT_ATTACHMENTS> RenderTargets;
+	bool												 bUseIndependentRenderTargetBlendStates;
+	bool												 bUseAlphaToCoverage;
 };

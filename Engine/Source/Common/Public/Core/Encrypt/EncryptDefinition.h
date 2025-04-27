@@ -9,5 +9,5 @@
 HLVM_ENUM(EEncryptType, TUINT8,
 	RSA_PKCS8,
 	BASE64,
-	No,
-	Unknow);
+	No
+	);

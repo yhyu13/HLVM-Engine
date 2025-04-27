@@ -36,7 +36,7 @@ public:
 	bool Push(ETaskPriority Priority, TaskType&& Task) noexcept
 		requires(std::is_move_constructible_v<TaskType>)
 	{
-		const bool bPushed = mTaskQueues[HLVM_ENUM_VALUE_AS_TYPE(size_t, Priority)].template Push<bTryPush>(MoveTemp(Task));
+		const bool bPushed = mTaskQueues[HLVM_ENUM_VALUE(Priority)].template Push<bTryPush>(MoveTemp(Task));
 		if (bPushed)
 		{
 			mCV.notify_one();

@@ -24,7 +24,7 @@ namespace hlvm_private
 			case EThreadPriority::Low:
 				policy = THREAD_PRIORITY_BELOW_NORMAL;
 				break;
-			case EThreadPriority::HLVM_NUM:
+			default:
 				HLVM_ASSERT_F(false, TXT("Unknown thread priority"));
 				break;
 		}

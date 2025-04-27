@@ -10,10 +10,11 @@
 /**
  *  @brief A reference pointer requires template class instance method (1) Increment reference (2) Decrement reference
  *  The template class should maintain a mutable atomic reference counter, and the template class should align itself to avoid
- *  false sharing.
+ *  false sharing. See FRefCountable as example
  *
- *  @details On construction, the TRefCountPtr increment the reference counting.
- *          On destruction, the TRefCountPtr tries to decrement the reference counting.
+ *  @details TRefCountPtr does not create critical section within, so member method is not thread safe. Therefore, do not pass
+ *  TRefCountPtr* or TRefCountPtr& to threads, simply copy TRefCountPtr instance to another TRefCountPtr instance, which guarantee
+ *  thread safety due to reference being incrementing and decrementing.
  */
 template <CRefCountable T, bool bAllowPolymorphic = true>
 class TRefCountPtr

@@ -80,6 +80,11 @@ public:
 		return this->size();
 	}
 
+	TSIZE NumBytes() const
+	{
+		return this->size() * sizeof(T);
+	}
+
 	T* GetData() const
 	{
 		return C_C(T*, this->data());
@@ -155,6 +160,11 @@ public:
 		return this->size();
 	}
 
+	TSIZE NumBytes() const
+	{
+		return this->size() * sizeof(T);
+	}
+
 	T* GetData() const
 	{
 		return C_C(T*, this->data());
@@ -196,20 +206,150 @@ public:
 };
 
 template <typename Key, typename Value, typename Allocator = std::allocator<std::pair<Key, Value>>>
-using TMap = phmap::flat_hash_map<Key, Value, std::hash<Key>, std::equal_to<Key>, Allocator>;
+class TMapSmall : public phmap::flat_hash_map<Key, Value, std::hash<Key>, std::equal_to<Key>, Allocator>
+{
+public:
+	using phmap::flat_hash_map<Key, Value, std::hash<Key>, std::equal_to<Key>, Allocator>::flat_hash_map;
+
+	// Num
+	TUINT32 Num() const
+	{
+		HLVM_ASSERT(this->size() <= S_C(size_t, TUINT32_MAX));
+		return S_C(TUINT32, this->size());
+	}
+
+	// Size
+	TSIZE Size() const
+	{
+		return this->size();
+	}
+
+	Value* Find(const Key& key)
+	{
+		auto Iter = this->find(key);
+		if (Iter == this->end())
+		{
+			return nullptr;
+		}
+		return &Iter->second;
+	}
+
+	const Value* Find(const Key& key) const
+	{
+		auto Iter = this->find(key);
+		if (Iter == this->end())
+		{
+			return nullptr;
+		}
+		return &Iter->second;
+	}
+
+	// Add
+	Value* Add(const Key& key, const Value& value)
+	{
+		auto Iter = this->find(key);
+		if (Iter == this->end())
+		{
+			Iter = this->insert({key, value}).first;
+		}
+		else
+		{
+			Iter->second = value;
+		}
+		return &Iter->second;
+	}
+
+	// Add move
+	Value* Add(const Key& key, Value&& value)
+	{
+		auto Iter = this->find(key);
+		if (Iter == this->end())
+		{
+			Iter = this->insert({key, value}).first;
+		}
+		else
+		{
+			Iter->second = value;
+		}
+		return &Iter->second;
+	}
+};
 
 template <typename Key, typename Value, typename Allocator = std::allocator<std::pair<Key, Value>>>
-using TStableMap = phmap::node_hash_map<Key, Value, std::hash<Key>, std::equal_to<Key>, Allocator>;
+class TMap : public phmap::flat_hash_map<Key, Value, std::hash<Key>, std::equal_to<Key>, Allocator>
+{
+public:
+	using phmap::flat_hash_map<Key, Value, std::hash<Key>, std::equal_to<Key>, Allocator>::flat_hash_map;
+
+	// Num
+	TUINT32 Num() const
+	{
+		HLVM_ASSERT(this->size() <= S_C(size_t, TUINT32_MAX));
+		return S_C(TUINT32, this->size());
+	}
+
+	// Size
+	TSIZE Size() const
+	{
+		return this->size();
+	}
+
+	Value* Find(const Key& key)
+	{
+		auto Iter = this->find(key);
+		if (Iter == this->end())
+		{
+			return nullptr;
+		}
+		return &Iter->second;
+	}
+
+	const Value* Find(const Key& key) const
+	{
+		auto Iter = this->find(key);
+		if (Iter == this->end())
+		{
+			return nullptr;
+		}
+		return &Iter->second;
+	}
+
+	// Add
+	Value* Add(const Key& key, const Value& value)
+	{
+		auto Iter = this->find(key);
+		if (Iter == this->end())
+		{
+			Iter = this->insert({key, value}).first;
+		}
+		else
+		{
+			Iter->second = value;
+		}
+		return &Iter->second;
+	}
+
+	// Add move
+	Value* Add(const Key& key, Value&& value)
+	{
+		auto Iter = this->find(key);
+		if (Iter == this->end())
+		{
+			Iter = this->insert({key, value}).first;
+		}
+		else
+		{
+			Iter->second = value;
+		}
+		return &Iter->second;
+	}
+};
 
 template <typename T, typename Allocator = std::allocator<T>>
-using TSet = phmap::flat_hash_set<T, std::hash<T>, std::equal_to<T>, Allocator>;
+using TSetSmall = phmap::flat_hash_set<T, std::hash<T>, std::equal_to<T>, Allocator>;
 
 template <typename T, typename Allocator = std::allocator<T>>
-using TStableSet = phmap::node_hash_set<T, std::hash<T>, std::equal_to<T>, Allocator>;
-
-#define HLVM_MAP_FIND_IF(map, key)        \
-	if (auto iter = (map).find((key)); \
-		iter != (map).end())
+using TSet = phmap::node_hash_set<T, std::hash<T>, std::equal_to<T>, Allocator>;
 
 using FByteVector = TVector<TBYTE>;
 using FByteBuffer = std::span<TBYTE>;

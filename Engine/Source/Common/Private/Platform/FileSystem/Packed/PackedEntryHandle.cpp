@@ -97,12 +97,10 @@ IFileHandle::OpRetType FPackedEntryHandle::Open(const FPath& FilePath, const FFi
 					std::memcpy(DecryptedBuffer.data(), RawBuffer.data(), RawBuffer.size());
 				}
 				break;
-				case EEncryptType::Unknow:
-				case EEncryptType::HLVM_NUM:
-				{
+				case EEncryptType::_NUM:
+				default:
 					HLVM_ENSURE_F(false, TXT("Unknow encrypt type"));
-				}
-				break;
+					break;
 			}
 
 			// Decompression
@@ -115,12 +113,10 @@ IFileHandle::OpRetType FPackedEntryHandle::Open(const FPath& FilePath, const FFi
 				case ECompressType::No:
 					mContentBuffer = MoveTemp(DecryptedBuffer);
 					break;
-				case ECompressType::Unknow:
-				case ECompressType::HLVM_NUM:
-				{
+				case ECompressType::_NUM:
+				default:
 					HLVM_ENSURE_F(false, TXT("Unknow compress type"));
-				}
-				break;
+					break;
 			}
 		}
 		mOpened = true;

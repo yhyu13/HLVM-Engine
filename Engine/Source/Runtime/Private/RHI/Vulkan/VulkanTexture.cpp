@@ -31,6 +31,6 @@ FVulkanTexture::~FVulkanTexture()
 	}
 	else
 	{
-		HLVM_LOG(LogVulkanRHI, trace, TXT("No Destroy Texture {} since not owned"), *GetName());
+		HLVM_LOG(LogVulkanRHI, trace, TXT("No Destroy Texture {} since {}"), *GetName(), HLVM_ENUM_TO_TCHAR(OwnerShip));
 	}
 }

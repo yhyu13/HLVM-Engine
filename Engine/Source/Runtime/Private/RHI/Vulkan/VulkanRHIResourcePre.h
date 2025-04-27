@@ -68,7 +68,7 @@ public:
 
 	inline const VkAttachmentDescriptionStencilLayout* GetStencilDesc() const { return bHasDepthStencil ? &StencilDesc : nullptr; }
 
-	inline ESubpassType GetSubpassHint() const { return SubpassHint; }
+	inline ESubpassHint GetSubpassHint() const { return SubpassHint; }
 
 protected:
 	VkImageLayout GetVRSImageLayout() const;
@@ -103,15 +103,15 @@ protected:
 	}
 
 protected:
-	VkAttachmentReference ColorReferences[RHI::RT_ATTACHMENT_MAX];
+	VkAttachmentReference ColorReferences[RHI::MAX_RT_ATTACHMENTS];
 	VkAttachmentReference DepthReference;
 	VkAttachmentReferenceStencilLayout StencilReference;
 	VkAttachmentReference FragmentDensityReference;
-	VkAttachmentReference ResolveReferences[RHI::RT_ATTACHMENT_MAX];
+	VkAttachmentReference ResolveReferences[RHI::MAX_RT_ATTACHMENTS];
 	VkAttachmentReference DepthStencilResolveReference;
 
 	// Depth goes in the "+1" slot, Depth resolve goes in the "+2 slot", and the Shading Rate texture goes in the "+3" slot.
-	VkAttachmentDescription Desc[RHI::RT_ATTACHMENT_MAX * 2 + 3];
+	VkAttachmentDescription Desc[RHI::MAX_RT_ATTACHMENTS * 2 + 3];
 	VkAttachmentDescriptionStencilLayout StencilDesc;
 
 	TUINT8 NumAttachmentDescriptions;
@@ -122,7 +122,7 @@ protected:
 	TUINT8 bHasFragmentDensityAttachment;
 	TUINT8 NumSamples;
 	TUINT8 NumUsedClearValues;
-	ESubpassType SubpassHint = ESubpassType::Default;
+	ESubpassHint SubpassHint = ESubpassHint::Default;
 
 	union
 	{
@@ -204,8 +204,8 @@ protected:
 //
 //	// Save image off for comparison, in case it gets aliased.
 //	TUINT32 NumColorAttachments;
-//	VkImage ColorRenderTargetImages[RHI::RT_ATTACHMENT_MAX];
-//	VkImage ColorResolveTargetImages[RHI::RT_ATTACHMENT_MAX];
+//	VkImage ColorRenderTargetImages[RHI::MAX_RT_ATTACHMENTS];
+//	VkImage ColorResolveTargetImages[RHI::MAX_RT_ATTACHMENTS];
 //	VkImage DepthStencilRenderTargetImage;
 //	VkImage DepthStencilResolveRenderTargetImage;
 //	VkImage FragmentDensityImage;

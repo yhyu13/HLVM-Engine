@@ -9,7 +9,7 @@ FVulkanBackBuffer::FVulkanBackBuffer(VkImage InImage, const FRHITextureCreateInf
 {
 	// Vulkan back buffer holds a image from swapchain and we don't own it
 	OwnerShip = EOwnerShip::Alias;
-	HLVM_LOG(LogVulkanRHI, trace, TXT("Create FVulkanBackBuffer {}"), *GetName());
+	HLVM_LOG(LogVulkanRHI, trace, TXT("Create FVulkanBackBuffer {}, {}"), *GetName(), HLVM_ENUM_TO_TCHAR(OwnerShip));
 }
 
 FVulkanBackBuffer::~FVulkanBackBuffer()

@@ -6,19 +6,45 @@
 
 #include "GlobalDefinition.h"
 #include "Math/MathGLM.h"
+#include "Utility/Hash.h"
+
+#define PLATFORM_SUPPORTS_MESH_SHADERS 1
+#define PLATFORM_SUPPORTS_GEOMETRY_SHADERS 1
 
 DECLARE_LOG_CATEGORY(LogRHI)
 
+enum class ERHIZBuffer : TUINT8
+{
+	Far = 0,
+	Near = 1,
+	IsInverted = (Far < Near) ? 1 : 0,
+};
+
 // RHI Interface Types
-enum class ERHIInterfaceType : TUINT32
+enum class ERHIInterfaceType : TUINT8
 {
 	Null = 0,
 	Vulkan,
 	// Add other RHI types as needed
 };
 
+// Utility Functions
+HLVM_INLINE_FUNC const TCHAR* GetRHIName(ERHIInterfaceType Type)
+{
+	switch (Type)
+	{
+		case ERHIInterfaceType::Vulkan:
+			return TXT("Vulkan");
+		case ERHIInterfaceType::Null:
+			return TXT("Null");
+		default:
+			HLVM_ASSERT_F(false, TXT("Unknown RHI Interface Type"));
+			return TXT("Unknown");
+	}
+};
+
 // Enumeration of pixel formats
-enum class EPixelFormat : TUINT32
+enum class EPixelFormat : TUINT8
 {
 	None = 0,
 	R8_UNorm,
@@ -42,7 +68,7 @@ enum class EPixelFormat : TUINT32
 };
 
 // Enumeration of texture creation flags
-enum class ETextureCreateFlag : TUINT64
+enum class ETextureCreateFlag : TUINT32
 {
 	None = 0,
 	RenderTarget = 1 << 0,
@@ -55,6 +81,11 @@ enum class ETextureCreateFlag : TUINT64
 	// Add more flags as needed
 };
 HLVM_DECLARE_ENMU_FLAGS(ETextureCreateFlag, ETextureCreateFlags)
+
+namespace RHI
+{
+	constexpr TUINT32 MAX_RT_ATTACHMENTS = 8;
+}
 
 // Enumeration of buffer usage flags
 enum class EBufferUsageFlag : TUINT32
@@ -87,24 +118,33 @@ enum class EMemoryPropertyFlag : TUINT32
 HLVM_DECLARE_ENMU_FLAGS(EMemoryPropertyFlag, EMemoryPropertyFlags)
 
 // Enumeration of shader stages
-enum class EShaderStage : TUINT32
+enum class EShaderStage : TUINT8
 {
 	Vertex,
-	Pixel, // Also known as Fragment in Vulkan
-	Compute,
+	Pixel,
 	Geometry,
-	Hull,	// Also known as Tessellation Control in Vulkan
-	Domain, // Also known as Tessellation Evaluation in Vulkan
+	Mesh,
+	Task,
+
+	Compute,
+
 	RayGeneration,
-	Intersection,
-	AnyHit,
-	ClosestHit,
-	Miss,
-	Callable
+	RayIntersection,
+	RayAnyHit,
+	RayClosestHit,
+	RayMiss,
+	RayCallable
 };
 
+namespace RHI
+{
+	constexpr TUINT32 NUM_GFX_SHADER_STAGES = 5;
+	constexpr TUINT32 MAX_SHADER_STAGES = 6;
+	constexpr TUINT32 MAX_VERTEX_ELEMENTS = 16; // Vertex attributes, bindings
+} // namespace RHI
+
 // Query Types
-enum class ERHIQueryType : TUINT32
+enum class ERHIQueryType : TUINT8
 {
 	None = 0,
 	Occlusion,
@@ -114,7 +154,7 @@ enum class ERHIQueryType : TUINT32
 };
 
 // Enumeration of texture filter modes
-enum class ETextureFilter : TUINT32
+enum class ETextureFilter : TUINT8
 {
 	None = 0,
 	Point,
@@ -123,7 +163,7 @@ enum class ETextureFilter : TUINT32
 };
 
 // Enumeration of texture address modes
-enum class ETextureAddressMode : TUINT32
+enum class ETextureAddressMode : TUINT8
 {
 	None = 0,
 	Wrap,
@@ -133,7 +173,7 @@ enum class ETextureAddressMode : TUINT32
 };
 
 // Enumeration of primitive topologies
-enum class EPrimitiveTopology : TUINT32
+enum class EPrimitiveTopology : TUINT8
 {
 	PointList,
 	LineList,
@@ -144,7 +184,7 @@ enum class EPrimitiveTopology : TUINT32
 };
 
 // Enumeration of polygon modes
-enum class EPolygonMode : TUINT32
+enum class EPolygonMode : TUINT8
 {
 	Fill,
 	Line,
@@ -152,14 +192,14 @@ enum class EPolygonMode : TUINT32
 };
 
 // Enumeration of front face orientations
-enum class EFrontFace : TUINT32
+enum class EFrontFace : TUINT8
 {
 	Clockwise,
 	CounterClockwise
 };
 
 // Enumeration of cull modes
-enum class ECullMode : TUINT32
+enum class ECullMode : TUINT8
 {
 	Front,
 	Back,
@@ -167,7 +207,7 @@ enum class ECullMode : TUINT32
 };
 
 // Enumeration of depth test modes
-enum class EDepthTest : TUINT32
+enum class EDepthTest : TUINT8
 {
 	Never,
 	Less,
@@ -180,7 +220,7 @@ enum class EDepthTest : TUINT32
 };
 
 // Enumeration of stencil test modes
-enum class EStencilTest : TUINT32
+enum class EStencilTest : TUINT8
 {
 	Never,
 	Less,
@@ -193,7 +233,7 @@ enum class EStencilTest : TUINT32
 };
 
 // Enumeration of blend modes
-enum class EBlendMode : TUINT32
+enum class EBlendMode : TUINT8
 {
 	Opaque,
 	Masked,
@@ -204,18 +244,134 @@ enum class EBlendMode : TUINT32
 	Custom
 };
 
-// Enumeration of comparison functions
-enum class ERHICompare : TUINT32
+HLVM_ENUM(ESamplerFilter, TUINT8,
+	Point,
+	Bilinear,
+	Trilinear,
+	AnisotropicPoint,
+	AnisotropicLinear);
+static_assert(ESamplerFilter_NUM <= (1 << 3), "ESamplerFilter will not fit on 3 bits");
+
+HLVM_ENUM(ESamplerAddressMode, TUINT8,
+	Wrap,
+	Clamp,
+	Mirror,
+	/** Not supported on all platforms */
+	Border);
+static_assert(ESamplerAddressMode_NUM <= (1 << 2), "ESamplerAddressMode will not fit on 2 bits");
+
+enum class ESamplerCompareFunction : TUINT8
 {
 	Never,
-	Less,
-	Equal,
-	LessEqual,
-	Greater,
-	NotEqual,
-	GreaterEqual,
-	Always
+	Less
 };
+
+HLVM_ENUM(ERasterizerFillMode, TUINT8,
+	Point,
+	Wireframe,
+	Solid);
+static_assert(ERasterizerFillMode_NUM <= (1 << 2), "ERasterizerFillMode will not fit on 2 bits");
+
+HLVM_ENUM(ERasterizerCullMode, TUINT8,
+	None,
+	CW,
+	CCW);
+static_assert(ERasterizerCullMode_NUM <= (1 << 2), "ERasterizerCullMode will not fit on 2 bits");
+
+HLVM_ENUM(ERasterizerDepthClipMode, TUINT8,
+	DepthClip,
+	DepthClamp);
+static_assert(ERasterizerDepthClipMode_NUM <= (1 << 1), "ERasterizerDepthClipMode will not fit on 1 bits");
+
+enum class EColorWriteMask : TUINT32
+{
+	RED = 1 << 0,
+	GREEN = 1 << 1,
+	BLUE = 1 << 2,
+	ALPHA = 1 << 3,
+
+	NUM,
+
+	NONE = 0,
+	RGB = RED | GREEN | BLUE,
+	RGBA = RED | GREEN | BLUE | ALPHA,
+	RG = RED | GREEN,
+	BA = BLUE | ALPHA,
+};
+static_assert(HLVM_ENUM_VALUE(EColorWriteMask::NUM) <= (1 << 4), "EColorWriteMask will not fit on 4 bits");
+
+enum class ECompareFunction : TUINT32
+{
+	Less = 0,
+	LessEqual = 1,
+	Greater = 2,
+	GreaterEqual = 3,
+	Equal = 4,
+	NotEqual = 5,
+	Never = 6,
+	Always = 7,
+
+	NUM,
+
+	// Utility enumerations
+	DepthNearOrEqual = ((HLVM_ENUM_VALUE(ERHIZBuffer::IsInverted) != 0) ? GreaterEqual : LessEqual),
+	DepthNear = ((HLVM_ENUM_VALUE(ERHIZBuffer::IsInverted) != 0) ? Greater : Less),
+	DepthFartherOrEqual = ((HLVM_ENUM_VALUE(ERHIZBuffer::IsInverted) != 0) ? LessEqual : GreaterEqual),
+	DepthFarther = ((HLVM_ENUM_VALUE(ERHIZBuffer::IsInverted) != 0) ? Less : Greater)
+};
+static_assert(HLVM_ENUM_VALUE(ECompareFunction::NUM) <= (1 << 3), "ECompareFunction will not fit on 3 bits");
+
+enum class EStencilMask : TUINT8
+{
+	Default = 0,
+	V_255 = 255,
+	V_1 = 1,
+	V_2 = 2,
+	V_4 = 4,
+	V_8 = 8,
+	V_16 = 16,
+	V_32 = 32,
+	V_64 = 64,
+	V_128 = 128
+};
+
+HLVM_ENUM(EStencilOp, TUINT8,
+	Keep,
+	Zero,
+	Replace,
+	SaturatedIncrement,
+	SaturatedDecrement,
+	Invert,
+	Increment,
+	Decrement);
+static_assert(EStencilOp_NUM <= (1 << 3), "EStencilOp will not fit on 3 bits");
+
+HLVM_ENUM(EBlendOperation, TUINT8,
+	Add,
+	Subtract,
+	Min,
+	Max,
+	ReverseSubtract);
+static_assert(EBlendOperation_NUM <= (1 << 3), "EBlendOperation will not fit on 3 bits");
+
+HLVM_ENUM(EBlendFactor, TUINT8,
+	Zero,
+	One,
+	SourceColor,
+	InverseSourceColor,
+	SourceAlpha,
+	InverseSourceAlpha,
+	DestAlpha,
+	InverseDestAlpha,
+	DestColor,
+	InverseDestColor,
+	ConstantBlendFactor,
+	InverseConstantBlendFactor,
+	Source1Color,
+	InverseSource1Color,
+	Source1Alpha,
+	InverseSource1Alpha);
+static_assert(EBlendFactor_NUM <= (1 << 4), "EBlendFactor will not fit on 4 bits");
 
 // Enumeration of viewport types (e.g., windowed, fullscreen)
 enum class ERHIViewportType : TUINT32
@@ -234,7 +390,7 @@ enum class ESwapChainFlags : TUINT32
 	HDR = 1 << 2,		   // High Dynamic Range (HDR) support
 };
 
-enum class ESubpassType : TUINT32
+enum class ESubpassHint : TUINT32
 {
 	Default,
 	DepthReading,
@@ -408,52 +564,32 @@ enum class ERHIAccessFlag : TUINT32
 };
 HLVM_DECLARE_ENMU_FLAGS(ERHIAccessFlag, ERHIAccessFlags)
 
-enum class EVariableRateShadingCombiner : TUINT32
+enum class EPrimitiveType : TUINT8
 {
-	Passthrough,
-	Override,
-	Min,
-	Max,
-	Sum
+	// Topology that defines a triangle N with 3 vertex extremities: 3*N+0, 3*N+1, 3*N+2.
+	TriangleList,
+
+	// Topology that defines a triangle N with 3 vertex extremities: N+0, N+1, N+2.
+	TriangleStrip,
+
+	// Topology that defines a line with 2 vertex extremities: 2*N+0, 2*N+1.
+	LineList,
+
+	// Topology that defines a quad N with 4 vertex extremities: 4*N+0, 4*N+1, 4*N+2, 4*N+3.
+	// Supported only if GRHISupportsQuadTopology == true.
+	QuadList,
+
+	// Topology that defines a point N with a single vertex N.
+	PointList,
+
+	// Topology that defines a screen aligned rectangle N with only 3 vertex corners:
+	//    3*N + 0 is upper-left corner,
+	//    3*N + 1 is upper-right corner,
+	//    3*N + 2 is the lower-left corner.
+	// Supported only if GRHISupportsRectTopology == true.
+	RectList,
+
+	Num
 };
+static_assert(HLVM_ENUM_VALUE(EPrimitiveType::Num) <= (1 << 3), "EPrimitiveType doesn't fit in 3 bits");
 
-// RHI Resource Types
-class FRHITexture;
-class FRHIBuffer;
-class FRHIShader;
-class FRHIShaderResourceView;
-class FRHIUnorderedAccessView;
-class FRHISamplerState;
-class FRHIRenderTargetView;
-class FRHIDepthStencilView;
-class FRHIShaderParameterStruct;
-class FRHIViewport;
-
-// RHI Command List Types
-class FRHICommandListBase;
-class FRHICommandListImmediate;
-class FRHIComputeCommandList;
-
-// RHI Pipeline State Types
-class FRHIGraphicsPipelineState;
-class FRHIComputePipelineState;
-
-// Utility Functions
-HLVM_INLINE_FUNC const TCHAR* GetRHIName(ERHIInterfaceType Type)
-{
-	switch (Type)
-	{
-		case ERHIInterfaceType::Vulkan:
-			return TXT("Vulkan");
-		case ERHIInterfaceType::Null:
-			return TXT("Null");
-		default:
-			HLVM_ASSERT_F(false, TXT("Unknown RHI Interface Type"));
-			return TXT("Unknown");
-	}
-};
-
-namespace RHI
-{
-	constexpr TUINT32 RT_ATTACHMENT_MAX = 8;
-}

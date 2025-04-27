@@ -43,11 +43,11 @@ FVulkanRenderTargetLayout::FVulkanRenderTargetLayout(const FRHIRenderPassInfo& R
 		}
 
 		// CustomResolveSubpass can have targets with a different NumSamples
-		HLVM_ENSURE(!NumSamples || NumSamples == ColorRTBinding.RenderTarget->GetNumSamples() || RPInfo.SubpassType == ESubpassType::CustomResolve);
+		HLVM_ENSURE(!NumSamples || NumSamples == ColorRTBinding.RenderTarget->GetNumSamples() || RPInfo.SubpassHint == ESubpassHint::CustomResolve);
 		NumSamples = ColorRTBinding.RenderTarget->GetNumSamples();
 
 		// With a CustomResolveSubpass last color attachment is a resolve target
-		bool bCustomResolveAttachment = (Index == (NumColorRenderTargets - 1)) && RPInfo.SubpassType == ESubpassType::CustomResolve;
+		bool bCustomResolveAttachment = (Index == (NumColorRenderTargets - 1)) && RPInfo.SubpassHint == ESubpassHint::CustomResolve;
 
 		VkAttachmentDescription& CurrDesc = Desc[NumAttachmentDescriptions];
 		CurrDesc.samples = bCustomResolveAttachment ? VK_SAMPLE_COUNT_1_BIT : static_cast<VkSampleCountFlagBits>(NumSamples);

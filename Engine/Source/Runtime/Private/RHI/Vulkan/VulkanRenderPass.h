@@ -463,7 +463,7 @@ public:
 		// 0b11 for 2, 0b1111 for 4, and so on
 		TUINT32 MultiviewMask = 0; // TODO : make render pass support multiview?
 
-		const bool bDeferredShadingSubpass = RTLayout.GetSubpassHint() == ESubpassType::DeferredShading;
+		const bool bDeferredShadingSubpass = RTLayout.GetSubpassHint() == ESubpassHint::DeferredShading;
 		//		const bool bApplyFragmentShadingRate = GRHISupportsAttachmentVariableRateShading
 		//			&& RTLayout.GetFragmentDensityAttachmentReference() != nullptr
 		//			&& Device.GetOptionalExtensions().HasKHRFragmentShadingRate
@@ -471,8 +471,8 @@ public:
 		//		const bool bResolveDepth = GRHISupportsDepthStencilResolve && Device.GetOptionalExtensions().HasKHRDepthStencilResolve && RTLayout.GetHasDepthStencilResolve();
 		const bool bApplyFragmentShadingRate = false;
 		const bool bResolveDepth = false;
-		const bool bCustomResolveSubpass = RTLayout.GetSubpassHint() == ESubpassType::CustomResolve;
-		const bool bDepthReadSubpass = bCustomResolveSubpass || (RTLayout.GetSubpassHint() == ESubpassType::DepthReading);
+		const bool bCustomResolveSubpass = RTLayout.GetSubpassHint() == ESubpassHint::CustomResolve;
+		const bool bDepthReadSubpass = bCustomResolveSubpass || (RTLayout.GetSubpassHint() == ESubpassHint::DepthReading);
 		const bool bHasDepthStencilAttachmentReference = (RTLayout.GetDepthAttachmentReference() != nullptr);
 
 		if (bApplyFragmentShadingRate)
@@ -834,15 +834,15 @@ private:
 	TAttachmentReferenceClass InputAttachments1[InputAttachment1Count];
 
 	// Two subpasses for deferred shading
-	TAttachmentReferenceClass InputAttachments2[RHI::RT_ATTACHMENT_MAX + 1];
+	TAttachmentReferenceClass InputAttachments2[RHI::MAX_RT_ATTACHMENTS + 1];
 	TAttachmentReferenceClass DepthStencilAttachment;
 
 	TAttachmentReferenceClass			 DepthStencilAttachmentReference;
 	TVector<TAttachmentDescriptionClass> AttachmentDescriptions;
 
 	// Tonemap subpass
-	TAttachmentReferenceClass InputAttachments3[RHI::RT_ATTACHMENT_MAX + 1];
-	TAttachmentReferenceClass ColorAttachments3[RHI::RT_ATTACHMENT_MAX + 1];
+	TAttachmentReferenceClass InputAttachments3[RHI::MAX_RT_ATTACHMENTS + 1];
+	TAttachmentReferenceClass ColorAttachments3[RHI::MAX_RT_ATTACHMENTS + 1];
 
 	FVulkanAttachmentReference<VkAttachmentReference2> ShadingRateAttachmentReference;
 	FVulkanFragmentShadingRateAttachmentInfo		   FragmentShadingRateAttachmentInfo;

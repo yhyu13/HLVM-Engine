@@ -282,26 +282,27 @@ namespace VulkanRHI
 	}
 
 	// Helper function to convert RHI compare function to Vulkan compare function
-	VkCompareOp VulkanCompareOpFromRHICompareFunction(ERHICompare RHIFunction)
+	VkCompareOp VulkanCompareOpFromRHICompareFunction(ECompareFunction RHIFunction)
 	{
 		switch (RHIFunction)
 		{
-			case ERHICompare::Never:
+			case ECompareFunction::Never:
 				return VK_COMPARE_OP_NEVER;
-			case ERHICompare::Less:
+			case ECompareFunction::Less:
 				return VK_COMPARE_OP_LESS;
-			case ERHICompare::Equal:
+			case ECompareFunction::Equal:
 				return VK_COMPARE_OP_EQUAL;
-			case ERHICompare::LessEqual:
+			case ECompareFunction::LessEqual:
 				return VK_COMPARE_OP_LESS_OR_EQUAL;
-			case ERHICompare::Greater:
+			case ECompareFunction::Greater:
 				return VK_COMPARE_OP_GREATER;
-			case ERHICompare::NotEqual:
+			case ECompareFunction::NotEqual:
 				return VK_COMPARE_OP_NOT_EQUAL;
-			case ERHICompare::GreaterEqual:
+			case ECompareFunction::GreaterEqual:
 				return VK_COMPARE_OP_GREATER_OR_EQUAL;
-			case ERHICompare::Always:
+			case ECompareFunction::Always:
 				return VK_COMPARE_OP_ALWAYS;
+			case ECompareFunction::NUM:
 			default:
 				HLVM_ASSERT_F(false, TXT("Unknown RHI compare function"));
 				return VK_COMPARE_OP_NEVER;
@@ -321,21 +322,21 @@ namespace VulkanRHI
 				return VK_SHADER_STAGE_COMPUTE_BIT;
 			case EShaderStage::Geometry:
 				return VK_SHADER_STAGE_GEOMETRY_BIT;
-			case EShaderStage::Hull:
-				return VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT;
-			case EShaderStage::Domain:
-				return VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT;
+			case EShaderStage::Mesh:
+				return VK_SHADER_STAGE_MESH_BIT_EXT;
+			case EShaderStage::Task:
+				return VK_SHADER_STAGE_TASK_BIT_EXT;
 			case EShaderStage::RayGeneration:
 				return VK_SHADER_STAGE_RAYGEN_BIT_KHR;
-			case EShaderStage::Intersection:
+			case EShaderStage::RayIntersection:
 				return VK_SHADER_STAGE_INTERSECTION_BIT_KHR;
-			case EShaderStage::AnyHit:
+			case EShaderStage::RayAnyHit:
 				return VK_SHADER_STAGE_ANY_HIT_BIT_KHR;
-			case EShaderStage::ClosestHit:
+			case EShaderStage::RayClosestHit:
 				return VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
-			case EShaderStage::Miss:
+			case EShaderStage::RayMiss:
 				return VK_SHADER_STAGE_MISS_BIT_KHR;
-			case EShaderStage::Callable:
+			case EShaderStage::RayCallable:
 				return VK_SHADER_STAGE_CALLABLE_BIT_KHR;
 			default:
 				HLVM_ASSERT_F(false, TXT("Unknown RHI shader stage"));

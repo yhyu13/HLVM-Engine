@@ -18,6 +18,17 @@ struct FMD5Digest
 	explicit FMD5Digest(boost::uuids::detail::md5::digest_type&& data);
 
 	FString ToString() const;
+
+	// compare operator
+	bool operator==(const FMD5Digest& other) const
+	{
+		return FMemory::Memcmp(digest, other.digest, sizeof(digest)) == 0;
+	}
+
+	bool operator!=(const FMD5Digest& other) const
+	{
+		return !(*this == other);
+	}
 };
 
 class FMD5Hash

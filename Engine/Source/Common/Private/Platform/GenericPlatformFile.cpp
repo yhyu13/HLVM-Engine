@@ -33,7 +33,7 @@ TNoNullablePtr<FGenericPlatformFile> FGenericPlatformFile::Get(EPlatformFileType
 			FGenericPlatformFile::_Init();
 		}
 	});
-	return sPlatformFileRedirector[HLVM_ENUM_VALUE_AS_TYPE(size_t, PlatformFileType)];
+	return sPlatformFileRedirector[HLVM_ENUM_VALUE(PlatformFileType)];
 }
 
 bool FGenericPlatformFile::IsDirectory(const FPath& path)

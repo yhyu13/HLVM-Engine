@@ -17,11 +17,15 @@ enum class ERHIResourceType : TUINT8
 	ShaderResourceView,
 	UnorderedAccessView,
 	SamplerState,
-	PipelineState,
+	GraphicsPSO,
+	ComputePSO,
 	Query,
 	VertexDeclaration,
 	Viewport,
-	RenderPass
+	RenderPass,
+	BlendState,
+	RasterizerState,
+	DepthStencilState,
 	// Add other resource types as needed
 };
 
@@ -165,19 +169,19 @@ public:
 	virtual ERHIResourceType GetType() const override { return ERHIResourceType::SamplerState; }
 };
 
-// Base class for RHI pipeline states
-class FRHIGraphicsPipelineState : virtual public IRHIResource
+// Base class for RHI pipeline states object (PSO)
+class FRHIGraphicsPSO : virtual public IRHIResource
 {
 public:
 	// Returns the type of the RHI resource
-	virtual ERHIResourceType GetType() const override { return ERHIResourceType::PipelineState; }
+	virtual ERHIResourceType GetType() const override { return ERHIResourceType::GraphicsPSO; }
 };
 
-class FRHIComputePipelineState : virtual public IRHIResource
+class FRHIComputePSO : virtual public IRHIResource
 {
 public:
 	// Returns the type of the RHI resource
-	virtual ERHIResourceType GetType() const override { return ERHIResourceType::PipelineState; }
+	virtual ERHIResourceType GetType() const override { return ERHIResourceType::ComputePSO; }
 };
 
 // Base class for RHI queries
@@ -232,16 +236,41 @@ public:
 	virtual ERHIResourceType GetType() const override { return ERHIResourceType::RenderPass; }
 };
 
+
+class FRHIBlendState : virtual public IRHIResource
+{
+public:
+	// Returns the type of the RHI resource
+	virtual ERHIResourceType GetType() const override { return ERHIResourceType::BlendState; }
+};
+
+class FRHIRasterizerState : virtual public IRHIResource
+{
+public:
+	// Returns the type of the RHI resource
+	virtual ERHIResourceType GetType() const override { return ERHIResourceType::RasterizerState; }
+};
+
+class FRHIDepthStencilState : virtual public IRHIResource
+{
+public:
+	// Returns the type of the RHI resource
+	virtual ERHIResourceType GetType() const override { return ERHIResourceType::DepthStencilState; }
+};
+
 // Smart pointer types for RHI resources
 using FRHIBufferRef = TRefCountPtr<FRHIBuffer>;
 using FRHIShaderRef = TRefCountPtr<FRHIShader>;
 using FShaderResourceViewRHIRef = TRefCountPtr<FRHIShaderResourceView>;
 using FUnorderedAccessViewRHIRef = TRefCountPtr<FRHIUnorderedAccessView>;
 using FSamplerStateRHIRef = TRefCountPtr<FRHISamplerState>;
-using FGraphicsPipelineStateRHIRef = TRefCountPtr<FRHIGraphicsPipelineState>;
-using FComputePipelineStateRHIRef = TRefCountPtr<FRHIComputePipelineState>;
+using FRHIGraphicsPSORef = TRefCountPtr<FRHIGraphicsPSO>;
+using FRHIComputePSORef = TRefCountPtr<FRHIComputePSO>;
 using FQueryRHIRef = TRefCountPtr<FRHIQuery>;
 using FRHIViewportRef = TRefCountPtr<FRHIViewport>;
 using FRHIRenderPassRef = TRefCountPtr<FRHIRenderPass>;
+using FRHIBlendStateRef = TRefCountPtr<FRHIBlendState>;
+using FRHIRasterizerStateRef = TRefCountPtr<FRHIRasterizerState>;
+using FRHIDepthStencilStateRef = TRefCountPtr<FRHIDepthStencilState>;
 
 #undef DECLARE_RHI_RESOURCE

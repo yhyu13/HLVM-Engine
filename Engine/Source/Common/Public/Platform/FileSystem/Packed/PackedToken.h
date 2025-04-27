@@ -16,8 +16,8 @@ struct FPackedTokenEntryData
 	size_t		  StartPos;
 	size_t		  Size;
 	size_t		  DecompressSize;
-	EEncryptType  EncryptType : 4 { EEncryptType::Unknow };
-	ECompressType CompressType : 4 { ECompressType::Unknow };
+	EEncryptType  EncryptType : 4 { EEncryptType::No };
+	ECompressType CompressType : 4 { ECompressType::No };
 };
 static_assert(sizeof(FPackedTokenEntryData) == 32, "FPackedTokenEntryData size is not 32 bytes");
 

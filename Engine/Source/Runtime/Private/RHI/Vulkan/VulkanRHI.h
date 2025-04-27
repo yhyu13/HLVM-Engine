@@ -42,8 +42,8 @@ public:
 	virtual FRHIShaderRef CreateShader(const FShaderCreateInfo& CreateInfo) override;
 
 	// Pipeline State Management
-	virtual FRHIGraphicsPipelineState* CreateGraphicsPipelineState(const FGraphicsPipelineStateInitializer& Initializer) override;
-	virtual FRHIComputePipelineState*  CreateComputePipelineState(const FComputePipelineStateInitializer& Initializer) override;
+	virtual FRHIGraphicsPSO* CreateGraphicsPSO(const FGraphicsPSOInitializer& Initializer) override;
+	virtual FRHIComputePSO*  CreateComputePSO(const FComputePSOInitializer& Initializer) override;
 
 	// Command List and Context
 	virtual FRHICommandListImmediate& GetImmediateCommandList() override;
@@ -83,8 +83,8 @@ public:
 	virtual void RHIFlushPendingDeletes() override;
 
 	// Misc
-	virtual void RHISetGraphicsPipelineState(FRHIGraphicsPipelineState* PipelineState) override;
-	virtual void RHISetComputePipelineState(FRHIComputePipelineState* PipelineState) override;
+	virtual void RHISetGraphicsPSO(FRHIGraphicsPSO* PipelineState) override;
+	virtual void RHISetComputePSO(FRHIComputePSO* PipelineState) override;
 	virtual void RHISetViewport(TUINT32 MinX, TUINT32 MinY, float MinZ, TUINT32 MaxX, TUINT32 MaxY, float MaxZ) override;
 	virtual void RHISetScissorRect(bool bEnable, TUINT32 MinX, TUINT32 MinY, TUINT32 MaxX, TUINT32 MaxY) override;
 
@@ -162,14 +162,14 @@ protected:
 	// Function to generate VkPipelineShaderStageCreateInfo from FShaderCreateInfo
 	VkPipelineShaderStageCreateInfo GenerateVkPipelineShaderStageCreateInfo(const FShaderCreateInfo& CreateInfo);
 
-	// Function to generate VkPipelineLayoutCreateInfo from FRHIGraphicsPipelineStateCreateInfo (assuming this struct exists)
+	// Function to generate VkPipelineLayoutCreateInfo from FRHIGraphicsPSOCreateInfo (assuming this struct exists)
 	VkPipelineLayoutCreateInfo GenerateVkPipelineLayoutCreateInfo(const FRHIGraphicsPipelineLayoutCreateInfo& CreateInfo);
 
-	// Function to generate VkGraphicsPipelineCreateInfo from FRHIGraphicsPipelineStateCreateInfo (assuming this struct exists)
-	VkGraphicsPipelineCreateInfo GenerateVkGraphicsPipelineCreateInfo(const FRHIGraphicsPipelineStateCreateInfo& CreateInfo);
+	// Function to generate VkGraphicsPipelineCreateInfo from FRHIGraphicsPSOCreateInfo (assuming this struct exists)
+	VkGraphicsPipelineCreateInfo GenerateVkGraphicsPipelineCreateInfo(const FRHIGraphicsPSOCreateInfo& CreateInfo);
 
-	// Function to generate VkComputePipelineCreateInfo from FRHIComputePipelineStateCreateInfo (assuming this struct exists)
-	VkComputePipelineCreateInfo GenerateVkComputePipelineCreateInfo(const FRHIComputePipelineStateCreateInfo& CreateInfo);
+	// Function to generate VkComputePipelineCreateInfo from FRHIComputePSOCreateInfo (assuming this struct exists)
+	VkComputePipelineCreateInfo GenerateVkComputePipelineCreateInfo(const FRHIComputePSOCreateInfo& CreateInfo);
 
 	// Function to generate VkQueryPoolCreateInfo from FRHIQueryCreateInfo (assuming this struct exists)
 	VkQueryPoolCreateInfo GenerateVkQueryPoolCreateInfo(const FRHIQueryCreateInfo& CreateInfo);

@@ -33,8 +33,8 @@ public:
 	virtual FRHIShaderRef CreateShader(const FShaderCreateInfo& CreateInfo) = 0;
 
 	// Pipeline State Management
-	virtual FRHIGraphicsPipelineState* CreateGraphicsPipelineState(const FGraphicsPipelineStateInitializer& Initializer) = 0;
-	virtual FRHIComputePipelineState* CreateComputePipelineState(const FComputePipelineStateInitializer& Initializer) = 0;
+	virtual FRHIGraphicsPSO* CreateGraphicsPSO(const FGraphicsPSOInitializer& Initializer) = 0;
+	virtual FRHIComputePSO* CreateComputePSO(const FComputePSOInitializer& Initializer) = 0;
 
 	// Command List and Context
 	virtual FRHICommandListImmediate& GetImmediateCommandList() = 0;
@@ -74,8 +74,8 @@ public:
 	virtual void RHIFlushPendingDeletes() = 0;
 
 	// Misc
-	virtual void RHISetGraphicsPipelineState(FRHIGraphicsPipelineState* PipelineState) = 0;
-	virtual void RHISetComputePipelineState(FRHIComputePipelineState* PipelineState) = 0;
+	virtual void RHISetGraphicsPSO(FRHIGraphicsPSO* PipelineState) = 0;
+	virtual void RHISetComputePSO(FRHIComputePSO* PipelineState) = 0;
 	virtual void RHISetViewport(TUINT32 MinX, TUINT32 MinY, float MinZ, TUINT32 MaxX, TUINT32 MaxY, float MaxZ) = 0;
 	virtual void RHISetScissorRect(bool bEnable, TUINT32 MinX, TUINT32 MinY, TUINT32 MaxX, TUINT32 MaxY) = 0;
 };

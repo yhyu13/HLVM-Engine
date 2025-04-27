@@ -32,7 +32,7 @@ namespace VulkanRHI
 	HLVM_EXTERN_FUNC VkSamplerAddressMode VulkanAddressModeFromRHIAddressMode(ETextureAddressMode RHIAddressMode);
 
 	// Helper function to convert RHI compare function to Vulkan compare function
-	HLVM_EXTERN_FUNC VkCompareOp VulkanCompareOpFromRHICompareFunction(ERHICompare RHIFunction);
+	HLVM_EXTERN_FUNC VkCompareOp VulkanCompareOpFromRHICompareFunction(ECompareFunction RHIFunction);
 
 	// Helper function to convert RHI shader stage to Vulkan shader stage
 	HLVM_EXTERN_FUNC VkShaderStageFlagBits VulkanShaderStageFromRHIStage(EShaderStage RHIShaderStage);

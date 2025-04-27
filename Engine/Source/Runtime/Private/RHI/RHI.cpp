@@ -12,7 +12,7 @@ void FRHIRenderPassInfo::Validate() const
 #if !HLVM_BUILD_RELEASE
 	TUINT32 NumSamples = 0;
 	TUINT32 ColorIndex = 0;
-	for (; ColorIndex < RHI::RT_ATTACHMENT_MAX; ++ColorIndex)
+	for (; ColorIndex < RHI::MAX_RT_ATTACHMENTS; ++ColorIndex)
 	{
 		const ColorRTBinding& Entry = ColorRenderTargets[ColorIndex];
 		if (Entry.RenderTarget)
@@ -25,7 +25,7 @@ void FRHIRenderPassInfo::Validate() const
 			else
 			{
 				// CustomResolveSubpass can have targets with a different NumSamples
-				HLVM_ENSURE_F(Entry.RenderTarget->GetNumSamples() == NumSamples || SubpassType == ESubpassType::CustomResolve,
+				HLVM_ENSURE_F(Entry.RenderTarget->GetNumSamples() == NumSamples || SubpassHint == ESubpassHint::CustomResolve,
 					TXT("RenderTarget have inconsistent NumSamples: first {}, then {}"), NumSamples, Entry.RenderTarget->GetNumSamples());
 			}
 
@@ -47,7 +47,7 @@ void FRHIRenderPassInfo::Validate() const
 	}
 
 	TUINT32 NumColorRenderTargets = ColorIndex;
-	for (; ColorIndex < RHI::RT_ATTACHMENT_MAX; ++ColorIndex)
+	for (; ColorIndex < RHI::MAX_RT_ATTACHMENTS; ++ColorIndex)
 	{
 		// Gap in the sequence of valid render targets (ie RT0, null, RT2, ...)
 		HLVM_ENSURE_F(!ColorRenderTargets[ColorIndex].RenderTarget, TXT("Missing color render target on slot %d"), ColorIndex - 1);
@@ -93,7 +93,7 @@ void FRHIRenderPassInfo::Validate() const
 			//HLVM_ENSURE(StencilStore == ERenderTargetStoreAction::EStore);
 		}
 
-		if (SubpassType == ESubpassType::DepthReading || SubpassType == ESubpassType::CustomResolve)
+		if (SubpassHint == ESubpassHint::DepthReading || SubpassHint == ESubpassHint::CustomResolve)
 		{
 			// for depth read sub-pass
 			// 1. render pass must have depth target
@@ -119,8 +119,8 @@ void FRHIRenderPassInfo::Validate() const
 	{
 		HLVM_ENSURE(DepthStencilRenderTarget.Action == EDepthStencilTargetActions::DontLoad_DontStore);
 		HLVM_ENSURE(DepthStencilRenderTarget.ExclusiveDepthStencil == FExclusiveDepthStencil::DepthNop_StencilNop);
-		HLVM_ENSURE(SubpassType != ESubpassType::DepthReading);
-		HLVM_ENSURE(SubpassType != ESubpassType::CustomResolve);
+		HLVM_ENSURE(SubpassHint != ESubpassHint::DepthReading);
+		HLVM_ENSURE(SubpassHint != ESubpassHint::CustomResolve);
 	}
 #endif
 }
