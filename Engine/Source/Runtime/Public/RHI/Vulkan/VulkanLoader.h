@@ -33,6 +33,7 @@
 	PFN_DEF(vkGetPhysicalDeviceFormatProperties)            \
 	PFN_DEF(vkGetPhysicalDeviceImageFormatProperties)       \
 	PFN_DEF(vkGetPhysicalDeviceProperties)                  \
+	PFN_DEF(vkGetPhysicalDeviceProperties2)                 \
 	PFN_DEF(vkGetPhysicalDeviceQueueFamilyProperties)       \
 	PFN_DEF(vkGetPhysicalDeviceMemoryProperties)            \
 	PFN_DEF(vkGetDeviceProcAddr)                            \

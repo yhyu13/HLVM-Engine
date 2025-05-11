@@ -6,56 +6,18 @@
 
 #include "RHI/RHIPipeline.h"
 #include "VulkanRHIResourcePre.h"
+#include "VulkanShader.h"
 
 // Information for the layout of descriptor sets; does not hold runtime objects
 class FVulkanDescriptorSetsLayoutInfo
 {
 public:
-	FVulkanDescriptorSetsLayoutInfo()
-	{
-		// Add expected descriptor types
-		for (TUINT32 i = VK_DESCRIPTOR_TYPE_BEGIN_RANGE; i <= VK_DESCRIPTOR_TYPE_END_RANGE; ++i)
-		{
-			LayoutTypes.Add(static_cast<VkDescriptorType>(i), 0);
-		}
-
-		LayoutTypes.Add(VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 0);
-	}
-
-	TUINT32 GetTypesUsed(VkDescriptorType Type) const
-	{
-		if (auto Value = LayoutTypes.Find(Type); Value != nullptr)
-		{
-			return *Value;
-		}
-		else
-		{
-			return 0;
-		}
-	}
-
 	struct FSetLayout
 	{
 		TVector<VkDescriptorSetLayoutBinding> LayoutBindings;
-		FMD5Digest							  Hash;
-
-		void GenerateHash()
-		{
-			Hash = FMD5Hash::Hash(LayoutBindings.GetData(), sizeof(VkDescriptorSetLayoutBinding) * LayoutBindings.Num());
-		}
-
-		friend FMD5Digest GetTypeHash(const FSetLayout& In)
-		{
-			return In.Hash;
-		}
 
 		bool operator==(const FSetLayout& In) const
 		{
-			if (In.Hash != Hash)
-			{
-				return false;
-			}
-
 			const TUINT32 NumBindings = LayoutBindings.Num();
 			if (In.LayoutBindings.Num() != NumBindings)
 			{
@@ -75,78 +37,6 @@ public:
 			return !(*this == In);
 		}
 	};
-
-	const TVector<FSetLayout>& GetLayouts() const
-	{
-		return SetLayouts;
-	}
-
-	friend TUINT32 GetTypeHash(const FVulkanDescriptorSetsLayoutInfo& In)
-	{
-		return In.Hash;
-	}
-
-	bool operator==(const FVulkanDescriptorSetsLayoutInfo& In) const
-	{
-		if (In.Hash != Hash)
-		{
-			return false;
-		}
-
-		if (In.BindPoint != BindPoint)
-		{
-			return false;
-		}
-
-		if (In.SetLayouts.Num() != SetLayouts.Num())
-		{
-			return false;
-		}
-
-		if (In.TypesUsageID != TypesUsageID)
-		{
-			return false;
-		}
-
-		for (TUINT32 Index = 0; Index < In.SetLayouts.Num(); ++Index)
-		{
-			if (In.SetLayouts[Index] != SetLayouts[Index])
-			{
-				return false;
-			}
-		}
-
-		if (StageInfos != In.StageInfos)
-		{
-			return false;
-		}
-
-		return true;
-	}
-
-	void CopyFrom(const FVulkanDescriptorSetsLayoutInfo& Info)
-	{
-		LayoutTypes = Info.LayoutTypes;
-		Hash = Info.Hash;
-		TypesUsageID = Info.TypesUsageID;
-		SetLayouts = Info.SetLayouts;
-		StageInfos = Info.StageInfos;
-	}
-
-	const auto& GetLayoutTypes() const
-	{
-		return LayoutTypes;
-	}
-
-	TUINT32 GetTypesUsageID() const
-	{
-		return TypesUsageID;
-	}
-
-	bool HasInputAttachments() const
-	{
-		return GetTypesUsed(VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT) > 0;
-	}
 
 	struct FStageInfo
 	{
@@ -177,19 +67,92 @@ public:
 			return true;
 		}
 	};
-	TStaticVector<FStageInfo, RHI::MAX_SHADER_STAGES> StageInfos;
 
-protected:
+public:
+	FVulkanDescriptorSetsLayoutInfo()
+	{
+		// Add expected descriptor types
+		for (TUINT32 i = VK_DESCRIPTOR_TYPE_BEGIN_RANGE; i <= VK_DESCRIPTOR_TYPE_END_RANGE; ++i)
+		{
+			LayoutTypes.Add(static_cast<VkDescriptorType>(i), 0);
+		}
+
+		LayoutTypes.Add(VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 0);
+	}
+
+	TUINT32 GetTypesUsed(VkDescriptorType Type) const
+	{
+		if (auto Value = LayoutTypes.Find(Type); Value != nullptr)
+		{
+			return *Value;
+		}
+		else
+		{
+			return 0;
+		}
+	}
+
+	const TVector<FSetLayout>& GetLayouts() const
+	{
+		return SetLayouts;
+	}
+
+	bool operator==(const FVulkanDescriptorSetsLayoutInfo& In) const
+	{
+
+		if (In.BindPoint != BindPoint)
+		{
+			return false;
+		}
+
+		if (In.SetLayouts.Num() != SetLayouts.Num())
+		{
+			return false;
+		}
+
+		for (TUINT32 Index = 0; Index < In.SetLayouts.Num(); ++Index)
+		{
+			if (In.SetLayouts[Index] != SetLayouts[Index])
+			{
+				return false;
+			}
+		}
+
+		if (StageInfos != In.StageInfos)
+		{
+			return false;
+		}
+
+		return true;
+	}
+
+	void CopyFrom(const FVulkanDescriptorSetsLayoutInfo& Info)
+	{
+		LayoutTypes = Info.LayoutTypes;
+		SetLayouts = Info.SetLayouts;
+		StageInfos = Info.StageInfos;
+	}
+
+	const auto& GetLayoutTypes() const
+	{
+		return LayoutTypes;
+	}
+
+	bool HasInputAttachments() const
+	{
+		return GetTypesUsed(VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT) > 0;
+	}
+
+	void FinalizeGraphicsBindings(const FVulkanPhysicalDeviceRef& PhysicalDevice, const FGraphicsShaderGatherInfo& ShaderGatherInfo, bool bUseBindless);
+
+public:
+	TStaticVector<FStageInfo, RHI::MAX_SHADER_STAGES> StageInfos {RHI::MAX_SHADER_STAGES};
+
+private:
+	void AddDescriptor(TUINT32 DescriptorSetIndex, const VkDescriptorSetLayoutBinding& Descriptor);
+
+private:
 	TMapSmall<VkDescriptorType, TUINT32> LayoutTypes;
 	TVector<FSetLayout>					 SetLayouts;
-
-	TUINT32 Hash = 0;
-
-	TUINT32 TypesUsageID = TUINT32_MAX;
-
-	VkPipelineBindPoint BindPoint = VK_PIPELINE_BIND_POINT_MAX_ENUM;
-
-	void CompileTypesUsageID();
-
-	void AddDescriptor(TINT32 DescriptorSetIndex, const VkDescriptorSetLayoutBinding& Descriptor);
+	VkPipelineBindPoint					 BindPoint = VK_PIPELINE_BIND_POINT_MAX_ENUM;
 };

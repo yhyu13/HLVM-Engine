@@ -7,43 +7,43 @@
 #include "RHIPipelinePre.h"
 
 // Structure for describing graphics pipeline state initialization parameters
-struct FGraphicsPSOInitializer
-{
-	FVertexDeclarationRHIRef VertexDeclaration;							  // Vertex declaration
-	FRHIShaderRef			 VertexShader;								  // Vertex shader
-	FRHIShaderRef			 PixelShader;								  // Pixel shader
-	FRHIShaderRef			 GeometryShader;							  // Geometry shader (optional)
-	FRHIShaderRef			 HullShader;								  // Hull shader (optional)
-	FRHIShaderRef			 DomainShader;								  // Domain shader (optional)
-	EPixelFormat			 RenderTargetFormats[RHI::MAX_RT_ATTACHMENTS]; // Formats of the render targets
-	EPixelFormat			 DepthStencilFormat;						  // Format of the depth-stencil target
-	TUINT32					 NumRenderTargets;							  // Number of render targets
-	TUINT32					 SampleCount;								  // Number of samples (for MSAA)
+// struct FGraphicsPSOInitializer
+//{
+//	FVertexDeclarationRHIRef VertexDeclaration;							  // Vertex declaration
+//	FRHIShaderRef			 VertexShader;								  // Vertex shader
+//	FRHIShaderRef			 PixelShader;								  // Pixel shader
+//	FRHIShaderRef			 GeometryShader;							  // Geometry shader (optional)
+//	FRHIShaderRef			 HullShader;								  // Hull shader (optional)
+//	FRHIShaderRef			 DomainShader;								  // Domain shader (optional)
+//	EPixelFormat			 RenderTargetFormats[RHI::MAX_RT_ATTACHMENTS]; // Formats of the render targets
+//	EPixelFormat			 DepthStencilFormat;						  // Format of the depth-stencil target
+//	TUINT32					 NumRenderTargets;							  // Number of render targets
+//	TUINT32					 SampleCount;								  // Number of samples (for MSAA)
+//
+//	// Constructor for easy initialization
+//	FGraphicsPSOInitializer()
+//		: VertexDeclaration(nullptr)
+//		, VertexShader(nullptr)
+//		, PixelShader(nullptr)
+//		, GeometryShader(nullptr)
+//		, HullShader(nullptr)
+//		, DomainShader(nullptr)
+//		, DepthStencilFormat(EPixelFormat::None)
+//		, NumRenderTargets(0)
+//		, SampleCount(1)
+//	{
+//		std::memset(RenderTargetFormats, HLVM_ENUM_VALUE(EPixelFormat::None), sizeof(RenderTargetFormats));
+//	}
+//};
 
-	// Constructor for easy initialization
-	FGraphicsPSOInitializer()
-		: VertexDeclaration(nullptr)
-		, VertexShader(nullptr)
-		, PixelShader(nullptr)
-		, GeometryShader(nullptr)
-		, HullShader(nullptr)
-		, DomainShader(nullptr)
-		, DepthStencilFormat(EPixelFormat::None)
-		, NumRenderTargets(0)
-		, SampleCount(1)
-	{
-		std::memset(RenderTargetFormats, HLVM_ENUM_VALUE(EPixelFormat::None), sizeof(RenderTargetFormats));
-	}
-};
-
-class FGraphicsPipelineStateInitializer
+class FGraphicsPSOInitializer
 {
 public:
 	// Can't use TEnumByte<EPixelFormat> as it changes the struct to be non trivially constructible, breaking memset
 	using TRenderTargetFormats = TStaticVector<EPixelFormat, RHI::MAX_RT_ATTACHMENTS>;
 	using TRenderTargetFlags = TStaticVector<ETextureCreateFlag, RHI::MAX_RT_ATTACHMENTS>;
 
-	FGraphicsPipelineStateInitializer()
+	FGraphicsPSOInitializer()
 		: BlendState(nullptr)
 		, RasterizerState(nullptr)
 		, DepthStencilState(nullptr)
@@ -63,7 +63,7 @@ public:
 	{
 	}
 
-	FGraphicsPipelineStateInitializer(
+	FGraphicsPSOInitializer(
 		FBoundShaderStateInput		InBoundShaderState,
 		FRHIBlendStateRef			InBlendState,
 		FRHIRasterizerStateRef		InRasterizerState,
@@ -79,9 +79,9 @@ public:
 		ERenderTargetLoadAction		InStencilTargetLoadAction,
 		ERenderTargetStoreAction	InStencilTargetStoreAction,
 		FExclusiveDepthStencil		InDepthStencilAccess,
-		TUINT32						InNumSamples,
+		TUINT8						InNumSamples,
 		ESubpassHint				InSubpassHint,
-		TUINT32						InSubpassIndex,
+		TUINT8						InSubpassIndex,
 		bool						bInDepthBounds)
 		: BoundShaderState(InBoundShaderState)
 		, BlendState(InBlendState)
@@ -105,13 +105,13 @@ public:
 	{
 	}
 
-	bool operator==(const FGraphicsPipelineStateInitializer& rhs) const
+	bool operator==(const FGraphicsPSOInitializer& rhs) const
 	{
 		if (BoundShaderState.VertexDeclarationRHI != rhs.BoundShaderState.VertexDeclarationRHI
 			|| BoundShaderState.VertexShaderRHI != rhs.BoundShaderState.VertexShaderRHI
 			|| BoundShaderState.PixelShaderRHI != rhs.BoundShaderState.PixelShaderRHI
 			|| BoundShaderState.GetMeshShader() != rhs.BoundShaderState.GetMeshShader()
-			|| BoundShaderState.GetAmplificationShader() != rhs.BoundShaderState.GetAmplificationShader()
+			|| BoundShaderState.GetTaskShader() != rhs.BoundShaderState.GetTaskShader()
 			|| BoundShaderState.GetGeometryShader() != rhs.BoundShaderState.GetGeometryShader()
 			|| BlendState != rhs.BlendState
 			|| RasterizerState != rhs.RasterizerState
@@ -186,10 +186,10 @@ public:
 		return RenderTargetsEnabled;
 	}
 
-	FBoundShaderStateInput	  BoundShaderState;
-	FRHIBlendStateRef		  BlendState;
-	FRHIRasterizerStateRef	  RasterizerState;
-	FRHIDepthStencilStateRef  DepthStencilState;
+	FBoundShaderStateInput	 BoundShaderState;
+	FRHIBlendStateRef		 BlendState;
+	FRHIRasterizerStateRef	 RasterizerState;
+	FRHIDepthStencilStateRef DepthStencilState;
 
 	EPrimitiveType			 PrimitiveType;
 	TUINT32					 RenderTargetsEnabled;
@@ -202,9 +202,9 @@ public:
 	ERenderTargetLoadAction	 StencilTargetLoadAction;
 	ERenderTargetStoreAction StencilTargetStoreAction;
 	FExclusiveDepthStencil	 DepthStencilAccess;
-	TUINT32					 NumSamples;
+	TUINT8					 NumSamples;
 	ESubpassHint			 SubpassHint;
-	TUINT32					 SubpassIndex;
+	TUINT8					 SubpassIndex;
 	bool					 bDepthBounds;
 };
 

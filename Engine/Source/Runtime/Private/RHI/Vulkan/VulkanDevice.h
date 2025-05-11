@@ -1,5 +1,5 @@
 /**
-* Copyright (c) 2025. MIT License. All rights reserved.
+ * Copyright (c) 2025. MIT License. All rights reserved.
  */
 
 #pragma once
@@ -47,10 +47,7 @@ public:
 	};
 
 public:
-	explicit FVulkanPhysicalDevice(VkPhysicalDevice InDevice)
-	{
-		mDevice = InDevice;
-	}
+	explicit FVulkanPhysicalDevice(VkPhysicalDevice InDevice);
 
 	HLVM_INLINE_FUNC VkPhysicalDevice GetHandle() const
 	{
@@ -62,6 +59,11 @@ public:
 		return mDevice;
 	}
 
+	const VkPhysicalDeviceProperties& GetProperties() const
+	{
+		return mProperties;
+	}
+
 	// 查询并返回队列族索引
 	QueueFamilyIndices QueryQueueFamilyIndices(VkSurfaceKHR Surface, bool bFresh = false);
 
@@ -70,7 +72,12 @@ public:
 
 private:
 	VkPhysicalDevice mDevice;
-	TMap<VkSurfaceKHR, QueueFamilyIndices> mSurfaceToQueueFamilyIndices;
+
+	VkPhysicalDeviceProperties			mProperties;
+	VkPhysicalDeviceIDPropertiesKHR		mDeviceIDProperties;
+	VkPhysicalDeviceSubgroupProperties mSubgroupProperties;
+
+	TMap<VkSurfaceKHR, QueueFamilyIndices>		mSurfaceToQueueFamilyIndices;
 	TMap<VkSurfaceKHR, SwapChainSupportDetails> mSurfaceToSwapChainSupportDetails;
 };
 

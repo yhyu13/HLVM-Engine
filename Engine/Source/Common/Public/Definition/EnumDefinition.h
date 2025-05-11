@@ -143,10 +143,9 @@ public:
 	/** Implicit conversion to EnumType. */
 	operator EnumType() const
 	{
-		return Value;
+		return static_cast<EnumType>(Value);
 	}
 
-public:
 	/**
 	 * Gets the enumeration value.
 	 *
@@ -154,7 +153,7 @@ public:
 	 */
 	EnumType GetValue() const
 	{
-		return Value;
+		return static_cast<EnumType>(Value);
 	}
 
 	/**

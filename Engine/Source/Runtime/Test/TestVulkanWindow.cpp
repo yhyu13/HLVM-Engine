@@ -1332,7 +1332,7 @@ RECORD_BOOL(test_GLFW3VulkanWindow)
 				FShaderCreateInfo geomShaderCreateInfo;
 				geomShaderCreateInfo.DebugName = TXT("gemo.spv");
 				geomShaderCreateInfo.Code = MoveTemp(geomShaderCode);
-				geomShaderCreateInfo.Stage = EShaderStage::Pixel;
+				geomShaderCreateInfo.Stage = EShaderStage::Geometry;
 				geomShaderCreateInfo.EntryPoints = {TXT("main")};
 				FRHIShaderRef GeomShader = VulkanRHI->CreateShader(geomShaderCreateInfo);
 			}

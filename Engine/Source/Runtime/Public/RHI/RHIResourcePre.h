@@ -133,23 +133,30 @@ struct FShaderCreateInfo : public IRHICreateInfo
 // Structure for describing sampler state creation parameters
 struct FRHISamplerStateCreateInfo : public IRHICreateInfo
 {
-	ETextureFilter		Filter;					 // Filter mode
-	ETextureAddressMode AddressModeU;			 // Address mode for U coordinate
-	ETextureAddressMode AddressModeV;			 // Address mode for V coordinate
-	ETextureAddressMode AddressModeW;			 // Address mode for W coordinate
-	TUINT32				MipMapLevelOfDetailBias; // Mip map level of detail bias
-	TUINT32				MaxAnisotropy;			 // Maximum anisotropy
-	ECompareFunction	ComparisonFunction;		 // Comparison function
-	FVec4				BorderColor;			 // Border color
+	ETextureFilter		Filter;		  // Filter mode
+	ETextureAddressMode AddressModeU; // Address mode for U coordinate
+	ETextureAddressMode AddressModeV; // Address mode for V coordinate
+	ETextureAddressMode AddressModeW; // Address mode for W coordinate
+	TFP32				MipBias;	  // Mip map level of detail bias
+	TFP32				MinMipLevel;
+	TFP32				MaxMipLevel;
+	TFP32				MaxAnisotropy;		// Maximum anisotropy
+	ECompareFunction	ComparisonFunction; // Comparison function
+	FVec4				BorderColor;		// Border color
 
 	// Constructor for easy initialization
-	FRHISamplerStateCreateInfo(const FString& InDebugName, ETextureFilter InFilter, ETextureAddressMode InAddressModeU, ETextureAddressMode InAddressModeV, ETextureAddressMode InAddressModeW, TUINT32 InMipMapLevelOfDetailBias = 0, TUINT32 InMaxAnisotropy = 1, ECompareFunction InComparisonFunction = ECompareFunction::Never, const FVec4& InBorderColor = FVec4(0.0f, 0.0f, 0.0f, 0.0f))
+	FRHISamplerStateCreateInfo(const FString& InDebugName, ETextureFilter InFilter, ETextureAddressMode InAddressModeU, ETextureAddressMode InAddressModeV, ETextureAddressMode InAddressModeW,
+		TFP32 InMipMapLevelOfDetailBias = 0,
+		TFP32 InMinMipLevel = 0, TFP32 InMaxMipLevel = TFP32_MAX,
+		TFP32 InMaxAnisotropy = 1, ECompareFunction InComparisonFunction = ECompareFunction::Never, const FVec4& InBorderColor = FVec4(0.0f))
 		: IRHICreateInfo(InDebugName)
 		, Filter(InFilter)
 		, AddressModeU(InAddressModeU)
 		, AddressModeV(InAddressModeV)
 		, AddressModeW(InAddressModeW)
-		, MipMapLevelOfDetailBias(InMipMapLevelOfDetailBias)
+		, MipBias(InMipMapLevelOfDetailBias)
+		, MinMipLevel(InMinMipLevel)
+		, MaxMipLevel(InMaxMipLevel)
 		, MaxAnisotropy(InMaxAnisotropy)
 		, ComparisonFunction(InComparisonFunction)
 		, BorderColor(InBorderColor)
@@ -521,6 +528,33 @@ private:
 	}
 };
 
+struct FRHIRasterizerStateCreateInfo
+{
+	TEnumAsUnderlying<ERasterizerFillMode> FillMode{ ERasterizerFillMode::Point };
+	TEnumAsUnderlying<ERasterizerCullMode> CullMode{ ERasterizerCullMode::None };
+	float								   DepthBias = 0.0f;
+	float								   SlopeScaleDepthBias = 0.0f;
+	ERasterizerDepthClipMode			   DepthClipMode = ERasterizerDepthClipMode::DepthClip;
+	bool								   bAllowMSAA = false;
+
+	FRHIRasterizerStateCreateInfo(ERasterizerFillMode InFillMode, ERasterizerCullMode InCullMode, bool bInAllowMSAA)
+		: FillMode(InFillMode)
+		, CullMode(InCullMode)
+		, bAllowMSAA(bInAllowMSAA)
+	{
+	}
+
+	FRHIRasterizerStateCreateInfo(ERasterizerFillMode InFillMode, ERasterizerCullMode InCullMode, float InDepthBias, float InSlopeScaleDepthBias, ERasterizerDepthClipMode InDepthClipMode, bool bInAllowMSAA)
+		: FillMode(InFillMode)
+		, CullMode(InCullMode)
+		, DepthBias(InDepthBias)
+		, SlopeScaleDepthBias(InSlopeScaleDepthBias)
+		, DepthClipMode(InDepthClipMode)
+		, bAllowMSAA(bInAllowMSAA)
+	{
+	}
+};
+
 struct FRHIDepthStencilStateCreateInfo
 {
 	bool								bEnableDepthWrite;
@@ -631,6 +665,6 @@ public:
 	}
 
 	TStaticVector<FRenderTarget, RHI::MAX_RT_ATTACHMENTS> RenderTargets;
-	bool												 bUseIndependentRenderTargetBlendStates;
-	bool												 bUseAlphaToCoverage;
+	bool												  bUseIndependentRenderTargetBlendStates;
+	bool												  bUseAlphaToCoverage;
 };

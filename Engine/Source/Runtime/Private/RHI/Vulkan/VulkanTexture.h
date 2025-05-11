@@ -33,20 +33,6 @@ protected:
 	EOwnerShip OwnerShip;
 };
 
-// Vulkan-specific RHI sampler state
-class FVulkanSamplerState : public FRHISamplerState, public FVulkanResource
-{
-public:
-	FVulkanSamplerState(VkSampler InSampler)
-		: Sampler(InSampler) {}
-
-	// Returns the Vulkan sampler handle
-	VkSampler GetSampler() const { return Sampler; }
-
-private:
-	VkSampler Sampler;
-};
-
 // Vulkan-specific RHI render target view
 class FVulkanRenderTargetView : public FRHIRenderTargetView, public FVulkanResource
 {
@@ -62,5 +48,4 @@ private:
 };
 
 using FVulkanTextureRef = TRefCountPtr<FVulkanTexture>;
-using FVulkanSamplerStateRef = TRefCountPtr<FVulkanSamplerState>;
 using FVulkanRenderTargetViewRef = TRefCountPtr<FVulkanRenderTargetView>;

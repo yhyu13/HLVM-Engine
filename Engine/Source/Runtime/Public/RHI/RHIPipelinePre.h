@@ -7,54 +7,30 @@
 #include "RHIDefinition.h"
 #include "RHIResource.h"
 
-// Enumeration of vertex element types
-enum class EVertexElementType : TUINT8
-{
-	VET_Float1,		  // 1-component float
-	VET_Float2,		  // 2-component float
-	VET_Float3,		  // 3-component float
-	VET_Float4,		  // 4-component float
-	VET_Int1,		  // 1-component integer
-	VET_Int2,		  // 2-component integer
-	VET_Int3,		  // 3-component integer
-	VET_Int4,		  // 4-component integer
-	VET_UInt1,		  // 1-component unsigned integer
-	VET_UInt2,		  // 2-component unsigned integer
-	VET_UInt3,		  // 3-component unsigned integer
-	VET_UInt4,		  // 4-component unsigned integer
-	VET_PackedNormal, // Packed normal (4 bytes)
-	VET_Color,		  // Color (4 bytes)
-					  // Add other vertex element types as needed
-};
-
-// Enumeration of vertex element usage
-enum class EVertexElementUsage : TUINT8
-{
-	Position,		   // Vertex position
-	Normal,			   // Vertex normal
-	Tangent,		   // Vertex tangent
-	Binormal,		   // Vertex binormal
-	Color,			   // Vertex color
-	TextureCoordinate, // Texture coordinate
-					   // Add other vertex element usages as needed
-};
-
 // Structure describing a single vertex element
 struct FVertexElement
 {
-	TUINT16				StreamIndex; // The stream index (for multi-stream vertex buffers)
-	TUINT16				Offset;		 // Offset in bytes from the start of the vertex
-	EVertexElementType	Type;		 // Type of the vertex element (e.g., float, int)
-	EVertexElementUsage Usage;		 // Usage of the vertex element (e.g., position, normal)
-	TUINT8				UsageIndex;	 // Index for distinguishing between multiple elements with the same usage (e.g., multiple texture coordinates)
+	TUINT8								  StreamIndex; // The stream index (for multi-stream vertex buffers)
+	TUINT8								  Offset;	   // Offset in bytes from the start of the vertex
+	TEnumAsUnderlying<EVertexElementType> Type;		   // Type of the vertex element (e.g., float, int)
+	TUINT8								  AttributeIndex;
+	TUINT16								  Stride;
+	TUINT8								  bUseInstance;
 
 	// Constructor for easy initialization
-	FVertexElement(TUINT16 InStreamIndex, TUINT16 InOffset, EVertexElementType InType, EVertexElementUsage InUsage, TUINT8 InUsageIndex = 0)
+	FVertexElement(
+		TUINT8								  InStreamIndex,
+		TUINT8								  InOffset,
+		TEnumAsUnderlying<EVertexElementType> InType,
+		TUINT8								  InAttributeIndex,
+		TUINT16								  InStride,
+		TUINT8								  InUseInstance = 0)
 		: StreamIndex(InStreamIndex)
 		, Offset(InOffset)
 		, Type(InType)
-		, Usage(InUsage)
-		, UsageIndex(InUsageIndex)
+		, AttributeIndex(InAttributeIndex)
+		, Stride(InStride)
+		, bUseInstance(InUseInstance)
 	{
 	}
 };
@@ -78,3 +54,72 @@ public:
 
 // Smart pointer type for RHI vertex declarations
 using FVertexDeclarationRHIRef = TRefCountPtr<FRHIVertexDeclaration>;
+
+struct FBoundShaderStateInput
+{
+	FBoundShaderStateInput() = default;
+
+	FBoundShaderStateInput(
+		FVertexDeclarationRHIRef InVertexDeclarationRHI, FRHIShaderRef InVertexShaderRHI, FRHIShaderRef InPixelShaderRHI
+#if PLATFORM_SUPPORTS_GEOMETRY_SHADERS
+		,
+		FRHIShaderRef InGeometryShaderRHI
+#endif
+		)
+		: VertexDeclarationRHI(InVertexDeclarationRHI)
+		, VertexShaderRHI(InVertexShaderRHI)
+		, PixelShaderRHI(InPixelShaderRHI)
+#if PLATFORM_SUPPORTS_GEOMETRY_SHADERS
+		, GeometryShaderRHI(InGeometryShaderRHI)
+#endif
+	{
+	}
+
+#if PLATFORM_SUPPORTS_MESH_SHADERS
+	FBoundShaderStateInput(
+		FRHIShaderRef InMeshShaderRHI,
+		FRHIShaderRef InTaskShader,
+		FRHIShaderRef InPixelShaderRHI)
+		: PixelShaderRHI(InPixelShaderRHI)
+		, MeshShaderRHI(InMeshShaderRHI)
+		, TaskShaderRHI(InTaskShader)
+	{
+	}
+#endif
+
+	FRHIShaderRef GetVertexShader() const { return VertexShaderRHI; }
+	FRHIShaderRef GetPixelShader() const { return PixelShaderRHI; }
+
+#if PLATFORM_SUPPORTS_MESH_SHADERS
+	FRHIShaderRef GetMeshShader() const { return MeshShaderRHI; }
+	void		  SetMeshShader(FRHIShaderRef InMeshShader) { MeshShaderRHI = InMeshShader; }
+	FRHIShaderRef GetTaskShader() const { return TaskShaderRHI; }
+	void		  SetTaskShader(FRHIShaderRef InTaskShader) { TaskShaderRHI = InTaskShader; }
+#else
+	constexpr FRHIShaderRef GetMeshShader() const { return nullptr; }
+	void					SetMeshShader(FRHIShaderRef) {}
+	constexpr FRHIShaderRef GetTaskShader() const { return nullptr; }
+	void					SetTaskShader(FRHIShaderRef) {}
+#endif
+
+#if PLATFORM_SUPPORTS_GEOMETRY_SHADERS
+	FRHIShaderRef GetGeometryShader() const { return GeometryShaderRHI; }
+	void		  SetGeometryShader(FRHIShaderRef InGeometryShader) { GeometryShaderRHI = InGeometryShader; }
+#else
+	constexpr FRHIShaderRef GetGeometryShader() const { return nullptr; }
+	void					SetGeometryShader(FRHIShaderRef) {}
+#endif
+
+	FVertexDeclarationRHIRef VertexDeclarationRHI = nullptr;
+	FRHIShaderRef			 VertexShaderRHI = nullptr;
+	FRHIShaderRef			 PixelShaderRHI = nullptr;
+
+private:
+#if PLATFORM_SUPPORTS_MESH_SHADERS
+	FRHIShaderRef MeshShaderRHI = nullptr;
+	FRHIShaderRef TaskShaderRHI = nullptr;
+#endif
+#if PLATFORM_SUPPORTS_GEOMETRY_SHADERS
+	FRHIShaderRef GeometryShaderRHI = nullptr;
+#endif
+};

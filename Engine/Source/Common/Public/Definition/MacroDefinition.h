@@ -45,3 +45,5 @@
 		}                              \
 	}                                  \
 	while (0)
+
+#define HLVM_ARRAY_SIZE(x) (sizeof(x) / sizeof(x[0]))

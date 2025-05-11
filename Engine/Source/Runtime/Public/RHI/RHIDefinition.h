@@ -373,6 +373,32 @@ HLVM_ENUM(EBlendFactor, TUINT8,
 	InverseSource1Alpha);
 static_assert(EBlendFactor_NUM <= (1 << 4), "EBlendFactor will not fit on 4 bits");
 
+// Enumeration of vertex element types
+HLVM_ENUM(EVertexElementType, TUINT8,
+	None,
+	Float1,
+	Float2,
+	Float3,
+	Float4,
+	PackedNormal,   // FPackedNormal
+	UByte4,
+	UByte4N,
+	Color,
+	Short2,
+	Short4,
+	Short2N,       // 16 bit word normalized to (value/32767.0,value/32767.0,0,0,1)
+	Half2,        // 16 bit float using 1 bit sign, 5 bit exponent, 10 bit mantissa
+	Half4,
+	Short4N,       // 4 X 16 bit word, normalized
+	UShort2,
+	UShort4,
+	UShort2N,      // 16 bit word normalized to (value/65535.0,value/65535.0,0,0,1)
+	UShort4N,      // 4 X 16 bit word unsigned, normalized
+	URGB10A2N,     // 10 bit r, g, b and 2 bit a normalized to (value/1023.0f, value/1023.0f, value/1023.0f, value/3.0f)
+	UInt
+);
+static_assert(EVertexElementType_NUM <= (1 << 5), "EVertexElementType will not fit on 5 bits");
+
 // Enumeration of viewport types (e.g., windowed, fullscreen)
 enum class ERHIViewportType : TUINT32
 {
@@ -574,20 +600,6 @@ enum class EPrimitiveType : TUINT8
 
 	// Topology that defines a line with 2 vertex extremities: 2*N+0, 2*N+1.
 	LineList,
-
-	// Topology that defines a quad N with 4 vertex extremities: 4*N+0, 4*N+1, 4*N+2, 4*N+3.
-	// Supported only if GRHISupportsQuadTopology == true.
-	QuadList,
-
-	// Topology that defines a point N with a single vertex N.
-	PointList,
-
-	// Topology that defines a screen aligned rectangle N with only 3 vertex corners:
-	//    3*N + 0 is upper-left corner,
-	//    3*N + 1 is upper-right corner,
-	//    3*N + 2 is the lower-left corner.
-	// Supported only if GRHISupportsRectTopology == true.
-	RectList,
 
 	Num
 };

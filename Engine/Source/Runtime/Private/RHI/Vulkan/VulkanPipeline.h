@@ -5,20 +5,22 @@
 #pragma once
 
 #include "VulkanDescriptorSets.h"
+#include "VulkanState.h"
 
 /** This represents a vertex declaration that hasn't been combined with a specific shader to create a bound shader. */
 class FVulkanVertexDeclaration : public FRHIVertexDeclaration
 {
 public:
 	FVertexDeclarationElementList Elements;
-	TUINT32 Hash;
-	TUINT32 HashNoStrides;
+	TUINT32						  Hash;
+	TUINT32						  HashNoStrides;
 
 	FVulkanVertexDeclaration(const FVertexDeclarationElementList& InElements, TUINT32 InHash, TUINT32 InHashNoStrides);
 
 	static void EmptyCache();
 };
 
+using FVulkanVertexDeclarationRef = TRefCountPtr<FVulkanVertexDeclaration>;
 
 class FVulkanVertexInputStateInfo
 {
@@ -26,9 +28,9 @@ public:
 	FVulkanVertexInputStateInfo();
 	~FVulkanVertexInputStateInfo();
 
-	void Generate(FVulkanVertexDeclaration* VertexDeclaration, TUINT32 VertexHeaderInOutAttributeMask);
+	void Generate(FVulkanVertexDeclarationRef VertexDeclaration, TUINT32 VertexHeaderInOutAttributeMask);
 
-	inline TUINT32 GetHash() const
+	inline FMD5Digest GetHash() const
 	{
 		HLVM_ASSERT(Info.sType == VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO);
 		return Hash;
@@ -39,21 +41,20 @@ public:
 		return Info;
 	}
 
-	bool operator ==(const FVulkanVertexInputStateInfo& Other);
+	bool operator==(const FVulkanVertexInputStateInfo& Other);
 
-protected:
+private:
+	FMD5Digest							 Hash;
 	VkPipelineVertexInputStateCreateInfo Info;
-	TUINT32 Hash;
 
-	TUINT32 BindingsNum;
-	TUINT32 BindingsMask;
-
-	//#todo-rco: Remove these TMaps
 	TMapSmall<TUINT32, TUINT32> BindingToStream;
 	TMapSmall<TUINT32, TUINT32> StreamToBinding;
 
-	TUINT32 NumElements;
+	TUINT32							BindingsNum;
+	TUINT32							BindingsMask;
 	VkVertexInputBindingDescription Bindings[RHI::MAX_VERTEX_ELEMENTS];
+
+	TUINT32							  AttributesNum;
 	VkVertexInputAttributeDescription Attributes[RHI::MAX_VERTEX_ELEMENTS];
 };
 
@@ -68,9 +69,7 @@ struct FVulkanDescSetLayoutBinding
 
 	bool operator==(const FVulkanDescSetLayoutBinding& In) const
 	{
-		return  Binding == In.Binding &&
-			DescriptorType == In.DescriptorType &&
-			StageFlags == In.StageFlags;
+		return Binding == In.Binding && DescriptorType == In.DescriptorType && StageFlags == In.StageFlags;
 	}
 };
 
@@ -84,12 +83,11 @@ struct FVulkanGraphicsPSODescription
 	PSOKey GeneratePSOKey() const;
 
 	TUINT32 VertexInputKey;
-	TUINT16 RasterizationSamples;
-	TUINT16 ControlPoints;
+	TUINT8	RasterizationSamples;
 	TUINT32 Topology;
 	struct FBlendAttachment
 	{
-		bool  bBlend;
+		bool   bBlend;
 		TUINT8 ColorBlendOp;
 		TUINT8 SrcColorBlendFactor;
 		TUINT8 DstColorBlendFactor;
@@ -106,7 +104,7 @@ struct FVulkanGraphicsPSODescription
 			return bBlend == In.bBlend && ColorBlendOp == In.ColorBlendOp && SrcColorBlendFactor == In.SrcColorBlendFactor && DstColorBlendFactor == In.DstColorBlendFactor && AlphaBlendOp == In.AlphaBlendOp && SrcAlphaBlendFactor == In.SrcAlphaBlendFactor && DstAlphaBlendFactor == In.DstAlphaBlendFactor && ColorWriteMask == In.ColorWriteMask;
 		}
 	};
-	TVector<FBlendAttachment> ColorAttachmentStates;
+	TVector<FBlendAttachment>					  ColorAttachmentStates;
 	TVector<TVector<FVulkanDescSetLayoutBinding>> DescSetLayoutBindings;
 
 	struct FVertexBinding
@@ -145,8 +143,8 @@ struct FVulkanGraphicsPSODescription
 	{
 		TUINT8 PolygonMode;
 		TUINT8 CullMode;
-		float DepthBiasSlopeScale;
-		float DepthBiasConstantFactor;
+		float  DepthBiasSlopeScale;
+		float  DepthBiasConstantFactor;
 
 		void ReadFrom(const VkPipelineRasterizationStateCreateInfo& InState);
 		void WriteInto(VkPipelineRasterizationStateCreateInfo& OutState) const;
@@ -160,22 +158,22 @@ struct FVulkanGraphicsPSODescription
 
 	struct FDepthStencil
 	{
-		TUINT8  DepthCompareOp;
-		bool   bDepthTestEnable;
-		bool   bDepthWriteEnable;
-		bool   bStencilTestEnable;
-		bool   bDepthBoundsTestEnable;
-		TUINT8  FrontFailOp;
-		TUINT8  FrontPassOp;
-		TUINT8  FrontDepthFailOp;
-		TUINT8  FrontCompareOp;
+		TUINT8	DepthCompareOp;
+		bool	bDepthTestEnable;
+		bool	bDepthWriteEnable;
+		bool	bStencilTestEnable;
+		bool	bDepthBoundsTestEnable;
+		TUINT8	FrontFailOp;
+		TUINT8	FrontPassOp;
+		TUINT8	FrontDepthFailOp;
+		TUINT8	FrontCompareOp;
 		TUINT32 FrontCompareMask;
 		TUINT32 FrontWriteMask;
 		TUINT32 FrontReference;
-		TUINT8  BackFailOp;
-		TUINT8  BackPassOp;
-		TUINT8  BackDepthFailOp;
-		TUINT8  BackCompareOp;
+		TUINT8	BackFailOp;
+		TUINT8	BackPassOp;
+		TUINT8	BackDepthFailOp;
+		TUINT8	BackCompareOp;
 		TUINT32 BackCompareMask;
 		TUINT32 BackWriteMask;
 		TUINT32 BackReference;
@@ -226,19 +224,19 @@ struct FVulkanGraphicsPSODescription
 
 		TVector<FAttachmentRef> ColorAttachments;
 		TVector<FAttachmentRef> ResolveAttachments;
-		FAttachmentRef		   Depth;
-		FStencilAttachmentRef  Stencil;
-		FAttachmentRef		   FragmentDensity;
+		FAttachmentRef			Depth;
+		FStencilAttachmentRef	Stencil;
+		FAttachmentRef			FragmentDensity;
 
 		struct FAttachmentDesc
 		{
 			TUINT32 Format;
-			TUINT8  Flags;
-			TUINT8  Samples;
-			TUINT8  LoadOp;
-			TUINT8  StoreOp;
-			TUINT8  StencilLoadOp;
-			TUINT8  StencilStoreOp;
+			TUINT8	Flags;
+			TUINT8	Samples;
+			TUINT8	LoadOp;
+			TUINT8	StoreOp;
+			TUINT8	StencilLoadOp;
+			TUINT8	StencilStoreOp;
 			TUINT64 InitialLayout;
 			TUINT64 FinalLayout;
 
@@ -266,16 +264,16 @@ struct FVulkanGraphicsPSODescription
 		};
 
 		TVector<FAttachmentDesc> Descriptions;
-		FStencilAttachmentDesc	StencilDescription;
+		FStencilAttachmentDesc	 StencilDescription;
 
-		TUINT8	NumAttachments;
-		TUINT8	NumColorAttachments;
-		TUINT8	bHasDepthStencil;
-		TUINT8	bHasResolveAttachments;
-		TUINT8	bHasDepthStencilResolve;
-		TUINT8	bHasFragmentDensityAttachment;
-		TUINT8	NumUsedClearValues;
-		TUINT32	RenderPassCompatibleHash;
+		TUINT8	  NumAttachments;
+		TUINT8	  NumColorAttachments;
+		TUINT8	  bHasDepthStencil;
+		TUINT8	  bHasResolveAttachments;
+		TUINT8	  bHasDepthStencilResolve;
+		TUINT8	  bHasFragmentDensityAttachment;
+		TUINT8	  NumUsedClearValues;
+		TUINT32	  RenderPassCompatibleHash;
 		FUIntVec3 Extent3D;
 
 		void ReadFrom(const FVulkanRenderTargetLayout& InState);
@@ -287,13 +285,8 @@ struct FVulkanGraphicsPSODescription
 		}
 	};
 	FRenderTargets RenderTargets;
-
-	TUINT8 SubpassIndex;
-
-	TUINT8 UseAlphaToCoverage;
-
-//	EVRSShadingRate	 ShadingRate = EVRSShadingRate::VRSSR_1x1;
-//	EVRSRateCombiner Combiner = EVRSRateCombiner::VRSRB_Passthrough;
+	TUINT8		   SubpassIndex;
+	TUINT8		   UseAlphaToCoverage;
 
 	bool operator==(const FVulkanGraphicsPSODescription& In) const
 	{
@@ -368,27 +361,25 @@ struct FVulkanGraphicsPSODescription
 			return false;
 		}
 
-//		if (ShadingRate != In.ShadingRate)
-//		{
-//			return false;
-//		}
-//
-//		if (Combiner != In.Combiner)
-//		{
-//			return false;
-//		}
+		//		if (ShadingRate != In.ShadingRate)
+		//		{
+		//			return false;
+		//		}
+		//
+		//		if (Combiner != In.Combiner)
+		//		{
+		//			return false;
+		//		}
 
 		return true;
 	}
 };
 
-
-class FVulkanGraphicsPSO : public FRHIGraphicsPSO , public FVulkanResource
+class FVulkanGraphicsPSO : public FRHIGraphicsPSO, public FVulkanResource, public FVulkanMinimalContext
 {
 public:
-	//void GeneratePSOMetadata(const FGraphicsPSOInitializer& PSOInitializer, FVulkanDescriptorSetsLayoutInfo& LayoutInfoOut, FVulkanGraphicsPSODescription& DescOut);
+	void GeneratePSOMetadata(const FGraphicsPSOInitializer& PSOInitializer, FVulkanDescriptorSetsLayoutInfo& LayoutInfoOut, FVulkanGraphicsPSODescription& DescOut);
 };
-
 
 // Vulkan-specific RHI query
 class FVulkanQuery : public FRHIQuery, public FVulkanResource
@@ -411,7 +402,6 @@ private:
 	TUINT32		  QueryIndex;
 	ERHIQueryType QueryType;
 };
-
 
 using FVulkanGraphicsPSORef = TRefCountPtr<FVulkanGraphicsPSO>;
 using FVulkanQueryRef = TRefCountPtr<FVulkanQuery>;

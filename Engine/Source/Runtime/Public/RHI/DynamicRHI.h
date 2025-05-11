@@ -21,9 +21,9 @@ public:
 	virtual void Init() = 0;
 	virtual void Shutdown() = 0;
 
-
 	// Resource Creation
 	virtual FRHITextureRef CreateTexture(const FRHITextureCreateInfo& CreateInfo) = 0;
+	virtual FRHISamplerStateRef CreateSamplerState(const FRHISamplerStateCreateInfo& CreateInfo) = 0;
 	virtual FRHIBufferRef CreateBuffer(const FRHIBufferCreateInfo& CreateInfo) = 0;
 	virtual FShaderResourceViewRHIRef CreateShaderResourceView(FRHITexture* Texture, const FRHIShaderResourceViewCreateInfo& CreateInfo) = 0;
 	virtual FUnorderedAccessViewRHIRef CreateUnorderedAccessView(FRHIBuffer* Buffer, const FRHIUnorderedAccessViewCreateInfo& CreateInfo) = 0;

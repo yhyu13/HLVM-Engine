@@ -53,4 +53,21 @@ public:
 	static T Max(T a, T b) {
 		return a > b ? a : b;
 	}
+
+	template <typename T>
+	static T Min(T a, T b) {
+		return a < b ? a : b;
+	}
+
+	// Clamp
+	template <typename T>
+	static T Clamp(T value, T min, T max) {
+		return FMath::Max(FMath::Min(value, max), min);
+	}
+
+	// Lerp
+	template <typename T>
+	static T Lerp(T a, T b, float t) {
+		return a + (b - a) * t;
+	}
 };

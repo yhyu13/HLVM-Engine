@@ -75,6 +75,12 @@ public:
 		return S_C(TUINT32, this->size());
 	}
 
+	TUINT32 SetNum(TUINT32 Num)
+	{
+		this->resize(Num);
+		return this->Num();
+	}
+
 	TSIZE Size() const
 	{
 		return this->size();
@@ -95,45 +101,101 @@ public:
 		return this->data();
 	}
 
-	TSIZE Add(const T& Value)
+	/**
+	 * @brief Equivalent to std::vector::push_back(const T&)
+	 * @return The index of the added element
+	 */
+	TUINT32 Add(const T& Value)
 	{
 		this->push_back(Value);
+		HLVM_ASSERT(this->size() <= S_C(size_t, TUINT32_MAX));
 		return this->size() - 1;
 	}
 
-	TSIZE Add(T&& Value)
+	/**
+	 * @brief Equivalent to std::vector::push_back(T&&)
+	 * @return The index of the added element
+	 */
+	TUINT32 Add(T&& Value)
 	{
 		this->push_back(Value);
+		HLVM_ASSERT(this->size() <= S_C(size_t, TUINT32_MAX));
 		return this->size() - 1;
+	}
+
+	/**
+	 * @brief Equivalent to std::vector::reserve()
+	 * @return The size of the container after the call
+	 */
+	TSIZE AddUninitialized(TSIZE NumUninitialized)
+	{
+		if (NumUninitialized > 0)
+		{
+			this->reserve(this->size() + NumUninitialized);
+		}
+		return this->size();
+	}
+
+	/**
+	 * @brief Equivalent to std::vector::resize()
+	 * @return The size of the container after the call
+	 */
+	TSIZE AddDefaulted(TSIZE NumDefaulted)
+	{
+		if (NumDefaulted > 0)
+		{
+			this->resize(this->size() + NumDefaulted);
+		}
+		return this->size();
+	}
+
+	T& AddDefaulted_GetRef()
+	{
+		this->emplace_back();
+		return this->back();
 	}
 
 	T* LastData() const
 	{
-		HLVM_ASSERT(this->size() > 0);
-		return C_C(T*, &(this->back()));
+		if (this->size() > 0)
+		{
+			return C_C(T*, &(this->back()));
+		}
+		else
+		{
+			return nullptr;
+		}
 	}
 
 	void Swap(TSIZE Index1, TSIZE Index2)
 	{
-		HLVM_ASSERT(Index1 < this->size() && Index2 < this->size());
-		std::iter_swap(this->begin() + Index1, this->begin() + Index2);
-	}
-
-	void Empty(TSIZE NewSize = 0)
-	{
-		this->clear();
-		this->resize(NewSize);
-	}
-
-	void Reset(TSIZE NewSize = 0)
-	{
-		TSIZE ReserveSize = this->size();
-		if (NewSize != 0)
+		if (Index1 < this->size() && Index2 < this->size())
 		{
-			ReserveSize = NewSize;
+			std::iter_swap(this->begin() + Index1, this->begin() + Index2);
 		}
+		else
+		{
+			HLVM_ASSERT_F(false, TXT("Invalid index, Index1 = {}, Index2 = {}"), Index1, Index2);
+		}
+	}
+
+	void Empty(TSIZE NewCapacity = 0)
+	{
 		this->clear();
-		this->reserve(ReserveSize);
+		this->resize(NewCapacity);
+		this->shrink_to_fit();
+		HLVM_ASSERT(this->capacity() == this->size());
+		HLVM_ASSERT(this->capacity() == NewCapacity);
+	}
+
+	void Reset(TSIZE NewCapacity = 0)
+	{
+		this->clear();
+		if (NewCapacity > 0)
+		{
+			this->reserve(NewCapacity);
+			HLVM_ASSERT(this->capacity() >= NewCapacity);
+		}
 	}
 
 	operator TVectorView<T>() const
@@ -141,7 +203,6 @@ public:
 		return TVectorView<T>(this->data(), this->size());
 	}
 };
-
 
 template <typename T, std::size_t N>
 class TStaticVector : public boost::container::static_vector<T, N>
@@ -244,13 +305,18 @@ public:
 		return &Iter->second;
 	}
 
+	bool Contains(const Key& key) const
+	{
+		return this->find(key) != this->end();
+	}
+
 	// Add
 	Value* Add(const Key& key, const Value& value)
 	{
 		auto Iter = this->find(key);
 		if (Iter == this->end())
 		{
-			Iter = this->insert({key, value}).first;
+			Iter = this->insert({ key, value }).first;
 		}
 		else
 		{
@@ -265,13 +331,22 @@ public:
 		auto Iter = this->find(key);
 		if (Iter == this->end())
 		{
-			Iter = this->insert({key, value}).first;
+			Iter = this->insert({ key, value }).first;
 		}
 		else
 		{
 			Iter->second = value;
 		}
 		return &Iter->second;
+	}
+
+	void Reset(TSIZE NewCapacity = 0)
+	{
+		this->clear();
+		if (NewCapacity > 0)
+		{
+			this->reserve(NewCapacity);
+		}
 	}
 };
 
@@ -314,13 +389,18 @@ public:
 		return &Iter->second;
 	}
 
+	bool Contains(const Key& key) const
+	{
+		return this->find(key) != this->end();
+	}
+
 	// Add
 	Value* Add(const Key& key, const Value& value)
 	{
 		auto Iter = this->find(key);
 		if (Iter == this->end())
 		{
-			Iter = this->insert({key, value}).first;
+			Iter = this->insert({ key, value }).first;
 		}
 		else
 		{
@@ -335,7 +415,7 @@ public:
 		auto Iter = this->find(key);
 		if (Iter == this->end())
 		{
-			Iter = this->insert({key, value}).first;
+			Iter = this->insert({ key, value }).first;
 		}
 		else
 		{

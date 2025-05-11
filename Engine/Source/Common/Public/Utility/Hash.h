@@ -14,10 +14,14 @@ struct FMD5Digest
 {
 	TBYTE digest[16];
 
-	FMD5Digest() = default;
+	FMD5Digest()
+	{
+		FMemory::MemzeroArray(&digest);
+	}
 	explicit FMD5Digest(boost::uuids::detail::md5::digest_type&& data);
 
-	FString ToString() const;
+	HLVM_NODISCARD FString ToString() const;
+	HLVM_NODISCARD bool Valid() const;
 
 	// compare operator
 	bool operator==(const FMD5Digest& other) const
@@ -34,7 +38,7 @@ struct FMD5Digest
 class FMD5Hash
 {
 public:
-	static FMD5Digest Hash(const void* data, size_t size);
+	static FMD5Digest Hash(const void* data, size_t size, FMD5Digest* prevHash = nullptr);
 };
 
 struct FSHA1Digest

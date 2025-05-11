@@ -16,9 +16,7 @@ struct FVulkanShaderHeader
 	// Includes all bindings, the index in this array is the binding slot
 	struct FBindingInfo
 	{
-		// VkDescriptorType
-		TUINT32 DescriptorType;
-		FString DebugName;
+		TUINT32 DescriptorType; // VkDescriptorType
 	};
 	TVector<FBindingInfo> Bindings;
 
@@ -107,6 +105,11 @@ struct FVulkanShaderHeader
 	}
 };
 
+struct FGraphicsShaderGatherInfo
+{
+	TNullablePtr<const FVulkanShaderHeader> ShaderHeaders[RHI::MAX_SHADER_STAGES];
+};
+
 // Vulkan-specific RHI shader
 class FVulkanShader : public FRHIShader, public FVulkanResource
 {
@@ -117,8 +120,14 @@ public:
 	// Returns the Vulkan shader module handle
 	VkShaderModule GetShaderModule() const { return ShaderModule; }
 
+	void SetShaderHeader(const FVulkanShaderHeader& InShaderHeader) { ShaderHeader = InShaderHeader; }
+	const FVulkanShaderHeader* GetCodeHeader() const { return &ShaderHeader; }
+
+	bool UsesBindless() const { return false; }
+
 private:
 	VkShaderModule ShaderModule;
+	FVulkanShaderHeader ShaderHeader;
 };
 
 // Vulkan-specific RHI shader resource view

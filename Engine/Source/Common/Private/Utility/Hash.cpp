@@ -19,12 +19,41 @@ FString FMD5Digest::ToString() const
 	return result;
 }
 
-FMD5Digest FMD5Hash::Hash(const void* data, size_t size)
+bool FMD5Digest::Valid() const
+{
+	TBYTE digest2[16];
+	FMemory::MemzeroArray(&digest2);
+	return FMemory::Memcmp(digest, digest2, sizeof(digest)) != 0;
+}
+
+// Function to mix two MD5 hashes
+HLVM_STATIC_FUNC boost::uuids::detail::md5 mix_md5_hashes(
+	const boost::uuids::detail::md5::digest_type* hash1,
+	const boost::uuids::detail::md5::digest_type* hash2)
+{
+	boost::uuids::detail::md5 md5;
+	// Cast digest_type (array of uint32_t) to char* for processing
+	const char* data1 = reinterpret_cast<const char*>(*hash1);
+	const char* data2 = reinterpret_cast<const char*>(*hash2);
+
+	md5.process_bytes(data1, sizeof(boost::uuids::detail::md5::digest_type));
+	md5.process_bytes(data2, sizeof(boost::uuids::detail::md5::digest_type));
+
+	return md5;
+}
+
+FMD5Digest FMD5Hash::Hash(const void* data, size_t size, FMD5Digest* prevHash)
 {
 	boost::uuids::detail::md5 hash;
 	hash.process_bytes(data, size);
 	boost::uuids::detail::md5::digest_type result;
 	hash.get_digest(result);
+	// Mix hash if possible
+	if (prevHash)
+	{
+		hash = mix_md5_hashes(&result, reinterpret_cast<boost::uuids::detail::md5::digest_type*>(&prevHash->digest));
+		hash.get_digest(result);
+	}
 	return FMD5Digest{ MoveTemp(result) };
 }
 

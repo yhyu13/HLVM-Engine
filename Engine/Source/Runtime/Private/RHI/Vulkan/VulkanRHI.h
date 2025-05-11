@@ -33,6 +33,7 @@ public:
 
 	// Resource Creation
 	virtual FRHITextureRef			   CreateTexture(const FRHITextureCreateInfo& CreateInfo) override;
+	virtual FRHISamplerStateRef		   CreateSamplerState(const FRHISamplerStateCreateInfo& CreateInfo) override;
 	virtual FRHIBufferRef			   CreateBuffer(const FRHIBufferCreateInfo& CreateInfo) override;
 	virtual FShaderResourceViewRHIRef  CreateShaderResourceView(FRHITexture* Texture, const FRHIShaderResourceViewCreateInfo& CreateInfo) override;
 	virtual FUnorderedAccessViewRHIRef CreateUnorderedAccessView(FRHIBuffer* Buffer, const FRHIUnorderedAccessViewCreateInfo& CreateInfo) override;
@@ -43,7 +44,7 @@ public:
 
 	// Pipeline State Management
 	virtual FRHIGraphicsPSO* CreateGraphicsPSO(const FGraphicsPSOInitializer& Initializer) override;
-	virtual FRHIComputePSO*  CreateComputePSO(const FComputePSOInitializer& Initializer) override;
+	virtual FRHIComputePSO*	 CreateComputePSO(const FComputePSOInitializer& Initializer) override;
 
 	// Command List and Context
 	virtual FRHICommandListImmediate& GetImmediateCommandList() override;
@@ -54,10 +55,10 @@ public:
 	virtual void RHIFlushResources() override;
 
 	// Viewport and Swap Chain
-	virtual void RHICreateViewport(void* WindowHandle, TUINT32 Width, TUINT32 Height, bool bIsFullscreen, EPixelFormat PreferredPixelFormat, FRHIViewportRef& OutViewport) override;
-	virtual void RHIResizeViewport(FRHIViewportRef& Viewport, TUINT32 Width, TUINT32 Height, bool bIsFullscreen, EPixelFormat PreferredPixelFormat) override;
-	virtual void RHISwapBuffers(FRHIViewportRef& Viewport) override;
-	virtual FRHITextureRef GetRHIBackBuffer() override;
+	virtual void			RHICreateViewport(void* WindowHandle, TUINT32 Width, TUINT32 Height, bool bIsFullscreen, EPixelFormat PreferredPixelFormat, FRHIViewportRef& OutViewport) override;
+	virtual void			RHIResizeViewport(FRHIViewportRef& Viewport, TUINT32 Width, TUINT32 Height, bool bIsFullscreen, EPixelFormat PreferredPixelFormat) override;
+	virtual void			RHISwapBuffers(FRHIViewportRef& Viewport) override;
+	virtual FRHITextureRef	GetRHIBackBuffer() override;
 	virtual FRHIViewportRef GetRHIViewport() override;
 
 	// Render Pass and Draw Commands
@@ -91,13 +92,14 @@ public:
 	// Vulkan-specific resource creation
 	VkImage		 CreateVulkanImage(const FRHITextureCreateInfo& CreateInfo) override;
 	void		 DestroyVulkanImage(VkImage Image) override;
+	VkSampler	 CreateVulkanSampler(const FRHISamplerStateCreateInfo& CreateInfo) override;
 	VkBuffer	 CreateVulkanBuffer(const FRHIBufferCreateInfo& CreateInfo, void** OutAllocation) override;
 	void		 DestroyVulkanBuffer(VkBuffer Buffer, void** InAllocation) override;
 	VkImageView	 CreateVulkanImageView(VkImage Image, const FRHIShaderResourceViewCreateInfo& CreateInfo) override;
 	VkBufferView CreateVulkanBufferView(VkBuffer Buffer, const FRHIUnorderedAccessViewCreateInfo& CreateInfo) override;
 
 	VkShaderModule CreateVulkanShaderModule(const FShaderCreateInfo& CreateInfo) override;
-	void DestroyVulkanShaderModule(VkShaderModule ShaderModule) override;
+	void		   DestroyVulkanShaderModule(VkShaderModule ShaderModule) override;
 
 	// Vulkan-specific command list management
 	VkCommandBuffer BeginVulkanCommandBuffer() override;
@@ -192,6 +194,6 @@ private:
 	FVulkanLogicalDeviceRef	 LogicalDevice;
 	FVulkanViewportRef		 VulkanViewport;
 
-	FVulkanRenderPassRef ActiveRenderPass;
+	FVulkanRenderPassRef		  ActiveRenderPass;
 	TVector<FVulkanRenderPassRef> PendingDestroyRenderPass;
 };

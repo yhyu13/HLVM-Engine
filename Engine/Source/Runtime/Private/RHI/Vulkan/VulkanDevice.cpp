@@ -4,6 +4,18 @@
 
 #include "VulkanDevice.h"
 
+FVulkanPhysicalDevice::FVulkanPhysicalDevice(VkPhysicalDevice InDevice)
+	: mDevice(InDevice)
+{
+	// Init VkPhysicalDeviceProperties and so on
+	VkPhysicalDeviceProperties2 properties;
+	VulkanRHI::ZeroVulkanStruct(&properties, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2_KHR);
+	properties.pNext = &mDeviceIDProperties;
+	mDeviceIDProperties.pNext = &mSubgroupProperties;
+	VulkanRHI::vkGetPhysicalDeviceProperties2(mDevice, &properties);
+	mProperties = properties.properties;
+}
+
 FVulkanPhysicalDevice::QueueFamilyIndices FVulkanPhysicalDevice::QueryQueueFamilyIndices(VkSurfaceKHR Surface, bool bFresh)
 {
 	using namespace VulkanRHI;

@@ -416,6 +416,11 @@ FRHITextureRef FVulkanRHI::CreateTexture(const FRHITextureCreateInfo& CreateInfo
 	return new FVulkanTexture(CreateInfo);
 }
 
+FRHISamplerStateRef FVulkanRHI::CreateSamplerState(const FRHISamplerStateCreateInfo& CreateInfo)
+{
+	return new FVulkanSamplerState(CreateInfo);
+}
+
 FRHIBufferRef FVulkanRHI::CreateBuffer(const FRHIBufferCreateInfo& CreateInfo)
 {
 	return new FVulkanBuffer(CreateInfo);
@@ -829,6 +834,40 @@ void FVulkanRHI::DestroyVulkanImage(VkImage Image)
 	VulkanRHI::vkDestroyImage(VulkanDevice, Image, VulkanRHI::VULKAN_CPU_ALLOCATOR);
 }
 
+VkSampler FVulkanRHI::CreateVulkanSampler(const FRHISamplerStateCreateInfo& CreateInfo)
+{
+	VkSamplerCreateInfo SamplerInfo;
+	VulkanRHI::ZeroVulkanStruct(&SamplerInfo, VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO);
+
+	SamplerInfo.magFilter = VulkanRHI::VulkanFilterFromRHIFilter(CreateInfo.Filter);
+	SamplerInfo.minFilter = VulkanRHI::VulkanFilterFromRHIFilter(CreateInfo.Filter);
+	SamplerInfo.mipmapMode = VulkanRHI::VulkanMipFilterFromRHIFilter(CreateInfo.Filter);
+	SamplerInfo.addressModeU = VulkanRHI::VulkanAddressModeFromRHIAddressMode(CreateInfo.AddressModeU);
+	SamplerInfo.addressModeV = VulkanRHI::VulkanAddressModeFromRHIAddressMode(CreateInfo.AddressModeV);
+	SamplerInfo.addressModeW = VulkanRHI::VulkanAddressModeFromRHIAddressMode(CreateInfo.AddressModeW);
+
+	SamplerInfo.mipLodBias = CreateInfo.MipBias;
+
+	SamplerInfo.maxAnisotropy = 1.0f;
+	if (CreateInfo.Filter == ETextureFilter::Anisotropic)
+	{
+		SamplerInfo.maxAnisotropy = FMath::Clamp(CreateInfo.MaxAnisotropy, 1.0f, PhysicalDevice->GetProperties().limits.maxSamplerAnisotropy);
+	}
+	SamplerInfo.anisotropyEnable = SamplerInfo.maxAnisotropy > 1.0f;
+
+	SamplerInfo.compareEnable = CreateInfo.ComparisonFunction != ECompareFunction::Never ? VK_TRUE : VK_FALSE;
+	SamplerInfo.compareOp = VulkanRHI::VulkanCompareOpFromRHICompareFunction(CreateInfo.ComparisonFunction);
+	SamplerInfo.minLod = CreateInfo.MinMipLevel;
+	SamplerInfo.maxLod = CreateInfo.MaxMipLevel;
+	// Only support opaque white (all 1) and transparent black (all 0) for the time being
+	SamplerInfo.borderColor = CreateInfo.BorderColor == FVec4{0.0f} ? VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK : VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
+
+	// call vk api
+	VkSampler Sampler;
+	VULKAN_ENSURE(VulkanRHI::vkCreateSampler(VulkanDevice, &SamplerInfo, VulkanRHI::VULKAN_CPU_ALLOCATOR, &Sampler));
+	return Sampler;
+}
+
 VkBuffer FVulkanRHI::CreateVulkanBuffer(const FRHIBufferCreateInfo& CreateInfo, void** OutAllocation)
 {
 	VkBufferUsageFlags	  UsageFlags = VulkanRHI::VulkanBufferUsageFlagsFromRHIUsageFlags(CreateInfo.UsageFlags);
@@ -1131,11 +1170,11 @@ VkSamplerCreateInfo FVulkanRHI::GenerateVkSamplerCreateInfo(const FRHISamplerSta
 	SamplerCreateInfo.addressModeW = VulkanRHI::VulkanAddressModeFromRHIAddressMode(CreateInfo.AddressModeW);
 
 	// Set mip map level of detail bias
-	SamplerCreateInfo.mipLodBias = static_cast<float>(CreateInfo.MipMapLevelOfDetailBias);
+	SamplerCreateInfo.mipLodBias = CreateInfo.MipBias;
 
 	// Set maximum anisotropy
 	SamplerCreateInfo.anisotropyEnable = VK_TRUE;
-	SamplerCreateInfo.maxAnisotropy = static_cast<float>(CreateInfo.MaxAnisotropy);
+	SamplerCreateInfo.maxAnisotropy = CreateInfo.MaxAnisotropy;
 
 	// Set comparison function
 	SamplerCreateInfo.compareEnable = VK_TRUE;

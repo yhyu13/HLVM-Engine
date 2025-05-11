@@ -23,6 +23,8 @@ public:
 	// Vulkan-specific resource creation
 	HLVM_NODISCARD virtual VkImage CreateVulkanImage(const FRHITextureCreateInfo& CreateInfo) = 0;
 	virtual void DestroyVulkanImage(VkImage Image) = 0;
+	HLVM_NODISCARD virtual VkSampler CreateVulkanSampler(const FRHISamplerStateCreateInfo& CreateInfo) = 0;
+
 	HLVM_NODISCARD virtual VkBuffer CreateVulkanBuffer(const FRHIBufferCreateInfo& CreateInfo, void** OutAllocation) = 0;
 	virtual void DestroyVulkanBuffer(VkBuffer Buffer, void** InAllocation) = 0;
 	HLVM_NODISCARD virtual VkImageView CreateVulkanImageView(VkImage Image, const FRHIShaderResourceViewCreateInfo& CreateInfo) = 0;

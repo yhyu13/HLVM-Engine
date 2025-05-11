@@ -134,6 +134,58 @@ namespace VulkanRHI
 #pragma clang diagnostic pop
 	}
 
+	VkFormat RHIVertexElementTypeToVulkanFormat(EVertexElementType Type)
+	{
+		switch (Type)
+		{
+			case EVertexElementType::Float1:
+				return VK_FORMAT_R32_SFLOAT;
+			case EVertexElementType::Float2:
+				return VK_FORMAT_R32G32_SFLOAT;
+			case EVertexElementType::Float3:
+				return VK_FORMAT_R32G32B32_SFLOAT;
+			case EVertexElementType::PackedNormal:
+				return VK_FORMAT_R8G8B8A8_SNORM;
+			case EVertexElementType::UByte4:
+				return VK_FORMAT_R8G8B8A8_UINT;
+			case EVertexElementType::UByte4N:
+				return VK_FORMAT_R8G8B8A8_UNORM;
+			case EVertexElementType::Color:
+				return VK_FORMAT_B8G8R8A8_UNORM;
+			case EVertexElementType::Short2:
+				return VK_FORMAT_R16G16_SINT;
+			case EVertexElementType::Short4:
+				return VK_FORMAT_R16G16B16A16_SINT;
+			case EVertexElementType::Short2N:
+				return VK_FORMAT_R16G16_SNORM;
+			case EVertexElementType::Half2:
+				return VK_FORMAT_R16G16_SFLOAT;
+			case EVertexElementType::Half4:
+				return VK_FORMAT_R16G16B16A16_SFLOAT;
+			case EVertexElementType::Short4N: // 4 X 16 bit word: normalized
+				return VK_FORMAT_R16G16B16A16_SNORM;
+			case EVertexElementType::UShort2:
+				return VK_FORMAT_R16G16_UINT;
+			case EVertexElementType::UShort4:
+				return VK_FORMAT_R16G16B16A16_UINT;
+			case EVertexElementType::UShort2N: // 16 bit word normalized to (value/65535.0:value/65535.0:0:0:1)
+				return VK_FORMAT_R16G16_UNORM;
+			case EVertexElementType::UShort4N: // 4 X 16 bit word unsigned: normalized
+				return VK_FORMAT_R16G16B16A16_UNORM;
+			case EVertexElementType::Float4:
+				return VK_FORMAT_R32G32B32A32_SFLOAT;
+			case EVertexElementType::URGB10A2N:
+				return VK_FORMAT_A2B10G10R10_UNORM_PACK32;
+			case EVertexElementType::UInt:
+				return VK_FORMAT_R32_UINT;
+			case EVertexElementType::_NUM:
+			case EVertexElementType::None:
+			default:
+				HLVM_ASSERT_F(false, TXT("Unknown EVertexElementType format {}"), HLVM_ENUM_TO_TCHAR(Type));
+				return VK_FORMAT_UNDEFINED;
+		}
+	}
+
 	// Convert RHI buffer usage flags to Vulkan usage flags
 	VkBufferUsageFlags VulkanBufferUsageFlagsFromRHIUsageFlags(EBufferUsageFlags RHIFlags)
 	{
@@ -259,6 +311,21 @@ namespace VulkanRHI
 		}
 	}
 
+	VkSamplerMipmapMode VulkanMipFilterFromRHIFilter(ETextureFilter RHIFilter)
+	{
+		switch (RHIFilter)
+		{
+			case ETextureFilter::None:
+				return VK_SAMPLER_MIPMAP_MODE_NEAREST;
+			case ETextureFilter::Point:
+				return VK_SAMPLER_MIPMAP_MODE_NEAREST;
+			case ETextureFilter::Linear:
+				return VK_SAMPLER_MIPMAP_MODE_LINEAR;
+			case ETextureFilter::Anisotropic:
+				return VK_SAMPLER_MIPMAP_MODE_LINEAR; // Vulkan does
+		}
+	}
+
 	// Helper function to convert RHI texture address mode to Vulkan address mode
 	VkSamplerAddressMode VulkanAddressModeFromRHIAddressMode(ETextureAddressMode RHIAddressMode)
 	{
@@ -306,6 +373,22 @@ namespace VulkanRHI
 			default:
 				HLVM_ASSERT_F(false, TXT("Unknown RHI compare function"));
 				return VK_COMPARE_OP_NEVER;
+		}
+	}
+
+	VkPrimitiveTopology VulkanPrimitiveTopologyFromRHIPrimitiveType(EPrimitiveType RHIPrimitiveType)
+	{
+		switch (RHIPrimitiveType)
+		{
+			case EPrimitiveType::LineList:
+				return VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
+			case EPrimitiveType::TriangleList:
+				return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+			case EPrimitiveType::TriangleStrip:
+				return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
+			case EPrimitiveType::Num:
+				HLVM_ASSERT_F(false, TXT("Unknown RHI compare function"));
+				return VK_PRIMITIVE_TOPOLOGY_MAX_ENUM;
 		}
 	}
 

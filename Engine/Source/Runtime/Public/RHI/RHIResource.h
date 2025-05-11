@@ -236,26 +236,55 @@ public:
 	virtual ERHIResourceType GetType() const override { return ERHIResourceType::RenderPass; }
 };
 
-
 class FRHIBlendState : virtual public IRHIResource
 {
 public:
+	FRHIBlendState(const FRHIBlendStateCreateInfo& InCreateInfo)
+		: CreateInfo(InCreateInfo)
+	{
+	}
+
+	const FRHIBlendStateCreateInfo& GetCreateInfo() const { return CreateInfo; }
+
 	// Returns the type of the RHI resource
 	virtual ERHIResourceType GetType() const override { return ERHIResourceType::BlendState; }
+
+protected:
+	FRHIBlendStateCreateInfo CreateInfo;
 };
 
 class FRHIRasterizerState : virtual public IRHIResource
 {
 public:
+	FRHIRasterizerState(const FRHIRasterizerStateCreateInfo& InCreateInfo)
+		: CreateInfo(InCreateInfo)
+	{
+	}
+
+	const FRHIRasterizerStateCreateInfo& GetCreateInfo() const { return CreateInfo; }
+
 	// Returns the type of the RHI resource
 	virtual ERHIResourceType GetType() const override { return ERHIResourceType::RasterizerState; }
+
+protected:
+	FRHIRasterizerStateCreateInfo CreateInfo;
 };
 
 class FRHIDepthStencilState : virtual public IRHIResource
 {
 public:
+	FRHIDepthStencilState(const FRHIDepthStencilStateCreateInfo& InCreateInfo)
+		: CreateInfo(InCreateInfo)
+	{
+	}
+
+	const FRHIDepthStencilStateCreateInfo& GetCreateInfo() const { return CreateInfo; }
+
 	// Returns the type of the RHI resource
 	virtual ERHIResourceType GetType() const override { return ERHIResourceType::DepthStencilState; }
+
+protected:
+	FRHIDepthStencilStateCreateInfo CreateInfo;
 };
 
 // Smart pointer types for RHI resources
@@ -263,7 +292,7 @@ using FRHIBufferRef = TRefCountPtr<FRHIBuffer>;
 using FRHIShaderRef = TRefCountPtr<FRHIShader>;
 using FShaderResourceViewRHIRef = TRefCountPtr<FRHIShaderResourceView>;
 using FUnorderedAccessViewRHIRef = TRefCountPtr<FRHIUnorderedAccessView>;
-using FSamplerStateRHIRef = TRefCountPtr<FRHISamplerState>;
+using FRHISamplerStateRef = TRefCountPtr<FRHISamplerState>;
 using FRHIGraphicsPSORef = TRefCountPtr<FRHIGraphicsPSO>;
 using FRHIComputePSORef = TRefCountPtr<FRHIComputePSO>;
 using FQueryRHIRef = TRefCountPtr<FRHIQuery>;
