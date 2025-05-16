@@ -26,17 +26,16 @@ class FVulkanVertexInputStateInfo
 {
 public:
 	FVulkanVertexInputStateInfo();
-	~FVulkanVertexInputStateInfo();
 
 	void Generate(FVulkanVertexDeclarationRef VertexDeclaration, TUINT32 VertexHeaderInOutAttributeMask);
 
-	inline FMD5Digest GetHash() const
+	const FMD5Digest& GetHash() const
 	{
 		HLVM_ASSERT(Info.sType == VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO);
 		return Hash;
 	}
 
-	inline const VkPipelineVertexInputStateCreateInfo& GetInfo() const
+	const VkPipelineVertexInputStateCreateInfo& GetInfo() const
 	{
 		return Info;
 	}
@@ -88,13 +87,13 @@ struct FVulkanGraphicsPSODescription
 	struct FBlendAttachment
 	{
 		bool   bBlend;
-		TUINT8 ColorBlendOp;
-		TUINT8 SrcColorBlendFactor;
-		TUINT8 DstColorBlendFactor;
-		TUINT8 AlphaBlendOp;
-		TUINT8 SrcAlphaBlendFactor;
-		TUINT8 DstAlphaBlendFactor;
-		TUINT8 ColorWriteMask;
+		TUINT32 ColorBlendOp;
+		TUINT32 SrcColorBlendFactor;
+		TUINT32 DstColorBlendFactor;
+		TUINT32 AlphaBlendOp;
+		TUINT32 SrcAlphaBlendFactor;
+		TUINT32 DstAlphaBlendFactor;
+		TUINT32 ColorWriteMask;
 
 		void ReadFrom(const VkPipelineColorBlendAttachmentState& InState);
 		void WriteInto(VkPipelineColorBlendAttachmentState& OutState) const;
@@ -110,8 +109,8 @@ struct FVulkanGraphicsPSODescription
 	struct FVertexBinding
 	{
 		TUINT32 Stride;
-		TUINT16 Binding;
-		TUINT16 InputRate;
+		TUINT32 Binding;
+		TUINT32	InputRate;
 
 		void ReadFrom(const VkVertexInputBindingDescription& InState);
 		void WriteInto(VkVertexInputBindingDescription& OutState) const;
@@ -122,6 +121,7 @@ struct FVulkanGraphicsPSODescription
 		}
 	};
 	TVector<FVertexBinding> VertexBindings;
+
 	struct FVertexAttribute
 	{
 		TUINT32 Location;
@@ -141,8 +141,8 @@ struct FVulkanGraphicsPSODescription
 
 	struct FRasterizer
 	{
-		TUINT8 PolygonMode;
-		TUINT8 CullMode;
+		TUINT32 PolygonMode;
+		TUINT32 CullMode;
 		float  DepthBiasSlopeScale;
 		float  DepthBiasConstantFactor;
 
@@ -200,10 +200,11 @@ struct FVulkanGraphicsPSODescription
 		struct FAttachmentRef
 		{
 			TUINT32 Attachment;
-			TUINT64 Layout;
+			TUINT32 Layout;
 
 			void ReadFrom(const VkAttachmentReference& InState);
 			void WriteInto(VkAttachmentReference& OutState) const;
+
 			bool operator==(const FAttachmentRef& In) const
 			{
 				return Attachment == In.Attachment && Layout == In.Layout;
@@ -212,7 +213,7 @@ struct FVulkanGraphicsPSODescription
 
 		struct FStencilAttachmentRef
 		{
-			TUINT64 Layout;
+			TUINT32 Layout;
 
 			void ReadFrom(const VkAttachmentReferenceStencilLayout& InState);
 			void WriteInto(VkAttachmentReferenceStencilLayout& OutState) const;
@@ -378,7 +379,7 @@ struct FVulkanGraphicsPSODescription
 class FVulkanGraphicsPSO : public FRHIGraphicsPSO, public FVulkanResource, public FVulkanMinimalContext
 {
 public:
-	void GeneratePSOMetadata(const FGraphicsPSOInitializer& PSOInitializer, FVulkanDescriptorSetsLayoutInfo& LayoutInfoOut, FVulkanGraphicsPSODescription& DescOut);
+	void GeneratePSOMetadata(const FGraphicsPSOCreateInfo& PSOInitializer, FVulkanDescriptorSetsLayoutInfo& LayoutInfoOut, FVulkanGraphicsPSODescription& DescOut);
 };
 
 // Vulkan-specific RHI query

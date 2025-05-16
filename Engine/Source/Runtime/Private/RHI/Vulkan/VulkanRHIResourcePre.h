@@ -42,8 +42,19 @@ public:
 
 class FVulkanRenderTargetLayout
 {
+private:
+	friend struct FVulkanGraphicsPSODescription;
+
 public:
-	FVulkanRenderTargetLayout(const FRHIRenderPassInfo& RPInfo);
+	struct RenderPassAdditionalInfo
+	{
+		VkImageLayout CurrentDepthLayout { VK_IMAGE_LAYOUT_UNDEFINED };
+		VkImageLayout CurrentStencilLayout{ VK_IMAGE_LAYOUT_UNDEFINED };
+	};
+
+public:
+	FVulkanRenderTargetLayout(const FRHIRenderPassInfo& RPInfo, const RenderPassAdditionalInfo& AdditionalInfo);
+	FVulkanRenderTargetLayout(const FGraphicsPSOCreateInfo& PSOInfo);
 
 	inline const VkOffset2D&			  GetOffset2D() const { return Offset.Offset2D; }
 	inline const VkOffset3D&			  GetOffset3D() const { return Offset.Offset3D; }

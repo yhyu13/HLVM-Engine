@@ -224,18 +224,6 @@ struct FVulkanSubpassDescription<VkSubpassDescription2> : public VkSubpassDescri
 		pNext = DepthStencilResolveAttachmentDesc;
 		DepthStencilResolveAttachmentDesc->pNext = Next;
 	}
-
-	void SetShadingRateAttachment(VkFragmentShadingRateAttachmentInfoKHR* ShadingRateAttachmentInfo)
-	{
-		const void* Next = pNext;
-		pNext = ShadingRateAttachmentInfo;
-		ShadingRateAttachmentInfo->pNext = Next;
-	}
-
-	void SetMultiViewMask(TUINT32 Mask)
-	{
-		viewMask = Mask;
-	}
 };
 
 template <typename TSubpassDependencyType>

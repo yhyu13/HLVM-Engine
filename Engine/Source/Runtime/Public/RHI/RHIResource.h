@@ -62,6 +62,10 @@ protected:
 	{                                                     \
 		CreateInfoPtr = &CreateInfo;                      \
 		UpdateCreateInfo(InCreateInfo);                   \
+	}                                                     \
+	const CreateteInfoType& GetCreateInfo() const         \
+	{                                                     \
+		return CreateInfo;                                \
 	}
 
 // Base class for RHI textures
@@ -70,16 +74,16 @@ class FRHITexture : virtual public IRHIResource
 public:
 	DECLARE_RHI_RESOURCE(FRHITexture, FRHITextureCreateInfo)
 
-	const FRHITextureCreateInfo& GetCreateInfo() const { return CreateInfo; }
-
 	// Returns the dimensions of the texture
-	FIntVec3 GetSize() const { return CreateInfo.Dimensions; }
+	FIntVec3 GetSize() const { return CreateInfo.Extent; }
 
 	// Returns the pixel format of the texture
 	EPixelFormat GetFormat() const { return CreateInfo.Format; }
 
 	// Returns the texture flags
-	ETextureCreateFlags GetFlags() const { return CreateInfo.Flags; }
+	ETextureCreateFlags GetCreateFlags() const { return CreateInfo.Flags; }
+
+	bool IsSRGB() const { return CreateInfo.Flags & ETextureCreateFlag::SRGB; }
 
 	// Returns whether the texture is multisampled
 	bool IsMultiSampled() const { return CreateInfo.NumSamples > 1; }
@@ -100,8 +104,6 @@ class FRHIBuffer : virtual public IRHIResource
 {
 public:
 	DECLARE_RHI_RESOURCE(FRHIBuffer, FRHIBufferCreateInfo)
-
-	const FRHIBufferCreateInfo& GetCreateInfo() const { return CreateInfo; }
 
 	// Returns the size of the buffer in bytes
 	virtual TSIZE GetSize() const { return CreateInfo.Size; }
@@ -124,8 +126,6 @@ class FRHIShader : virtual public IRHIResource
 {
 public:
 	DECLARE_RHI_RESOURCE(FRHIShader, FShaderCreateInfo)
-
-	const FShaderCreateInfo& GetCreateInfo() const { return CreateInfo; }
 
 	// Returns the shader stage (e.g., vertex, pixel, compute)
 	virtual EShaderStage GetStage() const { return CreateInfo.Stage; }
@@ -165,8 +165,13 @@ public:
 class FRHISamplerState : virtual public IRHIResource
 {
 public:
+	DECLARE_RHI_RESOURCE(FRHISamplerState, FRHISamplerStateCreateInfo)
+
 	// Returns the type of the RHI resource
 	virtual ERHIResourceType GetType() const override { return ERHIResourceType::SamplerState; }
+
+protected:
+	FRHISamplerStateCreateInfo CreateInfo;
 };
 
 // Base class for RHI pipeline states object (PSO)
@@ -205,7 +210,7 @@ public:
 	virtual ERHIResourceType GetType() const override { return ERHIResourceType::Viewport; }
 
 	// Returns the dimensions of the viewport
-	virtual FUIntVec2 GetSize() const { return CreateInfo.Dimensions; }
+	virtual FUIntVec2 GetSize() const { return CreateInfo.Extent; }
 
 	// Returns the viewport type (e.g., windowed, fullscreen)
 	virtual ERHIViewportType GetViewportType() const { return CreateInfo.ViewportType; }
@@ -214,7 +219,7 @@ public:
 	virtual void* GetSwapChain() const = 0;
 
 	// Resizes the viewport and swap chain
-	virtual void Resize(const FUIntVec2& NewDimensions) = 0;
+	virtual void Resize(const FUIntVec2& NewExtent) = 0;
 
 	// Begins a frame, acquire next back buffer
 	virtual void BeginFrame() = 0;
@@ -239,12 +244,7 @@ public:
 class FRHIBlendState : virtual public IRHIResource
 {
 public:
-	FRHIBlendState(const FRHIBlendStateCreateInfo& InCreateInfo)
-		: CreateInfo(InCreateInfo)
-	{
-	}
-
-	const FRHIBlendStateCreateInfo& GetCreateInfo() const { return CreateInfo; }
+	DECLARE_RHI_RESOURCE(FRHIBlendState, FRHIBlendStateCreateInfo)
 
 	// Returns the type of the RHI resource
 	virtual ERHIResourceType GetType() const override { return ERHIResourceType::BlendState; }
@@ -256,12 +256,7 @@ protected:
 class FRHIRasterizerState : virtual public IRHIResource
 {
 public:
-	FRHIRasterizerState(const FRHIRasterizerStateCreateInfo& InCreateInfo)
-		: CreateInfo(InCreateInfo)
-	{
-	}
-
-	const FRHIRasterizerStateCreateInfo& GetCreateInfo() const { return CreateInfo; }
+	DECLARE_RHI_RESOURCE(FRHIRasterizerState, FRHIRasterizerStateCreateInfo)
 
 	// Returns the type of the RHI resource
 	virtual ERHIResourceType GetType() const override { return ERHIResourceType::RasterizerState; }
@@ -273,12 +268,7 @@ protected:
 class FRHIDepthStencilState : virtual public IRHIResource
 {
 public:
-	FRHIDepthStencilState(const FRHIDepthStencilStateCreateInfo& InCreateInfo)
-		: CreateInfo(InCreateInfo)
-	{
-	}
-
-	const FRHIDepthStencilStateCreateInfo& GetCreateInfo() const { return CreateInfo; }
+	DECLARE_RHI_RESOURCE(FRHIDepthStencilState, FRHIDepthStencilStateCreateInfo)
 
 	// Returns the type of the RHI resource
 	virtual ERHIResourceType GetType() const override { return ERHIResourceType::DepthStencilState; }

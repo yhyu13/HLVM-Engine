@@ -26,7 +26,7 @@ struct IRHICreateInfo
 // Structure for describing texture creation parameters
 struct FRHITextureCreateInfo : public IRHICreateInfo
 {
-	FUIntVec3			Dimensions; // Width, Height, Depth (or array size)
+	FUIntVec3			Extent;		// Width, Height, Depth (or array size)
 	EPixelFormat		Format;		// Pixel format of the texture
 	TUINT8				NumMips;	// Number of mip levels
 	TUINT8				NumSamples; // Number of samples (for MSAA)
@@ -35,9 +35,9 @@ struct FRHITextureCreateInfo : public IRHICreateInfo
 
 	FRHITextureCreateInfo() = default;
 	// Constructor for easy initialization
-	FRHITextureCreateInfo(const FString& InDebugName, const FIntVec3& InDimensions, EPixelFormat InFormat, TUINT8 InNumMips = 1, TUINT8 InNumSamples = 1, ETextureCreateFlags InFlags = ETextureCreateFlag::None, const FClearValueBinding& InClearValue = FClearValueBinding::None())
+	FRHITextureCreateInfo(const FString& InDebugName, const FIntVec3& InExtent, EPixelFormat InFormat, TUINT8 InNumMips = 1, TUINT8 InNumSamples = 1, ETextureCreateFlags InFlags = ETextureCreateFlag::None, const FClearValueBinding& InClearValue = FClearValueBinding::None())
 		: IRHICreateInfo(InDebugName)
-		, Dimensions(InDimensions)
+		, Extent(InExtent)
 		, Format(InFormat)
 		, NumMips(InNumMips)
 		, NumSamples(InNumSamples)
@@ -145,6 +145,7 @@ struct FRHISamplerStateCreateInfo : public IRHICreateInfo
 	FVec4				BorderColor;		// Border color
 
 	// Constructor for easy initialization
+	FRHISamplerStateCreateInfo() = default;
 	FRHISamplerStateCreateInfo(const FString& InDebugName, ETextureFilter InFilter, ETextureAddressMode InAddressModeU, ETextureAddressMode InAddressModeV, ETextureAddressMode InAddressModeW,
 		TFP32 InMipMapLevelOfDetailBias = 0,
 		TFP32 InMinMipLevel = 0, TFP32 InMaxMipLevel = TFP32_MAX,
@@ -239,7 +240,7 @@ struct FRHIQueryCreateInfo : public IRHICreateInfo
 //// Structure for describing swap chain creation parameters
 // struct FRHISwapChainCreateInfo : public IRHICreateInfo
 //{
-//	FIntVec2		Dimensions;	   // Width and height of the swap chain buffers
+//	FIntVec2		Extent;	   // Width and height of the swap chain buffers
 //	EPixelFormat	Format;		   // Pixel format of the swap chain buffers
 //	TUINT32			NumBuffers;	   // Number of buffers in the swap chain (e.g., double or triple buffering)
 //	TUINT32			NumSamples;	   // Number of samples (for MSAA)
@@ -252,14 +253,14 @@ struct FRHIQueryCreateInfo : public IRHICreateInfo
 //	// Constructor for easy initialization
 //	FRHISwapChainCreateInfo(
 //		const FString&	InDebugName,
-//		const FIntVec2& InDimensions,
+//		const FIntVec2& InExtent,
 //		EPixelFormat	InFormat = EPixelFormat::R8G8B8A8_UNorm,
 //		TUINT32			InNumBuffers = 2, // Default to double buffering
 //		TUINT32			InNumSamples = 1, // Default to no MSAA
 //		ESwapChainFlags InFlags = ESwapChainFlags::None,
 //		FRHIViewport*	InViewport = nullptr)
 //		: IRHICreateInfo(InDebugName)
-//		, Dimensions(InDimensions)
+//		, Extent(InExtent)
 //		, Format(InFormat)
 //		, NumBuffers(InNumBuffers)
 //		, NumSamples(InNumSamples)
@@ -273,7 +274,7 @@ class IWindow;
 // Structure for describing viewport creation parameters
 struct FRHIViewportCreateInfo : public IRHICreateInfo
 {
-	FUIntVec2				Dimensions;	  // Width and height of the viewport
+	FUIntVec2				Extent;		  // Width and height of the viewport
 	ERHIViewportType		ViewportType; // Type of the viewport (e.g., windowed, fullscreen)
 	EPixelFormat			Format;		  // Pixel format of the viewport's back buffer
 	TNoNullablePtr<IWindow> NativeWindowHandle;
@@ -285,13 +286,13 @@ struct FRHIViewportCreateInfo : public IRHICreateInfo
 	// Constructor for easy initialization
 	FRHIViewportCreateInfo(
 		const FString&	 InDebugName,
-		const FUIntVec2& InDimensions,
+		const FUIntVec2& InExtent,
 		IWindow*		 InWindowHandle,
 		ERHIViewportType InViewportType = ERHIViewportType::Fullscreen,
 		EPixelFormat	 InFormat = EPixelFormat::R8G8B8A8_UNorm,
 		bool			 InHeadlessRendering = false)
 		: IRHICreateInfo(InDebugName)
-		, Dimensions(InDimensions)
+		, Extent(InExtent)
 		, ViewportType(InViewportType)
 		, Format(InFormat)
 		, NativeWindowHandle(InWindowHandle)
@@ -528,7 +529,7 @@ private:
 	}
 };
 
-struct FRHIRasterizerStateCreateInfo
+struct FRHIRasterizerStateCreateInfo : public IRHICreateInfo
 {
 	TEnumAsUnderlying<ERasterizerFillMode> FillMode{ ERasterizerFillMode::Point };
 	TEnumAsUnderlying<ERasterizerCullMode> CullMode{ ERasterizerCullMode::None };
@@ -537,6 +538,7 @@ struct FRHIRasterizerStateCreateInfo
 	ERasterizerDepthClipMode			   DepthClipMode = ERasterizerDepthClipMode::DepthClip;
 	bool								   bAllowMSAA = false;
 
+	FRHIRasterizerStateCreateInfo() = default;
 	FRHIRasterizerStateCreateInfo(ERasterizerFillMode InFillMode, ERasterizerCullMode InCullMode, bool bInAllowMSAA)
 		: FillMode(InFillMode)
 		, CullMode(InCullMode)
@@ -555,7 +557,7 @@ struct FRHIRasterizerStateCreateInfo
 	}
 };
 
-struct FRHIDepthStencilStateCreateInfo
+struct FRHIDepthStencilStateCreateInfo : public IRHICreateInfo
 {
 	bool								bEnableDepthWrite;
 	TEnumAsUnderlying<ECompareFunction> DepthTest;
@@ -606,7 +608,7 @@ struct FRHIDepthStencilStateCreateInfo
 	}
 };
 
-class FRHIBlendStateCreateInfo
+class FRHIBlendStateCreateInfo : public IRHICreateInfo
 {
 public:
 	struct FRenderTarget

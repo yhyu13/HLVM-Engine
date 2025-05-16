@@ -33,7 +33,7 @@ public:
 	virtual FRHIShaderRef CreateShader(const FShaderCreateInfo& CreateInfo) = 0;
 
 	// Pipeline State Management
-	virtual FRHIGraphicsPSO* CreateGraphicsPSO(const FGraphicsPSOInitializer& Initializer) = 0;
+	virtual FRHIGraphicsPSO* CreateGraphicsPSO(const FGraphicsPSOCreateInfo& Initializer) = 0;
 	virtual FRHIComputePSO* CreateComputePSO(const FComputePSOInitializer& Initializer) = 0;
 
 	// Command List and Context

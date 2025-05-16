@@ -6,7 +6,7 @@
 
 namespace VulkanRHI
 {
-	VkAttachmentLoadOp VulkanAttachmentLoadOpFromRHI(ERenderTargetLoadAction RHIState)
+	VkAttachmentLoadOp VulkanAttachmentLoadOpFromRHIAction(ERenderTargetLoadAction RHIState)
 	{
 		switch (RHIState)
 		{
@@ -22,7 +22,7 @@ namespace VulkanRHI
 		}
 	}
 
-	VkAttachmentStoreOp VulkanAttachmentStoreOpFromRHI(ERenderTargetStoreAction RHIState)
+	VkAttachmentStoreOp VulkanAttachmentStoreOpFromRHIAction(ERenderTargetStoreAction RHIState)
 	{
 		switch (RHIState)
 		{
@@ -37,25 +37,32 @@ namespace VulkanRHI
 		}
 	}
 
-	VkFormat VulkanFormatFromRHIFormat(EPixelFormat RHIFormat)
+	VkFormat VulkanFormatFromRHIFormat(EPixelFormat RHIFormat, bool bSRGB)
 	{
 		switch (RHIFormat)
 		{
 			case EPixelFormat::None:
 				return VK_FORMAT_UNDEFINED;
 			case EPixelFormat::R8_UNorm:
+				HLVM_ASSERT(!bSRGB);
 				return VK_FORMAT_R8_UNORM;
 			case EPixelFormat::R8G8_UNorm:
+				HLVM_ASSERT(!bSRGB);
 				return VK_FORMAT_R8G8_UNORM;
 			case EPixelFormat::R8G8B8A8_UNorm:
+				HLVM_ASSERT(!bSRGB);
 				return VK_FORMAT_R8G8B8A8_UNORM;
 			case EPixelFormat::B8G8R8A8_SRGB:
+				HLVM_ASSERT(bSRGB);
 				return VK_FORMAT_B8G8R8A8_SRGB;
 			case EPixelFormat::R16_UNorm:
+				HLVM_ASSERT(!bSRGB);
 				return VK_FORMAT_R16_UNORM;
 			case EPixelFormat::R16G16_UNorm:
+				HLVM_ASSERT(!bSRGB);
 				return VK_FORMAT_R16G16_UNORM;
 			case EPixelFormat::R16G16B16A16_UNorm:
+				HLVM_ASSERT(!bSRGB);
 				return VK_FORMAT_R16G16B16A16_UNORM;
 			case EPixelFormat::R32_UInt:
 				return VK_FORMAT_R32_UINT;
@@ -70,8 +77,10 @@ namespace VulkanRHI
 			case EPixelFormat::R32G32B32A32_Float:
 				return VK_FORMAT_R32G32B32A32_SFLOAT;
 			case EPixelFormat::D16_UNorm:
+				HLVM_ASSERT(!bSRGB);
 				return VK_FORMAT_D16_UNORM;
 			case EPixelFormat::D24_UNorm_S8_UInt:
+				HLVM_ASSERT(!bSRGB);
 				return VK_FORMAT_D24_UNORM_S8_UINT;
 			case EPixelFormat::D32_Float:
 				return VK_FORMAT_D32_SFLOAT;
@@ -83,9 +92,18 @@ namespace VulkanRHI
 		}
 	}
 
-	// Convert RHI pixel format to Vulkan format
 	EPixelFormat RHIFormatFromVulkanFormat(VkFormat VulkanFormat)
 	{
+		bool bSRGB_Out = false;
+		auto Ret = RHIFormatFromVulkanFormat(VulkanFormat, bSRGB_Out);
+		HLVM_ASSERT(!bSRGB_Out);
+		return Ret;
+	}
+
+	// Convert RHI pixel format to Vulkan format
+	EPixelFormat RHIFormatFromVulkanFormat(VkFormat VulkanFormat, bool& bSRGB_Out)
+	{
+		bSRGB_Out = false;
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wswitch-enum"
 		switch (VulkanFormat)
@@ -99,6 +117,7 @@ namespace VulkanRHI
 			case VK_FORMAT_R8G8B8A8_UNORM:
 				return EPixelFormat::R8G8B8A8_UNorm;
 			case VK_FORMAT_B8G8R8A8_SRGB:
+				bSRGB_Out = true;
 				return EPixelFormat::B8G8R8A8_SRGB;
 			case VK_FORMAT_R16_UNORM:
 				return EPixelFormat::R16_UNorm;
@@ -349,7 +368,7 @@ namespace VulkanRHI
 	}
 
 	// Helper function to convert RHI compare function to Vulkan compare function
-	VkCompareOp VulkanCompareOpFromRHICompareFunction(ECompareFunction RHIFunction)
+	VkCompareOp VulkanCompareOpFromRHI(ECompareFunction RHIFunction)
 	{
 		switch (RHIFunction)
 		{
@@ -389,6 +408,33 @@ namespace VulkanRHI
 			case EPrimitiveType::Num:
 				HLVM_ASSERT_F(false, TXT("Unknown RHI compare function"));
 				return VK_PRIMITIVE_TOPOLOGY_MAX_ENUM;
+		}
+	}
+
+	VkStencilOp VulkanStencilOpFromRHI(EStencilOp RHIStencilOp)
+	{
+		switch (RHIStencilOp)
+		{
+			case EStencilOp::Keep:
+				return VK_STENCIL_OP_KEEP;
+			case EStencilOp::Zero:
+				return VK_STENCIL_OP_ZERO;
+			case EStencilOp::Replace:
+				return VK_STENCIL_OP_REPLACE;
+			case EStencilOp::SaturatedIncrement:
+				return VK_STENCIL_OP_INCREMENT_AND_CLAMP;
+			case EStencilOp::SaturatedDecrement:
+				return VK_STENCIL_OP_DECREMENT_AND_CLAMP;
+			case EStencilOp::Invert:
+				return VK_STENCIL_OP_INVERT;
+			case EStencilOp::Increment:
+				return VK_STENCIL_OP_INCREMENT_AND_WRAP;
+			case EStencilOp::Decrement:
+				return VK_STENCIL_OP_DECREMENT_AND_WRAP;
+			case EStencilOp::_NUM:
+			default:
+				HLVM_ASSERT_F(false, TXT("Unknown RHI stencil op"));
+				return VK_STENCIL_OP_KEEP;
 		}
 	}
 

@@ -7,7 +7,7 @@
 #include "RHIPipelinePre.h"
 
 // Structure for describing graphics pipeline state initialization parameters
-// struct FGraphicsPSOInitializer
+// struct FGraphicsPSOCreateInfo
 //{
 //	FVertexDeclarationRHIRef VertexDeclaration;							  // Vertex declaration
 //	FRHIShaderRef			 VertexShader;								  // Vertex shader
@@ -21,7 +21,7 @@
 //	TUINT32					 SampleCount;								  // Number of samples (for MSAA)
 //
 //	// Constructor for easy initialization
-//	FGraphicsPSOInitializer()
+//	FGraphicsPSOCreateInfo()
 //		: VertexDeclaration(nullptr)
 //		, VertexShader(nullptr)
 //		, PixelShader(nullptr)
@@ -36,14 +36,14 @@
 //	}
 //};
 
-class FGraphicsPSOInitializer
+class FGraphicsPSOCreateInfo
 {
 public:
 	// Can't use TEnumByte<EPixelFormat> as it changes the struct to be non trivially constructible, breaking memset
 	using TRenderTargetFormats = TStaticVector<EPixelFormat, RHI::MAX_RT_ATTACHMENTS>;
-	using TRenderTargetFlags = TStaticVector<ETextureCreateFlag, RHI::MAX_RT_ATTACHMENTS>;
+	using TRenderTargetFlags = TStaticVector<ETextureCreateFlags, RHI::MAX_RT_ATTACHMENTS>;
 
-	FGraphicsPSOInitializer()
+	FGraphicsPSOCreateInfo()
 		: BlendState(nullptr)
 		, RasterizerState(nullptr)
 		, DepthStencilState(nullptr)
@@ -63,7 +63,7 @@ public:
 	{
 	}
 
-	FGraphicsPSOInitializer(
+	FGraphicsPSOCreateInfo(
 		FBoundShaderStateInput		InBoundShaderState,
 		FRHIBlendStateRef			InBlendState,
 		FRHIRasterizerStateRef		InRasterizerState,
@@ -105,7 +105,7 @@ public:
 	{
 	}
 
-	bool operator==(const FGraphicsPSOInitializer& rhs) const
+	bool operator==(const FGraphicsPSOCreateInfo& rhs) const
 	{
 		if (BoundShaderState.VertexDeclarationRHI != rhs.BoundShaderState.VertexDeclarationRHI
 			|| BoundShaderState.VertexShaderRHI != rhs.BoundShaderState.VertexShaderRHI

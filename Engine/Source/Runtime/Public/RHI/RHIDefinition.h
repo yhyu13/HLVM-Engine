@@ -78,6 +78,7 @@ enum class ETextureCreateFlag : TUINT32
 	Transient = 1 << 4,
 	InputAttachment = 1 << 5,
 	MemoryLess = 1 << 6,
+	SRGB = 1 << 7,
 	// Add more flags as needed
 };
 HLVM_DECLARE_ENMU_FLAGS(ETextureCreateFlag, ETextureCreateFlags)
@@ -380,23 +381,22 @@ HLVM_ENUM(EVertexElementType, TUINT8,
 	Float2,
 	Float3,
 	Float4,
-	PackedNormal,   // FPackedNormal
+	PackedNormal, // FPackedNormal
 	UByte4,
 	UByte4N,
 	Color,
 	Short2,
 	Short4,
-	Short2N,       // 16 bit word normalized to (value/32767.0,value/32767.0,0,0,1)
-	Half2,        // 16 bit float using 1 bit sign, 5 bit exponent, 10 bit mantissa
+	Short2N, // 16 bit word normalized to (value/32767.0,value/32767.0,0,0,1)
+	Half2,	 // 16 bit float using 1 bit sign, 5 bit exponent, 10 bit mantissa
 	Half4,
-	Short4N,       // 4 X 16 bit word, normalized
+	Short4N, // 4 X 16 bit word, normalized
 	UShort2,
 	UShort4,
-	UShort2N,      // 16 bit word normalized to (value/65535.0,value/65535.0,0,0,1)
-	UShort4N,      // 4 X 16 bit word unsigned, normalized
-	URGB10A2N,     // 10 bit r, g, b and 2 bit a normalized to (value/1023.0f, value/1023.0f, value/1023.0f, value/3.0f)
-	UInt
-);
+	UShort2N,  // 16 bit word normalized to (value/65535.0,value/65535.0,0,0,1)
+	UShort4N,  // 4 X 16 bit word unsigned, normalized
+	URGB10A2N, // 10 bit r, g, b and 2 bit a normalized to (value/1023.0f, value/1023.0f, value/1023.0f, value/3.0f)
+	UInt);
 static_assert(EVertexElementType_NUM <= (1 << 5), "EVertexElementType will not fit on 5 bits");
 
 // Enumeration of viewport types (e.g., windowed, fullscreen)
@@ -605,3 +605,57 @@ enum class EPrimitiveType : TUINT8
 };
 static_assert(HLVM_ENUM_VALUE(EPrimitiveType::Num) <= (1 << 3), "EPrimitiveType doesn't fit in 3 bits");
 
+enum class EGpuVendorId : TUINT32
+{
+	Unknown = 0xffffffff,
+	NotQueried = 0,
+
+	Amd = 0x1002,
+	ImgTec = 0x1010,
+	Nvidia = 0x10DE,
+	Arm = 0x13B5,
+	Broadcom = 0x14E4,
+	Qualcomm = 0x5143,
+	Intel = 0x8086,
+	Apple = 0x106B,
+	Vivante = 0x7a05,
+	VeriSilicon = 0x1EB1,
+	SamsungAMD = 0x144D,
+	Microsoft = 0x1414,
+
+	Kazan = 0x10003,	// VkVendorId
+	Codeplay = 0x10004, // VkVendorId
+	Mesa = 0x10005,		// VkVendorId
+};
+
+// Get venderid from TUINT32
+namespace  RHI
+{
+	HLVM_INLINE_FUNC EGpuVendorId GetVenderId(TUINT32 VenderId)
+	{
+		switch (S_C(EGpuVendorId, VenderId))
+		{
+			case EGpuVendorId::NotQueried:
+				return EGpuVendorId::NotQueried;
+			case EGpuVendorId::Amd:
+			case EGpuVendorId::ImgTec:
+			case EGpuVendorId::Nvidia:
+			case EGpuVendorId::Arm:
+			case EGpuVendorId::Broadcom:
+			case EGpuVendorId::Qualcomm:
+			case EGpuVendorId::Intel:
+			case EGpuVendorId::Apple:
+			case EGpuVendorId::Vivante:
+			case EGpuVendorId::VeriSilicon:
+			case EGpuVendorId::SamsungAMD:
+			case EGpuVendorId::Microsoft:
+			case EGpuVendorId::Kazan:
+			case EGpuVendorId::Codeplay:
+			case EGpuVendorId::Mesa:
+				return S_C(EGpuVendorId, VenderId);
+			case EGpuVendorId::Unknown:
+			default:
+				return EGpuVendorId::Unknown;
+		}
+	}
+}

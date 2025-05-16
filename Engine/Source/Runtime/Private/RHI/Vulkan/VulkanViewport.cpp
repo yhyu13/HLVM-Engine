@@ -45,7 +45,7 @@ void FVulkanViewport::Resize(const FUIntVec2& NewDimensions)
 		SwapChain->DestroySwapChain(&ReCreateInfo);
 		SwapChain.Reset();
 
-		CreateInfo.Dimensions = NewDimensions;
+		CreateInfo.Extent = NewDimensions;
 		CreateSwapChain(ReCreateInfo);
 
 		HLVM_ASSERT(SwapChain->swapChainExtent.width == NewDimensions.x && SwapChain->swapChainExtent.height == NewDimensions.y);
@@ -62,10 +62,15 @@ void FVulkanViewport::CreateSwapChain(FVulkanSwapChain::FRecreateInfo& InCreateI
 		// Create back buffer
 		HLVM_ASSERT(RHIBackBuffer == nullptr);
 		FRHITextureCreateInfo BackBufferCreateInfo;
-		BackBufferCreateInfo.Dimensions.x = SwapChain->swapChainExtent.width;
-		BackBufferCreateInfo.Dimensions.y = SwapChain->swapChainExtent.height;
-		BackBufferCreateInfo.Format = VulkanRHI::RHIFormatFromVulkanFormat(SwapChain->swapChainImageFormat);
+		BackBufferCreateInfo.Extent.x = SwapChain->swapChainExtent.width;
+		BackBufferCreateInfo.Extent.y = SwapChain->swapChainExtent.height;
+		bool sRGB = false;
+		BackBufferCreateInfo.Format = VulkanRHI::RHIFormatFromVulkanFormat(SwapChain->swapChainImageFormat, sRGB);
 		BackBufferCreateInfo.Flags |= ETextureCreateFlag::RenderTarget; // TODO back buffer support mass resolve?
+		if (sRGB)
+		{
+			BackBufferCreateInfo.Flags |= ETextureCreateFlag::SRGB;
+		}
 		BackBufferCreateInfo.NumMips = 1;
 		BackBufferCreateInfo.NumSamples = 1; // TODO back buffer support mass resolve
 		RHIBackBuffer = new FVulkanBackBuffer(VK_NULL_HANDLE, BackBufferCreateInfo, this);

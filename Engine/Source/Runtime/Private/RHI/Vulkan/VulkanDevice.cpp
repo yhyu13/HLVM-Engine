@@ -8,12 +8,27 @@ FVulkanPhysicalDevice::FVulkanPhysicalDevice(VkPhysicalDevice InDevice)
 	: mDevice(InDevice)
 {
 	// Init VkPhysicalDeviceProperties and so on
-	VkPhysicalDeviceProperties2 properties;
-	VulkanRHI::ZeroVulkanStruct(&properties, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2_KHR);
-	properties.pNext = &mDeviceIDProperties;
-	mDeviceIDProperties.pNext = &mSubgroupProperties;
-	VulkanRHI::vkGetPhysicalDeviceProperties2(mDevice, &properties);
-	mProperties = properties.properties;
+	{
+		VkPhysicalDeviceProperties2 properties;
+		VulkanRHI::ZeroVulkanStruct(&properties, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2_KHR);
+
+		VulkanRHI::ZeroVulkanStruct(&mDeviceIDProperties, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ID_PROPERTIES_KHR);
+		VulkanRHI::ZeroVulkanStruct(&mSubgroupProperties, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_PROPERTIES);
+		properties.pNext = &mDeviceIDProperties;
+		mDeviceIDProperties.pNext = &mSubgroupProperties;
+
+		VulkanRHI::vkGetPhysicalDeviceProperties2(mDevice, &properties);
+		mProperties = properties.properties;
+	}
+
+	mVendorId = RHI::GetVenderId(mProperties.vendorID);
+
+	HLVM_LOG(LogVulkanRHI, debug, TXT("- DeviceName: {}"), TO_TCHAR_CSTR(mProperties.deviceName));
+	HLVM_LOG(LogVulkanRHI, debug, TXT("- API={:d}.{:d}.{:d} (0x{:x}) Driver=0x{:x} VendorId=0x{:x}"),
+		VK_VERSION_MAJOR(mProperties.apiVersion), VK_VERSION_MINOR(mProperties.apiVersion), VK_VERSION_PATCH(mProperties.apiVersion),
+		mProperties.apiVersion, mProperties.driverVersion, mProperties.vendorID);
+	HLVM_LOG(LogVulkanRHI, debug, TXT("- DeviceID=0x{:x} Type={:s}"), mProperties.deviceID, *VULKAN_TYPE_TO_FSTRING(VkPhysicalDeviceType, mProperties.deviceType));
+	HLVM_LOG(LogVulkanRHI, debug, TXT("- Max Descriptor Sets Bound {:d}, Timestamps {:d}"), mProperties.limits.maxBoundDescriptorSets, mProperties.limits.timestampComputeAndGraphics);
 }
 
 FVulkanPhysicalDevice::QueueFamilyIndices FVulkanPhysicalDevice::QueryQueueFamilyIndices(VkSurfaceKHR Surface, bool bFresh)

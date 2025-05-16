@@ -456,7 +456,7 @@ FRHIShaderRef FVulkanRHI::CreateShader(const FShaderCreateInfo& CreateInfo)
 }
 
 // Pipeline State Management
-FRHIGraphicsPSO* FVulkanRHI::CreateGraphicsPSO(const FGraphicsPSOInitializer& Initializer)
+FRHIGraphicsPSO* FVulkanRHI::CreateGraphicsPSO(const FGraphicsPSOCreateInfo& Initializer)
 {
 	return nullptr;
 	//	VkPipeline		 Pipeline = CreateVulkanGraphicsPipeline(Initializer);
@@ -773,7 +773,7 @@ void FVulkanRHI::CreateVulkanViewPort()
 
 	FRHIViewportCreateInfo ViewportDesc;
 	ViewportDesc.DebugName = Property.Title;
-	ViewportDesc.Dimensions = Property.Extent;
+	ViewportDesc.Extent = Property.Extent;
 	ViewportDesc.ViewportType = ERHIViewportType::Fullscreen;
 	ViewportDesc.Format = EPixelFormat::R8G8B8A8_UNorm;
 	ViewportDesc.NativeWindowHandle = glfwWindow.get();
@@ -809,9 +809,9 @@ VkImage FVulkanRHI::CreateVulkanImage(const FRHITextureCreateInfo& CreateInfo)
 	VkImageCreateInfo ImageInfo = {};
 	ImageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 	ImageInfo.imageType = VK_IMAGE_TYPE_2D;
-	ImageInfo.extent.width = CreateInfo.Dimensions.x;
-	ImageInfo.extent.height = CreateInfo.Dimensions.y;
-	ImageInfo.extent.depth = CreateInfo.Dimensions.z;
+	ImageInfo.extent.width = CreateInfo.Extent.x;
+	ImageInfo.extent.height = CreateInfo.Extent.y;
+	ImageInfo.extent.depth = CreateInfo.Extent.z;
 	ImageInfo.mipLevels = CreateInfo.NumMips;
 	ImageInfo.arrayLayers = 1;
 	ImageInfo.format = VulkanRHI::VulkanFormatFromRHIFormat(CreateInfo.Format);
@@ -856,7 +856,7 @@ VkSampler FVulkanRHI::CreateVulkanSampler(const FRHISamplerStateCreateInfo& Crea
 	SamplerInfo.anisotropyEnable = SamplerInfo.maxAnisotropy > 1.0f;
 
 	SamplerInfo.compareEnable = CreateInfo.ComparisonFunction != ECompareFunction::Never ? VK_TRUE : VK_FALSE;
-	SamplerInfo.compareOp = VulkanRHI::VulkanCompareOpFromRHICompareFunction(CreateInfo.ComparisonFunction);
+	SamplerInfo.compareOp = VulkanRHI::VulkanCompareOpFromRHI(CreateInfo.ComparisonFunction);
 	SamplerInfo.minLod = CreateInfo.MinMipLevel;
 	SamplerInfo.maxLod = CreateInfo.MaxMipLevel;
 	// Only support opaque white (all 1) and transparent black (all 0) for the time being
@@ -1023,7 +1023,8 @@ void FVulkanRHI::PresentVulkanSwapChain(FRHIViewportRef& Viewport)
 void FVulkanRHI::BeginVulkanRenderPass(const FRHIRenderPassInfo& RenderPassInfo)
 {
 	HLVM_ASSERT(ActiveRenderPass == nullptr);
-	ActiveRenderPass = new FVulkanRenderPass(LogicalDevice, { RenderPassInfo });
+	// TODO Implement RenderPassAdditionalInfo based on renderpass info
+	ActiveRenderPass = new FVulkanRenderPass(LogicalDevice, { RenderPassInfo, FVulkanRenderTargetLayout::RenderPassAdditionalInfo{}});
 }
 
 void FVulkanRHI::EndVulkanRenderPass()
@@ -1087,9 +1088,9 @@ VkImageCreateInfo FVulkanRHI::GenerateVkImageCreateInfo(const FRHITextureCreateI
 	VkImageCreateInfo ImageCreateInfo = {};
 	ImageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 	ImageCreateInfo.imageType = VK_IMAGE_TYPE_2D; // Assuming 2D texture for simplicity
-	ImageCreateInfo.extent.width = CreateInfo.Dimensions.x;
-	ImageCreateInfo.extent.height = CreateInfo.Dimensions.y;
-	ImageCreateInfo.extent.depth = CreateInfo.Dimensions.z;
+	ImageCreateInfo.extent.width = CreateInfo.Extent.x;
+	ImageCreateInfo.extent.height = CreateInfo.Extent.y;
+	ImageCreateInfo.extent.depth = CreateInfo.Extent.z;
 	ImageCreateInfo.mipLevels = CreateInfo.NumMips;
 	ImageCreateInfo.samples = S_C(VkSampleCountFlagBits, CreateInfo.NumSamples);
 	ImageCreateInfo.format = VulkanRHI::VulkanFormatFromRHIFormat(CreateInfo.Format); // Helper function to convert RHI format to Vulkan format
@@ -1178,7 +1179,7 @@ VkSamplerCreateInfo FVulkanRHI::GenerateVkSamplerCreateInfo(const FRHISamplerSta
 
 	// Set comparison function
 	SamplerCreateInfo.compareEnable = VK_TRUE;
-	SamplerCreateInfo.compareOp = VulkanRHI::VulkanCompareOpFromRHICompareFunction(CreateInfo.ComparisonFunction);
+	SamplerCreateInfo.compareOp = VulkanRHI::VulkanCompareOpFromRHI(CreateInfo.ComparisonFunction);
 
 	// Set border color
 	SamplerCreateInfo.borderColor = VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK;

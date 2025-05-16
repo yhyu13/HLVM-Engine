@@ -98,7 +98,7 @@ void FRHIRenderPassInfo::Validate() const
 			// for depth read sub-pass
 			// 1. render pass must have depth target
 			// 2. depth target must support InputAttachement
-			HLVM_ENSURE(DepthStencilRenderTarget.DepthStencilTarget->GetFlags() & ETextureCreateFlag::InputAttachment);
+			HLVM_ENSURE(DepthStencilRenderTarget.DepthStencilTarget->GetCreateFlags() & ETextureCreateFlag::InputAttachment);
 		}
 
 		if (DepthStencilRenderTarget.ResolveTarget && DepthStencilRenderTarget.ResolveTarget != DepthStencilRenderTarget.DepthStencilTarget)

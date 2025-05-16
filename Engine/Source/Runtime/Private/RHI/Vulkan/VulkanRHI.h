@@ -43,7 +43,7 @@ public:
 	virtual FRHIShaderRef CreateShader(const FShaderCreateInfo& CreateInfo) override;
 
 	// Pipeline State Management
-	virtual FRHIGraphicsPSO* CreateGraphicsPSO(const FGraphicsPSOInitializer& Initializer) override;
+	virtual FRHIGraphicsPSO* CreateGraphicsPSO(const FGraphicsPSOCreateInfo& Initializer) override;
 	virtual FRHIComputePSO*	 CreateComputePSO(const FComputePSOInitializer& Initializer) override;
 
 	// Command List and Context

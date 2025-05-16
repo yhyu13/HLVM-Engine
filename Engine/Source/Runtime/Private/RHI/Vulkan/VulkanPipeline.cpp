@@ -138,7 +138,34 @@ void FVulkanVertexInputStateInfo::Generate(FVulkanVertexDeclarationRef VertexDec
 	Hash = FMD5Hash::Hash(Attributes, AttributesNum * sizeof(Attributes[0]), &Hash);
 }
 
-void FVulkanGraphicsPSO::GeneratePSOMetadata(const FGraphicsPSOInitializer& PSOInitializer, FVulkanDescriptorSetsLayoutInfo& LayoutInfoOut, FVulkanGraphicsPSODescription& DescOut)
+FVulkanVertexInputStateInfo::FVulkanVertexInputStateInfo()
+	: BindingsNum(0), BindingsMask(0), AttributesNum(0)
+{
+	FMemory::Memzero(&Info);
+	FMemory::MemzeroArray(&Bindings);
+	FMemory::MemzeroArray(&Attributes);
+}
+
+bool FVulkanVertexInputStateInfo::operator==(const FVulkanVertexInputStateInfo& Other)
+{
+	// Ignore bindings
+	if (AttributesNum != Other.AttributesNum)
+	{
+		return false;
+	}
+
+	for (TUINT32 i = 0; i < AttributesNum; i++)
+	{
+		if (FMemory::Memcmp(&Attributes[i], &Other.Attributes[i], sizeof(Attributes[0])) != 0)
+		{
+			return false;
+		}
+	}
+
+	return true;
+}
+
+void FVulkanGraphicsPSO::GeneratePSOMetadata(const FGraphicsPSOCreateInfo& PSOInitializer, FVulkanDescriptorSetsLayoutInfo& LayoutInfoOut, FVulkanGraphicsPSODescription& DescOut)
 {
 	FVulkanShaderRef Shaders[RHI::NUM_GFX_SHADER_STAGES];
 	GetVulkanGfxShaders(PSOInitializer.BoundShaderState, Shaders);
@@ -271,50 +298,256 @@ void FVulkanGraphicsPSO::GeneratePSOMetadata(const FGraphicsPSOInitializer& PSOI
 		DescOut.DepthStencil.ReadFrom(DSInfo);
 	}
 
-//	TUINT32 NumShaders = 0;
-//#if VULKAN_USE_SHADERKEYS
-//	TUINT64 SharedKey = 0;
-//	TUINT64 Primes[] = {
-//		6843488303525203279llu,
-//		3095754086865563867llu,
-//		8242695776924673527llu,
-//		7556751872809527943llu,
-//		8278265491465149053llu,
-//		1263027877466626099llu,
-//		2698115308251696101llu,
-//	};
-//	static_assert(sizeof(Primes) / sizeof(Primes[0]) >= RHI::NUM_GFX_SHADER_STAGES);
-//	for (TUINT32 Index = 0; Index < RHI::NUM_GFX_SHADER_STAGES; ++Index)
-//	{
-//		FVulkanShaderRef Shader = Shaders[Index];
-//		TUINT64			 Key = 0;
-//		if (Shader)
-//		{
-//			Key = Shader->GetShaderKey();
-//			++NumShaders;
-//		}
-//		DescOut.ShaderKeys[Index] = Key;
-//		SharedKey += Key * Primes[Index];
-//	}
-//	DescOut.ShaderKeyShared = SharedKey;
-//#else
-//	for (int32 Index = 0; Index < EShaderStage::NumGraphicsStages; ++Index)
-//	{
-//		FVulkanShaderRef Shader = Shaders[Index];
-//		if (Shader)
-//		{
-//			HLVM_ASSERT(Shader->Spirv.Num() != 0);
-//
-//			FSHAHash Hash = GetShaderHashForStage(PSOInitializer, (EShaderStage)Index);
-//			DescOut.ShaderHashes.Stages[Index] = Hash;
-//
-//			++NumShaders;
-//		}
-//	}
-//	DescOut.ShaderHashes.Finalize();
-//#endif
-	//HLVM_ASSERT(NumShaders > 0);
+	FVulkanRenderTargetLayout RTLayout(PSOInitializer);
+	DescOut.RenderTargets.ReadFrom(RTLayout);
+}
 
-	//FVulkanRenderTargetLayout RTLayout(PSOInitializer);
-	//DescOut.RenderTargets.ReadFrom(RTLayout);
+void FVulkanGraphicsPSODescription::FBlendAttachment::ReadFrom(const VkPipelineColorBlendAttachmentState& InState)
+{
+	bBlend = InState.blendEnable != VK_FALSE;
+	ColorBlendOp = S_C(TUINT32, InState.colorBlendOp);
+	SrcColorBlendFactor = S_C(TUINT32, InState.srcColorBlendFactor);
+	DstColorBlendFactor = S_C(TUINT32, InState.dstColorBlendFactor);
+	AlphaBlendOp = S_C(TUINT32, InState.alphaBlendOp);
+	SrcAlphaBlendFactor = S_C(TUINT32, InState.srcAlphaBlendFactor);
+	DstAlphaBlendFactor = S_C(TUINT32, InState.dstAlphaBlendFactor);
+	ColorWriteMask = S_C(TUINT32, InState.colorWriteMask);
+}
+
+void FVulkanGraphicsPSODescription::FBlendAttachment::WriteInto(VkPipelineColorBlendAttachmentState& Out) const
+{
+	Out.blendEnable = bBlend ? VK_TRUE : VK_FALSE;
+	Out.colorBlendOp = S_C(VkBlendOp, ColorBlendOp);
+	Out.srcColorBlendFactor = S_C(VkBlendFactor, SrcColorBlendFactor);
+	Out.dstColorBlendFactor = S_C(VkBlendFactor, DstColorBlendFactor);
+	Out.alphaBlendOp = S_C(VkBlendOp, AlphaBlendOp);
+	Out.srcAlphaBlendFactor = S_C(VkBlendFactor, SrcAlphaBlendFactor);
+	Out.dstAlphaBlendFactor = S_C(VkBlendFactor, DstAlphaBlendFactor);
+	Out.colorWriteMask = S_C(VkColorComponentFlags, ColorWriteMask);
+}
+
+void FVulkanGraphicsPSODescription::FVertexBinding::ReadFrom(const VkVertexInputBindingDescription& InState)
+{
+	Binding = InState.binding;
+	InputRate = S_C(TUINT32, InState.inputRate);
+	Stride = InState.stride;
+}
+
+void FVulkanGraphicsPSODescription::FVertexBinding::WriteInto(VkVertexInputBindingDescription& Out) const
+{
+	Out.binding = Binding;
+	Out.inputRate = S_C(VkVertexInputRate, InputRate);
+	Out.stride = Stride;
+}
+
+void FVulkanGraphicsPSODescription::FVertexAttribute::ReadFrom(const VkVertexInputAttributeDescription& InState)
+{
+	Binding = InState.binding;
+	Format = S_C(TUINT32, InState.format);
+	Location = InState.location;
+	Offset = InState.offset;
+}
+
+void FVulkanGraphicsPSODescription::FVertexAttribute::WriteInto(VkVertexInputAttributeDescription& Out) const
+{
+	Out.binding = Binding;
+	Out.format = S_C(VkFormat, Format);
+	Out.location = Location;
+	Out.offset = Offset;
+}
+
+void FVulkanGraphicsPSODescription::FRasterizer::ReadFrom(const VkPipelineRasterizationStateCreateInfo& InState)
+{
+	PolygonMode = S_C(TUINT32, InState.polygonMode);
+	CullMode = S_C(TUINT32, InState.cullMode);
+	DepthBiasSlopeScale = InState.depthBiasSlopeFactor;
+	DepthBiasConstantFactor = InState.depthBiasConstantFactor;
+}
+
+void FVulkanGraphicsPSODescription::FRasterizer::WriteInto(VkPipelineRasterizationStateCreateInfo& Out) const
+{
+	Out.polygonMode = S_C(VkPolygonMode, PolygonMode);
+	Out.cullMode = S_C(VkCullModeFlags, CullMode);
+	Out.frontFace = VK_FRONT_FACE_CLOCKWISE;
+	Out.depthClampEnable = VK_FALSE;
+	Out.depthBiasEnable = DepthBiasConstantFactor != 0.0f ? VK_TRUE : VK_FALSE;
+	Out.rasterizerDiscardEnable = VK_FALSE;
+	Out.depthBiasSlopeFactor = DepthBiasSlopeScale;
+	Out.depthBiasConstantFactor = DepthBiasConstantFactor;
+}
+
+void FVulkanGraphicsPSODescription::FDepthStencil::ReadFrom(const VkPipelineDepthStencilStateCreateInfo& InState)
+{
+	DepthCompareOp = S_C(TUINT8, InState.depthCompareOp);
+	bDepthTestEnable = InState.depthTestEnable != VK_FALSE;
+	bDepthWriteEnable = InState.depthWriteEnable != VK_FALSE;
+	bDepthBoundsTestEnable = InState.depthBoundsTestEnable != VK_FALSE;
+	bStencilTestEnable = InState.stencilTestEnable != VK_FALSE;
+	FrontFailOp = S_C(TUINT8, InState.front.failOp);
+	FrontPassOp = S_C(TUINT8, InState.front.passOp);
+	FrontDepthFailOp = S_C(TUINT8, InState.front.depthFailOp);
+	FrontCompareOp = S_C(TUINT8, InState.front.compareOp);
+	FrontCompareMask = S_C(TUINT8, InState.front.compareMask);
+	FrontWriteMask = InState.front.writeMask;
+	FrontReference = InState.front.reference;
+	BackFailOp = S_C(TUINT8, InState.back.failOp);
+	BackPassOp = S_C(TUINT8, InState.back.passOp);
+	BackDepthFailOp = S_C(TUINT8, InState.back.depthFailOp);
+	BackCompareOp = S_C(TUINT8, InState.back.compareOp);
+	BackCompareMask = S_C(TUINT8, InState.back.compareMask);
+	BackWriteMask = InState.back.writeMask;
+	BackReference = InState.back.reference;
+}
+
+void FVulkanGraphicsPSODescription::FDepthStencil::WriteInto(VkPipelineDepthStencilStateCreateInfo& Out) const
+{
+	Out.depthCompareOp = S_C(VkCompareOp, DepthCompareOp);
+	Out.depthTestEnable = bDepthTestEnable;
+	Out.depthWriteEnable = bDepthWriteEnable;
+	Out.depthBoundsTestEnable = bDepthBoundsTestEnable;
+	Out.stencilTestEnable = bStencilTestEnable;
+	Out.front.failOp = S_C(VkStencilOp, FrontFailOp);
+	Out.front.passOp = S_C(VkStencilOp, FrontPassOp);
+	Out.front.depthFailOp = S_C(VkStencilOp, FrontDepthFailOp);
+	Out.front.compareOp = S_C(VkCompareOp, FrontCompareOp);
+	Out.front.compareMask = FrontCompareMask;
+	Out.front.writeMask = FrontWriteMask;
+	Out.front.reference = FrontReference;
+	Out.back.failOp = S_C(VkStencilOp, BackFailOp);
+	Out.back.passOp = S_C(VkStencilOp, BackPassOp);
+	Out.back.depthFailOp = S_C(VkStencilOp, BackDepthFailOp);
+	Out.back.compareOp = S_C(VkCompareOp, BackCompareOp);
+	Out.back.writeMask = BackWriteMask;
+	Out.back.compareMask = BackCompareMask;
+	Out.back.reference = BackReference;
+}
+
+void FVulkanGraphicsPSODescription::FRenderTargets::FAttachmentRef::ReadFrom(const VkAttachmentReference& InState)
+{
+	Attachment = InState.attachment;
+	Layout = S_C(TUINT32, InState.layout);
+}
+
+void FVulkanGraphicsPSODescription::FRenderTargets::FAttachmentRef::WriteInto(VkAttachmentReference& Out) const
+{
+	Out.attachment = Attachment;
+	Out.layout = S_C(VkImageLayout, Layout);
+}
+
+void FVulkanGraphicsPSODescription::FRenderTargets::FStencilAttachmentRef::ReadFrom(const VkAttachmentReferenceStencilLayout& InState)
+{
+	Layout = S_C(TUINT32, InState.stencilLayout);
+}
+
+void FVulkanGraphicsPSODescription::FRenderTargets::FStencilAttachmentRef::WriteInto(VkAttachmentReferenceStencilLayout& Out) const
+{
+	Out.stencilLayout = S_C(VkImageLayout, Layout);
+}
+
+void FVulkanGraphicsPSODescription::FRenderTargets::FAttachmentDesc::ReadFrom(const VkAttachmentDescription& InState)
+{
+	Format = S_C(TUINT32, InState.format);
+	Flags = S_C(TUINT8, InState.flags);
+	Samples = S_C(TUINT8, InState.samples);
+	LoadOp = S_C(TUINT8, InState.loadOp);
+	StoreOp = S_C(TUINT8, InState.storeOp);
+	StencilLoadOp = S_C(TUINT8, InState.stencilLoadOp);
+	StencilStoreOp = S_C(TUINT8, InState.stencilStoreOp);
+	InitialLayout = S_C(TUINT32, InState.initialLayout);
+	FinalLayout = S_C(TUINT32, InState.finalLayout);
+}
+
+void FVulkanGraphicsPSODescription::FRenderTargets::FAttachmentDesc::WriteInto(VkAttachmentDescription& Out) const
+{
+	Out.format = S_C(VkFormat, Format);
+	Out.flags = Flags;
+	Out.samples = S_C(VkSampleCountFlagBits, Samples);
+	Out.loadOp = S_C(VkAttachmentLoadOp, LoadOp);
+	Out.storeOp = S_C(VkAttachmentStoreOp, StoreOp);
+	Out.stencilLoadOp = S_C(VkAttachmentLoadOp, StencilLoadOp);
+	Out.stencilStoreOp = S_C(VkAttachmentStoreOp, StencilStoreOp);
+	Out.initialLayout = S_C(VkImageLayout, InitialLayout);
+	Out.finalLayout = S_C(VkImageLayout, FinalLayout);
+}
+
+void FVulkanGraphicsPSODescription::FRenderTargets::FStencilAttachmentDesc::ReadFrom(const VkAttachmentDescriptionStencilLayout& InState)
+{
+	InitialLayout = S_C(TUINT32, InState.stencilInitialLayout);
+	FinalLayout = S_C(TUINT32, InState.stencilFinalLayout);
+}
+
+void FVulkanGraphicsPSODescription::FRenderTargets::FStencilAttachmentDesc::WriteInto(VkAttachmentDescriptionStencilLayout& Out) const
+{
+	Out.stencilInitialLayout = S_C(VkImageLayout, InitialLayout);
+	Out.stencilFinalLayout = S_C(VkImageLayout, FinalLayout);
+}
+
+void FVulkanGraphicsPSODescription::FRenderTargets::ReadFrom(const FVulkanRenderTargetLayout& RTLayout)
+{
+	NumAttachments = RTLayout.NumAttachmentDescriptions;
+	NumColorAttachments = RTLayout.NumColorAttachments;
+
+	bHasDepthStencil = RTLayout.bHasDepthStencil != 0;
+	bHasResolveAttachments = RTLayout.bHasResolveAttachments != 0;
+	bHasDepthStencilResolve = RTLayout.bHasDepthStencilResolve != 0;
+	bHasFragmentDensityAttachment = RTLayout.bHasFragmentDensityAttachment != 0;
+	NumUsedClearValues = RTLayout.NumUsedClearValues;
+
+	Extent3D.x = RTLayout.Extent.Extent3D.width;
+	Extent3D.y = RTLayout.Extent.Extent3D.height;
+	Extent3D.z = RTLayout.Extent.Extent3D.depth;
+
+	auto CopyAttachmentRefs = [&](TVector<FVulkanGraphicsPSODescription::FRenderTargets::FAttachmentRef>& Dest, const VkAttachmentReference* Source, TUINT32 Count) {
+		for (TUINT32 Index = 0; Index < Count; ++Index)
+		{
+			FVulkanGraphicsPSODescription::FRenderTargets::FAttachmentRef& New = Dest.AddDefaulted_GetRef();
+			New.ReadFrom(Source[Index]);
+		}
+	};
+	CopyAttachmentRefs(ColorAttachments, RTLayout.ColorReferences, HLVM_ARRAY_SIZE(RTLayout.ColorReferences));
+	CopyAttachmentRefs(ResolveAttachments, RTLayout.ResolveReferences, HLVM_ARRAY_SIZE(RTLayout.ResolveReferences));
+	Depth.ReadFrom(RTLayout.DepthReference);
+	Stencil.ReadFrom(RTLayout.StencilReference);
+	FragmentDensity.ReadFrom(RTLayout.FragmentDensityReference);
+
+	Descriptions.AddDefaulted(HLVM_ARRAY_SIZE(RTLayout.Desc));
+	for (TUINT32 Index = 0; Index < HLVM_ARRAY_SIZE(RTLayout.Desc); ++Index)
+	{
+		Descriptions[Index].ReadFrom(RTLayout.Desc[Index]);
+	}
+	StencilDescription.ReadFrom(RTLayout.StencilDesc);
+}
+
+void FVulkanGraphicsPSODescription::FRenderTargets::WriteInto(FVulkanRenderTargetLayout& Out) const
+{
+	Out.NumAttachmentDescriptions = NumAttachments;
+	Out.NumColorAttachments = NumColorAttachments;
+
+	Out.bHasDepthStencil = bHasDepthStencil;
+	Out.bHasResolveAttachments = bHasResolveAttachments;
+	Out.bHasDepthStencilResolve = bHasDepthStencilResolve;
+	Out.bHasFragmentDensityAttachment = bHasFragmentDensityAttachment;
+	Out.NumUsedClearValues = NumUsedClearValues;
+
+	Out.Extent.Extent3D.width = Extent3D.x;
+	Out.Extent.Extent3D.height = Extent3D.y;
+	Out.Extent.Extent3D.depth = Extent3D.z;
+
+	auto CopyAttachmentRefs = [&](const TVector<FVulkanGraphicsPSODescription::FRenderTargets::FAttachmentRef>& Source, VkAttachmentReference* Dest, TUINT32 Count) {
+		for (TUINT32 Index = 0; Index < Count; ++Index, ++Dest)
+		{
+			Source[Index].WriteInto(*Dest);
+		}
+	};
+	CopyAttachmentRefs(ColorAttachments, Out.ColorReferences, HLVM_ARRAY_SIZE(Out.ColorReferences));
+	CopyAttachmentRefs(ResolveAttachments, Out.ResolveReferences, HLVM_ARRAY_SIZE(Out.ResolveReferences));
+	Depth.WriteInto(Out.DepthReference);
+	Stencil.WriteInto(Out.StencilReference);
+	FragmentDensity.WriteInto(Out.FragmentDensityReference);
+
+	for (TUINT32 Index = 0; Index < HLVM_ARRAY_SIZE(Out.Desc); ++Index)
+	{
+		Descriptions[Index].WriteInto(Out.Desc[Index]);
+	}
+	StencilDescription.WriteInto(Out.StencilDesc);
 }

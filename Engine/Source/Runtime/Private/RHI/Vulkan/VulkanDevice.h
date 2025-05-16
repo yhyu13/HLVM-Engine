@@ -73,9 +73,11 @@ public:
 private:
 	VkPhysicalDevice mDevice;
 
-	VkPhysicalDeviceProperties			mProperties;
-	VkPhysicalDeviceIDPropertiesKHR		mDeviceIDProperties;
+	VkPhysicalDeviceProperties		   mProperties;
+	VkPhysicalDeviceIDPropertiesKHR	   mDeviceIDProperties;
 	VkPhysicalDeviceSubgroupProperties mSubgroupProperties;
+
+	EGpuVendorId mVendorId;
 
 	TMap<VkSurfaceKHR, QueueFamilyIndices>		mSurfaceToQueueFamilyIndices;
 	TMap<VkSurfaceKHR, SwapChainSupportDetails> mSurfaceToSwapChainSupportDetails;

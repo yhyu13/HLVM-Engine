@@ -17,14 +17,13 @@ public:
 	VkSampler GetSampler() const { return Sampler; }
 
 private:
-	FRHISamplerStateCreateInfo CreateInfo;
 	VkSampler				   Sampler;
 };
 
 class FVulkanRasterizerState : public FRHIRasterizerState, public FVulkanResource
 {
 public:
-	FVulkanRasterizerState(const FRHIRasterizerStateCreateInfo& InInitializer);
+	FVulkanRasterizerState(const FRHIRasterizerStateCreateInfo& InCreateInfo);
 
 	static void ResetCreateInfo(VkPipelineRasterizationStateCreateInfo& OutInfo)
 	{
@@ -40,9 +39,9 @@ public:
 class FVulkanDepthStencilState : public FRHIDepthStencilState, public FVulkanResource
 {
 public:
-	FVulkanDepthStencilState(const FRHIDepthStencilStateCreateInfo& InInitializer);
+	FVulkanDepthStencilState(const FRHIDepthStencilStateCreateInfo& InCreateInfo);
 
-	void SetupCreateInfo(const FGraphicsPSOInitializer& GfxPSOInit, VkPipelineDepthStencilStateCreateInfo& OutDepthStencilState);
+	void SetupCreateInfo(const FGraphicsPSOCreateInfo& GfxPSOCreateInfo, VkPipelineDepthStencilStateCreateInfo& OutDepthStencilState);
 };
 
 class FVulkanBlendState : public FRHIBlendState, public FVulkanResource
@@ -50,6 +49,10 @@ class FVulkanBlendState : public FRHIBlendState, public FVulkanResource
 public:
 	FVulkanBlendState(const FRHIBlendStateCreateInfo& InCreateInfo);
 
+	static void ResetCreateInfo(VkPipelineColorBlendStateCreateInfo& OutInfo)
+	{
+		VulkanRHI::ZeroVulkanStruct(&OutInfo, VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO);
+	}
 public:
 	// array the pipeline state can point right to
 	VkPipelineColorBlendAttachmentState BlendStates[RHI::MAX_RT_ATTACHMENTS];
