@@ -32,6 +32,7 @@ public:
 
 	HLVM_NODISCARD virtual VkShaderModule CreateVulkanShaderModule(const FShaderCreateInfo& CreateInfo) = 0;
 	virtual void DestroyVulkanShaderModule(VkShaderModule ShaderModule) = 0;
+	HLVM_NODISCARD virtual VkPipelineShaderStageCreateInfo GenerateVkPipelineShaderStageCreateInfo(const FShaderCreateInfo& CreateInfo, VkShaderModule ShaderModule) = 0;
 
 	// Vulkan-specific command list management
 	HLVM_NODISCARD virtual VkCommandBuffer BeginVulkanCommandBuffer() = 0;
@@ -62,4 +63,6 @@ public:
 
 	// Vulkan-specific memory management
 	virtual void FlushVulkanPendingDeletes() = 0;
+
+	virtual void SetVulkanMinimalContext(void* InContext) const = 0;
 };

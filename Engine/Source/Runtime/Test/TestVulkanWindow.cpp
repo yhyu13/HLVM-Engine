@@ -1330,11 +1330,16 @@ RECORD_BOOL(test_GLFW3VulkanWindow)
 
 				auto geomShaderCode = FGenericPlatformFile::Get()->ReadContent(FPath::Combine(DataDir, TXT("geom.spv")));
 				FShaderCreateInfo geomShaderCreateInfo;
-				geomShaderCreateInfo.DebugName = TXT("gemo.spv");
+				geomShaderCreateInfo.DebugName = TXT("geom.spv");
 				geomShaderCreateInfo.Code = MoveTemp(geomShaderCode);
 				geomShaderCreateInfo.Stage = EShaderStage::Geometry;
 				geomShaderCreateInfo.EntryPoints = {TXT("main")};
 				FRHIShaderRef GeomShader = VulkanRHI->CreateShader(geomShaderCreateInfo);
+
+				VkPipelineShaderStageCreateInfo ShaderStages[] = {
+					S_C(FVulkanShaderRef, VertShader)->GetPipelineShaderStageCreateInfo(),
+					S_C(FVulkanShaderRef, FragShader)->GetPipelineShaderStageCreateInfo()
+				};
 			}
 			VulkanRHI->RHIEndRenderPass();
 		}

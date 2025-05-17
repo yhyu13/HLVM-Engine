@@ -34,9 +34,8 @@ using FVulkanBackBufferRef = TRefCountPtr<FVulkanBackBuffer>;
 class FVulkanViewport : public FRHIViewport, public FVulkanResource, public FVulkanMinimalContext
 {
 public:
-	FVulkanViewport(const FRHIViewportCreateInfo& InCreateInfo,
-		const FVulkanMinimalContext&			  InContext)
-		: FRHIViewport(InCreateInfo), FVulkanMinimalContext(InContext)
+	FVulkanViewport(const FRHIViewportCreateInfo& InCreateInfo)
+		: FRHIViewport(InCreateInfo)
 	{
 	}
 

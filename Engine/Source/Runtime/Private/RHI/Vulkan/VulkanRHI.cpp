@@ -378,11 +378,13 @@ void FVulkanRHI::Init()
 	CreateSurface();
 	CreateVulkanPhysicalDevice();
 	CreateVulkanLogicalDevice();
+
 	CreateVulkanQueues();
 	CreateVulkanViewPort();
 
 	// Lastly, create Vulkan Memory Allocator
 	CreateVulkanMemoryAllocator();
+
 
 	HLVM_LOG(LogVulkanRHI, debug, TXT("VulkanRHI Init!"));
 }
@@ -778,12 +780,7 @@ void FVulkanRHI::CreateVulkanViewPort()
 	ViewportDesc.Format = EPixelFormat::R8G8B8A8_UNorm;
 	ViewportDesc.NativeWindowHandle = glfwWindow.get();
 	ViewportDesc.bHeadlessRendering = false;
-	FVulkanMinimalContext Context{
-		VulkanInstance,
-		PhysicalDevice,
-		LogicalDevice
-	};
-	VulkanViewport = new FVulkanViewport(ViewportDesc, Context);
+	VulkanViewport = new FVulkanViewport(ViewportDesc);
 
 	FVulkanSwapChain::FRecreateInfo RecreateInfo;
 	RecreateInfo.OldSwapChain = nullptr;
@@ -860,7 +857,7 @@ VkSampler FVulkanRHI::CreateVulkanSampler(const FRHISamplerStateCreateInfo& Crea
 	SamplerInfo.minLod = CreateInfo.MinMipLevel;
 	SamplerInfo.maxLod = CreateInfo.MaxMipLevel;
 	// Only support opaque white (all 1) and transparent black (all 0) for the time being
-	SamplerInfo.borderColor = CreateInfo.BorderColor == FVec4{0.0f} ? VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK : VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
+	SamplerInfo.borderColor = CreateInfo.BorderColor == FVec4{ 0.0f } ? VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK : VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
 
 	// call vk api
 	VkSampler Sampler;
@@ -937,10 +934,9 @@ VkBufferView FVulkanRHI::CreateVulkanBufferView(VkBuffer Buffer, const FRHIUnord
 
 VkShaderModule FVulkanRHI::CreateVulkanShaderModule(const FShaderCreateInfo& CreateInfo)
 {
+	VkShaderModuleCreateInfo createInfo;
+	VulkanRHI::ZeroVulkanStruct(&createInfo, VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO);
 	const TVector<TBYTE>& code = CreateInfo.Code;
-
-	VkShaderModuleCreateInfo createInfo{};
-	createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
 	createInfo.codeSize = code.size();
 	createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
 
@@ -1024,7 +1020,7 @@ void FVulkanRHI::BeginVulkanRenderPass(const FRHIRenderPassInfo& RenderPassInfo)
 {
 	HLVM_ASSERT(ActiveRenderPass == nullptr);
 	// TODO Implement RenderPassAdditionalInfo based on renderpass info
-	ActiveRenderPass = new FVulkanRenderPass(LogicalDevice, { RenderPassInfo, FVulkanRenderTargetLayout::RenderPassAdditionalInfo{}});
+	ActiveRenderPass = new FVulkanRenderPass(LogicalDevice, { RenderPassInfo, FVulkanRenderTargetLayout::RenderPassAdditionalInfo{} });
 }
 
 void FVulkanRHI::EndVulkanRenderPass()
@@ -1189,14 +1185,13 @@ VkSamplerCreateInfo FVulkanRHI::GenerateVkSamplerCreateInfo(const FRHISamplerSta
 }
 
 // Generate VkPipelineShaderStageCreateInfo from FShaderCreateInfo
-VkPipelineShaderStageCreateInfo FVulkanRHI::GenerateVkPipelineShaderStageCreateInfo(const FShaderCreateInfo& CreateInfo)
+VkPipelineShaderStageCreateInfo FVulkanRHI::GenerateVkPipelineShaderStageCreateInfo(const FShaderCreateInfo& CreateInfo, VkShaderModule ShaderModule)
 {
-	VkPipelineShaderStageCreateInfo ShaderStageCreateInfo = {};
-	ShaderStageCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	VkPipelineShaderStageCreateInfo ShaderStageCreateInfo;
+	VulkanRHI::ZeroVulkanStruct(&ShaderStageCreateInfo, VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO);
 	ShaderStageCreateInfo.stage = VulkanRHI::VulkanShaderStageFromRHIStage(CreateInfo.Stage); // Convert RHI shader stage to Vulkan shader stage
-	ShaderStageCreateInfo.module = VK_NULL_HANDLE;											  // To be set later
+	ShaderStageCreateInfo.module = ShaderModule;
 	ShaderStageCreateInfo.pName = TO_CHAR_CSTR(CreateInfo.EntryPoints[0].c_str());
-
 	return ShaderStageCreateInfo;
 }
 
@@ -1299,6 +1294,12 @@ VkQueryPoolCreateInfo FVulkanRHI::GenerateVkQueryPoolCreateInfo(const FRHIQueryC
 	QueryPoolCreateInfo.queryCount = CreateInfo.NumQueries;
 
 	return QueryPoolCreateInfo;
+}
+
+void FVulkanRHI::SetVulkanMinimalContext(void* InContext) const
+{
+	FVulkanMinimalContext* MinimalContext = S_C(FVulkanMinimalContext*, InContext);
+	*MinimalContext = FVulkanMinimalContext(VulkanInstance, PhysicalDevice, LogicalDevice);
 }
 
 #pragma clang diagnostic pop

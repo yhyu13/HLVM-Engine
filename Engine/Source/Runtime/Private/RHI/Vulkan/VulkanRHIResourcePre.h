@@ -10,6 +10,7 @@
 
 struct FVulkanMinimalContext
 {
+	FVulkanMinimalContext();
 	explicit FVulkanMinimalContext(VkInstance InInstance,
 		FVulkanPhysicalDeviceRef			  InPhysicalDevice,
 		FVulkanLogicalDeviceRef				  InDevice)
@@ -17,14 +18,6 @@ struct FVulkanMinimalContext
 		, PhysicalDevice(InPhysicalDevice)
 		, LogicalDevice(InDevice)
 	{
-	}
-
-	template <typename T>
-	void Update(T& InResource)
-	{
-		InResource.Instance = Instance;
-		InResource.PhysicalDevice = PhysicalDevice;
-		InResource.LogicalDevice = LogicalDevice;
 	}
 
 	VkInstance				 Instance;

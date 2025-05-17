@@ -131,6 +131,8 @@ public:
 	// Vulkan-specific memory management
 	void FlushVulkanPendingDeletes() override;
 
+	void SetVulkanMinimalContext(void* InContext) const override;
+
 protected:
 	// Vulkan-specific initialization
 	void CreateVulkanInstance();
@@ -162,7 +164,7 @@ protected:
 	VkSamplerCreateInfo GenerateVkSamplerCreateInfo(const FRHISamplerStateCreateInfo& CreateInfo);
 
 	// Function to generate VkPipelineShaderStageCreateInfo from FShaderCreateInfo
-	VkPipelineShaderStageCreateInfo GenerateVkPipelineShaderStageCreateInfo(const FShaderCreateInfo& CreateInfo);
+	VkPipelineShaderStageCreateInfo GenerateVkPipelineShaderStageCreateInfo(const FShaderCreateInfo& CreateInfo, VkShaderModule ShaderModule) override;
 
 	// Function to generate VkPipelineLayoutCreateInfo from FRHIGraphicsPSOCreateInfo (assuming this struct exists)
 	VkPipelineLayoutCreateInfo GenerateVkPipelineLayoutCreateInfo(const FRHIGraphicsPipelineLayoutCreateInfo& CreateInfo);

@@ -4,6 +4,12 @@
 
 #include "VulkanRHIResource.h"
 #include "VulkanRHIResourcePre.h"
+#include "RHI/Vulkan/IVulkanDynamicRHI.h"
+
+FVulkanMinimalContext::FVulkanMinimalContext()
+{
+	GetDynamicRHI<IVulkanDynamicRHI>()->SetVulkanMinimalContext(this);
+}
 
 FVulkanRenderTargetLayout::FVulkanRenderTargetLayout(const FRHIRenderPassInfo& RPInfo, const RenderPassAdditionalInfo& AdditionalInfo)
 	: NumAttachmentDescriptions(0)

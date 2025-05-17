@@ -156,3 +156,62 @@ private:
 	TVector<FSetLayout>					 SetLayouts;
 	VkPipelineBindPoint					 BindPoint = VK_PIPELINE_BIND_POINT_MAX_ENUM;
 };
+
+//// Layout for a Pipeline, also includes DescriptorSets layout
+//class FVulkanLayout : public FVulkanMinimalContext
+//{
+//public:
+//    FVulkanLayout(bool InGfxLayout, bool InUsesBindless);
+//    virtual ~FVulkanLayout();
+//
+//    bool IsGfxLayout() const
+//    {
+//       return bIsGfxLayout;
+//    }
+//
+//    inline const FVulkanDescriptorSetsLayout& GetDescriptorSetsLayout() const
+//    {
+//       return DescriptorSetLayout;
+//    }
+//
+//    inline VkPipelineLayout GetPipelineLayout() const
+//    {
+//       return bUsesBindless ? Device->GetBindlessDescriptorManager()->GetPipelineLayout() : PipelineLayout;
+//    }
+//
+//    inline bool HasDescriptors() const
+//    {
+//       return DescriptorSetLayout.GetLayouts().Num() > 0;
+//    }
+//
+//    inline uint32 GetDescriptorSetLayoutHash() const
+//    {
+//       return DescriptorSetLayout.GetHash();
+//    }
+//
+//protected:
+//    const bool bIsGfxLayout;
+//    const bool bUsesBindless;
+//    FVulkanDescriptorSetsLayout    DescriptorSetLayout;
+//    VkPipelineLayout         PipelineLayout;
+//
+//    template <bool bIsCompute>
+//    inline void FinalizeBindings(const FUniformBufferGatherInfo& UBGatherInfo)
+//    {
+//       // Setting descriptor is only allowed prior to compiling the layout
+//       check(DescriptorSetLayout.GetHandles().Num() == 0);
+//
+//       DescriptorSetLayout.FinalizeBindings<bIsCompute>(UBGatherInfo);
+//    }
+//
+//    inline void ProcessBindingsForStage(VkShaderStageFlagBits StageFlags, ShaderStage::EStage DescSet, const FVulkanShaderHeader& CodeHeader, FUniformBufferGatherInfo& OutUBGatherInfo) const
+//    {
+//       // Setting descriptor is only allowed prior to compiling the layout
+//       check(DescriptorSetLayout.GetHandles().Num() == 0);
+//
+//       DescriptorSetLayout.ProcessBindingsForStage(StageFlags, DescSet, CodeHeader, OutUBGatherInfo);
+//    }
+//
+//    void Compile(FVulkanDescriptorSetLayoutMap& DSetLayoutMap);
+//};
+

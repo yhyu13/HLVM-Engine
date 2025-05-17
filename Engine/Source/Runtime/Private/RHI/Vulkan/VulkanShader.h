@@ -120,14 +120,17 @@ public:
 	// Returns the Vulkan shader module handle
 	VkShaderModule GetShaderModule() const { return ShaderModule; }
 
-	void SetShaderHeader(const FVulkanShaderHeader& InShaderHeader) { ShaderHeader = InShaderHeader; }
+	const VkPipelineShaderStageCreateInfo& GetPipelineShaderStageCreateInfo() const { return PipelineShaderStageCreateInfo; }
+
+	void					   SetShaderHeader(const FVulkanShaderHeader& InShaderHeader) { ShaderHeader = InShaderHeader; }
 	const FVulkanShaderHeader* GetCodeHeader() const { return &ShaderHeader; }
 
 	bool UsesBindless() const { return false; }
 
 private:
-	VkShaderModule ShaderModule;
-	FVulkanShaderHeader ShaderHeader;
+	VkShaderModule					ShaderModule;
+	VkPipelineShaderStageCreateInfo PipelineShaderStageCreateInfo;
+	FVulkanShaderHeader				ShaderHeader;
 };
 
 // Vulkan-specific RHI shader resource view

@@ -9,6 +9,7 @@ FVulkanShader::FVulkanShader(const FShaderCreateInfo& InCreateInfo)
 	: FRHIShader(InCreateInfo)
 {
 	ShaderModule = GetDynamicRHI<IVulkanDynamicRHI>()->CreateVulkanShaderModule(InCreateInfo);
+	PipelineShaderStageCreateInfo = GetDynamicRHI<IVulkanDynamicRHI>()->GenerateVkPipelineShaderStageCreateInfo(InCreateInfo, ShaderModule);
 	HLVM_LOG(LogVulkanRHI, trace, TXT("Created Vulkan Shader Module: {}"), *GetName());
 }
 
