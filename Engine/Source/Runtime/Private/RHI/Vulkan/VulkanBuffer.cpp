@@ -42,7 +42,7 @@ FVulkanBuffer& FVulkanBuffer::operator=(FVulkanBuffer&& Other)
 
 void FVulkanBuffer::CreateBuffer()
 {
-	Buffer = GetDynamicRHI<IVulkanDynamicRHI>()->CreateVulkanBuffer(CreateInfo, R_C(void**, &Allocation));
+	Buffer = RHI::GetDynamicRHI<IVulkanDynamicRHI>()->CreateVulkanBuffer(CreateInfo, R_C(void**, &Allocation));
 }
 
 void FVulkanBuffer::DestroyBuffer()
@@ -51,5 +51,5 @@ void FVulkanBuffer::DestroyBuffer()
 	{
 		return;
 	}
-	GetDynamicRHI<IVulkanDynamicRHI>()->DestroyVulkanBuffer(Buffer, R_C(void**, &Allocation));
+	RHI::GetDynamicRHI<IVulkanDynamicRHI>()->DestroyVulkanBuffer(Buffer, R_C(void**, &Allocation));
 }

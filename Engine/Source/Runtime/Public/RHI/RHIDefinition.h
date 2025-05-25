@@ -44,8 +44,7 @@ HLVM_INLINE_FUNC const TCHAR* GetRHIName(ERHIInterfaceType Type)
 };
 
 // Enumeration of pixel formats
-enum class EPixelFormat : TUINT8
-{
+HLVM_ENUM(EPixelFormat, TUINT8,
 	None = 0,
 	R8_UNorm,
 	R8G8_UNorm,
@@ -63,9 +62,57 @@ enum class EPixelFormat : TUINT8
 	D16_UNorm,
 	D24_UNorm_S8_UInt,
 	D32_Float,
-	D32_Float_S8_UInt,
+	D32_Float_S8_UInt
 	// Add more formats as needed
-};
+);
+
+//enum class EPixelFormatCapability : TUINT32
+//{
+//	None = 0,
+//	Texture1D = 1ull << 1,
+//	Texture2D = 1ull << 2,
+//	Texture3D = 1ull << 3,
+//	TextureCube = 1ull << 4,
+//	RenderTarget = 1ull << 5,
+//	DepthStencil = 1ull << 6,
+//	TextureMipmaps = 1ull << 7,
+//	TextureLoad = 1ull << 8,
+//	TextureSample = 1ull << 9,
+//	TextureGather = 1ull << 10,
+//	TextureAtomics = 1ull << 11,
+//	TextureBlendable = 1ull << 12,
+//	TextureStore = 1ull << 13,
+//
+//	Buffer = 1ull << 14,
+//	VertexBuffer = 1ull << 15,
+//	IndexBuffer = 1ull << 16,
+//	BufferLoad = 1ull << 17,
+//	BufferStore = 1ull << 18,
+//	BufferAtomics = 1ull << 19,
+//
+//	UAV = 1ull << 20,
+//	TypedUAVLoad = 1ull << 21,
+//	TypedUAVStore = 1ull << 22,
+//
+//	TextureFilterable = 1ull << 23,
+//
+//	AnyTexture = Texture1D | Texture2D | Texture3D | TextureCube,
+//
+//	AllTextureFlags = AnyTexture | RenderTarget | DepthStencil | TextureMipmaps | TextureLoad | TextureSample | TextureGather | TextureAtomics | TextureBlendable | TextureStore,
+//	AllBufferFlags = Buffer | VertexBuffer | IndexBuffer | BufferLoad | BufferStore | BufferAtomics,
+//	AllUAVFlags = UAV | TypedUAVLoad | TypedUAVStore,
+//
+//	AllFlags = AllTextureFlags | AllBufferFlags | AllUAVFlags
+//};
+//HLVM_ENMU_CLASS_FLAGS(EPixelFormatCapability, EPixelFormatCapabilities);
+
+namespace RHI
+{
+	HLVM_STATIC_FUNC bool HasStencil(EPixelFormat Type)
+	{
+		return (Type == EPixelFormat::D24_UNorm_S8_UInt || Type == EPixelFormat::D32_Float_S8_UInt);
+	}
+} // namespace RHI
 
 // Enumeration of texture creation flags
 enum class ETextureCreateFlag : TUINT32
@@ -79,9 +126,24 @@ enum class ETextureCreateFlag : TUINT32
 	InputAttachment = 1 << 5,
 	MemoryLess = 1 << 6,
 	SRGB = 1 << 7,
+	ArraySlices = 1 << 8, // Allow texture array slices
+	Present = 1 << 9,
+	RenderTargetResolve = 1 << 10,
+	DepthStencilResolve = 1 << 11,
+	UAV = 1 << 12,
 	// Add more flags as needed
 };
-HLVM_DECLARE_ENMU_FLAGS(ETextureCreateFlag, ETextureCreateFlags)
+HLVM_ENMU_CLASS_FLAGS(ETextureCreateFlag, ETextureCreateFlags)
+
+enum class ETextureDimension : TUINT8
+{
+	None = 0,
+	Texture2D,
+	Texture2DArray,
+	Texture3D,
+	TextureCube,
+	TextureCubeArray,
+};
 
 namespace RHI
 {
@@ -100,7 +162,7 @@ enum class EBufferUsageFlag : TUINT32
 	TransferSource = 1 << 5,	 // Buffer is used as a transfer source
 	TransferDestination = 1 << 6 // Buffer is used as a transfer destination
 };
-HLVM_DECLARE_ENMU_FLAGS(EBufferUsageFlag, EBufferUsageFlags)
+HLVM_ENMU_CLASS_FLAGS(EBufferUsageFlag, EBufferUsageFlags)
 
 // Enumeration of memory property flags
 enum class EMemoryPropertyFlag : TUINT32
@@ -116,7 +178,7 @@ enum class EMemoryPropertyFlag : TUINT32
 	DeviceUncachedAMD = 1 << 7, // VK_MEMORY_PROPERTY_DEVICE_UNCACHED_BIT_AMD
 	RDMACapableNV = 1 << 8		// VK_MEMORY_PROPERTY_RDMA_CAPABLE_BIT_NV
 };
-HLVM_DECLARE_ENMU_FLAGS(EMemoryPropertyFlag, EMemoryPropertyFlags)
+HLVM_ENMU_CLASS_FLAGS(EMemoryPropertyFlag, EMemoryPropertyFlags)
 
 // Enumeration of shader stages
 enum class EShaderStage : TUINT8
@@ -588,7 +650,7 @@ enum class ERHIAccessFlag : TUINT32
 	// A mask of all bits representing read-write states.
 	ReadWrite = DSVRead | DSVWrite,
 };
-HLVM_DECLARE_ENMU_FLAGS(ERHIAccessFlag, ERHIAccessFlags)
+HLVM_ENMU_CLASS_FLAGS(ERHIAccessFlag, ERHIAccessFlags)
 
 enum class EPrimitiveType : TUINT8
 {
@@ -604,6 +666,48 @@ enum class EPrimitiveType : TUINT8
 	Num
 };
 static_assert(HLVM_ENUM_VALUE(EPrimitiveType::Num) <= (1 << 3), "EPrimitiveType doesn't fit in 3 bits");
+
+enum class ERHIDescriptorHeapType : TUINT8
+{
+	Standard,
+	Sampler,
+	RenderTarget,
+	DepthStencil,
+	Count,
+	Invalid = TUINT8_MAX
+};
+
+struct FRHIDescriptorHandle
+{
+	FRHIDescriptorHandle() = default;
+	FRHIDescriptorHandle(ERHIDescriptorHeapType InType, TUINT32 InIndex)
+		: Index(InIndex)
+		, Type(HLVM_ENUM_VALUE(InType))
+	{
+	}
+	FRHIDescriptorHandle(TUINT8 InType, TUINT32 InIndex)
+		: Index(InIndex)
+		, Type(InType)
+	{
+	}
+
+	inline TUINT32				  GetIndex() const { return Index; }
+	inline ERHIDescriptorHeapType GetType() const { return ERHIDescriptorHeapType(Type); }
+	inline TUINT8				  GetRawType() const { return Type; }
+
+	inline bool IsValid() const { return Index != TUINT32_MAX && Type != HLVM_ENUM_VALUE(ERHIDescriptorHeapType::Invalid); }
+
+private:
+	TUINT32 Index{ TUINT32_MAX };
+	TUINT8	Type{ HLVM_ENUM_VALUE(ERHIDescriptorHeapType::Invalid) };
+};
+
+enum class ERHIBindlessConfiguration : TUINT8
+{
+	Disabled,
+	AllShaders,
+	RayTracingShaders,
+};
 
 enum class EGpuVendorId : TUINT32
 {
@@ -629,7 +733,7 @@ enum class EGpuVendorId : TUINT32
 };
 
 // Get venderid from TUINT32
-namespace  RHI
+namespace RHI
 {
 	HLVM_INLINE_FUNC EGpuVendorId GetVenderId(TUINT32 VenderId)
 	{
@@ -658,4 +762,4 @@ namespace  RHI
 				return EGpuVendorId::Unknown;
 		}
 	}
-}
+} // namespace RHI

@@ -199,19 +199,19 @@ public:
 	FThreadAffinityMode() = default;
 	explicit FThreadAffinityMode(const FThreadAffinityMode1& Mask1)
 		: std::variant<FThreadAffinityMode1,
-			FThreadAffinityMode2,
-			FThreadAffinityMode3>(Mask1)
+			  FThreadAffinityMode2,
+			  FThreadAffinityMode3>(Mask1)
 	{
 	}
 	explicit FThreadAffinityMode(const FThreadAffinityMode2& Mask2)
 		: std::variant<FThreadAffinityMode1,
-			FThreadAffinityMode2, FThreadAffinityMode3>(Mask2)
+			  FThreadAffinityMode2, FThreadAffinityMode3>(Mask2)
 	{
 	}
 	explicit FThreadAffinityMode(const FThreadAffinityMode3& Mask3)
 		: std::variant<FThreadAffinityMode1,
-			FThreadAffinityMode2,
-			FThreadAffinityMode3>(Mask3)
+			  FThreadAffinityMode2,
+			  FThreadAffinityMode3>(Mask3)
 	{
 	}
 

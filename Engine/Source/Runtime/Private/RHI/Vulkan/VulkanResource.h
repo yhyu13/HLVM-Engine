@@ -4,34 +4,107 @@
 
 #pragma once
 
-#include "VulkanMisc.h"
-#include "VulkanDevice.h"
-#include "VulkanSyncObject.h"
+#include "VulkanResourcePre.h"
 
-struct FVulkanMinimalContext
-{
-	FVulkanMinimalContext();
-	explicit FVulkanMinimalContext(VkInstance InInstance,
-		FVulkanPhysicalDeviceRef			  InPhysicalDevice,
-		FVulkanLogicalDeviceRef				  InDevice)
-		: Instance(InInstance)
-		, PhysicalDevice(InPhysicalDevice)
-		, LogicalDevice(InDevice)
-	{
-	}
+#include "VulkanBuffer.h"
+#include "VulkanShader.h"
+#include "VulkanState.h"
 
-	VkInstance				 Instance;
-	FVulkanPhysicalDeviceRef PhysicalDevice;
-	FVulkanLogicalDeviceRef	 LogicalDevice;
-};
-
-// Base class for all RHI resources
-class FVulkanResource : virtual public IRHIResource
+class FVulkanView : public FVulkanMinimalContext, public FRefCountable
 {
 public:
-	FVulkanResource() = default;
-	virtual ERHIInterfaceType GetInterfaceType() const override { return ERHIInterfaceType::Vulkan; }
+	struct FInvalidatedState
+	{
+		bool bInitialized = false;
+	};
+
+	struct FTypedBufferView
+	{
+		VkBufferView View = VK_NULL_HANDLE;
+		TUINT32		 ViewId = 0;
+		bool		 bVolatile = false; // Whether source buffer is volatile
+	};
+
+	struct FStructuredBufferView
+	{
+		VkBuffer Buffer = VK_NULL_HANDLE;
+		TUINT32	 HandleId = 0;
+		TUINT32	 Offset = 0;
+		TUINT32	 Size = 0;
+	};
+
+	struct FAccelerationStructureView
+	{
+		VkAccelerationStructureKHR Handle = VK_NULL_HANDLE;
+	};
+
+	struct FTextureView
+	{
+		VkImageView View = VK_NULL_HANDLE;
+		VkImage		Image = VK_NULL_HANDLE;
+		TUINT32		ViewId = 0;
+	};
+
+	typedef std::variant<
+		FInvalidatedState, FTypedBufferView, FTextureView, FStructuredBufferView, FAccelerationStructureView>
+		TStorage;
+
+	enum class EType : TUINT8
+	{
+		Invalid = 0,
+		TypedBuffer,
+		Texture,
+		StructuredBuffer,
+		AccelerationStructure,
+	};
+
+	FVulkanView(VkDescriptorType InDescriptorType);
+
+	~FVulkanView();
+
+	void Invalidate();
+
+	EType GetViewType() const
+	{
+		return EType(Storage.index());
+	}
+
+	bool IsInitialized() const
+	{
+		return (GetViewType() != EType::Invalid) || std::get<FInvalidatedState>(Storage).bInitialized;
+	}
+
+	const FTypedBufferView&			  GetTypedBufferView() const { return std::get<FTypedBufferView>(Storage); }
+	const FTextureView&				  GetTextureView() const { return std::get<FTextureView>(Storage); }
+	const FStructuredBufferView&	  GetStructuredBufferView() const { return std::get<FStructuredBufferView>(Storage); }
+	const FAccelerationStructureView& GetAccelerationStructureView() const { return std::get<FAccelerationStructureView>(Storage); }
+
+	// NOTE: The InOffset applies to the FVulkanResourceMultiBuffer (it does not include any internal Allocation offsets that may exist)
+	FVulkanView* InitAsTypedBufferView(FVulkanBufferRef Buffer, EPixelFormat Format, TUINT32 InOffset, TUINT32 InSize);
+
+	FVulkanView* InitAsTextureView(VkImage InImage, VkImageViewType ViewType, VkImageAspectFlags AspectFlags, EPixelFormat UEFormat, VkFormat Format, TUINT32 FirstMip, TUINT32 NumMips, TUINT32 ArraySliceIndex, TUINT32 NumArraySlices, bool bUseIdentitySwizzle = false, VkImageUsageFlags ImageUsageFlags = 0, VkSamplerYcbcrConversion SamplerYcbcrConversion = nullptr);
+
+	// NOTE: The InOffset applies to the FVulkanResourceMultiBuffer (it does not include any internal Allocation offsets that may exist)
+	FVulkanView* InitAsStructuredBufferView(FVulkanBufferRef Buffer, TUINT32 InOffset, TUINT32 InSize);
+
+	FVulkanView* InitAsAccelerationStructureView(FVulkanBufferRef Buffer, TUINT32 Offset, TUINT32 Size);
+
+	// No moving or copying
+	FVulkanView(FVulkanView&&) = delete;
+	FVulkanView(FVulkanView const&) = delete;
+	FVulkanView& operator=(FVulkanView&&) = delete;
+	FVulkanView& operator=(FVulkanView const&) = delete;
+
+	FRHIDescriptorHandle GetBindlessHandle() const
+	{
+		return BindlessHandle;
+	}
+
+private:
+	FRHIDescriptorHandle BindlessHandle;
+	TStorage			 Storage{ FInvalidatedState() };
 };
+using FVulkanViewRef = TRefCountPtr<FVulkanView>;
 
 class FVulkanRenderTargetLayout
 {
@@ -41,7 +114,7 @@ private:
 public:
 	struct RenderPassAdditionalInfo
 	{
-		VkImageLayout CurrentDepthLayout { VK_IMAGE_LAYOUT_UNDEFINED };
+		VkImageLayout CurrentDepthLayout{ VK_IMAGE_LAYOUT_UNDEFINED };
 		VkImageLayout CurrentStencilLayout{ VK_IMAGE_LAYOUT_UNDEFINED };
 	};
 
@@ -140,83 +213,3 @@ protected:
 		VkExtent2D Extent2D;
 	} Extent;
 };
-
-// class FVulkanFramebuffer
-//{
-// public:
-//	FVulkanFramebuffer(FVulkanLogicalDeviceRef Device, const FRHISetRenderTargetsInfo& InRTInfo, const FVulkanRenderTargetLayout& RTLayout, const FVulkanRenderPass& RenderPass);
-//	~FVulkanFramebuffer();
-//
-//	bool Matches(const FRHISetRenderTargetsInfo& RTInfo) const;
-//
-//	TUINT32 GetNumColorAttachments() const
-//	{
-//		return NumColorAttachments;
-//	}
-//
-//	void Destroy(FVulkanLogicalDeviceRef Device);
-//
-//	VkFramebuffer GetHandle()
-//	{
-//		return Framebuffer;
-//	}
-//
-//	const FVulkanView::FTextureView& GetPartialDepthTextureView() const
-//	{
-//		HLVM_ASSERT(PartialDepthTextureView);
-//		return PartialDepthTextureView->GetTextureView();
-//	}
-//
-//	TIndirectArray<FVulkanView> OwnedTextureViews;
-//	TArray<FVulkanView const*> AttachmentTextureViews;
-//
-//	// Copy from the Depth render target partial view
-//	FVulkanView const* PartialDepthTextureView = nullptr;
-//
-//	bool ContainsRenderTarget(FRHITexture* Texture) const
-//	{
-//		ensure(Texture);
-//		FVulkanTexture* VulkanTexture = ResourceCast(Texture);
-//		return ContainsRenderTarget(VulkanTexture->Image);
-//	}
-//
-//	bool ContainsRenderTarget(VkImage Image) const
-//	{
-//		ensure(Image != VK_NULL_HANDLE);
-//		for (TUINT32 Index = 0; Index < NumColorAttachments; ++Index)
-//		{
-//			if (ColorRenderTargetImages[Index] == Image)
-//			{
-//				return true;
-//			}
-//		}
-//
-//		return (DepthStencilRenderTargetImage == Image);
-//	}
-//
-//	VkRect2D GetRenderArea() const
-//	{
-//		return RenderArea;
-//	}
-//
-// private:
-//	VkFramebuffer Framebuffer;
-//	VkRect2D RenderArea;
-//
-//	// Unadjusted number of color render targets as in FRHISetRenderTargetsInfo
-//	TUINT32 NumColorRenderTargets;
-//
-//	// Save image off for comparison, in case it gets aliased.
-//	TUINT32 NumColorAttachments;
-//	VkImage ColorRenderTargetImages[RHI::MAX_RT_ATTACHMENTS];
-//	VkImage ColorResolveTargetImages[RHI::MAX_RT_ATTACHMENTS];
-//	VkImage DepthStencilRenderTargetImage;
-//	VkImage DepthStencilResolveRenderTargetImage;
-//	VkImage FragmentDensityImage;
-//
-//	// Predefined set of barriers, when executes ensuring all writes are finished
-//	TArray<VkImageMemoryBarrier> WriteBarriers;
-//
-//	friend class FVulkanCommandListContext;
-// };
-//

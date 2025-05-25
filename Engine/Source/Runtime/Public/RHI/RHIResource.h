@@ -37,7 +37,7 @@ public:
 	virtual ~IRHIResource() = default;
 
 	// Returns the type of the RHI resource
-	virtual ERHIResourceType GetType() const = 0;
+	virtual ERHIResourceType GetResourceType() const = 0;
 
 	// Returns the RHI interface type (e.g., Vulkan, DirectX)
 	virtual ERHIInterfaceType GetInterfaceType() const = 0;
@@ -74,8 +74,14 @@ class FRHITexture : virtual public IRHIResource
 public:
 	DECLARE_RHI_RESOURCE(FRHITexture, FRHITextureCreateInfo)
 
-	// Returns the dimensions of the texture
-	FIntVec3 GetSize() const { return CreateInfo.Extent; }
+	// Returns the extent of the texture
+	FUIntVec3 GetExtent() const { return CreateInfo.Extent; }
+
+	// Return dimension of the texture
+	ETextureDimension GetDimension() const { return CreateInfo.Dimension; }
+
+	// Return Array size
+	TUINT8 GetArraySize() const { return CreateInfo.ArraySize; }
 
 	// Returns the pixel format of the texture
 	EPixelFormat GetFormat() const { return CreateInfo.Format; }
@@ -92,7 +98,7 @@ public:
 	TUINT8 GetNumSamples() const { return CreateInfo.NumSamples; }
 
 	// Returns the type of the RHI resource
-	virtual ERHIResourceType GetType() const override { return ERHIResourceType::Texture; }
+	virtual ERHIResourceType GetResourceType() const override { return ERHIResourceType::Texture; }
 
 protected:
 	FRHITextureCreateInfo CreateInfo; // Declaration struct as a member
@@ -115,7 +121,7 @@ public:
 	virtual EMemoryPropertyFlags GetMemoryFlags() const { return CreateInfo.MemoryPropertyFlags; }
 
 	// Returns the type of the RHI resource
-	virtual ERHIResourceType GetType() const override { return ERHIResourceType::Buffer; }
+	virtual ERHIResourceType GetResourceType() const override { return ERHIResourceType::Buffer; }
 
 protected:
 	FRHIBufferCreateInfo CreateInfo; // Declaration struct as a member
@@ -131,7 +137,7 @@ public:
 	virtual EShaderStage GetStage() const { return CreateInfo.Stage; }
 
 	// Returns the type of the RHI resource
-	virtual ERHIResourceType GetType() const override { return ERHIResourceType::Shader; }
+	virtual ERHIResourceType GetResourceType() const override { return ERHIResourceType::Shader; }
 
 protected:
 	FShaderCreateInfo CreateInfo; // Declaration struct as a member
@@ -146,7 +152,7 @@ public:
 	FRHIShaderResourceViewCreateInfo CreateInfo; // Declaration struct as a member
 
 	// Returns the type of the RHI resource
-	virtual ERHIResourceType GetType() const override { return ERHIResourceType::ShaderResourceView; }
+	virtual ERHIResourceType GetResourceType() const override { return ERHIResourceType::ShaderResourceView; }
 };
 
 // Base class for RHI unordered access views
@@ -158,7 +164,7 @@ public:
 	FRHIUnorderedAccessViewCreateInfo CreateInfo; // Declaration struct as a member
 
 	// Returns the type of the RHI resource
-	virtual ERHIResourceType GetType() const override { return ERHIResourceType::UnorderedAccessView; }
+	virtual ERHIResourceType GetResourceType() const override { return ERHIResourceType::UnorderedAccessView; }
 };
 
 // Base class for RHI sampler states
@@ -168,7 +174,7 @@ public:
 	DECLARE_RHI_RESOURCE(FRHISamplerState, FRHISamplerStateCreateInfo)
 
 	// Returns the type of the RHI resource
-	virtual ERHIResourceType GetType() const override { return ERHIResourceType::SamplerState; }
+	virtual ERHIResourceType GetResourceType() const override { return ERHIResourceType::SamplerState; }
 
 protected:
 	FRHISamplerStateCreateInfo CreateInfo;
@@ -179,14 +185,14 @@ class FRHIGraphicsPSO : virtual public IRHIResource
 {
 public:
 	// Returns the type of the RHI resource
-	virtual ERHIResourceType GetType() const override { return ERHIResourceType::GraphicsPSO; }
+	virtual ERHIResourceType GetResourceType() const override { return ERHIResourceType::GraphicsPSO; }
 };
 
 class FRHIComputePSO : virtual public IRHIResource
 {
 public:
 	// Returns the type of the RHI resource
-	virtual ERHIResourceType GetType() const override { return ERHIResourceType::ComputePSO; }
+	virtual ERHIResourceType GetResourceType() const override { return ERHIResourceType::ComputePSO; }
 };
 
 // Base class for RHI queries
@@ -197,7 +203,7 @@ public:
 	virtual ERHIQueryType GetQueryType() const = 0;
 
 	// Returns the type of the RHI resource
-	virtual ERHIResourceType GetType() const override { return ERHIResourceType::Query; }
+	virtual ERHIResourceType GetResourceType() const override { return ERHIResourceType::Query; }
 };
 
 // Base class for RHI viewports
@@ -207,7 +213,7 @@ public:
 	DECLARE_RHI_RESOURCE(FRHIViewport, FRHIViewportCreateInfo)
 
 	// Returns the type of the RHI resource
-	virtual ERHIResourceType GetType() const override { return ERHIResourceType::Viewport; }
+	virtual ERHIResourceType GetResourceType() const override { return ERHIResourceType::Viewport; }
 
 	// Returns the dimensions of the viewport
 	virtual FUIntVec2 GetSize() const { return CreateInfo.Extent; }
@@ -238,7 +244,7 @@ class FRHIRenderPass : virtual public IRHIResource
 {
 public:
 	// Returns the type of the RHI resource
-	virtual ERHIResourceType GetType() const override { return ERHIResourceType::RenderPass; }
+	virtual ERHIResourceType GetResourceType() const override { return ERHIResourceType::RenderPass; }
 };
 
 class FRHIBlendState : virtual public IRHIResource
@@ -247,7 +253,7 @@ public:
 	DECLARE_RHI_RESOURCE(FRHIBlendState, FRHIBlendStateCreateInfo)
 
 	// Returns the type of the RHI resource
-	virtual ERHIResourceType GetType() const override { return ERHIResourceType::BlendState; }
+	virtual ERHIResourceType GetResourceType() const override { return ERHIResourceType::BlendState; }
 
 protected:
 	FRHIBlendStateCreateInfo CreateInfo;
@@ -259,7 +265,7 @@ public:
 	DECLARE_RHI_RESOURCE(FRHIRasterizerState, FRHIRasterizerStateCreateInfo)
 
 	// Returns the type of the RHI resource
-	virtual ERHIResourceType GetType() const override { return ERHIResourceType::RasterizerState; }
+	virtual ERHIResourceType GetResourceType() const override { return ERHIResourceType::RasterizerState; }
 
 protected:
 	FRHIRasterizerStateCreateInfo CreateInfo;
@@ -271,7 +277,7 @@ public:
 	DECLARE_RHI_RESOURCE(FRHIDepthStencilState, FRHIDepthStencilStateCreateInfo)
 
 	// Returns the type of the RHI resource
-	virtual ERHIResourceType GetType() const override { return ERHIResourceType::DepthStencilState; }
+	virtual ERHIResourceType GetResourceType() const override { return ERHIResourceType::DepthStencilState; }
 
 protected:
 	FRHIDepthStencilStateCreateInfo CreateInfo;

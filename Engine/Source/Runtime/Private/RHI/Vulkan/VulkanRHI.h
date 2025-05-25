@@ -5,27 +5,26 @@
 #pragma once
 
 #include "RHI/Vulkan/IVulkanDynamicRHI.h"
-#include "VulkanRHIResource.h"
-#include <functional>
+#include "VulkanResourcePost.h"
+
+struct FVulkanRHIInitializer
+{
+	TVector<TVector<FString>>				RequiredExtensions;
+	std::function<VkSurfaceKHR(VkInstance)> CreateSurfaceFunc;
+	SharedRefPtr<IWindow>					NativeWindowHandle;
+};
 
 class FVulkanRHI final : public IVulkanDynamicRHI
 {
 public:
-	struct FInitializer
-	{
-		TVector<TVector<FString>>				RequiredExtensions;
-		std::function<VkSurfaceKHR(VkInstance)> CreateSurfaceFunc;
-		SharedRefPtr<IWindow>					NativeWindowHandle;
-	};
-
 public:
 	HLVM_STATIC_FUNC FVulkanRHI* Get()
 	{
-		return GetDynamicRHI<FVulkanRHI>();
+		return RHI::GetDynamicRHI<FVulkanRHI>();
 	}
 
 	FVulkanRHI() = delete;
-	explicit FVulkanRHI(const FInitializer& Params);
+	explicit FVulkanRHI(const FVulkanRHIInitializer& Params);
 
 	// Initialization and Shutdown
 	virtual void Init() override;
@@ -133,13 +132,15 @@ public:
 
 	void SetVulkanMinimalContext(void* InContext) const override;
 
-protected:
+private:
 	// Vulkan-specific initialization
 	void CreateVulkanInstance();
 	void CreateDebugLayer();
 	void CreateSurface();
 	void CreateVulkanPhysicalDevice();
 	void CreateVulkanLogicalDevice();
+	void CreateGlobals();
+
 	void CreateVulkanQueues();
 	void CreateVulkanViewPort();
 
@@ -179,14 +180,12 @@ protected:
 	VkQueryPoolCreateInfo GenerateVkQueryPoolCreateInfo(const FRHIQueryCreateInfo& CreateInfo);
 
 private:
-	FInitializer InitializerParam;
+	FVulkanRHIInitializer InitializerParam;
 
 	// Vulkan-specific members and methods
-	VkInstance				 VulkanInstance;
+	VkInstance				 Instance;
 	VkDebugUtilsMessengerEXT DebugMessenger;
 	VkSurfaceKHR			 VulkanSurface; // 用于显示的窗口句柄 // TODO, we should only let swapchain manage surface
-	VkDevice				 VulkanDevice;
-	VkPhysicalDevice		 VulkanPhysicalDevice;
 	VkQueue					 GraphicsQueue;
 	VkQueue					 ComputeQueue;
 	VkQueue					 TransferQueue;
@@ -196,6 +195,6 @@ private:
 	FVulkanLogicalDeviceRef	 LogicalDevice;
 	FVulkanViewportRef		 VulkanViewport;
 
-	FVulkanRenderPassRef		  ActiveRenderPass;
-	TVector<FVulkanRenderPassRef> PendingDestroyRenderPass;
+	FVulkanRenderPassRef		  CurrentRenderPass;
+	FVulkanFrameBufferRef		  CurrentFrameBuffer;
 };

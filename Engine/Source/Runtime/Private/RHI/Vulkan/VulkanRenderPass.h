@@ -6,12 +6,12 @@
 
 #include "Core/Container/ContainerDefinition.h"
 #include "RHI/RHIResource.h"
-#include "VulkanRHIResourcePre.h"
+#include "VulkanResourcePre.h"
 
-class FVulkanRenderPass : public FRHIRenderPass, public FVulkanResource
+class FVulkanRenderPass : public FRHIRenderPass, public FVulkanResource, public FVulkanMinimalContext
 {
 public:
-	FVulkanRenderPass(FVulkanLogicalDeviceRef Device, const FVulkanRenderTargetLayout& RTLayout);
+	FVulkanRenderPass(const FVulkanRenderTargetLayout& RTLayout);
 	~FVulkanRenderPass() override;
 
 	HLVM_INLINE_FUNC const FVulkanRenderTargetLayout& GetLayout() const
@@ -30,7 +30,6 @@ public:
 	}
 
 private:
-	FVulkanLogicalDeviceRef	  Device;
 	FVulkanRenderTargetLayout Layout;
 	VkRenderPass			  RenderPass;
 };
@@ -862,7 +861,7 @@ namespace VulkanRHI
 //		: VulkanRHI::FDeviceChild(InDevice) {}
 //	~FVulkanRenderPassManager();
 //
-//	FVulkanFramebuffer* GetOrCreateFramebuffer(const FRHISetRenderTargetsInfo& RenderTargetsInfo, const FVulkanRenderTargetLayout& RTLayout, FVulkanRenderPass* RenderPass);
+//	FVulkanFrameBuffer* GetOrCreateFramebuffer(const FRHIRenderTargetsInfo& RenderTargetsInfo, const FVulkanRenderTargetLayout& RTLayout, FVulkanRenderPass* RenderPass);
 //	FVulkanRenderPass*	GetOrCreateRenderPass(const FVulkanRenderTargetLayout& RTLayout)
 //	{
 //		const TUINT32 RenderPassHash = RTLayout.GetRenderPassFullHash();
@@ -890,7 +889,7 @@ namespace VulkanRHI
 //		return RenderPass;
 //	}
 //
-//	void BeginRenderPass(FVulkanCommandListContext& Context, FVulkanLogicalDeviceRef InDevice, FVulkanCmdBuffer* CmdBuffer, const FRHIRenderPassInfo& RPInfo, const FVulkanRenderTargetLayout& RTLayout, FVulkanRenderPass* RenderPass, FVulkanFramebuffer* Framebuffer);
+//	void BeginRenderPass(FVulkanCommandListContext& Context, FVulkanLogicalDeviceRef InDevice, FVulkanCmdBuffer* CmdBuffer, const FRHIRenderPassInfo& RPInfo, const FVulkanRenderTargetLayout& RTLayout, FVulkanRenderPass* RenderPass, FVulkanFrameBuffer* Framebuffer);
 //	void EndRenderPass(FVulkanCmdBuffer* CmdBuffer);
 //
 //	FRWRivalLock RenderPassesLock;
@@ -903,7 +902,83 @@ namespace VulkanRHI
 //
 //	struct FFramebufferList
 //	{
-//		TVector<FVulkanFramebuffer*> Framebuffer;
+//		TVector<FVulkanFrameBuffer*> Framebuffer;
 //	};
 //	TMap<TUINT32, FFramebufferList*> Framebuffers;
 //};
+
+class FVulkanFrameBuffer : public FVulkanMinimalContext, public FRefCountable
+{
+public:
+	FVulkanFrameBuffer(const FRHIRenderTargetsInfo& InRTInfo, const FVulkanRenderTargetLayout& RTLayout, const FVulkanRenderPassRef& RenderPass);
+	~FVulkanFrameBuffer();
+
+	bool Matches(const FRHIRenderTargetsInfo& RTInfo) const;
+
+	TUINT32 GetNumColorAttachments() const
+	{
+		return NumColorAttachments;
+	}
+
+	void Destroy();
+
+	VkFramebuffer GetHandle()
+	{
+		return Framebuffer;
+	}
+
+	const FVulkanView::FTextureView& GetPartialDepthTextureView() const
+	{
+		HLVM_ASSERT(PartialDepthTextureView);
+		return PartialDepthTextureView->GetTextureView();
+	}
+
+	TVector<FVulkanViewRef> OwnedTextureViews;
+	TVector<FVulkanViewRef> AttachmentTextureViews;
+
+	// Copy from the Depth render target partial view
+	FVulkanViewRef PartialDepthTextureView = nullptr;
+
+	bool ContainsRenderTarget(FRHITextureRef Texture) const
+	{
+		FVulkanTextureRef VulkanTexture = Texture;
+		return ContainsRenderTarget(VulkanTexture->GetImage());
+	}
+
+	bool ContainsRenderTarget(VkImage Image) const
+	{
+		HLVM_ENSURE(Image != VK_NULL_HANDLE);
+		for (TUINT32 Index = 0; Index < NumColorAttachments; ++Index)
+		{
+			if (ColorRenderTargetImages[Index] == Image)
+			{
+				return true;
+			}
+		}
+
+		return (DepthStencilRenderTargetImage == Image);
+	}
+
+	VkRect2D GetRenderArea() const
+	{
+		return RenderArea;
+	}
+
+private:
+	VkFramebuffer Framebuffer;
+	VkRect2D	  RenderArea;
+
+	// Unadjusted number of color render targets as in FRHIRenderTargetsInfo
+	TUINT32 NumColorRenderTargets;
+
+	// Save image off for comparison, in case it gets aliased.
+	TUINT32 NumColorAttachments;
+	VkImage ColorRenderTargetImages[RHI::MAX_RT_ATTACHMENTS];
+	VkImage ColorResolveTargetImages[RHI::MAX_RT_ATTACHMENTS];
+	VkImage DepthStencilRenderTargetImage;
+	VkImage DepthStencilResolveRenderTargetImage;
+
+	// Predefined set of barriers, when executes ensuring all writes are finished
+	TVector<VkImageMemoryBarrier> WriteBarriers;
+};
+using FVulkanFrameBufferRef = TRefCountPtr<FVulkanFrameBuffer>;

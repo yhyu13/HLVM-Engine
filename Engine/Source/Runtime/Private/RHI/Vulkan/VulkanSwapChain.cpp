@@ -3,7 +3,7 @@
  */
 
 #include "VulkanSwapChain.h"
-#include "VulkanRHIResource.h"
+#include "VulkanResourcePost.h"
 
 FVulkanSwapChain::FVulkanSwapChain(FVulkanViewport* InOwnerViewport, FRecreateInfo* InCreateInfo)
 	: OwnerViewport(InOwnerViewport)

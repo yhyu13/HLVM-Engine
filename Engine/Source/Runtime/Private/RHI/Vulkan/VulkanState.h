@@ -5,7 +5,7 @@
 #pragma once
 
 #include "RHI/RHIPipeline.h"
-#include "VulkanRHIResourcePre.h"
+#include "VulkanResourcePre.h"
 
 // Vulkan-specific RHI sampler state
 class FVulkanSamplerState : public FRHISamplerState, public FVulkanResource

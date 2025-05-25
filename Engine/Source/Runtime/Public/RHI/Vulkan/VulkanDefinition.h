@@ -9,6 +9,7 @@
 #include "RHI/DynamicRHI.h"
 
 DECLARE_LOG_CATEGORY(LogVulkan)
+DECLARE_LOG_CATEGORY(LogVulkanRHI)
 
 #define VK_NO_PROTOTYPES
 #include <vulkan/vulkan_core.h>
@@ -99,4 +100,7 @@ namespace VulkanRHI
 	};
 } // namespace VulkanRHI
 
-DECLARE_LOG_CATEGORY(LogVulkanRHI)
+enum class ELLMTagVulkan : TUINT8
+{
+	VulkanTextures
+};

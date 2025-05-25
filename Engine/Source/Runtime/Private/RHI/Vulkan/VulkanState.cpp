@@ -8,7 +8,7 @@
 FVulkanSamplerState::FVulkanSamplerState(const FRHISamplerStateCreateInfo& InCreateInfo)
 	: FRHISamplerState(InCreateInfo)
 {
-	Sampler = GetDynamicRHI<IVulkanDynamicRHI>()->CreateVulkanSampler(CreateInfo);
+	Sampler = RHI::GetDynamicRHI<IVulkanDynamicRHI>()->CreateVulkanSampler(CreateInfo);
 }
 
 FVulkanBlendState::FVulkanBlendState(const FRHIBlendStateCreateInfo& InCreateInfo)

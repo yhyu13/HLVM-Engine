@@ -125,15 +125,15 @@ public:
 
 	/**
 	 * @brief Equivalent to std::vector::reserve()
-	 * @return The size of the container after the call
+	 * @return The capacity of the container after the call
 	 */
-	TSIZE AddUninitialized(TSIZE NumUninitialized)
+	TSIZE Reserve(TSIZE NewCapacity)
 	{
-		if (NumUninitialized > 0)
+		if (NewCapacity > 0)
 		{
-			this->reserve(this->size() + NumUninitialized);
+			this->reserve(NewCapacity);
 		}
-		return this->size();
+		return this->capacity();
 	}
 
 	/**
@@ -182,20 +182,16 @@ public:
 	void Empty(TSIZE NewCapacity = 0)
 	{
 		this->clear();
-		this->resize(NewCapacity);
 		this->shrink_to_fit();
-		HLVM_ASSERT(this->capacity() == this->size());
-		HLVM_ASSERT(this->capacity() == NewCapacity);
+		this->reserve(NewCapacity);
+		HLVM_ASSERT(this->capacity() >= NewCapacity);
 	}
 
 	void Reset(TSIZE NewCapacity = 0)
 	{
 		this->clear();
-		if (NewCapacity > 0)
-		{
-			this->reserve(NewCapacity);
-			HLVM_ASSERT(this->capacity() >= NewCapacity);
-		}
+		this->reserve(NewCapacity);
+		HLVM_ASSERT(this->capacity() >= NewCapacity);
 	}
 
 	operator TVectorView<T>() const
@@ -258,6 +254,17 @@ public:
 	{
 		HLVM_ASSERT(Index1 < this->size() && Index2 < this->size());
 		std::iter_swap(this->begin() + Index1, this->begin() + Index2);
+	}
+
+	void Empty(TSIZE NewCapacity = 0)
+	{
+		this->clear();
+		HLVM_ASSERT(this->capacity() <= NewCapacity);
+	}
+
+	void Reset(TSIZE NewCapacity = 0)
+	{
+		Empty(NewCapacity);
 	}
 
 	operator TVectorView<T>() const

@@ -5,8 +5,7 @@
 #pragma once
 
 #include "RHI/RHIPipeline.h"
-#include "VulkanRHIResourcePre.h"
-#include "VulkanShader.h"
+#include "VulkanResource.h"
 
 // Information for the layout of descriptor sets; does not hold runtime objects
 class FVulkanDescriptorSetsLayoutInfo

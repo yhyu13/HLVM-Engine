@@ -2,13 +2,12 @@
  * Copyright (c) 2025. MIT License. All rights reserved.
  */
 
-#include "VulkanRHIResource.h"
-#include "VulkanRHIResourcePre.h"
+#include "VulkanResourcePost.h"
 #include "RHI/Vulkan/IVulkanDynamicRHI.h"
 
 FVulkanMinimalContext::FVulkanMinimalContext()
 {
-	GetDynamicRHI<IVulkanDynamicRHI>()->SetVulkanMinimalContext(this);
+	RHI::GetDynamicRHI<IVulkanDynamicRHI>()->SetVulkanMinimalContext(this);
 }
 
 FVulkanRenderTargetLayout::FVulkanRenderTargetLayout(const FRHIRenderPassInfo& RPInfo, const RenderPassAdditionalInfo& AdditionalInfo)
@@ -30,7 +29,7 @@ FVulkanRenderTargetLayout::FVulkanRenderTargetLayout(const FRHIRenderPassInfo& R
 	for (TUINT32 Index = 0; Index < NumColorRenderTargets; ++Index)
 	{
 		const FRHIRenderPassInfo::ColorRTBinding& ColorRTBinding = RPInfo.ColorRenderTargets[Index];
-		FVulkanTexture*							  Texture = S_C(FVulkanTexture*, ColorRTBinding.RenderTarget.Get());
+		FVulkanTextureRef						  Texture = ColorRTBinding.RenderTarget;
 		HLVM_ASSERT(Texture);
 		const FRHITextureCreateInfo& TextureInfo = Texture->GetCreateInfo();
 
@@ -96,7 +95,7 @@ FVulkanRenderTargetLayout::FVulkanRenderTargetLayout(const FRHIRenderPassInfo& R
 	{
 		VkAttachmentDescription& CurrDesc = Desc[NumAttachmentDescriptions];
 		FMemory::Memzero(&CurrDesc);
-		FVulkanTextureRef Texture = S_C(FVulkanTextureRef, RPInfo.DepthStencilRenderTarget.DepthStencilTarget);
+		FVulkanTextureRef Texture = RPInfo.DepthStencilRenderTarget.DepthStencilTarget;
 		HLVM_ASSERT(Texture);
 		const FRHITextureCreateInfo& TextureInfo = Texture->GetCreateInfo();
 		CurrDesc.samples = static_cast<VkSampleCountFlagBits>(RPInfo.DepthStencilRenderTarget.DepthStencilTarget->GetNumSamples());
@@ -231,15 +230,15 @@ FVulkanRenderTargetLayout::FVulkanRenderTargetLayout(const FGraphicsPSOCreateInf
 	NumSamples = PSOInfo.NumSamples;
 	for (TUINT32 Index = 0; Index < PSOInfo.RenderTargetsEnabled; ++Index)
 	{
-		EPixelFormat UEFormat = PSOInfo.RenderTargetFormats[Index];
-		if (UEFormat != EPixelFormat::None)
+		EPixelFormat RHIFormat = PSOInfo.RenderTargetFormats[Index];
+		if (RHIFormat != EPixelFormat::None)
 		{
 			// With a CustomResolveSubpass last color attachment is a resolve target
 			bool bCustomResolveAttachment = (Index == (PSOInfo.RenderTargetsEnabled - 1)) && PSOInfo.SubpassHint == ESubpassHint::CustomResolve;
 
 			VkAttachmentDescription& CurrDesc = Desc[NumAttachmentDescriptions];
 			CurrDesc.samples = bCustomResolveAttachment ? VK_SAMPLE_COUNT_1_BIT : static_cast<VkSampleCountFlagBits>(NumSamples);
-			CurrDesc.format = VulkanRHI::VulkanFormatFromRHIFormat(UEFormat, PSOInfo.RenderTargetFlags[Index] & ETextureCreateFlag::SRGB);
+			CurrDesc.format = VulkanRHI::VulkanFormatFromRHIFormat(RHIFormat, PSOInfo.RenderTargetFlags[Index] & ETextureCreateFlag::SRGB);
 			CurrDesc.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 			CurrDesc.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 			CurrDesc.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
@@ -263,7 +262,6 @@ FVulkanRenderTargetLayout::FVulkanRenderTargetLayout(const FGraphicsPSOCreateInf
 				++NumAttachmentDescriptions;
 				bHasResolveAttachments = true;
 			}
-
 
 			++NumAttachmentDescriptions;
 			++NumColorAttachments;
@@ -320,7 +318,239 @@ FVulkanRenderTargetLayout::FVulkanRenderTargetLayout(const FGraphicsPSOCreateInf
 		bHasDepthStencil = true;
 	}
 
-
 	SubpassHint = PSOInfo.SubpassHint;
 	NumUsedClearValues = bFoundClearOp ? NumAttachmentDescriptions : 0;
 }
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-parameter"
+
+FVulkanView::FVulkanView(VkDescriptorType InDescriptorType)
+{
+	// BindlessHandle = LogicalDevice.GetBindlessDescriptorManager()->ReserveDescriptor(InDescriptorType);
+}
+
+FVulkanView::~FVulkanView()
+{
+	Invalidate();
+
+	if (BindlessHandle.IsValid())
+	{
+		// LogicalDevice.GetDeferredDeletionQueue().EnqueueBindlessHandle(BindlessHandle);
+		BindlessHandle = FRHIDescriptorHandle();
+	}
+}
+
+void FVulkanView::Invalidate()
+{
+	// Carry forward its initialized state
+	const bool bIsInitialized = IsInitialized();
+
+	switch (GetViewType())
+	{
+		default:
+		case EType::Invalid:
+			HLVM_ASSERT(false);
+			break;
+
+		case EType::TypedBuffer:
+			// LogicalDevice.GetDeferredDeletionQueue().EnqueueResource(VulkanRHI::FDeferredDeletionQueue2::EType::BufferView, Storage.Get<FTypedBufferView>().View);
+			break;
+
+		case EType::Texture:
+			// LogicalDevice.GetDeferredDeletionQueue().EnqueueResource(VulkanRHI::FDeferredDeletionQueue2::EType::ImageView, Storage.Get<FTextureView>().View);
+			break;
+
+		case EType::StructuredBuffer:
+			// Nothing to do
+			break;
+
+		case EType::AccelerationStructure:
+			// LogicalDevice.GetDeferredDeletionQueue().EnqueueResource(VulkanRHI::FDeferredDeletionQueue2::EType::AccelerationStructure, Storage.Get<FAccelerationStructureView>().Handle);
+			break;
+	}
+
+	Storage.emplace<FInvalidatedState>();
+	std::get<FInvalidatedState>(Storage).bInitialized = bIsInitialized;
+}
+
+FVulkanView* FVulkanView::InitAsTypedBufferView(FVulkanBufferRef Buffer, EPixelFormat RHIFormat, TUINT32 InOffset, TUINT32 InSize)
+{
+	//	// We will need a deferred update if the descriptor was already in use
+	//	const bool bImmediateUpdate = !IsInitialized();
+	//
+	//	HLVM_ASSERT(GetViewType() == EType::Invalid);
+	//	Storage.emplace<FTypedBufferView>();
+	//	FTypedBufferView& TBV = std::get<FTypedBufferView>(Storage);
+	//
+	//	const TUINT32 TotalOffset = Buffer->GetOffset() + InOffset;
+	//
+	//	HLVM_ASSERT(RHIFormat != PF_Unknown);
+	//	VkFormat VKFormat = GVulkanBufferFormat[RHIFormat];
+	//	HLVM_ASSERT(Format != VK_FORMAT_UNDEFINED);
+	//
+	//	VkBufferViewCreateInfo ViewInfo;
+	//	ZeroVulkanStruct(ViewInfo, VK_STRUCTURE_TYPE_BUFFER_VIEW_CREATE_INFO);
+	//	ViewInfo.buffer = Buffer->GetHandle();
+	//	ViewInfo.offset = TotalOffset;
+	//	ViewInfo.format = Format;
+	//
+	//	const TUINT32 TypeSize =  VulkanRHI::GetNumBitsPerPixel(Format) / 8u;
+	//	// View size has to be a multiple of element size
+	//	// Commented out because there are multiple places in the high level rendering code which re-purpose buffers for a new format while there are still
+	//	// views with the old format lying around, and then lock them with a size computed based on the new stride, triggering this assert when the old views
+	//	// are re-created. These places need to be fixed before re-enabling this HLVM_ASSERT (UE-211785).
+	//	//HLVM_ASSERT(IsAligned(InSize, TypeSize));
+	//
+	//	//#todo-rco: Revisit this if buffer views become VK_BUFFER_USAGE_STORAGE_BUFFER_BIT instead of VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT
+	//	const VkPhysicalDeviceLimits& Limits = LogicalDevice.GetLimits();
+	//	const uint64 MaxSize = (uint64)Limits.maxTexelBufferElements * TypeSize;
+	//	ViewInfo.range = FMath::Min<uint64>(InSize, MaxSize);
+	//	// TODO: add a HLVM_ASSERT() for exceeding MaxSize, to catch code which blindly makes views without checking the platform limits.
+	//
+	//	HLVM_ASSERT(Buffer->GetBufferUsageFlags() & (VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT));
+	//	HLVM_ASSERT(IsAligned(InOffset, Limits.minTexelBufferOffsetAlignment));
+	//
+	//	VERIFYVULKANRESULT(VulkanRHI::vkCreateBufferView(LogicalDevice->GetHandle(), &ViewInfo, VulkanRHI::VULKAN_CPU_ALLOCATOR, &TBV.View));
+	//
+	//	TBV.bVolatile = Buffer->IsVolatile();
+	//	if (!TBV.bVolatile && UseVulkanDescriptorCache())
+	//	{
+	//		TBV.ViewId = ++GVulkanBufferViewHandleIdCounter;
+	//	}
+	//
+	//	INC_DWORD_STAT(STAT_VulkanNumBufferViews);
+	//	// :todo-jn: the buffer view is actually not needed in bindless anymore
+	//
+	//	LogicalDevice.GetBindlessDescriptorManager()->UpdateTexelBuffer(BindlessHandle, ViewInfo, bImmediateUpdate);
+
+	return this;
+}
+
+FVulkanView* FVulkanView::InitAsTextureView(
+	VkImage InImage, VkImageViewType ViewType, VkImageAspectFlags AspectFlags, EPixelFormat RHIFormat, VkFormat VKFormat, TUINT32 FirstMip, TUINT32 NumMips, TUINT32 ArraySliceIndex, TUINT32 NumArraySlices, bool bUseIdentitySwizzle, VkImageUsageFlags ImageUsageFlags, VkSamplerYcbcrConversion SamplerYcbcrConversion)
+{
+	// We will need a deferred update if the descriptor was already in use
+	const bool bImmediateUpdate = !IsInitialized();
+
+	HLVM_ASSERT(GetViewType() == EType::Invalid);
+	Storage.emplace<FTextureView>();
+	FTextureView& TV = std::get<FTextureView>(Storage);
+
+	VkImageViewCreateInfo ViewInfo;
+	VulkanRHI::ZeroVulkanStruct(&ViewInfo, VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO);
+	ViewInfo.image = InImage;
+	ViewInfo.viewType = ViewType;
+	ViewInfo.format = VKFormat;
+
+	VkSamplerYcbcrConversionInfo SamplerYcbcrConversionInfo;
+	if (SamplerYcbcrConversion)
+	{
+		VulkanRHI::ZeroVulkanStruct(&SamplerYcbcrConversionInfo, VK_STRUCTURE_TYPE_SAMPLER_YCBCR_CONVERSION_INFO);
+		SamplerYcbcrConversionInfo.conversion = SamplerYcbcrConversion;
+		SamplerYcbcrConversionInfo.pNext = ViewInfo.pNext;
+		ViewInfo.pNext = &SamplerYcbcrConversionInfo;
+	}
+
+	if (bUseIdentitySwizzle)
+	{
+		ViewInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+		ViewInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+		ViewInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+		ViewInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+	}
+	else
+	{
+		ViewInfo.components = VulkanRHI::VulkanFormatComponentMappingFromRHIFormat(RHIFormat);
+	}
+
+	ViewInfo.subresourceRange.aspectMask = AspectFlags;
+	ViewInfo.subresourceRange.baseMipLevel = FirstMip;
+	HLVM_ENSURE(NumMips != 0xFFFFFFFF);
+	ViewInfo.subresourceRange.levelCount = NumMips;
+
+	HLVM_ENSURE(ArraySliceIndex != 0xFFFFFFFF);
+	HLVM_ENSURE(NumArraySlices != 0xFFFFFFFF);
+	ViewInfo.subresourceRange.baseArrayLayer = ArraySliceIndex;
+	ViewInfo.subresourceRange.layerCount = NumArraySlices;
+
+	// HACK.  DX11 on PC currently uses a D24S8 depthbuffer and so needs an X24_G8 SRV to visualize stencil.
+	// So take that as our cue to visualize stencil.  In the future, the platform independent code will have a real format
+	// instead of PF_DepthStencil, so the cross-platform code could figure out the proper format to pass in for this.
+	if (RHI::HasStencil(RHIFormat))
+	{
+		HLVM_ENSURE(VulkanRHI::VulkanFormatHasStencil(ViewInfo.format));
+		ViewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT;
+	}
+
+	// Inform the driver the view will only be used with a subset of usage flags (to help performance and/or compatibility)
+	VkImageViewUsageCreateInfo ImageViewUsageCreateInfo;
+	if (ImageUsageFlags != 0)
+	{
+		VulkanRHI::ZeroVulkanStruct(&ImageViewUsageCreateInfo, VK_STRUCTURE_TYPE_IMAGE_VIEW_USAGE_CREATE_INFO);
+		ImageViewUsageCreateInfo.usage = ImageUsageFlags;
+
+		ImageViewUsageCreateInfo.pNext = C_C(void*, ViewInfo.pNext);
+		ViewInfo.pNext = &ImageViewUsageCreateInfo;
+	}
+
+	VULKAN_ENSURE(VulkanRHI::vkCreateImageView(LogicalDevice->GetHandle(), &ViewInfo, VulkanRHI::VULKAN_CPU_ALLOCATOR, &TV.View));
+
+	TV.Image = InImage;
+
+	const bool bDepthOrStencilAspect = (AspectFlags & (VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT)) != 0;
+
+	// TODO
+	//LogicalDevice.GetBindlessDescriptorManager()->UpdateImage(BindlessHandle, TV.View, bDepthOrStencilAspect, bImmediateUpdate);
+
+	return this;
+}
+
+FVulkanView* FVulkanView::InitAsStructuredBufferView(FVulkanBufferRef Buffer, TUINT32 InOffset, TUINT32 InSize)
+{
+	//	// We will need a deferred update if the descriptor was already in use
+	//	const bool bImmediateUpdate = !IsInitialized();
+	//
+	//	HLVM_ASSERT(GetViewType() == EType::Invalid);
+	//	Storage.Emplace<FStructuredBufferView>();
+	//	FStructuredBufferView& SBV = Storage.Get<FStructuredBufferView>();
+	//
+	//	const TUINT32 TotalOffset = Buffer->GetOffset() + InOffset;
+	//
+	//	SBV.Buffer = Buffer->GetHandle();
+	//	SBV.HandleId = Buffer->GetCurrentAllocation().HandleId;
+	//	SBV.Offset = TotalOffset;
+	//
+	//	// :todo-jn: Volatile buffers use temporary allocations that can be smaller than the buffer creation size.  Check if the savings are still worth it.
+	//	if (Buffer->IsVolatile())
+	//	{
+	//		InSize = FMath::Min<uint64>(InSize, Buffer->GetCurrentSize());
+	//	}
+	//
+	//	SBV.Size = InSize;
+	//
+	//	LogicalDevice.GetBindlessDescriptorManager()->UpdateBuffer(BindlessHandle, Buffer->GetHandle(), TotalOffset, InSize, bImmediateUpdate);
+
+	return this;
+}
+
+FVulkanView* FVulkanView::InitAsAccelerationStructureView(FVulkanBufferRef Buffer, TUINT32 Offset, TUINT32 Size)
+{
+	//	HLVM_ASSERT(GetViewType() == EType::Invalid);
+	//	Storage.Emplace<FAccelerationStructureView>();
+	//	FAccelerationStructureView& ASV = Storage.Get<FAccelerationStructureView>();
+	//
+	//	VkAccelerationStructureCreateInfoKHR CreateInfo;
+	//	ZeroVulkanStruct(CreateInfo, VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR);
+	//	CreateInfo.buffer = Buffer->GetHandle();
+	//	CreateInfo.offset = Buffer->GetOffset() + Offset;
+	//	CreateInfo.size = Size;
+	//	CreateInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
+	//
+	//	VERIFYVULKANRESULT(VulkanDynamicAPI::vkCreateAccelerationStructureKHR(LogicalDevice->GetHandle(), &CreateInfo, VulkanRHI::VULKAN_CPU_ALLOCATOR, &ASV.Handle));
+	//
+	//	LogicalDevice.GetBindlessDescriptorManager()->UpdateAccelerationStructure(BindlessHandle, ASV.Handle);
+
+	return this;
+}
+#pragma clang diagnostic pop

@@ -26,12 +26,14 @@ struct IRHICreateInfo
 // Structure for describing texture creation parameters
 struct FRHITextureCreateInfo : public IRHICreateInfo
 {
-	FUIntVec3			Extent;		// Width, Height, Depth (or array size)
-	EPixelFormat		Format;		// Pixel format of the texture
-	TUINT8				NumMips;	// Number of mip levels
-	TUINT8				NumSamples; // Number of samples (for MSAA)
-	ETextureCreateFlags Flags;		// Texture creation flags
-	FClearValueBinding	ClearValue; // Clear value for the texture
+	FUIntVec3			Extent;								  // Width, Height, Depth
+	TUINT8				ArraySize{ 0 };						  // Number of array slices (for texture arrays)
+	ETextureDimension	Dimension{ ETextureDimension::None }; // Texture dimension
+	EPixelFormat		Format{ EPixelFormat::None };		  // Pixel format of the texture
+	TUINT8				NumMips{ 1 };						  // Number of mip levels
+	TUINT8				NumSamples{ 1 };					  // Number of samples (for MSAA)
+	ETextureCreateFlags Flags;								  // Texture creation flags
+	FClearValueBinding	ClearValue;							  // Clear value for the texture
 
 	FRHITextureCreateInfo() = default;
 	// Constructor for easy initialization

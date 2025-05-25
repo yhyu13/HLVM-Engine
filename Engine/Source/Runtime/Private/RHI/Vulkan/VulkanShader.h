@@ -5,7 +5,7 @@
 #pragma once
 
 #include "RHI/RHIResource.h"
-#include "VulkanRHIResourcePre.h"
+#include "VulkanResourcePre.h"
 
 // Vulkan ParameterMap:
 // Buffer Index = EBufferIndex

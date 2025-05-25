@@ -1,11 +1,65 @@
 /**
-* Copyright (c) 2025. MIT License. All rights reserved.
+ * Copyright (c) 2025. MIT License. All rights reserved.
  */
 
+#include <RHI/RHIResourcePost.h>
 #include "RHI/DynamicRHI.h"
 
-// Extern
-TNoNullablePtr<FDynamicRHI> GDynamicRHI;
+namespace RHI
+{
+	// Extern
+	TNoNullablePtr<FDynamicRHI> GDynamicRHI;
+}
+
+void FRHIRenderPassInfo::ConvertToRenderTargetsInfo(FRHIRenderTargetsInfo& OutRTInfo) const
+{
+	for (TUINT32 Index = 0; Index < RHI::MAX_RT_ATTACHMENTS; ++Index)
+	{
+		if (!ColorRenderTargets[Index].RenderTarget)
+		{
+			break;
+		}
+
+		OutRTInfo.ColorRenderTarget[Index].Texture = ColorRenderTargets[Index].RenderTarget;
+		ERenderTargetLoadAction LoadAction = RHI::GetLoadAction(ColorRenderTargets[Index].Action);
+		OutRTInfo.ColorRenderTarget[Index].LoadAction = LoadAction;
+		OutRTInfo.ColorRenderTarget[Index].StoreAction = RHI::GetStoreAction(ColorRenderTargets[Index].Action);
+		OutRTInfo.ColorRenderTarget[Index].ArraySliceIndex = ColorRenderTargets[Index].ArraySliceIndex;
+		OutRTInfo.ColorRenderTarget[Index].MipIndex = ColorRenderTargets[Index].MipIndex;
+		++OutRTInfo.NumColorRenderTargets;
+
+		OutRTInfo.bClearColor |= (LoadAction == ERenderTargetLoadAction::Clear);
+
+		if (ColorRenderTargets[Index].ResolveTarget)
+		{
+			OutRTInfo.bHasResolveAttachments = true;
+			OutRTInfo.ColorResolveRenderTarget[Index] = OutRTInfo.ColorRenderTarget[Index];
+			OutRTInfo.ColorResolveRenderTarget[Index].Texture = ColorRenderTargets[Index].ResolveTarget;
+		}
+	}
+
+	ERenderTargetActions	 DepthActions = RHI::GetDepthActions(DepthStencilRenderTarget.Action);
+	ERenderTargetActions	 StencilActions = RHI::GetStencilActions(DepthStencilRenderTarget.Action);
+	ERenderTargetLoadAction	 DepthLoadAction = RHI::GetLoadAction(DepthActions);
+	ERenderTargetStoreAction DepthStoreAction = RHI::GetStoreAction(DepthActions);
+	ERenderTargetLoadAction	 StencilLoadAction = RHI::GetLoadAction(StencilActions);
+	ERenderTargetStoreAction StencilStoreAction = RHI::GetStoreAction(StencilActions);
+
+	OutRTInfo.DepthStencilRenderTarget = FRHIDepthStencilRenderTargetView(DepthStencilRenderTarget.DepthStencilTarget,
+		DepthLoadAction,
+		RHI::GetStoreAction(DepthActions),
+		StencilLoadAction,
+		RHI::GetStoreAction(StencilActions),
+		DepthStencilRenderTarget.ExclusiveDepthStencil);
+	OutRTInfo.bClearDepth = (DepthLoadAction == ERenderTargetLoadAction::Clear);
+	OutRTInfo.bClearStencil = (StencilLoadAction == ERenderTargetLoadAction::Clear);
+
+	if (DepthStencilRenderTarget.ResolveTarget && DepthStencilRenderTarget.ResolveTarget != DepthStencilRenderTarget.DepthStencilTarget)
+	{
+		OutRTInfo.DepthStencilResolveRenderTarget = OutRTInfo.DepthStencilRenderTarget;
+		OutRTInfo.DepthStencilResolveRenderTarget.Texture = DepthStencilRenderTarget.ResolveTarget;
+	}
+}
 
 void FRHIRenderPassInfo::Validate() const
 {
@@ -37,7 +91,7 @@ void FRHIRenderPassInfo::Validate() const
 
 			if (Entry.ResolveTarget)
 			{
-				//HLVM_ENSURE(Store == ERenderTargetStoreAction::EMultisampleResolve);
+				// HLVM_ENSURE(Store == ERenderTargetStoreAction::EMultisampleResolve);
 			}
 		}
 		else
@@ -62,14 +116,14 @@ void FRHIRenderPassInfo::Validate() const
 		}
 		ERenderTargetStoreAction DepthStore = RHI::GetStoreAction(RHI::GetDepthActions(DepthStencilRenderTarget.Action));
 		ERenderTargetStoreAction StencilStore = RHI::GetStoreAction(RHI::GetStencilActions(DepthStencilRenderTarget.Action));
-		bool bIsMSAAResolve = (DepthStore == ERenderTargetStoreAction::MultisampleResolve) || (StencilStore == ERenderTargetStoreAction::MultisampleResolve);
+		bool					 bIsMSAAResolve = (DepthStore == ERenderTargetStoreAction::MultisampleResolve) || (StencilStore == ERenderTargetStoreAction::MultisampleResolve);
 		// Don't try to resolve a non-msaa
 		HLVM_ENSURE(!bIsMSAAResolve || DepthStencilRenderTarget.DepthStencilTarget->GetNumSamples() > 1);
 		// Don't resolve to null
-		//HLVM_ENSURE(DepthStencilRenderTarget.ResolveTarget || DepthStore != ERenderTargetStoreAction::EStore);
+		// HLVM_ENSURE(DepthStencilRenderTarget.ResolveTarget || DepthStore != ERenderTargetStoreAction::EStore);
 
 		// Don't write to depth if read-only
-		//HLVM_ENSURE(DepthStencilRenderTarget.ExclusiveDepthStencil.IsDepthWrite() || DepthStore != ERenderTargetStoreAction::EStore);
+		// HLVM_ENSURE(DepthStencilRenderTarget.ExclusiveDepthStencil.IsDepthWrite() || DepthStore != ERenderTargetStoreAction::EStore);
 		// This is not true for stencil. VK and Metal specify that the DontCare store action MAY leave the attachment in an undefined state.
 		/*HLVM_ENSURE(DepthStencilRenderTarget.ExclusiveDepthStencil.IsStencilWrite() || StencilStore != ERenderTargetStoreAction::EStore);*/
 
@@ -78,19 +132,19 @@ void FRHIRenderPassInfo::Validate() const
 		{
 			// If this is DepthStencil we must store it out unless we are absolutely sure it will never be used again.
 			// it is valid to use a depthbuffer for performance and not need the results later.
-			//HLVM_ENSURE(StencilStore == ERenderTargetStoreAction::EStore);
+			// HLVM_ENSURE(StencilStore == ERenderTargetStoreAction::EStore);
 		}
 
 		if (DepthStencilRenderTarget.ExclusiveDepthStencil.IsDepthWrite())
 		{
 			// this check is incorrect for mobile, depth/stencil is intermediate and we don't want to store it to main memory
-			//HLVM_ENSURE(DepthStore == ERenderTargetStoreAction::EStore);
+			// HLVM_ENSURE(DepthStore == ERenderTargetStoreAction::EStore);
 		}
 
 		if (DepthStencilRenderTarget.ExclusiveDepthStencil.IsStencilWrite())
 		{
 			// this check is incorrect for mobile, depth/stencil is intermediate and we don't want to store it to main memory
-			//HLVM_ENSURE(StencilStore == ERenderTargetStoreAction::EStore);
+			// HLVM_ENSURE(StencilStore == ERenderTargetStoreAction::EStore);
 		}
 
 		if (SubpassHint == ESubpassHint::DepthReading || SubpassHint == ESubpassHint::CustomResolve)
@@ -108,7 +162,7 @@ void FRHIRenderPassInfo::Validate() const
 			// 2. Must be using MSAA resolve
 			// 3. Resolve target sample count must be 1
 			// 4. Resolve target format must be the same as the MSAA target format
-			//HLVM_ENSURE_F(GRHISupportsDepthStencilResolve, TXT("Attempted to resolve depth/stencil target but feature is not supported."));
+			// HLVM_ENSURE_F(GRHISupportsDepthStencilResolve, TXT("Attempted to resolve depth/stencil target but feature is not supported."));
 			HLVM_ENSURE_F(bIsMSAAResolve, TXT("Depth/stencil resolve target is bound but resolve was not requested."));
 			HLVM_ENSURE_F(DepthStencilRenderTarget.ResolveTarget->GetNumSamples() == 1, TXT("Depth/stencil resolve targets must have a sample count of 1."));
 			HLVM_ENSURE_F(DepthStencilRenderTarget.ResolveTarget->GetFormat() == DepthStencilRenderTarget.DepthStencilTarget->GetFormat(),

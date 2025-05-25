@@ -8,13 +8,13 @@
 FVulkanShader::FVulkanShader(const FShaderCreateInfo& InCreateInfo)
 	: FRHIShader(InCreateInfo)
 {
-	ShaderModule = GetDynamicRHI<IVulkanDynamicRHI>()->CreateVulkanShaderModule(InCreateInfo);
-	PipelineShaderStageCreateInfo = GetDynamicRHI<IVulkanDynamicRHI>()->GenerateVkPipelineShaderStageCreateInfo(InCreateInfo, ShaderModule);
+	ShaderModule = RHI::GetDynamicRHI<IVulkanDynamicRHI>()->CreateVulkanShaderModule(InCreateInfo);
+	PipelineShaderStageCreateInfo = RHI::GetDynamicRHI<IVulkanDynamicRHI>()->GenerateVkPipelineShaderStageCreateInfo(InCreateInfo, ShaderModule);
 	HLVM_LOG(LogVulkanRHI, trace, TXT("Created Vulkan Shader Module: {}"), *GetName());
 }
 
 FVulkanShader::~FVulkanShader()
 {
-	GetDynamicRHI<IVulkanDynamicRHI>()->DestroyVulkanShaderModule(ShaderModule);
+	RHI::GetDynamicRHI<IVulkanDynamicRHI>()->DestroyVulkanShaderModule(ShaderModule);
 	HLVM_LOG(LogVulkanRHI, trace, TXT("Destroy Vulkan Shader Module: {}"), *GetName());
 }

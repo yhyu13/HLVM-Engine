@@ -20,53 +20,53 @@
 #define HLVM_ENUM_TO_TCHAR(enum_value) TO_TCHAR_CSTR(magic_enum::enum_name((enum_value)).data())
 
 // Reference https://www.reddit.com/r/cpp/comments/13psi6f/comment/jleje26/?utm_source=share&utm_medium=web3x&utm_name=web3xcss&utm_term=1&utm_content=share_button
-#define HLVM_DECLARE_FLAGS_OPERATOR(Flags, op)                            \
-	inline friend Flags operator op(Flags::EnumType a, Flags::EnumType b) \
-	{                                                                     \
-		return Flags((EnumValue(a) op EnumValue(b)));                     \
-	}                                                                     \
-	inline friend Flags operator op(Flags a, Flags::EnumType b)           \
-	{                                                                     \
-		return Flags((a.value op EnumValue(b)));                          \
-	}                                                                     \
-	inline friend Flags operator op(Flags::EnumType a, Flags b)           \
-	{                                                                     \
-		return Flags((EnumValue(a) op b.value));                          \
-	}                                                                     \
-	inline friend Flags operator op(Flags a, Flags b)                     \
-	{                                                                     \
-		return Flags((a.value op b.value));                               \
+#define HLVM_DECLARE_FLAGS_OPERATOR(enum_class, Flags, op)          \
+	inline Flags operator op(enum_class a, enum_class b)            \
+	{                                                               \
+		return Flags((Flags::EnumValue(a) op Flags::EnumValue(b))); \
+	}                                                               \
+	inline Flags operator op(Flags a, enum_class b)                 \
+	{                                                               \
+		return Flags((a.value op Flags::EnumValue(b)));             \
+	}                                                               \
+	inline Flags operator op(enum_class a, Flags b)                 \
+	{                                                               \
+		return Flags((Flags::EnumValue(a) op b.value));             \
+	}                                                               \
+	inline Flags operator op(Flags a, Flags b)                      \
+	{                                                               \
+		return Flags((a.value op b.value));                         \
 	}
 
-#define HLVM_DECLARE_FLAGS_OPERATOR2(Flags, op)                    \
-	inline friend Flags& operator op(Flags & a, Flags::EnumType b) \
-	{                                                              \
-		return a = Flags(a.value op EnumValue(b));                 \
-	}                                                              \
-	inline friend Flags& operator op(Flags & a, Flags b)           \
-	{                                                              \
-		return a = Flags(a.value op b.value);                      \
+#define HLVM_DECLARE_FLAGS_OPERATOR2(enum_class, Flags, op) \
+	inline Flags& operator op(Flags & a, enum_class b)      \
+	{                                                       \
+		return a = Flags(a.value op Flags::EnumValue(b));   \
+	}                                                       \
+	inline Flags& operator op(Flags & a, Flags b)           \
+	{                                                       \
+		return a = Flags(a.value op b.value);               \
 	}
 
-#define HLVM_DECLARE_FLAGS_OPERATOR3(Flags)                   \
-	inline friend bool operator==(Flags a, Flags::EnumType b) \
-	{                                                         \
-		return a.value == EnumValue(b);                       \
-	}                                                         \
-	inline friend bool operator==(Flags a, Flags b)           \
-	{                                                         \
-		return a.value == b.value;                            \
-	}                                                         \
-	inline friend bool operator!=(Flags a, Flags::EnumType b) \
-	{                                                         \
-		return a.value != EnumValue(b);                       \
-	}                                                         \
-	inline friend bool operator!=(Flags a, Flags b)           \
-	{                                                         \
-		return a.value != b.value;                            \
+#define HLVM_DECLARE_FLAGS_OPERATOR3(enum_class, Flags) \
+	inline bool operator==(Flags a, enum_class b)       \
+	{                                                   \
+		return a.value == Flags::EnumValue(b);          \
+	}                                                   \
+	inline bool operator==(Flags a, Flags b)            \
+	{                                                   \
+		return a.value == b.value;                      \
+	}                                                   \
+	inline bool operator!=(Flags a, enum_class b)       \
+	{                                                   \
+		return a.value != Flags::EnumValue(b);          \
+	}                                                   \
+	inline bool operator!=(Flags a, Flags b)            \
+	{                                                   \
+		return a.value != b.value;                      \
 	}
 
-#define HLVM_DECLARE_ENMU_FLAGS(enum_class, Flags)                  \
+#define HLVM_ENMU_CLASS_FLAGS(enum_class, Flags)                  \
 	struct Flags                                                    \
 	{                                                               \
 		using EnumType = enum_class;                                \
@@ -79,12 +79,36 @@
 		{                                                           \
 			return value;                                           \
 		}                                                           \
-		HLVM_DECLARE_FLAGS_OPERATOR(Flags, &)                       \
-		HLVM_DECLARE_FLAGS_OPERATOR2(Flags, &=)                     \
-		HLVM_DECLARE_FLAGS_OPERATOR(Flags, |)                       \
-		HLVM_DECLARE_FLAGS_OPERATOR2(Flags, |=)                     \
-		HLVM_DECLARE_FLAGS_OPERATOR3(Flags)                         \
-	};
+	};                                                              \
+	HLVM_DECLARE_FLAGS_OPERATOR(enum_class, Flags, &)               \
+	HLVM_DECLARE_FLAGS_OPERATOR2(enum_class, Flags, &=)             \
+	HLVM_DECLARE_FLAGS_OPERATOR(enum_class, Flags, |)               \
+	HLVM_DECLARE_FLAGS_OPERATOR2(enum_class, Flags, |=)             \
+	HLVM_DECLARE_FLAGS_OPERATOR3(enum_class, Flags)
+
+template <typename EnumFlags>
+bool EnumHasAnyFlags(EnumFlags&& GivenFlags, EnumFlags&& FlagsToCheck)
+{
+	return (GivenFlags & FlagsToCheck);
+}
+
+template <typename EnumFlags, typename EnumType>
+bool EnumHasAnyFlags(EnumFlags&& GivenFlags, EnumType&& FlagsToCheck)
+{
+	return (GivenFlags & FlagsToCheck);
+}
+
+template <typename EnumFlags>
+bool EnumHasAllFlags(EnumFlags&& GivenFlags, EnumFlags&& FlagsToCheck)
+{
+	return (GivenFlags & FlagsToCheck) == GivenFlags;
+}
+
+template <typename EnumFlags, typename EnumType>
+bool EnumHasAllFlags(EnumFlags&& GivenFlags, EnumType&& FlagsToCheck)
+{
+	return (GivenFlags & FlagsToCheck) == GivenFlags;
+}
 
 template <class EnumType>
 class TEnumAsUnderlying

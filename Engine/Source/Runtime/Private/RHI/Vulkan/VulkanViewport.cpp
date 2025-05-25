@@ -64,6 +64,7 @@ void FVulkanViewport::CreateSwapChain(FVulkanSwapChain::FRecreateInfo& InCreateI
 		FRHITextureCreateInfo BackBufferCreateInfo;
 		BackBufferCreateInfo.Extent.x = SwapChain->swapChainExtent.width;
 		BackBufferCreateInfo.Extent.y = SwapChain->swapChainExtent.height;
+		BackBufferCreateInfo.Extent.z = 0;
 		bool sRGB = false;
 		BackBufferCreateInfo.Format = VulkanRHI::RHIFormatFromVulkanFormat(SwapChain->swapChainImageFormat, sRGB);
 		BackBufferCreateInfo.Flags |= ETextureCreateFlag::RenderTarget; // TODO back buffer support mass resolve?
@@ -73,6 +74,8 @@ void FVulkanViewport::CreateSwapChain(FVulkanSwapChain::FRecreateInfo& InCreateI
 		}
 		BackBufferCreateInfo.NumMips = 1;
 		BackBufferCreateInfo.NumSamples = 1; // TODO back buffer support mass resolve
+		BackBufferCreateInfo.Dimension = ETextureDimension::Texture2D;
+
 		RHIBackBuffer = new FVulkanBackBuffer(VK_NULL_HANDLE, BackBufferCreateInfo, this);
 	}
 	else

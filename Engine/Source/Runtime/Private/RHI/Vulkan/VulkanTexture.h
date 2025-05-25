@@ -1,11 +1,11 @@
 /**
-* Copyright (c) 2025. MIT License. All rights reserved.
+ * Copyright (c) 2025. MIT License. All rights reserved.
  */
 
 #pragma once
 
 #include "RHI/RHIResource.h"
-#include "VulkanRHIResourcePre.h"
+#include "VulkanResource.h"
 
 // Vulkan-specific RHI texture
 class FVulkanTexture : public FRHITexture, public FVulkanResource
@@ -14,10 +14,11 @@ public:
 	enum class EOwnerShip
 	{
 		Owner, // Owns the image
-		Alias // Alias of another image
+		Alias  // Alias of another image
 	};
 
 public:
+	FVulkanTexture();
 	FVulkanTexture(const FRHITextureCreateInfo& InCreateInfo);
 	FVulkanTexture(VkImage Image, const FRHITextureCreateInfo& InCreateInfo);
 
@@ -28,9 +29,40 @@ public:
 
 	void SetOwnerShip(EOwnerShip InOwnerShip) { OwnerShip = InOwnerShip; }
 
+	VkImageViewType GetImageViewType() const
+	{
+		return VulkanRHI::VulkanImageViewTypeFromRHIDimension(CreateInfo.Dimension);
+	}
+
+	TUINT32 GetEffectiveArraySize() const;
+
+	VkFormat GetViewFormat() const { return ViewFormat; }
+	VkFormat GetStorageFormat() const { return StorageFormat; }
+
+	VkImageAspectFlags GetFullAspectFlags() const { return FullAspectFlags; }
+	VkImageAspectFlags GetPartialAspectFlags() const { return PartialAspectFlags; }
+	FVulkanViewRef GetFullView() const { return FullView; }
+	FVulkanViewRef GetPartialView() const { return PartialView; }
+
+	VkImageUsageFlags GetImageUsageFlags() const { return ImageUsageFlags; }
+
 protected:
-	VkImage Image;
 	EOwnerShip OwnerShip;
+	VkImage	   Image;
+
+private:
+	void PostInit();
+
+private:
+	VkFormat ViewFormat;
+	VkFormat StorageFormat;
+
+	VkImageAspectFlags FullAspectFlags;	   // depth + stencil
+	VkImageAspectFlags PartialAspectFlags; // only depth
+	FVulkanViewRef	   FullView;
+	FVulkanViewRef	   PartialView;
+
+	VkImageUsageFlags ImageUsageFlags;
 };
 
 // Vulkan-specific RHI render target view

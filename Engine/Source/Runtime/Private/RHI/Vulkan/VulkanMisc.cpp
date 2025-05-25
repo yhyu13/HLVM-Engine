@@ -37,32 +37,32 @@ namespace VulkanRHI
 		}
 	}
 
-	VkFormat VulkanFormatFromRHIFormat(EPixelFormat RHIFormat, bool bSRGB)
+	VkFormat VulkanFormatFromRHIFormat(EPixelFormat RHIFormat, bool bSRGBFlag)
 	{
 		switch (RHIFormat)
 		{
 			case EPixelFormat::None:
 				return VK_FORMAT_UNDEFINED;
 			case EPixelFormat::R8_UNorm:
-				HLVM_ASSERT(!bSRGB);
+				HLVM_ENSURE(!bSRGBFlag);
 				return VK_FORMAT_R8_UNORM;
 			case EPixelFormat::R8G8_UNorm:
-				HLVM_ASSERT(!bSRGB);
+				HLVM_ENSURE(!bSRGBFlag);
 				return VK_FORMAT_R8G8_UNORM;
 			case EPixelFormat::R8G8B8A8_UNorm:
-				HLVM_ASSERT(!bSRGB);
+				HLVM_ENSURE(!bSRGBFlag);
 				return VK_FORMAT_R8G8B8A8_UNORM;
 			case EPixelFormat::B8G8R8A8_SRGB:
-				HLVM_ASSERT(bSRGB);
+				HLVM_ENSURE(bSRGBFlag);
 				return VK_FORMAT_B8G8R8A8_SRGB;
 			case EPixelFormat::R16_UNorm:
-				HLVM_ASSERT(!bSRGB);
+				HLVM_ENSURE(!bSRGBFlag);
 				return VK_FORMAT_R16_UNORM;
 			case EPixelFormat::R16G16_UNorm:
-				HLVM_ASSERT(!bSRGB);
+				HLVM_ENSURE(!bSRGBFlag);
 				return VK_FORMAT_R16G16_UNORM;
 			case EPixelFormat::R16G16B16A16_UNorm:
-				HLVM_ASSERT(!bSRGB);
+				HLVM_ENSURE(!bSRGBFlag);
 				return VK_FORMAT_R16G16B16A16_UNORM;
 			case EPixelFormat::R32_UInt:
 				return VK_FORMAT_R32_UINT;
@@ -77,27 +77,109 @@ namespace VulkanRHI
 			case EPixelFormat::R32G32B32A32_Float:
 				return VK_FORMAT_R32G32B32A32_SFLOAT;
 			case EPixelFormat::D16_UNorm:
-				HLVM_ASSERT(!bSRGB);
+				HLVM_ENSURE(!bSRGBFlag);
 				return VK_FORMAT_D16_UNORM;
 			case EPixelFormat::D24_UNorm_S8_UInt:
-				HLVM_ASSERT(!bSRGB);
+				HLVM_ENSURE(!bSRGBFlag);
 				return VK_FORMAT_D24_UNORM_S8_UINT;
 			case EPixelFormat::D32_Float:
 				return VK_FORMAT_D32_SFLOAT;
 			case EPixelFormat::D32_Float_S8_UInt:
 				return VK_FORMAT_D32_SFLOAT_S8_UINT; // Add more formats as needed
+			case EPixelFormat::_NUM:
 			default:
 				HLVM_ASSERT_F(false, TXT("Unknown RHI format {}"), HLVM_ENUM_TO_TCHAR(RHIFormat));
 				return VK_FORMAT_UNDEFINED;
 		}
 	}
 
-	EPixelFormat RHIFormatFromVulkanFormat(VkFormat VulkanFormat)
+	VkFormat VulkanFormatTryRemoveSRGB(VkFormat VKFormat)
 	{
-		bool bSRGB_Out = false;
-		auto Ret = RHIFormatFromVulkanFormat(VulkanFormat, bSRGB_Out);
-		HLVM_ASSERT(!bSRGB_Out);
-		return Ret;
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wswitch"
+		switch (VKFormat)
+		{
+			case VK_FORMAT_B8G8R8A8_SRGB:
+				return VK_FORMAT_B8G8R8A8_UNORM;
+		}
+#pragma clang diagnostic pop
+		return VKFormat;
+	}
+
+	VkImageViewType VulkanImageViewTypeFromRHIDimension(ETextureDimension RHIDimension)
+	{
+		switch (RHIDimension)
+		{
+			case ETextureDimension::Texture2D:
+				return VK_IMAGE_VIEW_TYPE_2D;
+			case ETextureDimension::Texture2DArray:
+				return VK_IMAGE_VIEW_TYPE_2D_ARRAY;
+			case ETextureDimension::Texture3D:
+				return VK_IMAGE_VIEW_TYPE_3D;
+			case ETextureDimension::TextureCube:
+				return VK_IMAGE_VIEW_TYPE_CUBE;
+			case ETextureDimension::TextureCubeArray:
+				return VK_IMAGE_VIEW_TYPE_CUBE_ARRAY;
+			case ETextureDimension::None:
+			default:
+				HLVM_ASSERT_F(false, TXT("Unknown texture dimension {}"), HLVM_ENUM_TO_TCHAR(RHIDimension));
+				return VK_IMAGE_VIEW_TYPE_MAX_ENUM;
+		}
+	}
+
+	VkComponentMapping VulkanFormatComponentMappingFromRHIFormat(EPixelFormat RHIFormat)
+	{
+		const VkComponentMapping ComponentMappingRGBA = { VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A };
+		const VkComponentMapping ComponentMappingRGB1 = { VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_ONE };
+		const VkComponentMapping ComponentMappingRG01 = { VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_ZERO, VK_COMPONENT_SWIZZLE_ONE };
+		const VkComponentMapping ComponentMappingR001 = { VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_ZERO, VK_COMPONENT_SWIZZLE_ZERO, VK_COMPONENT_SWIZZLE_ONE };
+		const VkComponentMapping ComponentMappingRIII = { VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY };
+		const VkComponentMapping ComponentMapping000R = { VK_COMPONENT_SWIZZLE_ZERO, VK_COMPONENT_SWIZZLE_ZERO, VK_COMPONENT_SWIZZLE_ZERO, VK_COMPONENT_SWIZZLE_R };
+		const VkComponentMapping ComponentMappingR000 = { VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_ZERO, VK_COMPONENT_SWIZZLE_ZERO, VK_COMPONENT_SWIZZLE_ZERO };
+		const VkComponentMapping ComponentMappingRR01 = { VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_ZERO, VK_COMPONENT_SWIZZLE_ONE };
+
+		switch (RHIFormat)
+		{
+			case EPixelFormat::R8_UNorm:
+				return ComponentMappingR001;
+			case EPixelFormat::R8G8_UNorm:
+				return ComponentMappingRG01;
+			case EPixelFormat::R8G8B8A8_UNorm:
+				return ComponentMappingRGBA;
+			case EPixelFormat::B8G8R8A8_SRGB:
+				return ComponentMappingRGBA;
+			case EPixelFormat::R16_UNorm:
+				return ComponentMappingR001;
+			case EPixelFormat::R16G16_UNorm:
+				return ComponentMappingRG01;
+			case EPixelFormat::R16G16B16A16_UNorm:
+				return ComponentMappingRGBA;
+			case EPixelFormat::R32_UInt:
+				return ComponentMappingR001;
+			case EPixelFormat::R32G32_UInt:
+				return ComponentMappingRG01;
+			case EPixelFormat::R32G32B32A32_UInt:
+				return ComponentMappingRGBA;
+			case EPixelFormat::R32_Float:
+				return ComponentMappingR001;
+			case EPixelFormat::R32G32_Float:
+				return ComponentMappingRG01;
+			case EPixelFormat::R32G32B32A32_Float:
+				return ComponentMappingRGBA;
+			case EPixelFormat::D16_UNorm:
+				return ComponentMappingR000;
+			case EPixelFormat::D24_UNorm_S8_UInt:
+				return ComponentMappingRR01;
+			case EPixelFormat::D32_Float:
+				return ComponentMappingR000;
+			case EPixelFormat::D32_Float_S8_UInt:
+				return ComponentMappingRR01; // Add more formats as needed
+			case EPixelFormat::None:
+			case EPixelFormat::_NUM:
+			default:
+				HLVM_ASSERT_F(false, TXT("Unknown RHI format {}"), HLVM_ENUM_TO_TCHAR(RHIFormat));
+				return ComponentMappingRGBA;
+		}
 	}
 
 	// Convert RHI pixel format to Vulkan format
@@ -153,6 +235,14 @@ namespace VulkanRHI
 #pragma clang diagnostic pop
 	}
 
+	EPixelFormat RHIFormatFromVulkanFormatNoSRGB(VkFormat VulkanFormat)
+	{
+		bool bSRGB_Out = false;
+		auto Ret = RHIFormatFromVulkanFormat(VulkanFormat, bSRGB_Out);
+		HLVM_ENSURE(!bSRGB_Out);
+		return Ret;
+	}
+
 	VkFormat RHIVertexElementTypeToVulkanFormat(EVertexElementType Type)
 	{
 		switch (Type)
@@ -203,6 +293,24 @@ namespace VulkanRHI
 				HLVM_ASSERT_F(false, TXT("Unknown EVertexElementType format {}"), HLVM_ENUM_TO_TCHAR(Type));
 				return VK_FORMAT_UNDEFINED;
 		}
+	}
+
+	VkImageAspectFlags GetAspectMaskFromRHIFormat(EPixelFormat Format, bool bIncludeDepth, bool bIncludeStencil)
+	{
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wswitch-enum"
+		switch (Format)
+		{
+			case EPixelFormat::D24_UNorm_S8_UInt:
+			case EPixelFormat::D32_Float_S8_UInt:
+				return (bIncludeDepth ? VK_IMAGE_ASPECT_DEPTH_BIT : 0) | (bIncludeStencil ? VK_IMAGE_ASPECT_STENCIL_BIT : 0);
+			case EPixelFormat::D16_UNorm:
+			case EPixelFormat::D32_Float:
+				return VK_IMAGE_ASPECT_DEPTH_BIT;
+			default:
+				return VK_IMAGE_ASPECT_COLOR_BIT;
+		}
+#pragma clang diagnostic pop
 	}
 
 	// Convert RHI buffer usage flags to Vulkan usage flags
@@ -524,7 +632,7 @@ namespace VulkanRHI
 			}
 			else
 			{
-				HLVM_ASSERT(StencilLayout == VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL);
+				HLVM_ENSURE(StencilLayout == VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL);
 				return VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL;
 			}
 		}
@@ -536,7 +644,7 @@ namespace VulkanRHI
 			}
 			else
 			{
-				HLVM_ASSERT(StencilLayout == VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL);
+				HLVM_ENSURE(StencilLayout == VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL);
 				return VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL;
 			}
 		}

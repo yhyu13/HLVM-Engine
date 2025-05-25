@@ -46,7 +46,7 @@ public:
 	virtual ~FRHIVertexDeclaration() override = default;
 
 	// Returns the type of the RHI resource
-	virtual ERHIResourceType GetType() const override { return ERHIResourceType::VertexDeclaration; }
+	virtual ERHIResourceType GetResourceType() const override { return ERHIResourceType::VertexDeclaration; }
 
 	// Returns the list of vertex elements
 	virtual const FVertexDeclarationElementList& GetVertexElements() const = 0;

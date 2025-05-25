@@ -346,11 +346,16 @@ namespace
 		requiredExtensions = {};
 		deviceQueueFamilyIndices = {};
 	}
+
 } // namespace
 
-FVulkanRHI::FVulkanRHI(const FVulkanRHI::FInitializer& Params)
+FVulkanRHI::FVulkanRHI(const FVulkanRHIInitializer& Params)
 	: InitializerParam(Params)
 {
+	// Set GDynamicRHI before init
+	HLVM_ENSURE_F(RHI::GDynamicRHI == nullptr, TXT("GDynamicRHI should be nullptr before FVulkanRHI init!"));
+	RHI::SetDynamicRHI(this);
+
 	ResetBeforeInit();
 	for (const auto& extensions : Params.RequiredExtensions)
 	{
@@ -378,6 +383,7 @@ void FVulkanRHI::Init()
 	CreateSurface();
 	CreateVulkanPhysicalDevice();
 	CreateVulkanLogicalDevice();
+	CreateGlobals();
 
 	CreateVulkanQueues();
 	CreateVulkanViewPort();
@@ -385,29 +391,28 @@ void FVulkanRHI::Init()
 	// Lastly, create Vulkan Memory Allocator
 	CreateVulkanMemoryAllocator();
 
-
 	HLVM_LOG(LogVulkanRHI, debug, TXT("VulkanRHI Init!"));
 }
 
 void FVulkanRHI::Shutdown()
 {
-	// TODO : desotry every vulkan handle
+	VkDevice Device = LogicalDevice->GetHandle();
+
 	VulkanViewport = nullptr;
 	LogicalDevice = nullptr;
 	PhysicalDevice = nullptr;
 
-	PendingDestroyRenderPass.Empty();
-
-	VulkanRHI::vkDeviceWaitIdle(VulkanDevice);
+	VulkanRHI::vkDeviceWaitIdle(Device);
 
 	// Cleanup Vulkan resources
 	vmaDestroyAllocator(VulkanRHI::VULKAN_VMA_ALLOCATOR);
-	VulkanRHI::vkDestroyDevice(VulkanDevice, VulkanRHI::VULKAN_CPU_ALLOCATOR);
+	VulkanRHI::vkDestroyDevice(Device, VulkanRHI::VULKAN_CPU_ALLOCATOR);
+
 	if (bUseValidationLayers)
 	{
-		DestroyDebugUtilsMessengerEXT(VulkanInstance, DebugMessenger, VulkanRHI::VULKAN_CPU_ALLOCATOR);
+		DestroyDebugUtilsMessengerEXT(Instance, DebugMessenger, VulkanRHI::VULKAN_CPU_ALLOCATOR);
 	}
-	VulkanRHI::vkDestroyInstance(VulkanInstance, VulkanRHI::VULKAN_CPU_ALLOCATOR);
+	VulkanRHI::vkDestroyInstance(Instance, VulkanRHI::VULKAN_CPU_ALLOCATOR);
 
 	HLVM_LOG(LogVulkanRHI, debug, TXT("VulkanRHI Shutdown!"));
 }
@@ -664,7 +669,7 @@ void FVulkanRHI::CreateVulkanInstance()
 		CreateInfo.pNext = nullptr;
 	}
 
-	VkResult Result = VulkanRHI::vkCreateInstance(&CreateInfo, nullptr, &VulkanInstance);
+	VkResult Result = VulkanRHI::vkCreateInstance(&CreateInfo, nullptr, &Instance);
 	HLVM_ENSURE(Result == VK_SUCCESS);
 }
 
@@ -672,25 +677,26 @@ void FVulkanRHI::CreateDebugLayer()
 {
 	VkDebugUtilsMessengerCreateInfoEXT createInfo;
 	PopulateDebugMessengerCreateInfo(createInfo);
-	VkResult Result = CreateDebugUtilsMessengerEXT(VulkanInstance, &createInfo, nullptr, &DebugMessenger);
+	VkResult Result = CreateDebugUtilsMessengerEXT(Instance, &createInfo, nullptr, &DebugMessenger);
 	HLVM_ENSURE(Result == VK_SUCCESS);
 }
 
 void FVulkanRHI::CreateSurface()
 {
-	VulkanSurface = InitializerParam.CreateSurfaceFunc(VulkanInstance);
+	VulkanSurface = InitializerParam.CreateSurfaceFunc(Instance);
 	HLVM_ENSURE(VulkanSurface != VK_NULL_HANDLE);
 }
 
 void FVulkanRHI::CreateVulkanPhysicalDevice()
 {
+	VkPhysicalDevice VulkanPhysicalDevice = VK_NULL_HANDLE;
 	// 1 Find suitable device
 	uint32_t DeviceCount = 0;
-	VulkanRHI::vkEnumeratePhysicalDevices(VulkanInstance, &DeviceCount, nullptr);
+	VulkanRHI::vkEnumeratePhysicalDevices(Instance, &DeviceCount, nullptr);
 	HLVM_ENSURE(DeviceCount > 0);
 
 	TVector<VkPhysicalDevice> PhysicalDevices(DeviceCount);
-	VulkanRHI::vkEnumeratePhysicalDevices(VulkanInstance, &DeviceCount, PhysicalDevices.data());
+	VulkanRHI::vkEnumeratePhysicalDevices(Instance, &DeviceCount, PhysicalDevices.data());
 
 	for (const auto& device : PhysicalDevices)
 	{
@@ -706,6 +712,7 @@ void FVulkanRHI::CreateVulkanPhysicalDevice()
 
 void FVulkanRHI::CreateVulkanLogicalDevice()
 {
+	VkDevice LogicalDeviceHandle = VK_NULL_HANDLE;
 	// 2 Create logical device
 	deviceQueueFamilyIndices = FindQueueFamilies(PhysicalDevice->GetHandle(), VulkanSurface);
 
@@ -748,23 +755,29 @@ void FVulkanRHI::CreateVulkanLogicalDevice()
 		createInfo.enabledLayerCount = 0;
 	}
 
-	VULKAN_ENSURE(VulkanRHI::vkCreateDevice(VulkanPhysicalDevice, &createInfo, nullptr, &VulkanDevice));
-	LogicalDevice = new FVulkanLogicalDevice(VulkanDevice);
+	VULKAN_ENSURE(VulkanRHI::vkCreateDevice(PhysicalDevice->GetHandle(), &createInfo, nullptr, &LogicalDeviceHandle));
+	LogicalDevice = new FVulkanLogicalDevice(LogicalDeviceHandle);
+}
+
+void FVulkanRHI::CreateGlobals()
+{
+	// Initialize GPixel Formats
+
 }
 
 void FVulkanRHI::CreateVulkanQueues()
 {
 	// Queues are created during device creation
-	VulkanRHI::vkGetDeviceQueue(VulkanDevice, deviceQueueFamilyIndices.graphicsFamily, 0, &GraphicsQueue);
+	VulkanRHI::vkGetDeviceQueue(LogicalDevice->GetHandle(), deviceQueueFamilyIndices.graphicsFamily, 0, &GraphicsQueue);
 	HLVM_ENSURE(GraphicsQueue != VK_NULL_HANDLE);
 
-	VulkanRHI::vkGetDeviceQueue(VulkanDevice, deviceQueueFamilyIndices.computeFamily, 0, &ComputeQueue);
+	VulkanRHI::vkGetDeviceQueue(LogicalDevice->GetHandle(), deviceQueueFamilyIndices.computeFamily, 0, &ComputeQueue);
 	HLVM_ENSURE(ComputeQueue != VK_NULL_HANDLE);
 
-	VulkanRHI::vkGetDeviceQueue(VulkanDevice, deviceQueueFamilyIndices.transferFamily, 0, &TransferQueue);
+	VulkanRHI::vkGetDeviceQueue(LogicalDevice->GetHandle(), deviceQueueFamilyIndices.transferFamily, 0, &TransferQueue);
 	HLVM_ENSURE(TransferQueue != VK_NULL_HANDLE);
 
-	VulkanRHI::vkGetDeviceQueue(VulkanDevice, deviceQueueFamilyIndices.presentFamily, 0, &PresentQueue);
+	VulkanRHI::vkGetDeviceQueue(LogicalDevice->GetHandle(), deviceQueueFamilyIndices.presentFamily, 0, &PresentQueue);
 	HLVM_ENSURE(PresentQueue != VK_NULL_HANDLE);
 }
 
@@ -793,9 +806,9 @@ void FVulkanRHI::CreateVulkanMemoryAllocator()
 	VmaAllocatorCreateInfo allocatorCreateInfo = {};
 	allocatorCreateInfo.flags = VMA_ALLOCATOR_CREATE_EXT_MEMORY_BUDGET_BIT;
 	allocatorCreateInfo.vulkanApiVersion = VULKAN_API_VERSION;
-	allocatorCreateInfo.physicalDevice = VulkanPhysicalDevice;
-	allocatorCreateInfo.device = VulkanDevice;
-	allocatorCreateInfo.instance = VulkanInstance;
+	allocatorCreateInfo.physicalDevice = PhysicalDevice->GetHandle();
+	allocatorCreateInfo.device = LogicalDevice->GetHandle();
+	allocatorCreateInfo.instance = Instance;
 	allocatorCreateInfo.pVulkanFunctions = &VulkanRHI::VULKAN_VMA_FUNCTIONS;
 	vmaCreateAllocator(&allocatorCreateInfo, &VulkanRHI::VULKAN_VMA_ALLOCATOR);
 }
@@ -819,7 +832,7 @@ VkImage FVulkanRHI::CreateVulkanImage(const FRHITextureCreateInfo& CreateInfo)
 	ImageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
 
 	VkImage	 Image;
-	VkResult Result = VulkanRHI::vkCreateImage(VulkanDevice, &ImageInfo, VulkanRHI::VULKAN_CPU_ALLOCATOR, &Image);
+	VkResult Result = VulkanRHI::vkCreateImage(LogicalDevice->GetHandle(), &ImageInfo, VulkanRHI::VULKAN_CPU_ALLOCATOR, &Image);
 	HLVM_ENSURE(Result == VK_SUCCESS);
 
 	return Image;
@@ -828,7 +841,7 @@ VkImage FVulkanRHI::CreateVulkanImage(const FRHITextureCreateInfo& CreateInfo)
 void FVulkanRHI::DestroyVulkanImage(VkImage Image)
 {
 	HLVM_ENSURE(Image != VK_NULL_HANDLE);
-	VulkanRHI::vkDestroyImage(VulkanDevice, Image, VulkanRHI::VULKAN_CPU_ALLOCATOR);
+	VulkanRHI::vkDestroyImage(LogicalDevice->GetHandle(), Image, VulkanRHI::VULKAN_CPU_ALLOCATOR);
 }
 
 VkSampler FVulkanRHI::CreateVulkanSampler(const FRHISamplerStateCreateInfo& CreateInfo)
@@ -861,7 +874,7 @@ VkSampler FVulkanRHI::CreateVulkanSampler(const FRHISamplerStateCreateInfo& Crea
 
 	// call vk api
 	VkSampler Sampler;
-	VULKAN_ENSURE(VulkanRHI::vkCreateSampler(VulkanDevice, &SamplerInfo, VulkanRHI::VULKAN_CPU_ALLOCATOR, &Sampler));
+	VULKAN_ENSURE(VulkanRHI::vkCreateSampler(LogicalDevice->GetHandle(), &SamplerInfo, VulkanRHI::VULKAN_CPU_ALLOCATOR, &Sampler));
 	return Sampler;
 }
 
@@ -910,7 +923,7 @@ VkImageView FVulkanRHI::CreateVulkanImageView(VkImage Image, const FRHIShaderRes
 	ViewInfo.subresourceRange.layerCount = 1;
 
 	VkImageView ImageView;
-	VkResult	Result = VulkanRHI::vkCreateImageView(VulkanDevice, &ViewInfo, nullptr, &ImageView);
+	VkResult	Result = VulkanRHI::vkCreateImageView(LogicalDevice->GetHandle(), &ViewInfo, nullptr, &ImageView);
 	HLVM_ENSURE(Result == VK_SUCCESS);
 
 	return ImageView;
@@ -926,7 +939,7 @@ VkBufferView FVulkanRHI::CreateVulkanBufferView(VkBuffer Buffer, const FRHIUnord
 	ViewInfo.range = CreateInfo.Size;
 
 	VkBufferView BufferView;
-	VkResult	 Result = VulkanRHI::vkCreateBufferView(VulkanDevice, &ViewInfo, nullptr, &BufferView);
+	VkResult	 Result = VulkanRHI::vkCreateBufferView(LogicalDevice->GetHandle(), &ViewInfo, nullptr, &BufferView);
 	HLVM_ENSURE(Result == VK_SUCCESS);
 
 	return BufferView;
@@ -941,14 +954,14 @@ VkShaderModule FVulkanRHI::CreateVulkanShaderModule(const FShaderCreateInfo& Cre
 	createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
 
 	VkShaderModule shaderModule = VK_NULL_HANDLE;
-	VULKAN_ENSURE(VulkanRHI::vkCreateShaderModule(VulkanDevice, &createInfo, VulkanRHI::VULKAN_CPU_ALLOCATOR, &shaderModule));
+	VULKAN_ENSURE(VulkanRHI::vkCreateShaderModule(LogicalDevice->GetHandle(), &createInfo, VulkanRHI::VULKAN_CPU_ALLOCATOR, &shaderModule));
 	return shaderModule;
 }
 
 void FVulkanRHI::DestroyVulkanShaderModule(VkShaderModule ShaderModule)
 {
 	HLVM_ASSERT(ShaderModule != VK_NULL_HANDLE);
-	VulkanRHI::vkDestroyShaderModule(VulkanDevice, ShaderModule, VulkanRHI::VULKAN_CPU_ALLOCATOR);
+	VulkanRHI::vkDestroyShaderModule(LogicalDevice->GetHandle(), ShaderModule, VulkanRHI::VULKAN_CPU_ALLOCATOR);
 }
 
 // Vulkan-specific command list management
@@ -961,7 +974,7 @@ VkCommandBuffer FVulkanRHI::BeginVulkanCommandBuffer()
 	AllocInfo.commandBufferCount = 1;
 
 	VkCommandBuffer CommandBuffer;
-	VkResult		Result = VulkanRHI::vkAllocateCommandBuffers(VulkanDevice, &AllocInfo, &CommandBuffer);
+	VkResult		Result = VulkanRHI::vkAllocateCommandBuffers(LogicalDevice->GetHandle(), &AllocInfo, &CommandBuffer);
 	HLVM_ENSURE(Result == VK_SUCCESS);
 
 	VkCommandBufferBeginInfo BeginInfo = {};
@@ -996,7 +1009,7 @@ void FVulkanRHI::SubmitVulkanCommandsAndFlushGPU()
 
 void FVulkanRHI::FlushVulkanResources()
 {
-	VulkanRHI::vkDeviceWaitIdle(VulkanDevice);
+	VulkanRHI::vkDeviceWaitIdle(LogicalDevice->GetHandle());
 }
 
 // Vulkan-specific viewport and swap chain management
@@ -1018,16 +1031,26 @@ void FVulkanRHI::PresentVulkanSwapChain(FRHIViewportRef& Viewport)
 // Vulkan-specific render pass management
 void FVulkanRHI::BeginVulkanRenderPass(const FRHIRenderPassInfo& RenderPassInfo)
 {
-	HLVM_ASSERT(ActiveRenderPass == nullptr);
+	HLVM_ASSERT(CurrentRenderPass == nullptr);
 	// TODO Implement RenderPassAdditionalInfo based on renderpass info
-	ActiveRenderPass = new FVulkanRenderPass(LogicalDevice, { RenderPassInfo, FVulkanRenderTargetLayout::RenderPassAdditionalInfo{} });
+	FVulkanRenderTargetLayout RTLayout{ RenderPassInfo, FVulkanRenderTargetLayout::RenderPassAdditionalInfo{} };
+	CurrentRenderPass = new FVulkanRenderPass(RTLayout);
+
+	// TODO framebuffer
+	FRHIRenderTargetsInfo RTInfo;
+	RenderPassInfo.ConvertToRenderTargetsInfo(RTInfo);
+	CurrentFrameBuffer = new FVulkanFrameBuffer(RTInfo, RTLayout, CurrentRenderPass);
+
+	// TODO begin render pass
+	// TODO : vulkan command buffer
 }
 
 void FVulkanRHI::EndVulkanRenderPass()
 {
-	HLVM_ASSERT(ActiveRenderPass != nullptr);
-	PendingDestroyRenderPass.Add(ActiveRenderPass);
-	ActiveRenderPass = nullptr;
+	HLVM_ASSERT(CurrentRenderPass != nullptr);
+	CurrentRenderPass = nullptr;
+	CurrentFrameBuffer->Destroy(); // Should not call destory here, because it will be destroyed when render pass ends
+	CurrentFrameBuffer = nullptr;
 }
 
 // Vulkan-specific query and timestamp management
@@ -1039,7 +1062,7 @@ VkQueryPool FVulkanRHI::CreateVulkanQueryPool(ERHIQueryType QueryType)
 	PoolInfo.queryCount = 1;
 
 	VkQueryPool QueryPool;
-	VkResult	Result = VulkanRHI::vkCreateQueryPool(VulkanDevice, &PoolInfo, nullptr, &QueryPool);
+	VkResult	Result = VulkanRHI::vkCreateQueryPool(LogicalDevice->GetHandle(), &PoolInfo, nullptr, &QueryPool);
 	HLVM_ENSURE(Result == VK_SUCCESS);
 
 	return QueryPool;
@@ -1057,7 +1080,7 @@ void FVulkanRHI::EndVulkanQuery(VkQueryPool QueryPool, TUINT32 QueryIndex)
 
 void FVulkanRHI::GetVulkanQueryResults(VkQueryPool QueryPool, TUINT32 QueryIndex, TUINT64& OutResult, bool bWait)
 {
-	VkResult Result = VulkanRHI::vkGetQueryPoolResults(VulkanDevice, QueryPool, QueryIndex, 1, sizeof(OutResult), &OutResult, sizeof(OutResult), bWait ? VK_QUERY_RESULT_WAIT_BIT : 0);
+	VkResult Result = VulkanRHI::vkGetQueryPoolResults(LogicalDevice->GetHandle(), QueryPool, QueryIndex, 1, sizeof(OutResult), &OutResult, sizeof(OutResult), bWait ? VK_QUERY_RESULT_WAIT_BIT : 0);
 	HLVM_ENSURE(Result == VK_SUCCESS);
 }
 
@@ -1299,7 +1322,7 @@ VkQueryPoolCreateInfo FVulkanRHI::GenerateVkQueryPoolCreateInfo(const FRHIQueryC
 void FVulkanRHI::SetVulkanMinimalContext(void* InContext) const
 {
 	FVulkanMinimalContext* MinimalContext = S_C(FVulkanMinimalContext*, InContext);
-	*MinimalContext = FVulkanMinimalContext(VulkanInstance, PhysicalDevice, LogicalDevice);
+	*MinimalContext = FVulkanMinimalContext(Instance, PhysicalDevice, LogicalDevice);
 }
 
 #pragma clang diagnostic pop

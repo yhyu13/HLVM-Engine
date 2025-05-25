@@ -1,5 +1,5 @@
 /**
-* Copyright (c) 2025. MIT License. All rights reserved.
+ * Copyright (c) 2025. MIT License. All rights reserved.
  */
 
 #pragma once
@@ -22,13 +22,15 @@ using FIntVec3 = glm::ivec3;
 using FUIntVec3 = glm::uvec3;
 
 // Define a mathematical structure using GLM types
-struct FTransform {
+struct FTransform
+{
 	FVec3 position;
 	FVec3 scale;
 	FVec3 rotation; // Euler angles in radians
 
 	// Method to get the transformation matrix
-	FMat4 getTransformationMatrix() const {
+	FMat4 getTransformationMatrix() const
+	{
 		// Start with an identity matrix
 		FMat4 transform = FMat4(1.0f);
 
@@ -47,27 +49,56 @@ struct FTransform {
 	}
 };
 
-class FMath {
+class FMath
+{
 public:
 	template <typename T>
-	static T Max(T a, T b) {
+	static T Max(T a, T b)
+	{
 		return a > b ? a : b;
 	}
 
+	template <typename T, typename U, typename V>
+	static T Max(U a, V b)
+	{
+		return S_C(T, a) > S_C(T, b) ? S_C(T, a) : S_C(T, b);
+	}
+
 	template <typename T>
-	static T Min(T a, T b) {
+	static T Min(T a, T b)
+	{
 		return a < b ? a : b;
+	}
+
+	template <typename T, typename U, typename V>
+	static T Min(U a, V b)
+	{
+		return S_C(T, a) < S_C(T, b) ? S_C(T, a) : S_C(T, b);
 	}
 
 	// Clamp
 	template <typename T>
-	static T Clamp(T value, T min, T max) {
+	static T Clamp(T value, T min, T max)
+	{
+		return FMath::Max(FMath::Min(value, max), min);
+	}
+
+	template <typename T, typename U, typename V>
+	static T Clamp(T value, U min, V max)
+	{
 		return FMath::Max(FMath::Min(value, max), min);
 	}
 
 	// Lerp
 	template <typename T>
-	static T Lerp(T a, T b, float t) {
+	static T Lerp(T a, T b, float t)
+	{
 		return a + (b - a) * t;
+	}
+
+	template <typename T, typename U, typename V>
+	static T Lerp(U a, V b, float t)
+	{
+		return S_C(T, a) + (S_C(T, b) - S_C(T, a)) * t;
 	}
 };

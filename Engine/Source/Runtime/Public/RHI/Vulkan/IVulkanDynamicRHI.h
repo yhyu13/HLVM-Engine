@@ -7,14 +7,12 @@
 #include "RHI/DynamicRHI.h"
 #include "VulkanLoader.h"
 
-class FVulkanBackBuffer;
-
 class IVulkanDynamicRHI : public FDynamicRHI
 {
 public:
 	HLVM_STATIC_FUNC IVulkanDynamicRHI* Get()
 	{
-		return GetDynamicRHI<IVulkanDynamicRHI>();
+		return RHI::GetDynamicRHI<IVulkanDynamicRHI>();
 	}
 
 	// RHI Interface Type

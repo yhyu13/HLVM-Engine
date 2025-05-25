@@ -8,20 +8,33 @@
 
 namespace VulkanRHI
 {
-	HLVM_EXTERN_FUNC VkAttachmentLoadOp VulkanAttachmentLoadOpFromRHIAction(ERenderTargetLoadAction RHIState);
+	HLVM_EXTERN_VAR TStaticVector<VkFormat, EPixelFormat_NUM> GVulkanSRGBTextureFormat;
+
+	HLVM_EXTERN_FUNC VkAttachmentLoadOp	 VulkanAttachmentLoadOpFromRHIAction(ERenderTargetLoadAction RHIState);
 	HLVM_EXTERN_FUNC VkAttachmentStoreOp VulkanAttachmentStoreOpFromRHIAction(ERenderTargetStoreAction RHIState);
 
 	// Helper function to convert RHI pixel format to Vulkan format
-	HLVM_EXTERN_FUNC VkFormat VulkanFormatFromRHIFormat(EPixelFormat RHIFormat, bool bSRGB = false);
+	HLVM_EXTERN_FUNC VkFormat VulkanFormatFromRHIFormat(EPixelFormat RHIFormat, bool bSRGBFlag = false);
+	HLVM_EXTERN_FUNC VkFormat VulkanFormatTryRemoveSRGB(VkFormat VKFormat);
+
+	// Helper function to convert RHI texture dimension to Vulkan image type
+	HLVM_EXTERN_FUNC VkImageViewType VulkanImageViewTypeFromRHIDimension(ETextureDimension RHIDimension);
+
+	// Helper function to convert RHI texture format to Vulkan format
+	HLVM_EXTERN_FUNC VkComponentMapping VulkanFormatComponentMappingFromRHIFormat(EPixelFormat RHIFormat);
+
 	// Helper function to convert Vulkan format to RHI format
-	HLVM_EXTERN_FUNC EPixelFormat RHIFormatFromVulkanFormat(VkFormat VulkanFormat);
 	HLVM_EXTERN_FUNC EPixelFormat RHIFormatFromVulkanFormat(VkFormat VulkanFormat, bool& bSRGB_Out);
+	HLVM_EXTERN_FUNC EPixelFormat RHIFormatFromVulkanFormatNoSRGB(VkFormat VulkanFormat);
 
 	// Helper function to convert RHI Vertex element to vk format
 	HLVM_EXTERN_FUNC VkFormat RHIVertexElementTypeToVulkanFormat(EVertexElementType Type);
 
 	// Helper function to convert RHI texture usage flags to Vulkan usage flags
 	HLVM_EXTERN_FUNC VkImageUsageFlags VulkanTextureUsageFlagsFromRHIUsageFlags(ETextureCreateFlags RHIFlags);
+
+	// Helper function to get aspect mask from RHI format
+	HLVM_EXTERN_FUNC VkImageAspectFlags GetAspectMaskFromRHIFormat(EPixelFormat Format, bool bIncludeDepth, bool bIncludeStencil);
 
 	// Helper function to convert RHI buffer usage flags to Vulkan usage flags
 	HLVM_EXTERN_FUNC VkBufferUsageFlags VulkanBufferUsageFlagsFromRHIUsageFlags(EBufferUsageFlags RHIFlags);
@@ -53,4 +66,4 @@ namespace VulkanRHI
 	HLVM_EXTERN_FUNC VkImageLayout VulkanGetMergedDepthStencilLayout(VkImageLayout DepthLayout, VkImageLayout StencilLayout);
 
 	HLVM_EXTERN_FUNC bool VulkanFormatHasStencil(VkFormat Format);
-} // namespace VulkanMisc
+} // namespace VulkanRHI

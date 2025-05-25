@@ -251,7 +251,7 @@ void FVulkanGraphicsPSO::GeneratePSOMetadata(const FGraphicsPSOCreateInfo& PSOIn
 		}
 	}
 
-	DescOut.ColorAttachmentStates.AddUninitialized(NumRenderTargets);
+	DescOut.ColorAttachmentStates.AddDefaulted(NumRenderTargets);
 	for (TUINT32 Index = 0; Index < DescOut.ColorAttachmentStates.Num(); ++Index)
 	{
 		DescOut.ColorAttachmentStates[Index].ReadFrom(BlendState->BlendStates[Index]);
@@ -259,13 +259,13 @@ void FVulkanGraphicsPSO::GeneratePSOMetadata(const FGraphicsPSOCreateInfo& PSOIn
 
 	{
 		const VkPipelineVertexInputStateCreateInfo& VBInfo = VertexInputState.GetInfo();
-		DescOut.VertexBindings.AddUninitialized(VBInfo.vertexBindingDescriptionCount);
+		DescOut.VertexBindings.AddDefaulted(VBInfo.vertexBindingDescriptionCount);
 		for (TUINT32 Index = 0; Index < VBInfo.vertexBindingDescriptionCount; ++Index)
 		{
 			DescOut.VertexBindings[Index].ReadFrom(VBInfo.pVertexBindingDescriptions[Index]);
 		}
 
-		DescOut.VertexAttributes.AddUninitialized(VBInfo.vertexAttributeDescriptionCount);
+		DescOut.VertexAttributes.AddDefaulted(VBInfo.vertexAttributeDescriptionCount);
 		for (TUINT32 Index = 0; Index < VBInfo.vertexAttributeDescriptionCount; ++Index)
 		{
 			DescOut.VertexAttributes[Index].ReadFrom(VBInfo.pVertexAttributeDescriptions[Index]);
