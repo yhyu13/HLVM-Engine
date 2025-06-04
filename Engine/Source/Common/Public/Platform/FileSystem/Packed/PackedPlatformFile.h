@@ -39,5 +39,5 @@ private:
 	FAtomicFlagNC						   mPackedEntryQuickFindMapLock;
 
 	TVector<std::unique_ptr<FPackedFileHandle>> mMountedPackedFileHandles{};
-	FRWRivalLock								mMountedPackedFileHandlesLock;
+	FRWLock								mMountedPackedFileHandlesLock;
 };

@@ -71,8 +71,8 @@ struct FVulkanShaderHeader
 	TUINT32 RayTracingPayloadType = 0;
 	TUINT32 RayTracingPayloadSize = 0;
 
-	FSHA1Digest SourceHash;
-	TUINT32		SpirvCRC = 0;
+	FVulkanHash SourceCodeHash;
+	FVulkanHash SpirvCodeHash;
 	TUINT8		WaveSize = 0;
 
 	// For RayHitGroup shaders

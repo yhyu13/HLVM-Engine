@@ -7,29 +7,29 @@
 #include "ParallelDefinition.h"
 #include "Platform/GenericPlatformAtomicPointer.h"
 
-#ifndef HLVM_ATOMIC_LOCK_ENABLE_PADDING
-	#define HLVM_ATOMIC_LOCK_ENABLE_PADDING 1
+#ifndef _HLVM_ATOMIC_LOCK_ENABLE_PADDING
+	#define _HLVM_ATOMIC_LOCK_ENABLE_PADDING 1
 #endif
 
-#if HLVM_ATOMIC_LOCK_ENABLE_PADDING
+#if _HLVM_ATOMIC_LOCK_ENABLE_PADDING
 	#pragma clang diagnostic push
 	#pragma clang diagnostic ignored "-Wunused-private-field"
 #endif
 
 #if !HLVM_BUILD_RELEASE
-	#define HLVM_DEADLOCK_TIMER 1 // Debug break on potential dead lock
+	#define _HLVM_DEADLOCK_TIMER 1 // Debug break on potential dead lock
 #else
-	#define HLVM_DEADLOCK_TIMER 0
+	#define _HLVM_DEADLOCK_TIMER 0
 #endif // !HLVM_BUILD_RELEASE
 
-#define HLVM_LOCK_METHOD_NOEXCEPT noexcept(!HLVM_DEADLOCK_TIMER)
+#define _HLVM_LOCK_NOEXCEPT noexcept(!_HLVM_DEADLOCK_TIMER)
 
 class FAtomicLockGuard
 {
 public:
 	NOCOPYMOVE(FAtomicLockGuard)
 	FAtomicLockGuard() = delete;
-	explicit FAtomicLockGuard(std::atomic_flag& flag) HLVM_LOCK_METHOD_NOEXCEPT;
+	explicit FAtomicLockGuard(std::atomic_flag& flag) _HLVM_LOCK_NOEXCEPT;
 	~FAtomicLockGuard() noexcept;
 
 private:
@@ -64,11 +64,11 @@ class TAtomicLockGuard
 public:
 	NOCOPYMOVE(TAtomicLockGuard)
 	TAtomicLockGuard() = delete;
-	explicit TAtomicLockGuard(T& Flag) HLVM_LOCK_METHOD_NOEXCEPT : mLock(&Flag)
+	explicit TAtomicLockGuard(T& Flag) _HLVM_LOCK_NOEXCEPT : mLock(&Flag)
 	{
 		mLock->Lock();
 	}
-	explicit TAtomicLockGuard(std::optional<T>& Flag) HLVM_LOCK_METHOD_NOEXCEPT : mLock(Flag.has_value() ? &Flag.value() : nullptr)
+	explicit TAtomicLockGuard(std::optional<T>& Flag) _HLVM_LOCK_NOEXCEPT : mLock(Flag.has_value() ? &Flag.value() : nullptr)
 	{
 		if (mLock)
 		{
@@ -95,7 +95,7 @@ private:
 
 namespace hlvm_private
 {
-	HLVM_EXTERN_FUNC void LockAtomic(std::atomic_flag* flag) HLVM_LOCK_METHOD_NOEXCEPT;
+	HLVM_EXTERN_FUNC void LockAtomic(std::atomic_flag* flag) _HLVM_LOCK_NOEXCEPT;
 	HLVM_EXTERN_FUNC void UnlockAtomic(std::atomic_flag* flag) noexcept;
 } // namespace hlvm_private
 
@@ -112,7 +112,7 @@ public:
 	FAtomicLockGuard TOKENPASTE2LINE(__lock_guard_s_)(sc_flag); \
 	HLVM_ATOMIC_THREAD_FENCE()
 
-	static void LockS() HLVM_LOCK_METHOD_NOEXCEPT
+	static void LockS() _HLVM_LOCK_NOEXCEPT
 	{
 		hlvm_private::LockAtomic(&sc_flag);
 	}
@@ -144,7 +144,7 @@ public:
 	FAtomicLockGuard TOKENPASTE2LINE(__lock_guard_ni_)(ni_flag); \
 	HLVM_ATOMIC_THREAD_FENCE()
 
-	static void LockNI() HLVM_LOCK_METHOD_NOEXCEPT
+	static void LockNI() _HLVM_LOCK_NOEXCEPT
 	{
 		hlvm_private::LockAtomic(&ni_flag);
 	}
@@ -177,7 +177,7 @@ public:
 
 	FAtomicFlagNC() = default;
 
-	void Lock() const HLVM_LOCK_METHOD_NOEXCEPT;
+	void Lock() const _HLVM_LOCK_NOEXCEPT;
 	void Unlock() const noexcept;
 
 	std::atomic_flag& GetAtomicFlagNC() noexcept
@@ -189,7 +189,7 @@ protected:
 	mutable std::atomic_flag nc_flag{ 0 };
 
 private:
-#if HLVM_ATOMIC_LOCK_ENABLE_PADDING
+#if _HLVM_ATOMIC_LOCK_ENABLE_PADDING
 	PADDING(HLVM_CACHE_LINE_SIZE - sizeof(std::atomic_flag));
 #endif
 };
@@ -232,7 +232,7 @@ public:
 		return *this;
 	}
 
-	void Lock() const HLVM_LOCK_METHOD_NOEXCEPT;
+	void Lock() const _HLVM_LOCK_NOEXCEPT;
 	void Unlock() const noexcept;
 
 	std::atomic_flag& GetAtomicFlag() noexcept
@@ -244,7 +244,7 @@ protected:
 	mutable std::atomic_flag mFlag{ 0 };
 
 private:
-#if HLVM_ATOMIC_LOCK_ENABLE_PADDING
+#if _HLVM_ATOMIC_LOCK_ENABLE_PADDING
 	PADDING(HLVM_CACHE_LINE_SIZE - sizeof(std::atomic_flag));
 #endif
 };
@@ -286,7 +286,7 @@ public:
 		return *this;
 	}
 
-	void Lock() const HLVM_LOCK_METHOD_NOEXCEPT;
+	void Lock() const _HLVM_LOCK_NOEXCEPT;
 	void Unlock() const noexcept;
 
 protected:
@@ -295,14 +295,16 @@ protected:
 	mutable std::atomic_uint_fast32_t mCount = 0;
 
 private:
-#if HLVM_ATOMIC_LOCK_ENABLE_PADDING
+#if _HLVM_ATOMIC_LOCK_ENABLE_PADDING
 	PADDING(HLVM_CACHE_LINE_SIZE - sizeof(std::atomic_flag) - sizeof(std::thread::id) - sizeof(std::atomic_uint_fast32_t));
 #endif
 };
 
 /**
  * Define 2 rival groups, threads from only one rival group could enter the critical section
- *  This is useful for the parallelism of excluding reader-writer from each other.
+ * This is useful for the parallelism of excluding reader-writer from each other but accesses within each group are shared.
+ * For example, ECS system read and write to the same underlying components array requires exclusive read or write.
+ * But read or write can be parallel within each domain.
  */
 class FRWRivalLock
 {
@@ -317,7 +319,7 @@ public:
 	NOCOPYMOVE(FRWRivalLock)
 	FRWRivalLock() = default;
 
-	void LockRV(int group) const HLVM_LOCK_METHOD_NOEXCEPT;
+	void LockRV(FRWRivalLock::Group group) const _HLVM_LOCK_NOEXCEPT;
 	void UnlockRV() const noexcept;
 
 private:
@@ -327,13 +329,13 @@ private:
 };
 
 // Conditionally apply rival lock. If not enabled, rival lock would not take actual effect.
-template <typename RivalGroupType>
+template <typename TRival>
 struct RivialLockGuardCond
 {
 	NOCOPYMOVE(RivialLockGuardCond)
 	RivialLockGuardCond() = delete;
 
-	explicit RivialLockGuardCond(RivalGroupType& flag, int group, bool enabled = true)
+	explicit RivialLockGuardCond(TRival& flag, TRival::Group group, bool enabled = true)
 		: mLock(&flag), mEnabled(enabled)
 	{
 		if (mEnabled)
@@ -351,15 +353,46 @@ struct RivialLockGuardCond
 	}
 
 private:
-	RivalGroupType* mLock;
+	TRival* mLock;
 	BIT_FLAG(mEnabled);
 };
 
-#define LOCK_GUARD_RIVAL(lock, group, ...)                                                              \
-	RivialLockGuardCond<FRWRivalLock> TOKENPASTE2LINE(__lock_guard_rival_)(lock, group, ##__VA_ARGS__); \
+#define LOCK_GUARD_RWRival(lock, group, ...)                                                              \
+	RivialLockGuardCond<FRWRivalLock> TOKENPASTE2LINE(__lock_guard_rwrival_)(lock, group, ##__VA_ARGS__); \
 	HLVM_ATOMIC_THREAD_FENCE()
 
-#if HLVM_ATOMIC_LOCK_ENABLE_PADDING
+/**
+ * Similar to FRWRivalLock, but it is not a rival lock, all readers could enter the critical section,
+ * but writer is exclusive to only one thread. For example, reading a global struct can be parallel
+ * but updating the same global struct is exclusive.
+ */
+class FRWLock
+{
+public:
+	enum Group
+	{
+		Read = 0,
+		Write = 1,
+		NUM_GROUPS = 2
+	};
+
+	NOCOPYMOVE(FRWLock)
+	FRWLock() = default;
+
+	void LockRV(FRWLock::Group group) const _HLVM_LOCK_NOEXCEPT;
+	void UnlockRV() const noexcept;
+
+private:
+	HLVM_CACHE_ALIGN mutable TAtomicPointer<Group*> mCurrentGroupPtr{ nullptr };
+	Group											mGroups[NUM_GROUPS]{ Read, Write };
+	mutable std::atomic_uint_fast32_t				mProgramCounter{ 0 };
+};
+
+#define LOCK_GUARD_RW(lock, group, ...)                                                         \
+	RivialLockGuardCond<FRWLock> TOKENPASTE2LINE(__lock_guard_rw_)(lock, group, ##__VA_ARGS__); \
+	HLVM_ATOMIC_THREAD_FENCE()
+
+#if _HLVM_ATOMIC_LOCK_ENABLE_PADDING
 	#pragma clang diagnostic pop
 #endif
-#undef HLVM_ATOMIC_LOCK_ENABLE_PADDING
+#undef _HLVM_ATOMIC_LOCK_ENABLE_PADDING

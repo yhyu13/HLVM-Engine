@@ -8,8 +8,6 @@
 
 namespace VulkanRHI
 {
-	HLVM_EXTERN_VAR TStaticVector<VkFormat, EPixelFormat_NUM> GVulkanSRGBTextureFormat;
-
 	HLVM_EXTERN_FUNC VkAttachmentLoadOp	 VulkanAttachmentLoadOpFromRHIAction(ERenderTargetLoadAction RHIState);
 	HLVM_EXTERN_FUNC VkAttachmentStoreOp VulkanAttachmentStoreOpFromRHIAction(ERenderTargetStoreAction RHIState);
 
@@ -67,3 +65,28 @@ namespace VulkanRHI
 
 	HLVM_EXTERN_FUNC bool VulkanFormatHasStencil(VkFormat Format);
 } // namespace VulkanRHI
+
+template< typename THash>
+struct TVulkanHash
+{
+	using TDigest = THash::Digest;
+	// Use either md5 or sha1
+	TDigest Hash;
+
+	void Update(const void* Data, TSIZE Size)
+	{
+		Hash = THash::Hash(Data, Size, &Hash);
+	}
+
+	void Reset()
+	{
+		Hash = TDigest();
+	}
+
+	bool Valid() const
+	{
+		return Hash.Valid();
+	}
+};
+
+using FVulkanHash = TVulkanHash<FMD5>;

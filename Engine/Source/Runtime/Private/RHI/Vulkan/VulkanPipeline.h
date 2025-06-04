@@ -29,7 +29,7 @@ public:
 
 	void Generate(FVulkanVertexDeclarationRef VertexDeclaration, TUINT32 VertexHeaderInOutAttributeMask);
 
-	const FMD5Digest& GetHash() const
+	const FVulkanHash& GetHash() const
 	{
 		HLVM_ASSERT(Info.sType == VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO);
 		return Hash;
@@ -43,7 +43,7 @@ public:
 	bool operator==(const FVulkanVertexInputStateInfo& Other);
 
 private:
-	FMD5Digest							 Hash;
+	FVulkanHash							 Hash;
 	VkPipelineVertexInputStateCreateInfo Info;
 
 	TMapSmall<TUINT32, TUINT32> BindingToStream;
@@ -76,7 +76,7 @@ struct FVulkanGraphicsPSODescription
 {
 	struct PSOKey
 	{
-		FMD5Digest Hash;
+		FVulkanHash Hash;
 	};
 
 	PSOKey GeneratePSOKey() const;

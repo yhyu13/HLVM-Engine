@@ -216,7 +216,7 @@ class CommonModule(BaseModule):
         self.target_interface.add_compile_options(domain=DomainEnum.PUBLIC, values=[
             '$<$<COMPILE_LANGUAGE:C>: -Wall -Wextra -pedantic -Werror>',
             '$<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra -pedantic -Werror -Wunused-variable -Wconversion -Weverything>',
-            '$<$<COMPILE_LANGUAGE:CXX>:-Wno-padded -Wno-gnu-zero-variadic-macro-arguments -Wno-reserved-identifier -Wno-exit-time-destructors -Wno-global-constructors -Wno-c++98-compat-pedantic -Wno-float-equal -Wno-covered-switch-default>',
+            '$<$<COMPILE_LANGUAGE:CXX>:-Wno-padded -Wno-gnu-zero-variadic-macro-arguments -Wno-reserved-identifier -Wno-exit-time-destructors -Wno-global-constructors -Wno-c++98-compat-pedantic -Wno-float-equal -Wno-covered-switch-default -Wno-c++20-compat>',
             '$<$<COMPILE_LANGUAGE:CXX>:-Wno-error=global-constructors -Wno-error=exit-time-destructors -Wno-error=unsafe-buffer-usage -Wno-error=unused-function -Wno-error=unused-but-set-variable -Wno-error=unused-variable -Wno-error=unused-member-function>'
         ])
 

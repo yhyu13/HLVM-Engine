@@ -24,7 +24,7 @@ FVulkanGraphicsPSODescription::PSOKey FVulkanGraphicsPSODescription::GeneratePSO
 	// TODO : we should implement UE5 memory writer archive system that fully serailize each element
 	// after that, generate the struct hash
 	PSOKey Key;
-	Key.Hash = FMD5Hash::Hash(this, sizeof(FVulkanGraphicsPSODescription));
+	Key.Hash.Update(this, sizeof(FVulkanGraphicsPSODescription));
 	return Key;
 }
 
@@ -134,8 +134,9 @@ void FVulkanVertexInputStateInfo::Generate(FVulkanVertexDeclarationRef VertexDec
 	Info.vertexAttributeDescriptionCount = AttributesNum;
 	Info.pVertexAttributeDescriptions = Attributes;
 
-	Hash = FMD5Hash::Hash(Bindings, BindingsNum * sizeof(Bindings[0]));
-	Hash = FMD5Hash::Hash(Attributes, AttributesNum * sizeof(Attributes[0]), &Hash);
+	Hash.Reset();
+	Hash.Update(Bindings, BindingsNum * sizeof(Bindings[0]));
+	Hash.Update(Attributes, AttributesNum * sizeof(Attributes[0]));
 }
 
 FVulkanVertexInputStateInfo::FVulkanVertexInputStateInfo()

@@ -8,7 +8,7 @@
 
 #include <emmintrin.h>
 
-#if HLVM_DEADLOCK_TIMER
+#if _HLVM_DEADLOCK_TIMER
 	#define INIT_DEADLOCK_TIMER() FTimer _timer
 	#define ASSERT_DEADLOCK_TIMER() HLVM_ENSURE_F(_timer.Mark() < 10., TXT("Dead lock after 10s"))
 #else
@@ -93,7 +93,7 @@ HLVM_STATIC_VAR constexpr std::chrono::microseconds us0{ 0 };
 
 namespace hlvm_private
 {
-	void LockAtomic(std::atomic_flag* flag) HLVM_LOCK_METHOD_NOEXCEPT // extern
+	void LockAtomic(std::atomic_flag* flag) _HLVM_LOCK_NOEXCEPT // extern
 	{
 		LOCK_BODY(flag);
 	}
@@ -104,7 +104,7 @@ namespace hlvm_private
 	}
 } // namespace hlvm_private
 
-FAtomicLockGuard::FAtomicLockGuard(std::atomic_flag& flag) HLVM_LOCK_METHOD_NOEXCEPT : mLock(&flag)
+FAtomicLockGuard::FAtomicLockGuard(std::atomic_flag& flag) _HLVM_LOCK_NOEXCEPT : mLock(&flag)
 {
 	hlvm_private::LockAtomic(mLock);
 }
@@ -114,7 +114,7 @@ FAtomicLockGuard::~FAtomicLockGuard() noexcept
 	hlvm_private::UnlockAtomic(mLock);
 }
 
-void FAtomicFlagNC::Lock() const HLVM_LOCK_METHOD_NOEXCEPT
+void FAtomicFlagNC::Lock() const _HLVM_LOCK_NOEXCEPT
 {
 	hlvm_private::LockAtomic(&nc_flag);
 }
@@ -124,7 +124,7 @@ void FAtomicFlagNC::Unlock() const noexcept
 	hlvm_private::UnlockAtomic(&nc_flag);
 }
 
-void FAtomicFlag::Lock() const HLVM_LOCK_METHOD_NOEXCEPT
+void FAtomicFlag::Lock() const _HLVM_LOCK_NOEXCEPT
 {
 	hlvm_private::LockAtomic(&mFlag);
 }
@@ -134,7 +134,7 @@ void FAtomicFlag::Unlock() const noexcept
 	hlvm_private::UnlockAtomic(&mFlag);
 }
 
-void FRecursiveAtomicFlag::Lock() const HLVM_LOCK_METHOD_NOEXCEPT
+void FRecursiveAtomicFlag::Lock() const _HLVM_LOCK_NOEXCEPT
 {
 	// Test if the same thread already is held
 	if (mOwnerTid == GCurrentTID64)
@@ -164,7 +164,7 @@ void FRecursiveAtomicFlag::Unlock() const noexcept
 	hlvm_private::UnlockAtomic(&mFlag);
 }
 
-void FRWRivalLock::LockRV(int group) const HLVM_LOCK_METHOD_NOEXCEPT
+void FRWRivalLock::LockRV(FRWRivalLock::Group group) const _HLVM_LOCK_NOEXCEPT
 {
 	Group* desiredGroupPtr = C_C(Group*, &mGroups[group]);
 
@@ -176,9 +176,9 @@ void FRWRivalLock::LockRV(int group) const HLVM_LOCK_METHOD_NOEXCEPT
 		{
 			return;
 		}
-		// But if UnLock happens after 'if (mCurrentGroupPtr == groupPtr)' and before above fetch_add statement,
-		// There is a chance that fetch_add returns 0, which allow other rival group to compete for lock, so we need to compete for the lock as
-		// And Before competing for the lock, we need to reset mProgramCounter by subtracting 1
+		// If a UnLock happens after 'if (mCurrentGroupPtr == groupPtr)' and between the above fetch_add statement,
+		// there is a chance the above fetch_add returns 0, which falsely make the same group to compete for the lock,
+		// But Before competing for the lock, we need to reset mProgramCounter by subtracting 1
 		mProgramCounter.fetch_sub(1, std::memory_order_relaxed);
 	}
 
@@ -216,6 +216,67 @@ void FRWRivalLock::LockRV(int group) const HLVM_LOCK_METHOD_NOEXCEPT
 }
 
 void FRWRivalLock::UnlockRV() const noexcept
+{
+	// If mProgramCounter == 0, it means that the lock is not held by any rival group, so we can reset mCurrentGroupPtr to nullptr
+	if (mProgramCounter.fetch_sub(1, std::memory_order_relaxed) == 1)
+	{
+		mCurrentGroupPtr = nullptr;
+	}
+}
+
+void FRWLock::LockRV(FRWLock::Group group) const _HLVM_LOCK_NOEXCEPT
+{
+	Group* desiredGroupPtr = C_C(Group*, &mGroups[group]);
+
+	// Test if the same group already is held
+	if (mCurrentGroupPtr == desiredGroupPtr)
+	{
+		// If already held by the same rival group, try to add to program counter
+		// Similar to FRWRivalLock::LockRV but only read is shared and write is exclusive
+		if (mProgramCounter.fetch_add(1, std::memory_order_relaxed) > 0 && group != FRWLock::Group::Write)
+		{
+			return;
+		}
+		// If a UnLock happens after 'if (mCurrentGroupPtr == groupPtr)' and between the above fetch_add statement,
+		// there is a chance the above fetch_add returns 0, which falsely make the same group to compete for the lock,
+		// But Before competing for the lock, we need to reset mProgramCounter by subtracting 1
+		mProgramCounter.fetch_sub(1, std::memory_order_relaxed);
+	}
+
+	// Try to compete for the lock
+	INIT_DEADLOCK_TIMER();
+	Group* _expected = nullptr;
+	while (!FGenericPlatformAtomicPointer::AtomicCompareExchange(&mCurrentGroupPtr, &_expected, desiredGroupPtr))
+	{
+		uint_fast8_t spin_count = PAUSE_SPIN_COUNT;
+		do
+		{
+			THREAD_PAUSE();
+		}
+		while (!FGenericPlatformAtomicPointer::AtomicCompareExchange(&mCurrentGroupPtr, &_expected, desiredGroupPtr) && --spin_count);
+		if (spin_count)
+		{
+			break;
+		}
+		spin_count = SLEEP_SPIN_COUNT;
+		do
+		{
+			THREAD_SLEEP0();
+		}
+		while (!FGenericPlatformAtomicPointer::AtomicCompareExchange(&mCurrentGroupPtr, &_expected, desiredGroupPtr) && --spin_count);
+		if (spin_count > 0)
+		{
+			break;
+		}
+		ASSERT_DEADLOCK_TIMER();
+		THREAD_YIELD();
+	}
+
+	// Add to program counter
+	mProgramCounter.fetch_add(1, std::memory_order_relaxed);
+}
+
+void FRWLock::UnlockRV() const noexcept
 {
 	// If mProgramCounter == 0, it means that the lock is not held by any rival group, so we can reset mCurrentGroupPtr to nullptr
 	if (mProgramCounter.fetch_sub(1, std::memory_order_relaxed) == 1)

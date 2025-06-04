@@ -22,7 +22,7 @@ TNoNullablePtr<FPackedPlatformFile> FPackedPlatformFile::Get()
 
 bool FPackedPlatformFile::IsDirectory(const FPath&)
 {
-	//	LOCK_GUARD_RIVAL(mMountedPackedFileHandlesLock, FRWRivalLock::Group::Read);
+	//	LOCK_GUARD_RW(mMountedPackedFileHandlesLock, FRWLock::Group::Read);
 	//	Packed file does not contain directory
 	HLVM_LOG(LogPackedPlatformFile, warn, TXT("Packed file does not contain directory"));
 	return false;
@@ -30,7 +30,7 @@ bool FPackedPlatformFile::IsDirectory(const FPath&)
 
 bool FPackedPlatformFile::Exists(const FPath& path)
 {
-	LOCK_GUARD_RIVAL(mMountedPackedFileHandlesLock, FRWRivalLock::Group::Read);
+	LOCK_GUARD_RW(mMountedPackedFileHandlesLock, FRWLock::Group::Read);
 	for (auto& packed_file_handle : mMountedPackedFileHandles)
 	{
 		if (packed_file_handle->mTokenEntryFragmentMap.find(path.GetHash()) != packed_file_handle->mTokenEntryFragmentMap.end())
@@ -43,14 +43,14 @@ bool FPackedPlatformFile::Exists(const FPath& path)
 
 TSmallVector32<FPath> FPackedPlatformFile::Glob(const FPath&, const FString&, bool)
 {
-	// LOCK_GUARD_RIVAL(mMountedPackedFileHandlesLock, FRWRivalLock::Group::Read);
+	// LOCK_GUARD_RW(mMountedPackedFileHandlesLock, FRWLock::Group::Read);
 	HLVM_LOG(LogPackedPlatformFile, warn, TXT("Packed file does not support glob"));
 	return TSmallVector32<FPath>();
 }
 
 bool FPackedPlatformFile::Mount(const FPath& path)
 {
-	LOCK_GUARD_RIVAL(mMountedPackedFileHandlesLock, FRWRivalLock::Group::Write);
+	LOCK_GUARD_RW(mMountedPackedFileHandlesLock, FRWLock::Group::Write);
 	try
 	{
 		std::unique_ptr<FPackedFileHandle> packed_file_handle = std::make_unique<FPackedFileHandle>();
@@ -73,7 +73,7 @@ bool FPackedPlatformFile::Mount(const FPath& path)
 
 bool FPackedPlatformFile::Unmount(const FPath& path)
 {
-	LOCK_GUARD_RIVAL(mMountedPackedFileHandlesLock, FRWRivalLock::Group::Write);
+	LOCK_GUARD_RW(mMountedPackedFileHandlesLock, FRWLock::Group::Write);
 	try
 	{
 		if (auto iter = std::ranges::find_if(mMountedPackedFileHandles,
@@ -115,7 +115,7 @@ bool FPackedPlatformFile::Unmount(const FPath& path)
 
 FPackedEntryQuickFind FPackedPlatformFile::QuickFindPackedEntry(const FPath& path)
 {
-	LOCK_GUARD_RIVAL(mMountedPackedFileHandlesLock, FRWRivalLock::Group::Read);
+	LOCK_GUARD_RW(mMountedPackedFileHandlesLock, FRWLock::Group::Read);
 	/**
 	 * Quick search map if found
 	 */
