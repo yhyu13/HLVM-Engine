@@ -27,7 +27,7 @@ public:
 	{
 		static_assert(!std::is_pointer_v<T>, "Don't use a pointer!");
 		static_assert(std::is_array_v<T>, "Use a array but not!");
-		return FGenericPlatformMemory::Memzero(*Ptr, sizeof(*Ptr));
+		return FGenericPlatformMemory::Memzero(*Ptr, sizeof(T));
 	}
 
 	// Memcmp

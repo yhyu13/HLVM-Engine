@@ -1254,10 +1254,10 @@ RECORD_BOOL(test_GLFW3VulkanWindow)
 	IWindow::Properties Properties;
 	Properties.Resizable = false;
 	Properties.Mode = IWindow::EDisplayMode::Windowed;
-	SharedRefPtr<FGLFW3Vulkan> Window = MAKE_SHARED(FGLFW3Vulkan, Properties);
+	TSharedPtr<FGLFW3Vulkan> Window = MAKE_SHARED(FGLFW3Vulkan, Properties);
 	HLVM_LOG(LogTest, debug, TXT("FGLFW3Vulkan created!"));
 
-	UniqueRefPtr<FVulkanRHI> VulkanRHI = nullptr;
+	TUniquePtr<FVulkanRHI> VulkanRHI = nullptr;
 	// Vulkan rhi init
 	FVulkanRHIInitializer Initializer;
 	Initializer.RequiredExtensions = { Window->GetRequiredExtensions() };

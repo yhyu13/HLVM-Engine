@@ -155,8 +155,8 @@ FVulkanFrameBuffer::FVulkanFrameBuffer(const FRHIRenderTargetsInfo& InRTInfo, co
 
 	if (RTLayout.GetHasDepthStencil())
 	{
-		FVulkanTextureRef			 Texture = (InRTInfo.DepthStencilRenderTarget.Texture);
-		//const FRHITextureCreateInfo& Desc = Texture->GetCreateInfo();
+		FVulkanTextureRef Texture = (InRTInfo.DepthStencilRenderTarget.Texture);
+		// const FRHITextureCreateInfo& Desc = Texture->GetCreateInfo();
 		DepthStencilRenderTargetImage = Texture->GetImage();
 		HLVM_ENSURE(RHI::HasStencil(Texture->GetFormat()));
 
@@ -299,4 +299,101 @@ bool FVulkanFrameBuffer::Matches(const FRHIRenderTargetsInfo& InRTInfo) const
 	}
 
 	return true;
+}
+
+FVulkanRenderPassRef FVulkanRenderPassManager::GetOrCreateRenderPass(const FVulkanRenderTargetLayout& RTLayout)
+{
+	const FVulkanHash& RenderPassHash = RTLayout.GetRenderPassFullHash();
+	{
+		LOCK_GUARD_RW(RenderPassesLock, FRWLock::Group::Read);
+		FVulkanRenderPassRef* FoundRenderPass = RenderPasses.Find(RenderPassHash);
+		if (FoundRenderPass)
+		{
+			return *FoundRenderPass;
+		}
+	}
+
+	FVulkanRenderPassRef RenderPass = new FVulkanRenderPass(RTLayout);
+	{
+		LOCK_GUARD_RW(RenderPassesLock, FRWLock::Group::Write);
+		FVulkanRenderPassRef* FoundRenderPass = RenderPasses.Find(RenderPassHash);
+		if (FoundRenderPass)
+		{
+			return *FoundRenderPass;
+		}
+		else
+		{
+			RenderPasses.Add(RenderPassHash, RenderPass);
+		}
+	}
+	return RenderPass;
+}
+
+FVulkanFrameBufferRef FVulkanRenderPassManager::GetOrCreateFramebuffer(const FRHIRenderTargetsInfo& RenderTargetsInfo, const FVulkanRenderTargetLayout& RTLayout, FVulkanRenderPassRef RenderPass)
+{
+	FVulkanHash RTLayoutHash = RTLayout.GetRenderPassCompatibleHash();
+	TUINT64		MipsAndSlicesValues[RHI::MAX_RT_ATTACHMENTS];
+	for (TUINT32 Index = 0; Index < HLVM_ARRAY_SIZE(MipsAndSlicesValues); ++Index)
+	{
+		MipsAndSlicesValues[Index] = (S_C(TUINT64, RenderTargetsInfo.ColorRenderTarget[Index].ArraySliceIndex) << 32) | S_C(TUINT64, RenderTargetsInfo.ColorRenderTarget[Index].MipIndex);
+	}
+	RTLayoutHash.Update(MipsAndSlicesValues, sizeof(MipsAndSlicesValues));
+
+	auto FindFramebufferInList = [&](const TSharedPtr<FFramebufferList>& InFramebufferList) {
+		FVulkanFrameBufferRef OutFramebuffer = nullptr;
+
+		for (TUINT32 Index = 0; Index < InFramebufferList->Framebuffer.Num(); ++Index)
+		{
+			const VkRect2D RenderArea = InFramebufferList->Framebuffer[Index]->GetRenderArea();
+
+			if (InFramebufferList->Framebuffer[Index]->Matches(RenderTargetsInfo) && ((RTLayout.GetExtent2D().width == RenderArea.extent.width) && (RTLayout.GetExtent2D().height == RenderArea.extent.height) && (RTLayout.GetOffset2D().x == RenderArea.offset.x) && (RTLayout.GetOffset2D().y == RenderArea.offset.y)))
+			{
+				OutFramebuffer = InFramebufferList->Framebuffer[Index];
+				break;
+			}
+		}
+
+		return OutFramebuffer;
+	};
+
+	TSharedPtr<FFramebufferList>* FoundFramebufferList = nullptr;
+	TSharedPtr<FFramebufferList>  FramebufferList = nullptr;
+
+	{
+		LOCK_GUARD_RW(FramebuffersLock, FRWLock::Group::Read);
+		FoundFramebufferList = Framebuffers.Find(RTLayoutHash);
+		if (FoundFramebufferList)
+		{
+			FramebufferList = *FoundFramebufferList;
+
+			FVulkanFrameBufferRef ExistingFramebuffer = FindFramebufferInList(FramebufferList);
+			if (ExistingFramebuffer)
+			{
+				return ExistingFramebuffer;
+			}
+		}
+	}
+
+	FVulkanFrameBufferRef Framebuffer = new FVulkanFrameBuffer(RenderTargetsInfo, RTLayout, RenderPass);
+	{
+		LOCK_GUARD_RW(FramebuffersLock, FRWLock::Group::Write);
+		FoundFramebufferList = Framebuffers.Find(RTLayoutHash);
+		if (!FoundFramebufferList)
+		{
+			FramebufferList = MAKE_SHARED(FFramebufferList);
+			Framebuffers.Add(RTLayoutHash, FramebufferList);
+		}
+		else
+		{
+			FramebufferList = *FoundFramebufferList;
+			FVulkanFrameBufferRef ExistingFramebuffer = FindFramebufferInList(FramebufferList);
+			if (ExistingFramebuffer)
+			{
+				return ExistingFramebuffer;
+			}
+		}
+
+		FramebufferList->Framebuffer.Add(Framebuffer);
+	}
+	return Framebuffer;
 }

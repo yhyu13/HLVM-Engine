@@ -11,12 +11,11 @@ struct FVulkanRHIInitializer
 {
 	TVector<TVector<FString>>				RequiredExtensions;
 	std::function<VkSurfaceKHR(VkInstance)> CreateSurfaceFunc;
-	SharedRefPtr<IWindow>					NativeWindowHandle;
+	TSharedPtr<IWindow>						NativeWindowHandle;
 };
 
 class FVulkanRHI final : public IVulkanDynamicRHI
 {
-public:
 public:
 	HLVM_STATIC_FUNC FVulkanRHI* Get()
 	{
@@ -195,6 +194,7 @@ private:
 	FVulkanLogicalDeviceRef	 LogicalDevice;
 	FVulkanViewportRef		 VulkanViewport;
 
-	FVulkanRenderPassRef		  CurrentRenderPass;
-	FVulkanFrameBufferRef		  CurrentFrameBuffer;
+	TSharedPtr<FVulkanRenderPassManager> RenderPassManager;
+	FVulkanRenderPassRef	 CurrentRenderPass;
+	FVulkanFrameBufferRef	 CurrentFrameBuffer;
 };

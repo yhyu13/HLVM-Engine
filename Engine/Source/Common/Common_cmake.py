@@ -49,7 +49,7 @@ magic_enum = FindPackage(name='magic_enum',
 Boost = FindPackage(name='Boost',
                     config=False,
                     required=True,
-                    components=['iostreams filesystem system thread fiber date_time program_options'],
+                    components=['iostreams filesystem system thread fiber date_time program_options serialization'],
                     dependant_target_include_dirs=[
                         DomainValueModel(domain=DomainEnum.PUBLIC, values=['${Boost_INCLUDE_DIRS}'])],
                     dependant_target_link_dirs=[

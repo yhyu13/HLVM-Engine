@@ -86,7 +86,7 @@ struct FVulkanGraphicsPSODescription
 	TUINT32 Topology;
 	struct FBlendAttachment
 	{
-		bool   bBlend;
+		bool	bBlend;
 		TUINT32 ColorBlendOp;
 		TUINT32 SrcColorBlendFactor;
 		TUINT32 DstColorBlendFactor;
@@ -110,7 +110,7 @@ struct FVulkanGraphicsPSODescription
 	{
 		TUINT32 Stride;
 		TUINT32 Binding;
-		TUINT32	InputRate;
+		TUINT32 InputRate;
 
 		void ReadFrom(const VkVertexInputBindingDescription& InState);
 		void WriteInto(VkVertexInputBindingDescription& OutState) const;
@@ -143,8 +143,8 @@ struct FVulkanGraphicsPSODescription
 	{
 		TUINT32 PolygonMode;
 		TUINT32 CullMode;
-		float  DepthBiasSlopeScale;
-		float  DepthBiasConstantFactor;
+		float	DepthBiasSlopeScale;
+		float	DepthBiasConstantFactor;
 
 		void ReadFrom(const VkPipelineRasterizationStateCreateInfo& InState);
 		void WriteInto(VkPipelineRasterizationStateCreateInfo& OutState) const;
@@ -267,22 +267,37 @@ struct FVulkanGraphicsPSODescription
 		TVector<FAttachmentDesc> Descriptions;
 		FStencilAttachmentDesc	 StencilDescription;
 
-		TUINT8	  NumAttachments;
-		TUINT8	  NumColorAttachments;
-		TUINT8	  bHasDepthStencil;
-		TUINT8	  bHasResolveAttachments;
-		TUINT8	  bHasDepthStencilResolve;
-		TUINT8	  bHasFragmentDensityAttachment;
-		TUINT8	  NumUsedClearValues;
-		TUINT32	  RenderPassCompatibleHash;
-		FUIntVec3 Extent3D;
+		TUINT8		NumAttachments;
+		TUINT8		NumColorAttachments;
+		TUINT8		bHasDepthStencil;
+		TUINT8		bHasResolveAttachments;
+		TUINT8		bHasDepthStencilResolve;
+		TUINT8		bHasFragmentDensityAttachment;
+		TUINT8		NumUsedClearValues;
+		FVulkanHash RenderPassCompatibleHash;
+		FUIntVec3	Extent3D;
 
 		void ReadFrom(const FVulkanRenderTargetLayout& InState);
 		void WriteInto(FVulkanRenderTargetLayout& OutState) const;
 
 		bool operator==(const FRenderTargets& In) const
 		{
-			return ColorAttachments == In.ColorAttachments && ResolveAttachments == In.ResolveAttachments && Depth == In.Depth && Stencil == In.Stencil && FragmentDensity == In.FragmentDensity && Descriptions == In.Descriptions && StencilDescription == In.StencilDescription && NumAttachments == In.NumAttachments && NumColorAttachments == In.NumColorAttachments && bHasDepthStencil == In.bHasDepthStencil && bHasResolveAttachments == In.bHasResolveAttachments && bHasDepthStencilResolve == In.bHasDepthStencilResolve && bHasFragmentDensityAttachment == In.bHasFragmentDensityAttachment && NumUsedClearValues == In.NumUsedClearValues && RenderPassCompatibleHash == In.RenderPassCompatibleHash && Extent3D == In.Extent3D;
+			return ColorAttachments == In.ColorAttachments
+				&& ResolveAttachments == In.ResolveAttachments
+				&& Depth == In.Depth
+				&& Stencil == In.Stencil
+				&& FragmentDensity == In.FragmentDensity
+				&& Descriptions == In.Descriptions
+				&& StencilDescription == In.StencilDescription
+				&& NumAttachments == In.NumAttachments
+				&& NumColorAttachments == In.NumColorAttachments
+				&& bHasDepthStencil == In.bHasDepthStencil
+				&& bHasResolveAttachments == In.bHasResolveAttachments
+				&& bHasDepthStencilResolve == In.bHasDepthStencilResolve
+				&& bHasFragmentDensityAttachment == In.bHasFragmentDensityAttachment
+				&& NumUsedClearValues == In.NumUsedClearValues
+				&& RenderPassCompatibleHash == In.RenderPassCompatibleHash
+				&& Extent3D == In.Extent3D;
 		}
 	};
 	FRenderTargets RenderTargets;

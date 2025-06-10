@@ -853,60 +853,6 @@ namespace VulkanRHI
 	HLVM_EXTERN_FUNC VkRenderPass CreateVulkanRenderPass(FVulkanLogicalDeviceRef Device, const FVulkanRenderTargetLayout& RTLayout);
 }
 
-// TODO
-// class FVulkanRenderPassManager : public FVulkanMinimalContext
-//{
-// public:
-//	FVulkanRenderPassManager(FVulkanLogicalDeviceRef InDevice)
-//		: VulkanRHI::FDeviceChild(InDevice) {}
-//	~FVulkanRenderPassManager();
-//
-//	FVulkanFrameBuffer* GetOrCreateFramebuffer(const FRHIRenderTargetsInfo& RenderTargetsInfo, const FVulkanRenderTargetLayout& RTLayout, FVulkanRenderPass* RenderPass);
-//	FVulkanRenderPass*	GetOrCreateRenderPass(const FVulkanRenderTargetLayout& RTLayout)
-//	{
-//		const TUINT32 RenderPassHash = RTLayout.GetRenderPassFullHash();
-//
-//		{
-//			FRWScopeLock		ScopedReadLock(RenderPassesLock, SLT_ReadOnly);
-//			FVulkanRenderPass** FoundRenderPass = RenderPasses.Find(RenderPassHash);
-//			if (FoundRenderPass)
-//			{
-//				return *FoundRenderPass;
-//			}
-//		}
-//
-//		FVulkanRenderPass* RenderPass = new FVulkanRenderPass(*Device, RTLayout);
-//		{
-//			FRWScopeLock		ScopedWriteLock(RenderPassesLock, SLT_Write);
-//			FVulkanRenderPass** FoundRenderPass = RenderPasses.Find(RenderPassHash);
-//			if (FoundRenderPass)
-//			{
-//				delete RenderPass;
-//				return *FoundRenderPass;
-//			}
-//			RenderPasses.Add(RenderPassHash, RenderPass);
-//		}
-//		return RenderPass;
-//	}
-//
-//	void BeginRenderPass(FVulkanCommandListContext& Context, FVulkanLogicalDeviceRef InDevice, FVulkanCmdBuffer* CmdBuffer, const FRHIRenderPassInfo& RPInfo, const FVulkanRenderTargetLayout& RTLayout, FVulkanRenderPass* RenderPass, FVulkanFrameBuffer* Framebuffer);
-//	void EndRenderPass(FVulkanCmdBuffer* CmdBuffer);
-//
-//	FRWRivalLock RenderPassesLock;
-//	FRWRivalLock FramebuffersLock;
-//
-//	void NotifyDeletedRenderTarget(VkImage Image);
-//
-// private:
-//	TMap<TUINT32, FVulkanRenderPass*> RenderPasses;
-//
-//	struct FFramebufferList
-//	{
-//		TVector<FVulkanFrameBuffer*> Framebuffer;
-//	};
-//	TMap<TUINT32, FFramebufferList*> Framebuffers;
-//};
-
 class FVulkanFrameBuffer : public FVulkanMinimalContext, public FRefCountable
 {
 public:
@@ -982,3 +928,29 @@ private:
 	TVector<VkImageMemoryBarrier> WriteBarriers;
 };
 using FVulkanFrameBufferRef = TRefCountPtr<FVulkanFrameBuffer>;
+
+class FVulkanRenderPassManager : public FVulkanMinimalContext
+{
+public:
+	FVulkanRenderPassRef  GetOrCreateRenderPass(const FVulkanRenderTargetLayout& RTLayout);
+	FVulkanFrameBufferRef GetOrCreateFramebuffer(const FRHIRenderTargetsInfo& RenderTargetsInfo, const FVulkanRenderTargetLayout& RTLayout, FVulkanRenderPassRef RenderPass);
+
+	// TODO
+	//	void BeginRenderPass(FVulkanCommandListContext& Context, FVulkanLogicalDeviceRef InDevice, FVulkanCmdBuffer* CmdBuffer, const FRHIRenderPassInfo& RPInfo, const FVulkanRenderTargetLayout& RTLayout, FVulkanRenderPass* RenderPass, FVulkanFrameBuffer* Framebuffer);
+	//	void EndRenderPass(FVulkanCmdBuffer* CmdBuffer);
+
+	// TODO
+	//void NotifyDeletedRenderTarget(VkImage Image);
+
+private:
+	FRWLock RenderPassesLock;
+	FRWLock FramebuffersLock;
+
+	TMap<FVulkanHash, FVulkanRenderPassRef> RenderPasses;
+
+	struct FFramebufferList
+	{
+		TVector<FVulkanFrameBufferRef> Framebuffer;
+	};
+	TMap<FVulkanHash, TSharedPtr<FFramebufferList>> Framebuffers;
+};

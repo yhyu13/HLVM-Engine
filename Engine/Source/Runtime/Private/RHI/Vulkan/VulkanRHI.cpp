@@ -391,6 +391,8 @@ void FVulkanRHI::Init()
 	// Lastly, create Vulkan Memory Allocator
 	CreateVulkanMemoryAllocator();
 
+	RenderPassManager = MAKE_SHARED(FVulkanRenderPassManager);
+
 	HLVM_LOG(LogVulkanRHI, debug, TXT("VulkanRHI Init!"));
 }
 
@@ -398,6 +400,7 @@ void FVulkanRHI::Shutdown()
 {
 	VkDevice Device = LogicalDevice->GetHandle();
 
+	RenderPassManager = nullptr;
 	VulkanViewport = nullptr;
 	LogicalDevice = nullptr;
 	PhysicalDevice = nullptr;
@@ -783,7 +786,7 @@ void FVulkanRHI::CreateVulkanQueues()
 
 void FVulkanRHI::CreateVulkanViewPort()
 {
-	SharedRefPtr<FGLFW3Vulkan> glfwWindow = SP_C(FGLFW3Vulkan, InitializerParam.NativeWindowHandle);
+	TSharedPtr<FGLFW3Vulkan> glfwWindow = SP_C(FGLFW3Vulkan, InitializerParam.NativeWindowHandle);
 	const IWindow::Properties& Property = glfwWindow->GetProperties();
 
 	FRHIViewportCreateInfo ViewportDesc;
@@ -1032,14 +1035,14 @@ void FVulkanRHI::PresentVulkanSwapChain(FRHIViewportRef& Viewport)
 void FVulkanRHI::BeginVulkanRenderPass(const FRHIRenderPassInfo& RenderPassInfo)
 {
 	HLVM_ASSERT(CurrentRenderPass == nullptr);
-	// TODO Implement RenderPassAdditionalInfo based on renderpass info
-	FVulkanRenderTargetLayout RTLayout{ RenderPassInfo, FVulkanRenderTargetLayout::RenderPassAdditionalInfo{} };
-	CurrentRenderPass = new FVulkanRenderPass(RTLayout);
+	// TODO Implement FRenderPassAdditionalInfo based on renderpass info
+	FVulkanRenderTargetLayout RTLayout{ RenderPassInfo, FVulkanRenderTargetLayout::FRenderPassAdditionalInfo{} };
+	CurrentRenderPass = RenderPassManager->GetOrCreateRenderPass(RTLayout);
 
 	// TODO framebuffer
 	FRHIRenderTargetsInfo RTInfo;
 	RenderPassInfo.ConvertToRenderTargetsInfo(RTInfo);
-	CurrentFrameBuffer = new FVulkanFrameBuffer(RTInfo, RTLayout, CurrentRenderPass);
+	CurrentFrameBuffer = RenderPassManager->GetOrCreateFramebuffer(RTInfo, RTLayout, CurrentRenderPass);
 
 	// TODO begin render pass
 	// TODO : vulkan command buffer

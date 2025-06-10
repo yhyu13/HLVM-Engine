@@ -33,14 +33,14 @@
 #define C_C(type, value) const_cast<type>((value))
 #define R_C(type, value) reinterpret_cast<type>((value))
 
-#define MAKE_SHARED(type, value) std::make_shared<type>((value))
-#define MAKE_UNIQUE(type, value) std::make_unique<type>((value))
+#define MAKE_SHARED(type, ...) std::make_shared<type>(__VA_ARGS__)
+#define MAKE_UNIQUE(type, ...) std::make_unique<type>(__VA_ARGS__)
 
 template<typename T>
-using SharedRefPtr = std::shared_ptr<T>;
+using TSharedPtr = std::shared_ptr<T>;
 
 template<typename T>
-using UniqueRefPtr = std::unique_ptr<T>;
+using TUniquePtr = std::unique_ptr<T>;
 
 // Offset of a struct member. (Copy from UE5)
 #ifdef __clang__

@@ -299,18 +299,6 @@ public:
 		DepthStencilRenderTarget.ExclusiveDepthStencil = InEDS;
 	}
 
-	// Depth, no color, occlusion queries
-	explicit FRHIRenderPassInfo(FRHITextureRef DepthRT, TUINT32 InNumOcclusionQueries, EDepthStencilTargetActions DepthActions, FRHITextureRef ResolveDepthRT = nullptr, FExclusiveDepthStencil InEDS = FExclusiveDepthStencil::DepthWrite_StencilWrite)
-		: NumOcclusionQueries(InNumOcclusionQueries)
-	{
-		HLVM_ASSERT(!ResolveDepthRT || ResolveDepthRT->IsMultiSampled());
-		HLVM_ASSERT(DepthRT);
-		DepthStencilRenderTarget.DepthStencilTarget = DepthRT;
-		DepthStencilRenderTarget.ResolveTarget = ResolveDepthRT;
-		DepthStencilRenderTarget.Action = DepthActions;
-		DepthStencilRenderTarget.ExclusiveDepthStencil = InEDS;
-	}
-
 	// Color and depth
 	explicit FRHIRenderPassInfo(FRHITextureRef ColorRT, ERenderTargetActions ColorAction, FRHITextureRef DepthRT, EDepthStencilTargetActions DepthActions, FExclusiveDepthStencil InEDS = FExclusiveDepthStencil::DepthWrite_StencilWrite)
 	{
@@ -422,8 +410,5 @@ public:
 	ESubpassHint		  SubpassHint = ESubpassHint::Default;
 
 	FResolveRect ResolveRect;
-
-	TUINT32 NumOcclusionQueries = 0;
-	bool	bOcclusionQuery = false;
 	// TODO : occlusion query, multiview, variable shading rate support?
 };

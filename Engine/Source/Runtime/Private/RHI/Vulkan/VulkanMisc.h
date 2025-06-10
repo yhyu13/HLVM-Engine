@@ -66,27 +66,49 @@ namespace VulkanRHI
 	HLVM_EXTERN_FUNC bool VulkanFormatHasStencil(VkFormat Format);
 } // namespace VulkanRHI
 
-template< typename THash>
+template <typename THash>
 struct TVulkanHash
 {
 	using TDigest = THash::Digest;
 	// Use either md5 or sha1
-	TDigest Hash;
+	TDigest Digest;
 
 	void Update(const void* Data, TSIZE Size)
 	{
-		Hash = THash::Hash(Data, Size, &Hash);
+		Digest = THash::Hash(Data, Size, &Digest);
 	}
 
 	void Reset()
 	{
-		Hash = TDigest();
+		Digest = TDigest();
 	}
 
 	bool Valid() const
 	{
-		return Hash.Valid();
+		return Digest.Valid();
+	}
+
+	// == != operator
+	bool operator==(const TVulkanHash& Other) const
+	{
+		return FMemory::Memcmp(&Digest, &Other.Digest, sizeof(TDigest)) == 0;
+	}
+	bool operator!=(const TVulkanHash& Other) const
+	{
+		return !(*this == Other);
 	}
 };
+
+namespace std
+{
+	template <typename THash>
+	struct hash<TVulkanHash<THash>>
+	{
+		size_t operator()(const TVulkanHash<THash>& Hash) const
+		{
+			return Hash.Digest.GetTypeHash();
+		}
+	};
+} // namespace std
 
 using FVulkanHash = TVulkanHash<FMD5>;

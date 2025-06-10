@@ -37,6 +37,13 @@ public:
 		{
 			return !(*this == other);
 		}
+
+		TSIZE GetTypeHash() const
+		{
+			TSIZE v1 = *R_C(const TSIZE*, digest);
+			TSIZE v2 = *R_C(const TSIZE*, digest + 8);
+			return v1 ^ v2;
+		}
 	};
 public:
 	static FMD5::Digest Hash(const void* data, size_t size, FMD5::Digest* prevHash = nullptr);
@@ -68,6 +75,14 @@ public:
 		bool operator!=(const FSHA1::Digest& other) const
 		{
 			return !(*this == other);
+		}
+
+		TSIZE GetTypeHash() const
+		{
+			TSIZE v1 = *R_C(const TSIZE*, digest);
+			TSIZE v2 = *R_C(const TSIZE*, digest + 8);
+			TSIZE v3 = *R_C(const TUINT32*, digest + 16);
+			return v1 ^ v2 ^ v3;
 		}
 	};
 

@@ -494,6 +494,8 @@ void FVulkanGraphicsPSODescription::FRenderTargets::ReadFrom(const FVulkanRender
 	bHasFragmentDensityAttachment = RTLayout.bHasFragmentDensityAttachment != 0;
 	NumUsedClearValues = RTLayout.NumUsedClearValues;
 
+	RenderPassCompatibleHash = RTLayout.RenderPassCompatibleHash;
+
 	Extent3D.x = RTLayout.Extent.Extent3D.width;
 	Extent3D.y = RTLayout.Extent.Extent3D.height;
 	Extent3D.z = RTLayout.Extent.Extent3D.depth;
@@ -529,6 +531,8 @@ void FVulkanGraphicsPSODescription::FRenderTargets::WriteInto(FVulkanRenderTarge
 	Out.bHasDepthStencilResolve = bHasDepthStencilResolve;
 	Out.bHasFragmentDensityAttachment = bHasFragmentDensityAttachment;
 	Out.NumUsedClearValues = NumUsedClearValues;
+
+	Out.RenderPassCompatibleHash = RenderPassCompatibleHash;
 
 	Out.Extent.Extent3D.width = Extent3D.x;
 	Out.Extent.Extent3D.height = Extent3D.y;

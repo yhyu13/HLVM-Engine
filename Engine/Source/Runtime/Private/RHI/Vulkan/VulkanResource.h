@@ -108,46 +108,78 @@ using FVulkanViewRef = TRefCountPtr<FVulkanView>;
 
 class FVulkanRenderTargetLayout
 {
-private:
-	friend struct FVulkanGraphicsPSODescription;
-
 public:
-	struct RenderPassAdditionalInfo
+	struct FRenderPassAdditionalInfo
 	{
 		VkImageLayout CurrentDepthLayout{ VK_IMAGE_LAYOUT_UNDEFINED };
 		VkImageLayout CurrentStencilLayout{ VK_IMAGE_LAYOUT_UNDEFINED };
 	};
 
+private:
+	struct FRenderPassCompatibleHashableStruct
+	{
+		FRenderPassCompatibleHashableStruct()
+		{
+			FMemory::Memzero(this);
+		}
+
+		TUINT8							NumAttachments;
+		TUINT8							NumSamples;
+		TEnumAsUnderlying<ESubpassHint> SubpassHint;
+		// +1 for Depth, +1 for Stencil, +1 for Fragment Density
+		VkFormat Formats[RHI::MAX_RT_ATTACHMENTS + 2];
+		bool	 AttachmentsToResolve[RHI::MAX_RT_ATTACHMENTS + 2];
+	};
+
+	struct FRenderPassFullHashableStruct
+	{
+		FRenderPassFullHashableStruct()
+		{
+			FMemory::Memzero(this);
+		}
+
+		// +1 for Depth, +1 for Stencil, +1 for Fragment Density
+		TEnumAsUnderlying<VkAttachmentLoadOp>  LoadOps[RHI::MAX_RT_ATTACHMENTS + 2];
+		TEnumAsUnderlying<VkAttachmentStoreOp> StoreOps[RHI::MAX_RT_ATTACHMENTS + 2];
+		// If the initial != final we need to add FinalLayout and potentially RefLayout
+		VkImageLayout InitialLayout[RHI::MAX_RT_ATTACHMENTS + 2];
+		// VkImageLayout                   FinalLayout[RHI::MAX_RT_ATTACHMENTS  + 2];
+		// VkImageLayout                   RefLayout[RHI::MAX_RT_ATTACHMENTS  + 2];
+	};
+
 public:
-	FVulkanRenderTargetLayout(const FRHIRenderPassInfo& RPInfo, const RenderPassAdditionalInfo& AdditionalInfo);
+	FVulkanRenderTargetLayout(const FRHIRenderPassInfo& RPInfo, const FRenderPassAdditionalInfo& AdditionalInfo);
 	FVulkanRenderTargetLayout(const FGraphicsPSOCreateInfo& PSOInfo);
 
-	inline const VkOffset2D&			  GetOffset2D() const { return Offset.Offset2D; }
-	inline const VkOffset3D&			  GetOffset3D() const { return Offset.Offset3D; }
-	inline const VkExtent2D&			  GetExtent2D() const { return Extent.Extent2D; }
-	inline const VkExtent3D&			  GetExtent3D() const { return Extent.Extent3D; }
-	inline const VkAttachmentDescription* GetAttachmentDescriptions() const { return Desc; }
-	inline TUINT32						  GetNumColorAttachments() const { return NumColorAttachments; }
-	inline bool							  GetHasDepthStencil() const { return bHasDepthStencil != 0; }
-	inline bool							  GetHasResolveAttachments() const { return bHasResolveAttachments != 0; }
-	inline bool							  GetHasDepthStencilResolve() const { return bHasDepthStencilResolve != 0; }
-	inline bool							  GetHasFragmentDensityAttachment() const { return bHasFragmentDensityAttachment != 0; }
-	inline TUINT32						  GetNumAttachmentDescriptions() const { return NumAttachmentDescriptions; }
-	inline TUINT32						  GetNumSamples() const { return NumSamples; }
-	inline TUINT32						  GetNumUsedClearValues() const { return NumUsedClearValues; }
+	const FVulkanHash& GetRenderPassCompatibleHash() const { return RenderPassCompatibleHash; }
+	const FVulkanHash& GetRenderPassFullHash() const { return RenderPassFullHash; }
 
-	inline const VkAttachmentReference*				 GetColorAttachmentReferences() const { return NumColorAttachments > 0 ? ColorReferences : nullptr; }
-	inline const VkAttachmentReference*				 GetResolveAttachmentReferences() const { return bHasResolveAttachments ? ResolveReferences : nullptr; }
-	inline const VkAttachmentReference*				 GetDepthAttachmentReference() const { return bHasDepthStencil ? &DepthReference : nullptr; }
-	inline const VkAttachmentReferenceStencilLayout* GetStencilAttachmentReference() const { return bHasDepthStencil ? &StencilReference : nullptr; }
-	inline const VkAttachmentReference*				 GetDepthStencilResolveAttachmentReference() const { return bHasDepthStencilResolve ? &DepthStencilResolveReference : nullptr; }
-	inline const VkAttachmentReference*				 GetFragmentDensityAttachmentReference() const { return bHasFragmentDensityAttachment ? &FragmentDensityReference : nullptr; }
+	const VkOffset2D&			   GetOffset2D() const { return Offset.Offset2D; }
+	const VkOffset3D&			   GetOffset3D() const { return Offset.Offset3D; }
+	const VkExtent2D&			   GetExtent2D() const { return Extent.Extent2D; }
+	const VkExtent3D&			   GetExtent3D() const { return Extent.Extent3D; }
+	const VkAttachmentDescription* GetAttachmentDescriptions() const { return Desc; }
+	TUINT32						   GetNumColorAttachments() const { return NumColorAttachments; }
+	bool						   GetHasDepthStencil() const { return bHasDepthStencil != 0; }
+	bool						   GetHasResolveAttachments() const { return bHasResolveAttachments != 0; }
+	bool						   GetHasDepthStencilResolve() const { return bHasDepthStencilResolve != 0; }
+	bool						   GetHasFragmentDensityAttachment() const { return bHasFragmentDensityAttachment != 0; }
+	TUINT32						   GetNumAttachmentDescriptions() const { return NumAttachmentDescriptions; }
+	TUINT32						   GetNumSamples() const { return NumSamples; }
+	TUINT32						   GetNumUsedClearValues() const { return NumUsedClearValues; }
 
-	inline const VkAttachmentDescriptionStencilLayout* GetStencilDesc() const { return bHasDepthStencil ? &StencilDesc : nullptr; }
+	const VkAttachmentReference*			  GetColorAttachmentReferences() const { return NumColorAttachments > 0 ? ColorReferences : nullptr; }
+	const VkAttachmentReference*			  GetResolveAttachmentReferences() const { return bHasResolveAttachments ? ResolveReferences : nullptr; }
+	const VkAttachmentReference*			  GetDepthAttachmentReference() const { return bHasDepthStencil ? &DepthReference : nullptr; }
+	const VkAttachmentReferenceStencilLayout* GetStencilAttachmentReference() const { return bHasDepthStencil ? &StencilReference : nullptr; }
+	const VkAttachmentReference*			  GetDepthStencilResolveAttachmentReference() const { return bHasDepthStencilResolve ? &DepthStencilResolveReference : nullptr; }
+	const VkAttachmentReference*			  GetFragmentDensityAttachmentReference() const { return bHasFragmentDensityAttachment ? &FragmentDensityReference : nullptr; }
 
-	inline ESubpassHint GetSubpassHint() const { return SubpassHint; }
+	const VkAttachmentDescriptionStencilLayout* GetStencilDesc() const { return bHasDepthStencil ? &StencilDesc : nullptr; }
 
-protected:
+	ESubpassHint GetSubpassHint() const { return SubpassHint; }
+
+private:
 	FVulkanRenderTargetLayout()
 	{
 		NumAttachmentDescriptions = 0;
@@ -179,7 +211,9 @@ protected:
 
 	VkImageLayout GetVRSImageLayout() const;
 
-protected:
+private:
+	friend struct FVulkanGraphicsPSODescription;
+
 	VkAttachmentReference			   ColorReferences[RHI::MAX_RT_ATTACHMENTS];
 	VkAttachmentReference			   DepthReference;
 	VkAttachmentReferenceStencilLayout StencilReference;
@@ -188,7 +222,7 @@ protected:
 	VkAttachmentReference			   DepthStencilResolveReference;
 
 	// Depth goes in the "+1" slot, Depth resolve goes in the "+2 slot", and the Shading Rate texture goes in the "+3" slot.
-	VkAttachmentDescription				 Desc[RHI::MAX_RT_ATTACHMENTS * 2 + 3];
+	VkAttachmentDescription				 Desc[RHI::MAX_RT_ATTACHMENTS * 2 + 2];
 	VkAttachmentDescriptionStencilLayout StencilDesc;
 
 	TUINT8		 NumAttachmentDescriptions;
@@ -200,6 +234,9 @@ protected:
 	TUINT8		 NumSamples;
 	TUINT8		 NumUsedClearValues;
 	ESubpassHint SubpassHint = ESubpassHint::Default;
+
+	FVulkanHash RenderPassCompatibleHash;
+	FVulkanHash RenderPassFullHash;
 
 	union
 	{

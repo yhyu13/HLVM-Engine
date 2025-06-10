@@ -10,7 +10,7 @@ FVulkanMinimalContext::FVulkanMinimalContext()
 	RHI::GetDynamicRHI<IVulkanDynamicRHI>()->SetVulkanMinimalContext(this);
 }
 
-FVulkanRenderTargetLayout::FVulkanRenderTargetLayout(const FRHIRenderPassInfo& RPInfo, const RenderPassAdditionalInfo& AdditionalInfo)
+FVulkanRenderTargetLayout::FVulkanRenderTargetLayout(const FRHIRenderPassInfo& RPInfo, const FRenderPassAdditionalInfo& AdditionalInfo)
 	: NumAttachmentDescriptions(0)
 	, NumColorAttachments(0)
 	, bHasDepthStencil(false)
@@ -21,6 +21,9 @@ FVulkanRenderTargetLayout::FVulkanRenderTargetLayout(const FRHIRenderPassInfo& R
 	, NumUsedClearValues(0)
 {
 	ResetAttachments();
+
+	FRenderPassCompatibleHashableStruct CompatibleHashableStruct;
+	FRenderPassFullHashableStruct		FullHashableStruct;
 
 	bool bSetExtent = false;
 	bool bFoundClearOp = false;
@@ -83,9 +86,16 @@ FVulkanRenderTargetLayout::FVulkanRenderTargetLayout(const FRHIRenderPassInfo& R
 			Desc[NumAttachmentDescriptions + 1].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 			ResolveReferences[NumColorAttachments].attachment = NumAttachmentDescriptions + 1;
 			ResolveReferences[NumColorAttachments].layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+			CompatibleHashableStruct.AttachmentsToResolve[NumColorAttachments] = true;
 			++NumAttachmentDescriptions;
 			bHasResolveAttachments = true;
 		}
+
+		CompatibleHashableStruct.Formats[NumColorAttachments] = CurrDesc.format;
+		++CompatibleHashableStruct.NumAttachments;
+		FullHashableStruct.LoadOps[NumColorAttachments] = CurrDesc.loadOp;
+		FullHashableStruct.StoreOps[NumColorAttachments] = CurrDesc.storeOp;
+		FullHashableStruct.InitialLayout[NumColorAttachments] = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
 		++NumAttachmentDescriptions;
 		++NumColorAttachments;
@@ -175,12 +185,20 @@ FVulkanRenderTargetLayout::FVulkanRenderTargetLayout(const FRHIRenderPassInfo& R
 			DepthStencilResolveReference.layout = CurrentDepthLayout;
 			// NumColorAttachments was incremented after the last color attachment
 			HLVM_ENSURE_F(NumColorAttachments < 16, TXT("Must have room for depth resolve bit"));
+			CompatibleHashableStruct.AttachmentsToResolve[NumColorAttachments] = true;
 			++NumAttachmentDescriptions;
 			bHasDepthStencilResolve = true;
 		}
 
-		++NumAttachmentDescriptions;
+		CompatibleHashableStruct.Formats[RHI::MAX_RT_ATTACHMENTS] = CurrDesc.format;
+		FullHashableStruct.LoadOps[RHI::MAX_RT_ATTACHMENTS] = CurrDesc.loadOp;
+		FullHashableStruct.StoreOps[RHI::MAX_RT_ATTACHMENTS] = CurrDesc.storeOp;
+		FullHashableStruct.LoadOps[RHI::MAX_RT_ATTACHMENTS + 1] = CurrDesc.stencilLoadOp;
+		FullHashableStruct.StoreOps[RHI::MAX_RT_ATTACHMENTS + 1] = CurrDesc.stencilStoreOp;
+		FullHashableStruct.InitialLayout[RHI::MAX_RT_ATTACHMENTS] = CurrentDepthLayout;
+		FullHashableStruct.InitialLayout[RHI::MAX_RT_ATTACHMENTS + 1] = CurrentStencilLayout;
 
+		++NumAttachmentDescriptions;
 		bHasDepthStencil = true;
 
 		if (bSetExtent)
@@ -211,6 +229,13 @@ FVulkanRenderTargetLayout::FVulkanRenderTargetLayout(const FRHIRenderPassInfo& R
 	}
 
 	SubpassHint = RPInfo.SubpassHint;
+	CompatibleHashableStruct.SubpassHint = SubpassHint;
+	CompatibleHashableStruct.NumSamples = NumSamples;
+
+	RenderPassCompatibleHash.Update(&CompatibleHashableStruct, sizeof(CompatibleHashableStruct));
+	RenderPassFullHash = RenderPassCompatibleHash;
+	RenderPassFullHash.Update(&FullHashableStruct, sizeof(FullHashableStruct));
+
 	NumUsedClearValues = bFoundClearOp ? NumAttachmentDescriptions : 0;
 }
 
@@ -501,7 +526,7 @@ FVulkanView* FVulkanView::InitAsTextureView(
 	const bool bDepthOrStencilAspect = (AspectFlags & (VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT)) != 0;
 
 	// TODO
-	//LogicalDevice.GetBindlessDescriptorManager()->UpdateImage(BindlessHandle, TV.View, bDepthOrStencilAspect, bImmediateUpdate);
+	// LogicalDevice.GetBindlessDescriptorManager()->UpdateImage(BindlessHandle, TV.View, bDepthOrStencilAspect, bImmediateUpdate);
 
 	return this;
 }
