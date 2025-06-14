@@ -33,6 +33,91 @@ enum class ERHIResourceType : TUINT8
 class IRHIResource : public FRefCountable
 {
 public:
+	template <typename T>
+	struct IRHIHandle
+	{
+		static_assert(std::is_pointer_v<T>);
+
+		IRHIHandle() = default;
+		IRHIHandle(IRHIResource* InOwnerClass)
+			: OwnerClass(InOwnerClass)
+		{
+		}
+		IRHIHandle(IRHIResource* InOwnerClass, const IRHIHandle& InHandle)
+			: Handle(InHandle.Handle), OwnerClass(InOwnerClass)
+		{
+		}
+		explicit IRHIHandle(T InHandle)
+			: Handle(InHandle)
+		{
+		}
+
+		// assingment operator
+		IRHIHandle& operator=(const IRHIHandle& InHandle)
+		{
+			Handle = InHandle.Handle;
+			if (OwnerClass)
+			{
+				OwnerClass->UpdateHandle(Handle);
+			}
+			return *this;
+		}
+		IRHIHandle& operator=(T& InHandle)
+		{
+			Handle = InHandle;
+			if (OwnerClass)
+			{
+				OwnerClass->UpdateHandle(Handle);
+			}
+			return *this;
+		}
+		IRHIHandle& operator=(IRHIHandle&& InHandle)
+		{
+			Handle = InHandle.Handle;
+			if (OwnerClass)
+			{
+				OwnerClass->UpdateHandle(Handle);
+			}
+			return *this;
+		}
+		IRHIHandle& operator=(T&& InHandle)
+		{
+			Handle = InHandle;
+			if (OwnerClass)
+			{
+				OwnerClass->UpdateHandle(Handle);
+			}
+			return *this;
+		}
+
+		// compare operators
+		bool operator==(const IRHIHandle& InHandle) const
+		{
+			return Handle == InHandle.Handle;
+		}
+		bool operator!=(const IRHIHandle& InHandle) const
+		{
+			return Handle != InHandle.Handle;
+		}
+		bool operator==(std::nullptr_t) const
+		{
+			return Handle == nullptr;
+		}
+		bool operator!=(std::nullptr_t) const
+		{
+			return Handle != nullptr;
+		}
+
+		operator T() const
+		{
+			return Handle;
+		}
+
+		T			  Handle{ nullptr };
+		IRHIResource* OwnerClass{ nullptr };
+	};
+
+public:
 	IRHIResource() = default;
 	virtual ~IRHIResource() = default;
 
@@ -42,10 +127,19 @@ public:
 	// Returns the RHI interface type (e.g., Vulkan, DirectX)
 	virtual ERHIInterfaceType GetInterfaceType() const = 0;
 
-	// Returns the name of the resource for debugging
-	FString GetName() const { return FString::Format(TXT("[{}:{}]"),
-		HLVM_ENUM_TO_TCHAR(GetInterfaceType()), *CreateInfoPtr->DebugName); }
+	FString ToString() const
+	{
+		return FString::Format(TXT("name = {}, handle = 0x{:x}"), *GetDebugName(), HandlePtr);
+	}
 
+	// Returns the name of the resource for debugging
+	FString GetDebugName() const
+	{
+		return FString::Format(TXT("[{}:\"{}\"]"),
+			HLVM_ENUM_TO_TCHAR(GetInterfaceType()), *CreateInfoPtr->DebugName);
+	}
+
+protected:
 	// Updates the create info struct using CreateInfoPtr
 	template <typename T>
 	void UpdateCreateInfo(const T& InCreateInfo)
@@ -53,8 +147,17 @@ public:
 		*D_C(T*, CreateInfoPtr.Get()) = InCreateInfo;
 	}
 
+	template <typename T>
+	void UpdateHandle(T InHandle)
+	{
+		static_assert(std::is_pointer_v<T>);
+		static_assert(sizeof(T) == sizeof(TSIZE));
+		HandlePtr = R_C(TSIZE, InHandle);
+	}
+
 protected:
 	TNoNullablePtr<IRHICreateInfo> CreateInfoPtr;
+	TSIZE						   HandlePtr;
 };
 
 #define DECLARE_RHI_RESOURCE(ClassName, CreateteInfoType) \

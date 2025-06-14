@@ -181,9 +181,8 @@ struct TNoNullablePtr
 	}
 
 private:
-	T* m_ptr = nullptr;
+	T* m_ptr{ nullptr };
 };
-
 
 /**
  * Template for nullable pointers
@@ -222,6 +221,16 @@ struct TNullablePtr
 		return m_ptr != other.m_ptr;
 	}
 
+	// Compare with nullptr
+	bool operator==(std::nullptr_t) const
+	{
+		return m_ptr == nullptr;
+	}
+	bool operator!=(std::nullptr_t) const
+	{
+		return m_ptr != nullptr;
+	}
+
 	operator bool() const
 	{
 		return m_ptr != nullptr;
@@ -247,5 +256,5 @@ struct TNullablePtr
 	}
 
 private:
-	T* m_ptr = nullptr;
+	T* m_ptr{ nullptr };
 };

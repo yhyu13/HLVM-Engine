@@ -28,8 +28,8 @@ private:
 	void DestroyBuffer();
 
 private:
-	VkBuffer	  Buffer;
-	VmaAllocation Allocation;
+	IRHIHandle<VkBuffer> Buffer;
+	VmaAllocation		 Allocation;
 };
 
 // Vulkan-specific RHI unordered access view

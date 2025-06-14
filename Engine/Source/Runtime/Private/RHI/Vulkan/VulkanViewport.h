@@ -21,6 +21,11 @@ public:
 
 	void UpdateImage(VkImage InImage);
 
+	bool Valid() const
+	{
+		return Image != VK_NULL_HANDLE;
+	}
+
 private:
 	TNoNullablePtr<FVulkanViewport> OwnerViewport;
 };

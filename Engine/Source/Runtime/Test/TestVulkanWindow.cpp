@@ -1251,26 +1251,23 @@ RECORD_BOOL(test_GLFW3VulkanWindowRaw)
 
 RECORD_BOOL(test_GLFW3VulkanWindow)
 {
+	//1 . Create window
 	IWindow::Properties Properties;
 	Properties.Resizable = false;
 	Properties.Mode = IWindow::EDisplayMode::Windowed;
 	TSharedPtr<FGLFW3Vulkan> Window = MAKE_SHARED(FGLFW3Vulkan, Properties);
 	HLVM_LOG(LogTest, debug, TXT("FGLFW3Vulkan created!"));
 
-	TUniquePtr<FVulkanRHI> VulkanRHI = nullptr;
-	// Vulkan rhi init
+	//2 . Create RHI
 	FVulkanRHIInitializer Initializer;
 	Initializer.RequiredExtensions = { Window->GetRequiredExtensions() };
 	Initializer.CreateSurfaceFunc = [&Window](VkInstance Instance) { return Window->CreateSurface(Instance); };
 	Initializer.NativeWindowHandle = Window;
-	VulkanRHI = MAKE_UNIQUE(FVulkanRHI, Initializer);
+	TUniquePtr<FVulkanRHI> VulkanRHI = MAKE_UNIQUE(FVulkanRHI, Initializer);
+	HLVM_LOG(LogTest, debug, TXT("FVulkanRHI created!"));
 	VulkanRHI->Init();
 
 	{
-		FRHIViewportRef Viewport = VulkanRHI->GetRHIViewport();
-		Viewport->BeginFrame(); // Call begin frame in order to acquire next back buffer
-		FRHITextureRef BackBuffer = VulkanRHI->GetRHIBackBuffer();
-
 		// Create buffers
 		FRHIBufferRef VertexBuffer;
 		FRHIBufferRef IndexBuffer;
@@ -1338,6 +1335,15 @@ RECORD_BOOL(test_GLFW3VulkanWindow)
 				S_C(FVulkanShaderRef, FragShader)->GetPipelineShaderStageCreateInfo()
 			};
 		}
+
+	}
+
+	{
+		// 2.1 Call begine frame
+		FRHIViewportRef Viewport = VulkanRHI->GetRHIViewport();
+		Viewport->BeginFrame(); // Call begin frame in order to acquire next back buffer
+		// 2.2 Get back buffer
+		FRHITextureRef BackBuffer = VulkanRHI->GetRHIBackBuffer();
 
 		{
 			// Renderpass && Frame buffer

@@ -9,14 +9,13 @@ FVulkanBackBuffer::FVulkanBackBuffer(VkImage InImage, const FRHITextureCreateInf
 {
 	// Vulkan back buffer holds a image from swapchain and we don't own it
 	OwnerShip = EOwnerShip::Alias;
-	HLVM_LOG(LogVulkanRHI, trace, TXT("Create FVulkanBackBuffer {}, {}"), *GetName(), HLVM_ENUM_TO_TCHAR(OwnerShip));
+	HLVM_LOG(LogVulkanRHI, trace, TXT("Create FVulkanBackBuffer {}, {}"), *ToString(), HLVM_ENUM_TO_TCHAR(OwnerShip));
 }
 
 FVulkanBackBuffer::~FVulkanBackBuffer()
 {
 	// Just release handle, no need to destroy it since it is owned by swapchain
-	Image = VK_NULL_HANDLE;
-	HLVM_LOG(LogVulkanRHI, trace, TXT("Destroy FVulkanBackBuffer {}"), *GetName());
+	HLVM_LOG(LogVulkanRHI, trace, TXT("Destroy FVulkanBackBuffer {}"), *ToString());
 }
 
 void FVulkanBackBuffer::UpdateImage(VkImage InImage)
@@ -121,10 +120,12 @@ void FVulkanViewport::BeginFrame()
 	HLVM_ASSERT(RHIBackBuffer != nullptr);
 	HLVM_ENSURE(AcquireNextImageIndex());
 	RHIBackBuffer->UpdateImage(SwapChain->swapChainImages[SwapChainImageIndex]);
+	HLVM_ASSERT(RHIBackBuffer.Valid());
 }
 
 void FVulkanViewport::Present()
 {
 	HLVM_ASSERT(RHIBackBuffer != nullptr);
+	HLVM_ASSERT(RHIBackBuffer.Valid());
 	// TODO
 }

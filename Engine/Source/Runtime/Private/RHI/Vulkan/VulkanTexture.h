@@ -18,7 +18,6 @@ public:
 	};
 
 public:
-	FVulkanTexture();
 	FVulkanTexture(const FRHITextureCreateInfo& InCreateInfo);
 	FVulkanTexture(VkImage Image, const FRHITextureCreateInfo& InCreateInfo);
 
@@ -41,14 +40,14 @@ public:
 
 	VkImageAspectFlags GetFullAspectFlags() const { return FullAspectFlags; }
 	VkImageAspectFlags GetPartialAspectFlags() const { return PartialAspectFlags; }
-	FVulkanViewRef GetFullView() const { return FullView; }
-	FVulkanViewRef GetPartialView() const { return PartialView; }
+	FVulkanViewRef	   GetFullView() const { return FullView; }
+	FVulkanViewRef	   GetPartialView() const { return PartialView; }
 
 	VkImageUsageFlags GetImageUsageFlags() const { return ImageUsageFlags; }
 
 protected:
-	EOwnerShip OwnerShip;
-	VkImage	   Image;
+	EOwnerShip			OwnerShip;
+	IRHIHandle<VkImage> Image;
 
 private:
 	void PostInit();

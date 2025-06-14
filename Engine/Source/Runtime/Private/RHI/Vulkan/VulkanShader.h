@@ -128,7 +128,7 @@ public:
 	bool UsesBindless() const { return false; }
 
 private:
-	VkShaderModule					ShaderModule;
+	IRHIHandle<VkShaderModule>		ShaderModule;
 	VkPipelineShaderStageCreateInfo PipelineShaderStageCreateInfo;
 	FVulkanShaderHeader				ShaderHeader;
 };
