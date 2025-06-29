@@ -14,6 +14,7 @@
 #include <boost/container/static_vector.hpp>
 
 #include "Core/Mallocator/PMR.h"
+#include "Core/Assert.h"
 
 /**
  * phmap has alot of unconventional warnings, pretty bad code though
@@ -182,7 +183,10 @@ public:
 	void Empty(TSIZE NewCapacity = 0)
 	{
 		this->clear();
-		this->shrink_to_fit();
+		if (this->capacity() < NewCapacity)
+		{
+			this->shrink_to_fit();
+		}
 		this->reserve(NewCapacity);
 		HLVM_ASSERT(this->capacity() >= NewCapacity);
 	}
@@ -259,12 +263,19 @@ public:
 	void Empty(TSIZE NewCapacity = 0)
 	{
 		this->clear();
-		HLVM_ASSERT(this->capacity() <= NewCapacity);
+		if (this->capacity() < NewCapacity)
+		{
+			this->shrink_to_fit();
+		}
+		this->reserve(NewCapacity);
+		HLVM_ASSERT(this->capacity() >= NewCapacity);
 	}
 
 	void Reset(TSIZE NewCapacity = 0)
 	{
-		Empty(NewCapacity);
+		this->clear();
+		this->reserve(NewCapacity);
+		HLVM_ASSERT(this->capacity() >= NewCapacity);
 	}
 
 	operator TVectorView<T>() const
@@ -323,7 +334,9 @@ public:
 		auto Iter = this->find(key);
 		if (Iter == this->end())
 		{
-			Iter = this->insert({ key, value }).first;
+			auto result = this->insert({ key, value });
+			Iter = result.first;
+			HLVM_ASSERT(result.second);
 		}
 		else
 		{
@@ -338,7 +351,9 @@ public:
 		auto Iter = this->find(key);
 		if (Iter == this->end())
 		{
-			Iter = this->insert({ key, value }).first;
+			auto result = this->insert({ key, value });
+			Iter = result.first;
+			HLVM_ASSERT(result.second);
 		}
 		else
 		{
@@ -347,13 +362,22 @@ public:
 		return &Iter->second;
 	}
 
+	void Empty(TSIZE NewCapacity = 0)
+	{
+		this->clear();
+		if (this->capacity() < NewCapacity)
+		{
+			this->shrink_to_fit();
+		}
+		this->reserve(NewCapacity);
+		HLVM_ASSERT(this->capacity() >= NewCapacity);
+	}
+
 	void Reset(TSIZE NewCapacity = 0)
 	{
 		this->clear();
-		if (NewCapacity > 0)
-		{
-			this->reserve(NewCapacity);
-		}
+		this->reserve(NewCapacity);
+		HLVM_ASSERT(this->capacity() >= NewCapacity);
 	}
 };
 
@@ -407,7 +431,9 @@ public:
 		auto Iter = this->find(key);
 		if (Iter == this->end())
 		{
-			Iter = this->insert({ key, value }).first;
+			auto result = this->insert({ key, value });
+			Iter = result.first;
+			HLVM_ASSERT(result.second);
 		}
 		else
 		{
@@ -422,13 +448,33 @@ public:
 		auto Iter = this->find(key);
 		if (Iter == this->end())
 		{
-			Iter = this->insert({ key, value }).first;
+			auto result = this->insert({ key, value });
+			Iter = result.first;
+			HLVM_ASSERT(result.second);
 		}
 		else
 		{
 			Iter->second = value;
 		}
 		return &Iter->second;
+	}
+
+	void Empty(TSIZE NewCapacity = 0)
+	{
+		this->clear();
+		if (this->capacity() < NewCapacity)
+		{
+			this->shrink_to_fit();
+		}
+		this->reserve(NewCapacity);
+		HLVM_ASSERT(this->capacity() >= NewCapacity);
+	}
+
+	void Reset(TSIZE NewCapacity = 0)
+	{
+		this->clear();
+		this->reserve(NewCapacity);
+		HLVM_ASSERT(this->capacity() >= NewCapacity);
 	}
 };
 

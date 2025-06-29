@@ -200,6 +200,8 @@ public:
 	// Returns the number of samples in the texture
 	TUINT8 GetNumSamples() const { return CreateInfo.NumSamples; }
 
+	TUINT8 GetNumMips() const { return CreateInfo.NumMips; }
+
 	// Returns the type of the RHI resource
 	virtual ERHIResourceType GetResourceType() const override { return ERHIResourceType::Texture; }
 

@@ -2,7 +2,7 @@ Inspired by Flax Engine :
 https://github.com/yhyu13/FlaxEngine/blob/b2f9da4113a7c80586ce3c0e7a916a40f0c63f04/Source/Engine/Profiler/
 https://flaxengine.com/licensing
 
-FLAX to hlvm prompt:
+FLAX to hlvm prompt for LLM to auto convert:
 
 Given sample script
 

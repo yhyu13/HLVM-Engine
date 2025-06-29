@@ -59,7 +59,6 @@ public:
 	};
 
 	FVulkanView(VkDescriptorType InDescriptorType);
-
 	~FVulkanView();
 
 	void Invalidate();

@@ -352,6 +352,7 @@ FVulkanRenderTargetLayout::FVulkanRenderTargetLayout(const FGraphicsPSOCreateInf
 
 FVulkanView::FVulkanView(VkDescriptorType InDescriptorType)
 {
+	// TODO
 	// BindlessHandle = LogicalDevice.GetBindlessDescriptorManager()->ReserveDescriptor(InDescriptorType);
 }
 
@@ -361,6 +362,7 @@ FVulkanView::~FVulkanView()
 
 	if (BindlessHandle.IsValid())
 	{
+		// TODO : Deferred deletion queue (clean up before RHI destructor)
 		// LogicalDevice.GetDeferredDeletionQueue().EnqueueBindlessHandle(BindlessHandle);
 		BindlessHandle = FRHIDescriptorHandle();
 	}
@@ -379,11 +381,15 @@ void FVulkanView::Invalidate()
 			break;
 
 		case EType::TypedBuffer:
+			// TODO : Deferred deletion queue (clean up before RHI destructor)
 			// LogicalDevice.GetDeferredDeletionQueue().EnqueueResource(VulkanRHI::FDeferredDeletionQueue2::EType::BufferView, Storage.Get<FTypedBufferView>().View);
+			VulkanRHI::vkDestroyBufferView(LogicalDevice->GetHandle(), std::get<FTypedBufferView>(Storage).View, VulkanRHI::VULKAN_CPU_ALLOCATOR);
 			break;
 
 		case EType::Texture:
+			// TODO : Deferred deletion queue (clean up before RHI destructor)
 			// LogicalDevice.GetDeferredDeletionQueue().EnqueueResource(VulkanRHI::FDeferredDeletionQueue2::EType::ImageView, Storage.Get<FTextureView>().View);
+			VulkanRHI::vkDestroyImageView(LogicalDevice->GetHandle(), std::get<FTextureView>(Storage).View, VulkanRHI::VULKAN_CPU_ALLOCATOR);
 			break;
 
 		case EType::StructuredBuffer:
@@ -391,7 +397,9 @@ void FVulkanView::Invalidate()
 			break;
 
 		case EType::AccelerationStructure:
+			// TODO : Deferred deletion queue (clean up before RHI destructor)
 			// LogicalDevice.GetDeferredDeletionQueue().EnqueueResource(VulkanRHI::FDeferredDeletionQueue2::EType::AccelerationStructure, Storage.Get<FAccelerationStructureView>().Handle);
+			//VulkanRHI::vkDestroyAccelerationStructureKHR(LogicalDevice->GetHandle(), std::get<FAccelerationStructureView>(Storage).Handle, VulkanRHI::VULKAN_CPU_ALLOCATOR);
 			break;
 	}
 

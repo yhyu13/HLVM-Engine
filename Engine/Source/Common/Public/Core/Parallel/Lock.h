@@ -396,3 +396,8 @@ private:
 	#pragma clang diagnostic pop
 #endif
 #undef _HLVM_ATOMIC_LOCK_ENABLE_PADDING
+
+/*
+ * Generic Critical Section as an Atomic Flag
+ */
+using FCriticalSection = FAtomicFlag;

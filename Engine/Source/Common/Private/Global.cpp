@@ -19,15 +19,15 @@ FPath	GExecutablePath{};
 /**
  * Default to false
  */
-bool GGperfEnabled = false;
+bool GGperfEnabled {false};
 #endif
 
 /**
  * Default to -1 so that any verbosity is allowed
  */
-int GLogVerbosity = -1;
+int GLogVerbosity {-1};
 
 /**
  * Default to variable map
  */
-boost::program_options::variables_map GVariableMap;
+boost::program_options::variables_map GVariableMap{};

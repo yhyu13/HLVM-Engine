@@ -48,17 +48,6 @@ HLVM_STATIC_FUNC VkImageUsageFlags GetImageUsageFlags(const ETextureCreateFlags&
 	return UsageFlags;
 }
 
-void FVulkanTexture::PostInit()
-{
-	ViewFormat = VulkanRHI::VulkanFormatFromRHIFormat(GetFormat(), GetCreateFlags() & ETextureCreateFlag::SRGB);
-	StorageFormat = VulkanRHI::VulkanFormatTryRemoveSRGB(ViewFormat);
-
-	FullAspectFlags = VulkanRHI::GetAspectMaskFromRHIFormat(GetFormat(), true, true);
-	PartialAspectFlags = VulkanRHI::GetAspectMaskFromRHIFormat(GetFormat(), true, false);
-
-	ImageUsageFlags = ::GetImageUsageFlags(GetCreateFlags());
-}
-
 FVulkanTexture::FVulkanTexture(const FRHITextureCreateInfo& InCreateInfo)
 	: FRHITexture(InCreateInfo), Image(this)
 {
@@ -71,7 +60,7 @@ FVulkanTexture::FVulkanTexture(const FRHITextureCreateInfo& InCreateInfo)
 }
 
 FVulkanTexture::FVulkanTexture(VkImage InImage, const FRHITextureCreateInfo& InCreateInfo)
-	: FRHITexture(InCreateInfo)
+	: FRHITexture(InCreateInfo), Image(this)
 {
 	Image = InImage;
 	OwnerShip = EOwnerShip::Owner;
@@ -93,7 +82,18 @@ FVulkanTexture::~FVulkanTexture()
 	}
 }
 
-TUINT32 FVulkanTexture::GetEffectiveArraySize() const
+void FVulkanTexture::PostInit()
+{
+	ViewFormat = VulkanRHI::VulkanFormatFromRHIFormat(GetFormat(), GetCreateFlags() & ETextureCreateFlag::SRGB);
+	StorageFormat = VulkanRHI::VulkanFormatTryRemoveSRGB(ViewFormat);
+
+	FullAspectFlags = VulkanRHI::GetAspectMaskFromRHIFormat(GetFormat(), true, true);
+	PartialAspectFlags = VulkanRHI::GetAspectMaskFromRHIFormat(GetFormat(), true, false);
+
+	ImageUsageFlags = ::GetImageUsageFlags(GetCreateFlags());
+}
+
+TUINT32 FVulkanTexture::GetVulkanArraySize() const
 {
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wswitch-enum"

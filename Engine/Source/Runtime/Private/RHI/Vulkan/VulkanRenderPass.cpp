@@ -96,13 +96,13 @@ FVulkanFrameBuffer::FVulkanFrameBuffer(const FRHIRenderTargetsInfo& InRTInfo, co
 			if (InRTInfo.ColorRenderTarget[Index].ArraySliceIndex == -1)
 			{
 				ArraySliceIndex = 0;
-				NumArraySlices = Texture->GetEffectiveArraySize();
+				NumArraySlices = Texture->GetVulkanArraySize();
 			}
 			else
 			{
 				ArraySliceIndex = S_C(TUINT32, InRTInfo.ColorRenderTarget[Index].ArraySliceIndex);
 				NumArraySlices = 1;
-				HLVM_ASSERT(ArraySliceIndex < Texture->GetEffectiveArraySize());
+				HLVM_ASSERT(ArraySliceIndex < Texture->GetVulkanArraySize());
 			}
 
 			// About !RTLayout.GetIsMultiView(), from https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkFramebufferCreateInfo.html:
@@ -148,7 +148,7 @@ FVulkanFrameBuffer::FVulkanFrameBuffer(const FRHIRenderTargetsInfo& InRTInfo, co
 			if (ResolveTexture->GetImageViewType() == VK_IMAGE_VIEW_TYPE_2D || ResolveTexture->GetImageViewType() == VK_IMAGE_VIEW_TYPE_2D_ARRAY)
 			{
 				CreateOwnedView()->InitAsTextureView(
-					ResolveTexture->GetImage(), ResolveTexture->GetImageViewType(), ResolveTexture->GetFullAspectFlags(), ResolveTexture->GetCreateInfo().Format, ResolveTexture->GetViewFormat(), MipIndex, 1, FMath::Max<TUINT32>(0, InRTInfo.ColorRenderTarget[Index].ArraySliceIndex), ResolveTexture->GetEffectiveArraySize(), true);
+					ResolveTexture->GetImage(), ResolveTexture->GetImageViewType(), ResolveTexture->GetFullAspectFlags(), ResolveTexture->GetCreateInfo().Format, ResolveTexture->GetViewFormat(), MipIndex, 1, FMath::Max<TUINT32>(0, InRTInfo.ColorRenderTarget[Index].ArraySliceIndex), ResolveTexture->GetVulkanArraySize(), true);
 			}
 		}
 	}
@@ -175,7 +175,7 @@ FVulkanFrameBuffer::FVulkanFrameBuffer(const FRHIRenderTargetsInfo& InRTInfo, co
 		{
 			// depth attachments need a separate view to have no swizzle components, for validation correctness
 			CreateOwnedView()->InitAsTextureView(
-				Texture->GetImage(), Texture->GetImageViewType(), Texture->GetFullAspectFlags(), Texture->GetCreateInfo().Format, Texture->GetViewFormat(), MipIndex, 1, 0, Texture->GetEffectiveArraySize(), true);
+				Texture->GetImage(), Texture->GetImageViewType(), Texture->GetFullAspectFlags(), Texture->GetCreateInfo().Format, Texture->GetViewFormat(), MipIndex, 1, 0, Texture->GetVulkanArraySize(), true);
 		}
 		else
 		{
@@ -192,7 +192,7 @@ FVulkanFrameBuffer::FVulkanFrameBuffer(const FRHIRenderTargetsInfo& InRTInfo, co
 			if (ResolveTexture->GetImageViewType() == VK_IMAGE_VIEW_TYPE_2D || ResolveTexture->GetImageViewType() == VK_IMAGE_VIEW_TYPE_2D_ARRAY)
 			{
 				CreateOwnedView()->InitAsTextureView(
-					ResolveTexture->GetImage(), ResolveTexture->GetImageViewType(), ResolveTexture->GetFullAspectFlags(), ResolveTexture->GetCreateInfo().Format, ResolveTexture->GetViewFormat(), MipIndex, 1, 0, ResolveTexture->GetEffectiveArraySize(), true);
+					ResolveTexture->GetImage(), ResolveTexture->GetImageViewType(), ResolveTexture->GetFullAspectFlags(), ResolveTexture->GetCreateInfo().Format, ResolveTexture->GetViewFormat(), MipIndex, 1, 0, ResolveTexture->GetVulkanArraySize(), true);
 			}
 		}
 	}
@@ -227,11 +227,13 @@ FVulkanFrameBuffer::~FVulkanFrameBuffer()
 
 void FVulkanFrameBuffer::Destroy()
 {
-	// TODO
+	// TODO : Deferred deletion queue (clean up before RHI destructor)
 	//	VulkanRHI::FDeferredDeletionQueue2& Queue = LogicalDevice.GetDeferredDeletionQueue();
 	//
 	//	// will be deleted in reverse order
 	//	Queue.EnqueueResource(VulkanRHI::FDeferredDeletionQueue2::EType::Framebuffer, Framebuffer);
+	HLVM_ASSERT(Framebuffer != VK_NULL_HANDLE);
+	VulkanRHI::vkDestroyFramebuffer(LogicalDevice->GetHandle(), Framebuffer, VulkanRHI::VULKAN_CPU_ALLOCATOR);
 	Framebuffer = VK_NULL_HANDLE;
 }
 

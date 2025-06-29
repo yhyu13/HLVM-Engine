@@ -7,7 +7,7 @@
 #include "RHIDefinition.h"
 #include "RHIResourcePost.h"
 #include "RHIPipeline.h"
-#include "RHICommand.h"
+#include "RHICommandLost.h"
 
 class FDynamicRHI
 {

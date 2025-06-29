@@ -161,6 +161,7 @@ ctre = FetchContent(name='ctre',
                                                                  values=['ctre::ctre'])]
                     )
 
+# TODO : TracyClient should be added as ThirdParty cpp like Effil.cpp
 # Fetch the Tracy package from GitHub with the specified options
 tracy = FetchContent(name='Tracy',
                      git_repo_url='https://github.com/yhyu13/tracy.git',

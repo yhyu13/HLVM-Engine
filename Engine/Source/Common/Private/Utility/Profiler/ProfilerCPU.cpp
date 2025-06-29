@@ -134,17 +134,17 @@ TVector<FProfilerCPU::FTrackedEvent> FProfilerCPU::FTrackedThread::ExtractEvents
 	return Ret;
 }
 
-bool														  FProfilerCPU::Enabled{ true };  // Static
+bool														  FProfilerCPU::bEnabled{ true };  // Static
 TSmallVector64<std::shared_ptr<FProfilerCPU::FTrackedThread>> FProfilerCPU::TrackedThreads{}; // Static
 
 bool FProfilerCPU::IsProfilingCurrentThread()
 {
-	return Enabled && CurrentThread.Get() != nullptr;
+	return bEnabled && CurrentThread.Get() != nullptr;
 }
 
 FProfilerCPU::FTrackedEvent* FProfilerCPU::GetCurrentThreadActiveEvent()
 {
-	return Enabled && CurrentThread.Get() ? &CurrentThread.Get()->mEventBuffer.back() : nullptr;
+	return bEnabled && CurrentThread.Get() ? &CurrentThread.Get()->mEventBuffer.back() : nullptr;
 }
 
 size_t FProfilerCPU::BeginEvent()
@@ -154,7 +154,7 @@ size_t FProfilerCPU::BeginEvent()
 
 size_t FProfilerCPU::BeginEvent(const TCHAR* name)
 {
-	if (!Enabled)
+	if (!bEnabled)
 	{
 		return INVALID_INDEX_SIZE_T();
 	}
@@ -172,7 +172,7 @@ size_t FProfilerCPU::BeginEvent(const TCHAR* name)
 
 void FProfilerCPU::EndEvent(size_t index)
 {
-	if (!Enabled)
+	if (!bEnabled)
 	{
 		return;
 	}
@@ -185,7 +185,7 @@ void FProfilerCPU::EndEvent(size_t index)
 
 void FProfilerCPU::EndEvent()
 {
-	if (!Enabled)
+	if (!bEnabled)
 	{
 		return;
 	}
@@ -198,12 +198,12 @@ void FProfilerCPU::EndEvent()
 
 void FProfilerCPU::Dispose()
 {
-	Enabled = false;
+	bEnabled = false;
 }
 
 void FProfilerCPU::OnMemMalloc(void* ptr, size_t size)
 {
-	if (!Enabled)
+	if (!bEnabled)
 	{
 		return;
 	}
@@ -230,7 +230,7 @@ void FProfilerCPU::OnMemMalloc(void* ptr, size_t size)
 
 void FProfilerCPU::OnMemFree(void* ptr)
 {
-	if (!Enabled)
+	if (!bEnabled)
 	{
 		return;
 	}

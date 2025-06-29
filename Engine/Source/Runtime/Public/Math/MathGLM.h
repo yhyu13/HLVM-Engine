@@ -101,4 +101,11 @@ public:
 	{
 		return S_C(T, a) + (S_C(T, b) - S_C(T, a)) * t;
 	}
+
+	// abs
+	template <typename T>
+	static T Abs(T value)
+	{
+		return value < 0 ? -value : value;
+	}
 };

@@ -171,7 +171,7 @@ public:
 	/**
 	 * The profiling tools usage flag. Can be used to disable profiler. Engine turns it down before the exit and before platform startup.
 	 */
-	HLVM_STATIC_VAR bool Enabled;
+	HLVM_STATIC_VAR bool bEnabled;
 };
 
 /**
@@ -244,8 +244,8 @@ struct FScopeEventCPU
 	#define HLVM_PROFILER_CPU_ONOFF(cond)                   \
 		HLVM_SCOPED_VARIABLE(                               \
 			ScopedProfilerCPU,                              \
-			[]() -> void { FProfilerCPU::Enabled = cond; }, \
-			[]() -> void { FProfilerCPU::Enabled = !cond; })
+			[]() -> void { FProfilerCPU::bEnabled = cond; }, \
+			[]() -> void { FProfilerCPU::bEnabled = !cond; })
 #else
 	#define HLVM_PROFILER_CPU_ONOFF(cond) ((void)0)
 #endif

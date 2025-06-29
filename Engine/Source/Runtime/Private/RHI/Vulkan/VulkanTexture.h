@@ -33,7 +33,7 @@ public:
 		return VulkanRHI::VulkanImageViewTypeFromRHIDimension(CreateInfo.Dimension);
 	}
 
-	TUINT32 GetEffectiveArraySize() const;
+	TUINT32 GetVulkanArraySize() const;
 
 	VkFormat GetViewFormat() const { return ViewFormat; }
 	VkFormat GetStorageFormat() const { return StorageFormat; }

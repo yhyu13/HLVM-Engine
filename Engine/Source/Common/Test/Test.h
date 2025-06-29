@@ -220,9 +220,11 @@ int main(int ac, char* av[])
 	try
 	{
 		po::options_description desc("Allowed options");
-		desc.add_options()("help", "produce help message")("verbose,v", po::value<int>()->implicit_value(-1),
-			"enable verbosity override to specify level")("gperf",
-			po::value<int>()->implicit_value(0), "enable gerpftools profiling by cpu sample (linux only!)");
+		desc.add_options()
+			("help", "produce help message")
+			("v-lvl", po::value<int>()->implicit_value(-1), "enable verbosity override to specify level")
+				("gperf", po::value<int>()->implicit_value(0), "enable gerpftools profiling by cpu sample (linux only!)")
+						("no-cpu-profile", po::value<int>()->implicit_value(0), "disable cpu profiling (tracy)");
 
 		po::store(po::command_line_parser(ac, av).options(desc).run(), GVariableMap);
 		po::notify(GVariableMap);
@@ -239,10 +241,10 @@ int main(int ac, char* av[])
 		/**
 		 * Change verbosity
 		 */
-		if (GVariableMap.count("verbose"))
+		if (GVariableMap.count("v-lvl"))
 		{
-			GLogVerbosity = GVariableMap["verbose"].as<int>();
-			cout << "options: Verbosity override enabled.  Level is " << GLogVerbosity
+			GLogVerbosity = GVariableMap["v-lvl"].as<int>();
+			cout << "options: verbosity override is " << GLogVerbosity
 				 << "\n";
 		}
 		/**
@@ -253,7 +255,19 @@ int main(int ac, char* av[])
 			if (GVariableMap.count("gperf") && GVariableMap["gperf"].as<int>() == 1)
 			{
 				GGperfEnabled = true;
-				cout << "options: gperf enabled"
+				cout << "options: gperf 1"
+					 << "\n";
+			}
+		}
+		/**
+		 * Enable cpu profiler by default
+		 */
+		if constexpr (HLVM_COMPILE_WITH_PROFILER)
+		{
+			if (GVariableMap.count("no-cpu-profile") && GVariableMap["no-cpu-profile"].as<int>() == 1)
+			{
+				FProfilerCPU::bEnabled = false;
+				cout << "options: no-cpu-profile 1"
 					 << "\n";
 			}
 		}

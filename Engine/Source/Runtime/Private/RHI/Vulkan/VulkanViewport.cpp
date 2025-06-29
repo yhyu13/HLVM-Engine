@@ -61,6 +61,7 @@ void FVulkanViewport::CreateSwapChain(FVulkanSwapChain::FRecreateInfo& InCreateI
 		// Create back buffer
 		HLVM_ASSERT(RHIBackBuffer == nullptr);
 		FRHITextureCreateInfo BackBufferCreateInfo;
+		BackBufferCreateInfo.DebugName = TXT("VulkanBackBuffer");
 		BackBufferCreateInfo.Extent.x = SwapChain->swapChainExtent.width;
 		BackBufferCreateInfo.Extent.y = SwapChain->swapChainExtent.height;
 		BackBufferCreateInfo.Extent.z = 0;
