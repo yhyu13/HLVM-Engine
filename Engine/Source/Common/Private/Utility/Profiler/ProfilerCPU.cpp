@@ -14,60 +14,56 @@
 
 #if HLVM_COMPILE_WITH_PROFILER
 
-namespace hlvm_private
+/**
+ * TLS Wrapper for FTrackedThread, used later as tls object to hold FTrackedThread
+ */
+class FThreadPtrTLS
 {
-	/**
-	 * TLS Wrapper for FTrackedThread, used later as tls object to hold FTrackedThread
-	 */
-	class FThreadPtrTLS
+public:
+	NOCOPYMOVE(FThreadPtrTLS)
+	FThreadPtrTLS() = default;
+	~FThreadPtrTLS()
 	{
-	public:
-		NOCOPYMOVE(FThreadPtrTLS)
-		FThreadPtrTLS() = default;
-		~FThreadPtrTLS()
+		if (mThread)
 		{
-			if (mThread)
-			{
-				LOCK_GUARD_FLAG(FProfilerCPU::GetAtomicFlagS());
-				/**
-				 * Remove thread from tracked threads on tls destruction
-				 */
-				std::remove_if(FProfilerCPU::TrackedThreads.begin(), FProfilerCPU::TrackedThreads.end(),
-					[this](const std::shared_ptr<FProfilerCPU::FTrackedThread>& thread) {
-						return thread.get() == mThread;
-					});
-			}
+			LOCK_GUARD_FLAG(FProfilerCPU::GetAtomicFlagS());
+			/**
+			 * Remove thread from tracked threads on tls destruction
+			 */
+			std::remove_if(FProfilerCPU::TrackedThreads.begin(), FProfilerCPU::TrackedThreads.end(),
+				[this](const std::shared_ptr<FProfilerCPU::FTrackedThread>& thread) {
+					return thread.get() == mThread;
+				});
 		}
+	}
 
-		HLVM_INLINE_FUNC FProfilerCPU::FTrackedThread* Get() const
+	HLVM_INLINE_FUNC FProfilerCPU::FTrackedThread* Get() const
+	{
+		return mThread;
+	}
+
+	FProfilerCPU::FTrackedThread* Set(std::shared_ptr<FProfilerCPU::FTrackedThread>&& thread)
+	{
+		mThread = thread.get();
 		{
-			return mThread;
+			/**
+			 * Add thread to tracked threads on tls creation
+			 */
+			LOCK_GUARD_FLAG(FProfilerCPU::GetAtomicFlagS());
+			FProfilerCPU::TrackedThreads.push_back(MoveTemp(thread));
 		}
+		return mThread;
+	}
 
-		FProfilerCPU::FTrackedThread* Set(std::shared_ptr<FProfilerCPU::FTrackedThread>&& thread)
-		{
-			mThread = thread.get();
-			{
-				/**
-				 * Add thread to tracked threads on tls creation
-				 */
-				LOCK_GUARD_FLAG(FProfilerCPU::GetAtomicFlagS());
-				FProfilerCPU::TrackedThreads.push_back(MoveTemp(thread));
-			}
-			return mThread;
-		}
+	operator bool() const
+	{
+		return mThread != nullptr;
+	}
 
-		operator bool() const
-		{
-			return mThread != nullptr;
-		}
-
-	private:
-		FProfilerCPU::FTrackedThread* mThread;
-	};
-} // namespace hlvm_private
-
-HLVM_THREAD_LOCAL_VAR HLVM_STATIC_VAR hlvm_private::FThreadPtrTLS CurrentThread;
+private:
+	FProfilerCPU::FTrackedThread* mThread;
+};
+HLVM_THREAD_LOCAL_VAR HLVM_STATIC_VAR FThreadPtrTLS CurrentThread;
 
 FProfilerCPU::FTrackedThread::FTrackedThread(const TCHAR* name)
 {
@@ -134,7 +130,8 @@ TVector<FProfilerCPU::FTrackedEvent> FProfilerCPU::FTrackedThread::ExtractEvents
 	return Ret;
 }
 
-bool														  FProfilerCPU::bEnabled{ true };  // Static
+bool														  FProfilerCPU::bEnabled{ true }; // Static
+TUINT64														  FProfilerCPU::FrameCount{ 0 };  // Static
 TSmallVector64<std::shared_ptr<FProfilerCPU::FTrackedThread>> FProfilerCPU::TrackedThreads{}; // Static
 
 bool FProfilerCPU::IsProfilingCurrentThread()
@@ -221,8 +218,9 @@ void FProfilerCPU::OnMemMalloc(void* ptr, size_t size)
 	}
 	#endif
 
-	// Register allocation during the current CPU event
-	if (auto LastEvent = GetCurrentThreadActiveEvent())
+	// Register allocation during the current CPU event (TODO : should we reduce this value when free?)
+	if (FProfilerCPU::FTrackedEvent* LastEvent = GetCurrentThreadActiveEvent();
+		LastEvent)
 	{
 		LastEvent->NativeMemoryAllocation += size;
 	}
@@ -246,6 +244,21 @@ void FProfilerCPU::OnMemFree(void* ptr)
 	{
 		TracySecureFree(ptr);
 	}
+	#endif
+}
+
+void FProfilerCPU::OnFrameBegin()
+{
+	FrameCount++;
+	#if HLVM_PROFILER_USE_TRACY
+	FrameMarkStart(nullptr);
+	#endif
+}
+
+void FProfilerCPU::OnFrameEnd()
+{
+	#if HLVM_PROFILER_USE_TRACY
+	FrameMarkEnd(nullptr);
 	#endif
 }
 

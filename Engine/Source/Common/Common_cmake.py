@@ -2,28 +2,29 @@ from PyCMake.cmakecpp import *
 
 # Create a VcpkgContext object with the specified path for vcpkg root and version
 vcpkg_cxt_common = VcpkgContenxt(vcpkg_root_path='../Dependency/vcpkg',
-                          vcpkg_config=VcpkgConfigModel(name='Common',
-                                                        version='0.2.1',
-                                                        dependencies=[
-                                                            "spdlog",
-                                                            VcpkgPackage(name="mimalloc", features=["asm", "secure"],
-                                                                         default_features=False),
-                                                            "magic-enum",
-                                                            "boost",
-                                                            "libbacktrace",  # used by boost stack trace on linux
-                                                            "zstd",
-                                                            "botan",
-                                                            "rapidjson",
-                                                            "gperftools",  # linux cpu sampling
-                                                            "minitrace",  # chrome format tracing
-                                                            VcpkgPackage(name="luajit", features=["buildvm-64"],
-                                                                         default_features=True),
-                                                            "sol2",
-                                                            "pybind11",
-                                                            "taskflow",
-                                                            "dylib",
-                                                            "vulkan-headers",
-                                                        ]))
+                                 vcpkg_config=VcpkgConfigModel(name='Common',
+                                                               version='0.2.1',
+                                                               dependencies=[
+                                                                   "spdlog",
+                                                                   VcpkgPackage(name="mimalloc",
+                                                                                features=["asm", "secure"],
+                                                                                default_features=False),
+                                                                   "magic-enum",
+                                                                   "boost",
+                                                                   "libbacktrace",  # used by boost stack trace on linux
+                                                                   "zstd",
+                                                                   "botan",
+                                                                   "rapidjson",
+                                                                   "gperftools",  # linux cpu sampling
+                                                                   "minitrace",  # chrome format tracing
+                                                                   VcpkgPackage(name="luajit", features=["buildvm-64"],
+                                                                                default_features=True),
+                                                                   "sol2",
+                                                                   "pybind11",
+                                                                   "taskflow",
+                                                                   "dylib",
+                                                                   "vulkan-headers",
+                                                               ]))
 
 # Find the spdlog package with the specified options
 spdlog = FindPackage(name='spdlog',
@@ -109,10 +110,10 @@ sol2 = FindPackage(name='sol2',
 
 # Find the taskflow package with the specified options
 taskflow = FindPackage(name='Taskflow',
-                   config=True,
-                   required=True,
-                   dependant_target_link_libs=[
-                       DomainValueModel(domain=DomainEnum.PUBLIC, values=['Taskflow::Taskflow'])])
+                       config=True,
+                       required=True,
+                       dependant_target_link_libs=[
+                           DomainValueModel(domain=DomainEnum.PUBLIC, values=['Taskflow::Taskflow'])])
 
 # Find the dylib package with the specified options
 dylib = FindPackage(name='dylib',
@@ -123,11 +124,10 @@ dylib = FindPackage(name='dylib',
 
 # Find the vulkan-headers package with the specified options
 vulkan_header = FindPackage(name='VulkanHeaders',
-                    config=True,
-                    required=False,
-                    dependant_target_link_libs=[
-                        DomainValueModel(domain=DomainEnum.PUBLIC, values=['Vulkan::Headers'])])
-
+                            config=True,
+                            required=False,
+                            dependant_target_link_libs=[
+                                DomainValueModel(domain=DomainEnum.PUBLIC, values=['Vulkan::Headers'])])
 
 ##########################################################
 
@@ -165,14 +165,19 @@ ctre = FetchContent(name='ctre',
 # Fetch the Tracy package from GitHub with the specified options
 tracy = FetchContent(name='Tracy',
                      git_repo_url='https://github.com/yhyu13/tracy.git',
-                     git_tag='b48216cc6fbd0f36764c6d36bd71dd8f8e3d3830',
+                     git_tag='272cdbd9f2588b5b00b97dd3da853d44d6e8fd44',
                      target_compile_options=[TargetDomainValueModel(target='TracyClient', domain=DomainEnum.INTERFACE,
-                                                                    values=['-DTRACY_ONLY_LOCALHOST=ON',
-                                                                            '-DTRACY_NO_FRAME_IMAGE=ON',
-                                                                            '-DTRACY_ONLY_IPV4=ON',
-                                                                            '-DTRACY_USE_RPMALLOC=ON',
-                                                                            '-DTRACY_NO_EXIT=ON',
-                                                                            '-DTRACY_LIBBACKTRACE_ELF_DYNLOAD_SUPPORT=ON'])],
+                                                                    values=[
+                                                                        # '-DTRACY_ON_DEMAND=ON', On demand not work on Linux
+                                                                        '-DTRACY_ONLY_LOCALHOST=ON',
+                                                                        '-DTRACY_NO_FRAME_IMAGE=ON',
+                                                                        '-DTRACY_ONLY_IPV4=ON',
+                                                                        '-DTRACY_USE_RPMALLOC=ON',
+                                                                        # No exit will make client program wait unitl profiler finish, which prolong exit time especially for client release build
+                                                                        '-DTRACY_NO_EXIT=ON',
+                                                                        '-DTRACY_LIBBACKTRACE_ELF_DYNLOAD_SUPPORT=ON',
+                                                                        # '$<$<CONFIG:Release>:-DTRACY_NO_CODE_TRANSFER=ON>'
+                                                                    ])],
                      dependant_target_link_libs=[
                          DomainValueModel(domain=DomainEnum.PUBLIC, values=['Tracy::TracyClient'])]
                      )
@@ -189,9 +194,10 @@ class CommonModule(BaseModule):
     def __init__(self):
         super().__init__(module=ModuleTargetModel(target='Common',
                                                   type=ModuleEnum.SHARED if bBuildShared else ModuleEnum.STATIC,
-                                                  source_files=PyCMakeUtil.glob([PyCMakeUtil.GlobModel(path='./Private/**/*.cpp',
-                                                                                           recursive=True)
-                                                                                 ]),
+                                                  source_files=PyCMakeUtil.glob(
+                                                      [PyCMakeUtil.GlobModel(path='./Private/**/*.cpp',
+                                                                             recursive=True)
+                                                       ]),
                                                   unity_build=True),
                          fetch_packages=[yalantinlibs,
                                          parallel_hashmap,
@@ -256,6 +262,12 @@ class CommonProject(BaseProject):
         super().__init__(name='Common',
                          version='3.14',
                          vcpkg_context=vcpkg_cxt_common, **kwargs)
+
+        # Proxy
+        self.global_interface.add_global_set('ENV{HTTP_PROXY}', ["http://127.0.0.1:8889"])
+        self.global_interface.add_global_set('ENV{HTTPS_PROXY}', ["http://127.0.0.1:8889"])
+        self.global_interface.add_global_set('ENV{http_proxy}', ["http://127.0.0.1:8889"])
+        self.global_interface.add_global_set('ENV{https_proxy}', ["http://127.0.0.1:8889"])
 
         # Linker
         if bBuildShared:

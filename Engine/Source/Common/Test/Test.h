@@ -292,6 +292,7 @@ int main(int ac, char* av[])
 		HLVM_SCOPED_VARIABLE(
 			Scoped,
 			[&] {
+				FProfilerCPU::OnFrameBegin();
 				if constexpr (HLVM_ALLOW_GPERF)
 				{
 					if (GGperfEnabled)
@@ -308,6 +309,8 @@ int main(int ac, char* av[])
 						ProfilerStop();
 					}
 				}
+				FProfilerCPU::OnFrameEnd();
+				FProfilerCPU::Dispose();
 			});
 
 		// Run all registered test functions
@@ -316,6 +319,7 @@ int main(int ac, char* av[])
 			test_function();
 		}
 	}
+
 	// Finalize mallocator
 	{
 		FinlMallocator();

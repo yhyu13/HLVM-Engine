@@ -10,14 +10,14 @@
  * https://flaxengine.com/licensing
  */
 
-#include "Utility/Profiler/ProfilerDefinition.h"
+#include "TracyDefinition.h"
 
 #if HLVM_COMPILE_WITH_PROFILER
 	#if HLVM_PROFILER_USE_TRACY
 
 		#include "Utility/Profiler/ProfilerSrcLoc.h"
 
-		// Undef empty macros for disabled profiler
+		// Undef empty macros for other profiler and instead define new ones for tracy
 		#undef HLVM_PROFILE_CPU
 		#undef HLVM_PROFILE_CPU_NAMED
 		#undef HLVM_PROFILE_CPU_SRC_LOC

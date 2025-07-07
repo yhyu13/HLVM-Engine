@@ -129,6 +129,12 @@ class RuntimeProject(BaseProject):
                                                     output_dir="Common.output",
                                                     exclude_by_default=True))
 
+        # Proxy
+        self.global_interface.add_global_set('ENV{HTTP_PROXY}', ["http://127.0.0.1:8889"])
+        self.global_interface.add_global_set('ENV{HTTPS_PROXY}', ["http://127.0.0.1:8889"])
+        self.global_interface.add_global_set('ENV{http_proxy}', ["http://127.0.0.1:8889"])
+        self.global_interface.add_global_set('ENV{https_proxy}', ["http://127.0.0.1:8889"])
+
         # Linker
         if bBuildShared:
             self.global_interface.add_global_set('CMAKE_POSITION_INDEPENDENT_CODE', ['ON'])

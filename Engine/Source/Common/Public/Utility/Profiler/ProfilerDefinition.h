@@ -29,20 +29,6 @@
  * Global var to turn tracy code on/off in runtime
  */
 HLVM_INLINE_VAR bool GbTracyEnabled = true;
-	/**
-	 * Force Enable callstack
-	 */
-	#define TRACY_CALLSTACK 8
-
-	#if !HLVM_SHIPPING
-		#if defined(__clang__) || defined(__GNUC__)
-			#define TracyFunction __PRETTY_FUNCTION__
-		#elif defined(_MSC_VER)
-			#define TracyFunction __FUNCSIG__
-		#endif
-		#include <tracy/Tracy.hpp>
-		#include <tracy/TracyC.h>
-	#endif
 #endif
 
 // TODO : integrate minitrace with profiler interface

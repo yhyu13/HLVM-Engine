@@ -29,7 +29,7 @@
  * is optimized for shipping. e.g. disable profiling and other developer only features
  */
 #ifndef HLVM_SHIPPING
-	#define HLVM_SHIPPING 0
+	#define HLVM_SHIPPING 0 // TODO modify Common_cmake.py to define HLVM_SHIPPING in certain configuration
 #endif
 
 #include "Definition/KeywordDefinition.h"

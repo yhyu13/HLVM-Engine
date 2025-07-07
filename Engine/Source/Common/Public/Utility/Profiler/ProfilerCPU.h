@@ -161,17 +161,35 @@ public:
 	 */
 	HLVM_STATIC_FUNC void OnMemFree(void* ptr);
 
+	/**
+	 * Begin a frame
+	 */
+	HLVM_STATIC_FUNC void OnFrameBegin();
+
+	/**
+	 * End a frame
+	 */
+	HLVM_STATIC_FUNC void OnFrameEnd();
+
 public:
+	/**
+	 * The profiling tools usage flag. Can be used to disable profiler. Engine turns it down before the exit and before platform startup.
+	 */
+	HLVM_STATIC_VAR bool bEnabled;
+
+	/**
+	 *  The current frame count.
+	 */
+	HLVM_STATIC_VAR TUINT64 FrameCount;
+
+private:
+	friend class FThreadPtrTLS;
+
 	/**
 	 * The registered threads. Reading and writing to this variable should be guarded by the Lock method.
 	 * e.g. FAtomicLockGuard Lock(FProfilerCPU::GetAtomicFlagS()); ...
 	 */
 	HLVM_STATIC_VAR TSmallVector64<std::shared_ptr<FTrackedThread>> TrackedThreads;
-
-	/**
-	 * The profiling tools usage flag. Can be used to disable profiler. Engine turns it down before the exit and before platform startup.
-	 */
-	HLVM_STATIC_VAR bool bEnabled;
 };
 
 /**
@@ -241,9 +259,9 @@ struct FScopeEventCPU
 #endif
 
 #if HLVM_COMPILE_WITH_PROFILER
-	#define HLVM_PROFILER_CPU_ONOFF(cond)                   \
-		HLVM_SCOPED_VARIABLE(                               \
-			ScopedProfilerCPU,                              \
+	#define HLVM_PROFILER_CPU_ONOFF(cond)                    \
+		HLVM_SCOPED_VARIABLE(                                \
+			ScopedProfilerCPU,                               \
 			[]() -> void { FProfilerCPU::bEnabled = cond; }, \
 			[]() -> void { FProfilerCPU::bEnabled = !cond; })
 #else
