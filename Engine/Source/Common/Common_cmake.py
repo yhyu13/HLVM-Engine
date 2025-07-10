@@ -7,7 +7,8 @@ vcpkg_cxt_common = VcpkgContenxt(vcpkg_root_path='../Dependency/vcpkg',
                                                                dependencies=[
                                                                    "spdlog",
                                                                    VcpkgPackage(name="mimalloc",
-                                                                                features=["asm", "secure"],
+                                                                                features=["asm", "secure"],# asm no longer work on mimalloc2.2.3
+                                                                                #features=["secure"],
                                                                                 default_features=False),
                                                                    "magic-enum",
                                                                    "boost",
@@ -22,8 +23,10 @@ vcpkg_cxt_common = VcpkgContenxt(vcpkg_root_path='../Dependency/vcpkg',
                                                                    "sol2",
                                                                    "pybind11",
                                                                    "taskflow",
-                                                                   "dylib",
-                                                                   "vulkan-headers",
+                                                                   VcpkgPackage(name="bitserializer",
+                                                                                features=["rapidjson-archive",
+                                                                                          "msgpack-archive"],
+                                                                                default_features=True),
                                                                ]))
 
 # Find the spdlog package with the specified options
@@ -115,31 +118,23 @@ taskflow = FindPackage(name='Taskflow',
                        dependant_target_link_libs=[
                            DomainValueModel(domain=DomainEnum.PUBLIC, values=['Taskflow::Taskflow'])])
 
-# Find the dylib package with the specified options
-dylib = FindPackage(name='dylib',
-                    config=True,
-                    required=True,
-                    dependant_target_include_dirs=[
-                        DomainValueModel(domain=DomainEnum.PUBLIC, values=['${DYLIB_INCLUDE_DIRS}'])])
-
-# Find the vulkan-headers package with the specified options
-vulkan_header = FindPackage(name='VulkanHeaders',
-                            config=True,
-                            required=False,
-                            dependant_target_link_libs=[
-                                DomainValueModel(domain=DomainEnum.PUBLIC, values=['Vulkan::Headers'])])
-
 ##########################################################
 
 # Fetch the Yalantinglibs package from GitHub with the specified options
 yalantinlibs = FetchContent(name='yalantinglibs',
                             git_repo_url='https://github.com/yhyu13/yalantinglibs.git',
                             git_tag='abf6016a8f7841d29303ef68f118ea85b69a1051',
-                            target_compile_options=[TargetDomainValueModel(target='yalantinglibs',
-                                                                           domain=DomainEnum.INTERFACE,
-                                                                           values=['-DYLT_ENABLE_PMR=ON',
-                                                                                   '-DIGUANA_ENABLE_PMR=ON',
-                                                                                   '-DENABLE_STRUCT_PACK_OPTIMIZE=ON'])],
+                            # target_compile_options=[TargetDomainValueModel(target='yalantinglibs',
+                            #                                                domain=DomainEnum.INTERFACE,
+                            #                                                values=[#'-DYLT_ENABLE_PMR=ON',
+                            #                                                        #'-DIGUANA_ENABLE_PMR=ON',
+                            #                                                        '-DENABLE_PMR=ON',
+                            #                                                        '-DENABLE_STRUCT_PACK_OPTIMIZE=ON'])],
+                            option_overrides=[
+                                OptionOverrideModel(option='YLT_ENABLE_PMR', value='ON'),
+                                OptionOverrideModel(option='IGUANA_ENABLE_PMR', value='ON'),
+                                OptionOverrideModel(option='YLT_ENABLE_STRUCT_PACK_OPTIMIZE', value='ON')
+                            ],
                             dependant_target_link_libs=[
                                 DomainValueModel(domain=DomainEnum.PUBLIC, values=['yalantinglibs::yalantinglibs'])]
                             )
@@ -165,19 +160,26 @@ ctre = FetchContent(name='ctre',
 # Fetch the Tracy package from GitHub with the specified options
 tracy = FetchContent(name='Tracy',
                      git_repo_url='https://github.com/yhyu13/tracy.git',
-                     git_tag='272cdbd9f2588b5b00b97dd3da853d44d6e8fd44',
-                     target_compile_options=[TargetDomainValueModel(target='TracyClient', domain=DomainEnum.INTERFACE,
-                                                                    values=[
-                                                                        # '-DTRACY_ON_DEMAND=ON', On demand not work on Linux
-                                                                        '-DTRACY_ONLY_LOCALHOST=ON',
-                                                                        '-DTRACY_NO_FRAME_IMAGE=ON',
-                                                                        '-DTRACY_ONLY_IPV4=ON',
-                                                                        '-DTRACY_USE_RPMALLOC=ON',
-                                                                        # No exit will make client program wait unitl profiler finish, which prolong exit time especially for client release build
-                                                                        '-DTRACY_NO_EXIT=ON',
-                                                                        '-DTRACY_LIBBACKTRACE_ELF_DYNLOAD_SUPPORT=ON',
-                                                                        # '$<$<CONFIG:Release>:-DTRACY_NO_CODE_TRANSFER=ON>'
-                                                                    ])],
+                     git_tag='58d112e89245ae1d6221aa2a4842e24f56df213d',
+                     # target_compile_options=[TargetDomainValueModel(target='TracyClient', domain=DomainEnum.INTERFACE,
+                     #                                                values=[
+                     #                                                    # '-DTRACY_ON_DEMAND=ON', On demand not work on Linux
+                     #                                                    '-DTRACY_ONLY_LOCALHOST=ON',
+                     #                                                    '-DTRACY_NO_FRAME_IMAGE=ON',
+                     #                                                    '-DTRACY_ONLY_IPV4=ON',
+                     #                                                    '-DTRACY_USE_RPMALLOC=ON',
+                     #                                                    # No exit will make client program wait unitl profiler finish, which prolong exit time especially for client release build
+                     #                                                    '-DTRACY_NO_EXIT=OFF',
+                     #                                                    '-DTRACY_LIBBACKTRACE_ELF_DYNLOAD_SUPPORT=ON',
+                     #                                                ])],
+                     option_overrides=[
+                         OptionOverrideModel(option='TRACY_ONLY_LOCALHOST', value='ON'),
+                         OptionOverrideModel(option='TRACY_NO_FRAME_IMAGE', value='ON'),
+                         OptionOverrideModel(option='TRACY_ONLY_IPV4', value='ON'),
+                         OptionOverrideModel(option='TRACY_USE_RPMALLOC', value='ON'),
+                         OptionOverrideModel(option='TRACY_NO_EXIT', value='OFF'),
+                         OptionOverrideModel(option='TRACY_LIBBACKTRACE_ELF_DYNLOAD_SUPPORT', value='ON'),
+                     ],
                      dependant_target_link_libs=[
                          DomainValueModel(domain=DomainEnum.PUBLIC, values=['Tracy::TracyClient'])]
                      )
@@ -216,8 +218,6 @@ class CommonModule(BaseModule):
                                         luajit,
                                         sol2,
                                         taskflow,
-                                        dylib,
-                                        vulkan_header,
                                         ]
                          )
         self.target_interface.add_compile_options(domain=DomainEnum.PUBLIC, values=[

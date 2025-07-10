@@ -90,6 +90,11 @@ public:
 		return EFreeRetType::Success;
 	}
 
+	HLVM_INLINE_FUNC virtual void Collect(bool bForce) noexcept final override
+	{
+		mi_collect(bForce);
+	}
+
 private:
 	mi_heap_t*			 mHeap;
 	FMiMallocatorContext mCtx;

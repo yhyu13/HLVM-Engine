@@ -185,7 +185,7 @@ for config in "${buildConfigs[@]}"; do
         cbuild_param="--clean-first ${cbuild_param}"
     fi
     if [ ${RunClean} -eq 1 ]; then
-        cbuild_param="--target 'clean' ${cbuild_param}"
+        cbuild_param="--target clean ${cbuild_param}"
     fi
     if [ -n "${BuildTarget}" ]; then
         cbuild_param="--target ${BuildTarget} ${cbuild_param}"

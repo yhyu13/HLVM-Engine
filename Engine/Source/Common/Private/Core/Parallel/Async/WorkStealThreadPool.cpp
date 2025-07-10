@@ -100,6 +100,10 @@ FWorkStealThreadPool::FWorkStealThreadPool(const FThreadAffinityMode& AffinityMo
 				{
 					task();
 				}
+				/*
+				 * Collect memory for multithreading to avoid delayed freeing
+				 */
+				GMallocatorTLS->Collect();
 			}
 		};
 

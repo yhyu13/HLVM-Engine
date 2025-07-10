@@ -80,4 +80,6 @@ private:
 
 #if HLVM_ENABLE_GLOBAL_VMMALLOCATOR
 HLVM_INLINE_VAR HLVM_THREAD_LOCAL_VAR FVMArenaMallocator GVMArenaMallocatorTLS{};
+	#undef HLVM_LOW_GMALLOC_TLS
+	#define HLVM_LOW_GMALLOC_TLS GVMArenaMallocatorTLS
 #endif

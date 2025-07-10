@@ -324,5 +324,14 @@ int main(int ac, char* av[])
 	{
 		FinlMallocator();
 	}
+
+//	tracy::GetProfiler().RequestShutdown();
+//	std::this_thread::sleep_for( std::chrono::milliseconds( 10 ) );
+//	while( !tracy::GetProfiler().HasShutdownFinished() )
+//	{
+//		HLVM_LOG(LogTemp, info, TXT("Waiting for tracy to shutdown..."));
+//		std::this_thread::sleep_for( std::chrono::milliseconds( 1000 ) );
+//	}
+
 	return 0;
 }

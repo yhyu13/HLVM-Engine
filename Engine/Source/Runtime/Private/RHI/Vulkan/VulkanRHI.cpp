@@ -671,7 +671,6 @@ void FVulkanRHI::CreateVulkanInstance()
 		CreateInfo.enabledLayerCount = 0;
 		CreateInfo.pNext = nullptr;
 	}
-
 	VkResult Result = VulkanRHI::vkCreateInstance(&CreateInfo, nullptr, &Instance);
 	HLVM_ENSURE(Result == VK_SUCCESS);
 }

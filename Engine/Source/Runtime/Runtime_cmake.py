@@ -7,7 +7,8 @@ vcpkg_ctx_runtime = VcpkgContenxt(vcpkg_root_path='../Dependency/vcpkg',
                                                         dependencies=[
                                                             "glfw3",
                                                             "glm",
-                                                            "vulkan-headers",
+                                                            "dylib",
+                                                            #"vulkan-headers",
                                                             "vulkan-memory-allocator",
                                                             "assimp",
                                                             "bullet3",
@@ -35,14 +36,21 @@ glm = FindPackage(name='glm',
                   dependant_target_link_libs=[
                       DomainValueModel(domain=DomainEnum.PUBLIC, values=['glm::glm'])])
 
-# Find the vulkan-headers package with the specified options
-vulkan_header = FindPackage(name='VulkanHeaders',
-                            config=True,
-                            required=False,
-                            dependant_target_link_libs=[
-                                DomainValueModel(domain=DomainEnum.PUBLIC, values=['Vulkan::Headers'])])
+# Find the dylib package with the specified options
+dylib = FindPackage(name='dylib',
+                    config=True,
+                    required=True,
+                    dependant_target_include_dirs=[
+                        DomainValueModel(domain=DomainEnum.PUBLIC, values=['${DYLIB_INCLUDE_DIRS}'])])
 
-# Find the vulkan-headers package with the specified options
+# # Find the vulkan-headers package with the specified options
+# vulkan_header = FindPackage(name='VulkanHeaders',
+#                             config=True,
+#                             required=False,
+#                             dependant_target_link_libs=[
+#                                 DomainValueModel(domain=DomainEnum.PUBLIC, values=['Vulkan::Headers'])])
+
+# Find the vma package with the specified options
 vulkan_memory_allocator = FindPackage(name='VulkanMemoryAllocator',
                             config=True,
                             required=True,
@@ -68,7 +76,8 @@ class RuntimeModule(BaseModule):
                          fetch_packages=[],
                          find_packages=[glfw3,
                                         glm,
-                                        vulkan_header,
+                                        dylib,
+                                        #vulkan_header,
                                         vulkan_memory_allocator,
                                         ]
                          )

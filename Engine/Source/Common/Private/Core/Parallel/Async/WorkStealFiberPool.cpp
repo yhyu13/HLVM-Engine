@@ -7,6 +7,8 @@
 #if HLVM_ENABLE_BOOST_FIBER_POOL
 	#include "Platform/GenericPlatformThreadUtil.h"
 
+#error "Boost fiber pool support is deprecated"
+
 DECLARE_LOG_CATEGORY(LogWorkStealFiberPool);
 
 FWorkStealFiberPool* FWorkStealFiberPool::Get()
