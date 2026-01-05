@@ -3,7 +3,7 @@
  */
 
 #include "VulkanRHI.h"
-#include "Window/Vulkan/GLFW3Vulkan.h"
+#include "Window/Vulkan/GLFW3VulkanWindow.h"
 
 // TODO : Refactory these static method into each vulkan class
 namespace
@@ -785,7 +785,7 @@ void FVulkanRHI::CreateVulkanQueues()
 
 void FVulkanRHI::CreateVulkanViewPort()
 {
-	TSharedPtr<FGLFW3Vulkan> glfwWindow = SP_C(FGLFW3Vulkan, InitializerParam.NativeWindowHandle);
+	TSharedPtr<FGLFW3VulkanWindow> glfwWindow = SP_C(FGLFW3VulkanWindow, InitializerParam.NativeWindowHandle);
 	const IWindow::Properties& Property = glfwWindow->GetProperties();
 
 	FRHIViewportCreateInfo ViewportDesc;

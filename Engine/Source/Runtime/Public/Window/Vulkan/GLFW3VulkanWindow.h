@@ -10,14 +10,14 @@
 // Only include when HLVM_WINDOW_USE_VULKAN is true
 static_assert(HLVM_WINDOW_USE_VULKAN);
 
-class FGLFW3Vulkan final : public FGLFW3Window
+class FGLFW3VulkanWindow final : public FGLFW3Window
 {
 public:
-	NOCOPYMOVE(FGLFW3Vulkan)
+	NOCOPYMOVE(FGLFW3VulkanWindow)
 
-	FGLFW3Vulkan() = delete;
-	explicit FGLFW3Vulkan(const Properties& InProperties);
-	virtual ~FGLFW3Vulkan() override;
+	FGLFW3VulkanWindow() = delete;
+	explicit FGLFW3VulkanWindow(const Properties& InProperties);
+	virtual ~FGLFW3VulkanWindow() override;
 
 	/**
 	 * @brief Gets a handle from the platform's Vulkan surface

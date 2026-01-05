@@ -8,7 +8,7 @@ DECLARE_LOG_CATEGORY(LogTest)
 
 #include "Window/WindowDefinition.h"
 #if HLVM_WINDOW_USE_VULKAN
-	#include "Window/Vulkan/GLFW3Vulkan.h"
+	#include "Window/Vulkan/GLFW3VulkanWindow.h"
 
 using namespace VulkanRHI;
 
@@ -1236,7 +1236,7 @@ RECORD_BOOL(test_GLFW3VulkanWindowRaw)
 	HelloTriangleApplication app;
 	try
 	{
-		//app.run();
+		// app.run();
 	}
 	catch (const std::exception& e)
 	{
@@ -1251,52 +1251,62 @@ RECORD_BOOL(test_GLFW3VulkanWindowRaw)
 
 RECORD_BOOL(test_GLFW3VulkanWindow)
 {
-	//1 . Create window
-	IWindow::Properties Properties;
-	Properties.Resizable = false;
-	Properties.Mode = IWindow::EDisplayMode::Windowed;
-	TSharedPtr<FGLFW3Vulkan> Window = MAKE_SHARED(FGLFW3Vulkan, Properties);
-	HLVM_LOG(LogTest, debug, TXT("FGLFW3Vulkan created!"));
+	// 1 . Create window
+	TSharedPtr<FGLFW3VulkanWindow> gWindow;
+	{
+		IWindow::Properties Properties;
+		Properties.Resizable = false;
+		Properties.Mode = IWindow::EDisplayMode::Windowed;
+		gWindow = MAKE_SHARED(FGLFW3VulkanWindow, Properties);
+	}
+	HLVM_LOG(LogTest, debug, TXT("FGLFW3VulkanWindow created!"));
 
-	//2 . Create RHI
-	FVulkanRHIInitializer Initializer;
-	Initializer.RequiredExtensions = { Window->GetRequiredExtensions() };
-	Initializer.CreateSurfaceFunc = [&Window](VkInstance Instance) { return Window->CreateSurface(Instance); };
-	Initializer.NativeWindowHandle = Window;
-	TUniquePtr<FVulkanRHI> VulkanRHI = MAKE_UNIQUE(FVulkanRHI, Initializer);
+	// 2 . Create RHI
+	TSharedPtr<FVulkanRHI> gVulkanRHI;
+	{
+		FVulkanRHIInitializer Initializer;
+		Initializer.RequiredExtensions = { gWindow->GetRequiredExtensions() };
+		Initializer.CreateSurfaceFunc = [&gWindow](VkInstance Instance) { return gWindow->CreateSurface(Instance); };
+		Initializer.NativeWindowHandle = gWindow;
+		gVulkanRHI = MAKE_SHARED(FVulkanRHI, Initializer);
+	}
 	HLVM_LOG(LogTest, debug, TXT("FVulkanRHI created!"));
-	VulkanRHI->Init();
+	gVulkanRHI->Init();
 
 	{
 		// Create buffers
 		FRHIBufferRef VertexBuffer;
 		FRHIBufferRef IndexBuffer;
 		{
-			TVector<Vertex> vertices = {
-				{ { 0.0f, 0.8f, 0.0f }, { 1.0f, 0.0f, 0.0f } },
-				{ { -0.8f, -0.8f, 0.0f }, { 0.0f, 1.0f, 0.0f } },
-				{ { 0.8f, -0.8f, 0.0f }, { 0.0f, 0.0f, 1.0f } },
-			};
-			const VkDeviceSize vertexBufferSize = vertices.size() * sizeof(Vertex);
+			{
+				TVector<Vertex> vertices = {
+					{ { 0.0f, 0.8f, 0.0f }, { 1.0f, 0.0f, 0.0f } },
+					{ { -0.8f, -0.8f, 0.0f }, { 0.0f, 1.0f, 0.0f } },
+					{ { 0.8f, -0.8f, 0.0f }, { 0.0f, 0.0f, 1.0f } },
+				};
+				const VkDeviceSize vertexBufferSize = vertices.size() * sizeof(Vertex);
 
-			FRHIBufferCreateInfo VertexBufferCreateDesc;
-			VertexBufferCreateDesc.DebugName = TXT("Vertex Test");
-			VertexBufferCreateDesc.UsageFlags = EBufferUsageFlag::Vertex;
-			VertexBufferCreateDesc.UsageFlags |= EBufferUsageFlag::TransferDestination;
-			VertexBufferCreateDesc.Size = vertexBufferSize;
-			VertexBufferCreateDesc.MemoryPropertyFlags = EMemoryPropertyFlag::DeviceLocal;
-			VertexBufferCreateDesc.MemoryPropertyFlags |= EMemoryPropertyFlag::HostVisible;
-			VertexBuffer = VulkanRHI->CreateBuffer(VertexBufferCreateDesc);
+				FRHIBufferCreateInfo VertexBufferCreateDesc;
+				VertexBufferCreateDesc.DebugName = TXT("Vertex Test");
+				VertexBufferCreateDesc.UsageFlags = EBufferUsageFlag::Vertex;
+				VertexBufferCreateDesc.UsageFlags |= EBufferUsageFlag::TransferDestination;
+				VertexBufferCreateDesc.Size = vertexBufferSize;
+				VertexBufferCreateDesc.MemoryPropertyFlags = EMemoryPropertyFlag::DeviceLocal;
+				VertexBufferCreateDesc.MemoryPropertyFlags |= EMemoryPropertyFlag::HostVisible;
+				VertexBuffer = gVulkanRHI->CreateBuffer(VertexBufferCreateDesc);
+			}
 
-			TVector<uint32_t>  indices = { 0, 1, 2 };
-			const VkDeviceSize indexBufferSize = indices.size() * sizeof(uint32_t);
+			{
+				TVector<uint32_t>  indices = { 0, 1, 2 };
+				const VkDeviceSize indexBufferSize = indices.size() * sizeof(uint32_t);
 
-			FRHIBufferCreateInfo IndexBufferCreateDesc;
-			IndexBufferCreateDesc.DebugName = TXT("Index Test");
-			(IndexBufferCreateDesc.UsageFlags = EBufferUsageFlag::Index) |= EBufferUsageFlag::TransferDestination;
-			IndexBufferCreateDesc.Size = indexBufferSize;
-			(IndexBufferCreateDesc.MemoryPropertyFlags = EMemoryPropertyFlag::DeviceLocal) |= EMemoryPropertyFlag::HostVisible;
-			IndexBuffer = VulkanRHI->CreateBuffer(IndexBufferCreateDesc);
+				FRHIBufferCreateInfo IndexBufferCreateDesc;
+				IndexBufferCreateDesc.DebugName = TXT("Index Test");
+				(IndexBufferCreateDesc.UsageFlags = EBufferUsageFlag::Index) |= EBufferUsageFlag::TransferDestination;
+				IndexBufferCreateDesc.Size = indexBufferSize;
+				(IndexBufferCreateDesc.MemoryPropertyFlags = EMemoryPropertyFlag::DeviceLocal) |= EMemoryPropertyFlag::HostVisible;
+				IndexBuffer = gVulkanRHI->CreateBuffer(IndexBufferCreateDesc);
+			}
 		}
 
 		FRHIShaderRef VertShader;
@@ -1306,29 +1316,35 @@ RECORD_BOOL(test_GLFW3VulkanWindow)
 			const bool bDataDirExist = FGenericPlatformFile::Get(EPlatformFileType::Disk)->Exists(DataDir);
 			HLVM_ENSURE_F(bDataDirExist, TXT("Data directory not exist {}"), *DataDir);
 
-			auto vertShaderCode = FGenericPlatformFile::Get()->ReadContent(FPath::Combine(DataDir, TXT("vert.spv")));
-			FShaderCreateInfo vertShaderCreateInfo;
-			vertShaderCreateInfo.DebugName = TXT("vert.spv");
-			vertShaderCreateInfo.Code = MoveTemp(vertShaderCode);
-			vertShaderCreateInfo.Stage = EShaderStage::Vertex;
-			vertShaderCreateInfo.EntryPoints = {TXT("main")};
-			VertShader = VulkanRHI->CreateShader(vertShaderCreateInfo);
+			{
+				auto			  vertShaderCode = FGenericPlatformFile::Get()->ReadContent(FPath::Combine(DataDir, TXT("vert.spv")));
+				FShaderCreateInfo vertShaderCreateInfo;
+				vertShaderCreateInfo.DebugName = TXT("vert.spv");
+				vertShaderCreateInfo.Code = MoveTemp(vertShaderCode);
+				vertShaderCreateInfo.Stage = EShaderStage::Vertex;
+				vertShaderCreateInfo.EntryPoints = { TXT("main") };
+				VertShader = gVulkanRHI->CreateShader(vertShaderCreateInfo);
+			}
 
-			auto fragShaderCode = FGenericPlatformFile::Get()->ReadContent(FPath::Combine(DataDir, TXT("frag.spv")));
-			FShaderCreateInfo fragShaderCreateInfo;
-			fragShaderCreateInfo.DebugName = TXT("frag.spv");
-			fragShaderCreateInfo.Code = MoveTemp(fragShaderCode);
-			fragShaderCreateInfo.Stage = EShaderStage::Pixel;
-			fragShaderCreateInfo.EntryPoints = {TXT("main")};
-			FragShader = VulkanRHI->CreateShader(fragShaderCreateInfo);
+			{
+				auto			  fragShaderCode = FGenericPlatformFile::Get()->ReadContent(FPath::Combine(DataDir, TXT("frag.spv")));
+				FShaderCreateInfo fragShaderCreateInfo;
+				fragShaderCreateInfo.DebugName = TXT("frag.spv");
+				fragShaderCreateInfo.Code = MoveTemp(fragShaderCode);
+				fragShaderCreateInfo.Stage = EShaderStage::Pixel;
+				fragShaderCreateInfo.EntryPoints = { TXT("main") };
+				FragShader = gVulkanRHI->CreateShader(fragShaderCreateInfo);
+			}
 
-			auto geomShaderCode = FGenericPlatformFile::Get()->ReadContent(FPath::Combine(DataDir, TXT("geom.spv")));
-			FShaderCreateInfo geomShaderCreateInfo;
-			geomShaderCreateInfo.DebugName = TXT("geom.spv");
-			geomShaderCreateInfo.Code = MoveTemp(geomShaderCode);
-			geomShaderCreateInfo.Stage = EShaderStage::Geometry;
-			geomShaderCreateInfo.EntryPoints = {TXT("main")};
-			FRHIShaderRef GeomShader = VulkanRHI->CreateShader(geomShaderCreateInfo);
+			{
+				auto			  geomShaderCode = FGenericPlatformFile::Get()->ReadContent(FPath::Combine(DataDir, TXT("geom.spv")));
+				FShaderCreateInfo geomShaderCreateInfo;
+				geomShaderCreateInfo.DebugName = TXT("geom.spv");
+				geomShaderCreateInfo.Code = MoveTemp(geomShaderCode);
+				geomShaderCreateInfo.Stage = EShaderStage::Geometry;
+				geomShaderCreateInfo.EntryPoints = { TXT("main") };
+				FRHIShaderRef GeomShader = gVulkanRHI->CreateShader(geomShaderCreateInfo);
+			}
 
 			VkPipelineShaderStageCreateInfo ShaderStages[] = {
 				S_C(FVulkanShaderRef, VertShader)->GetPipelineShaderStageCreateInfo(),
@@ -1336,26 +1352,26 @@ RECORD_BOOL(test_GLFW3VulkanWindow)
 			};
 		}
 
-	}
-
-	{
-		// 2.1 Call begine frame
-		FRHIViewportRef Viewport = VulkanRHI->GetRHIViewport();
-		Viewport->BeginFrame(); // Call begin frame in order to acquire next back buffer
-		// 2.2 Get back buffer
-		FRHITextureRef BackBuffer = VulkanRHI->GetRHIBackBuffer();
-
+		// 2.1 Call begin frame
+		FRHIViewportRef Viewport = gVulkanRHI->GetRHIViewport();
 		{
-			// Renderpass && Frame buffer
-			VulkanRHI->RHIBeginRenderPass(FRHIRenderPassInfo{ BackBuffer, ERenderTargetActions::Clear_Store });
-			{
-				// Pipeline (PSO)
+			Viewport->BeginFrame(); // Call begin frame in order to acquire next back buffer
+			// 2.2 Get back buffer
+			FRHITextureRef BackBuffer = gVulkanRHI->GetRHIBackBuffer();
 
+			{
+				// Renderpass && Frame buffer
+				gVulkanRHI->RHIBeginRenderPass(FRHIRenderPassInfo{ BackBuffer, ERenderTargetActions::Clear_Store });
+				{
+					// Pipeline (PSO)
+				}
+				gVulkanRHI->RHIEndRenderPass();
 			}
-			VulkanRHI->RHIEndRenderPass();
+
+			Viewport->Present();
 		}
 	}
-	VulkanRHI->Shutdown();
+	gVulkanRHI->Shutdown();
 
 	/*
 	 * initWindow();

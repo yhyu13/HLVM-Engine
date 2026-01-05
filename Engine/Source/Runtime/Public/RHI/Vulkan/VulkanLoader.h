@@ -10,6 +10,11 @@
 	#include <vk_mem_alloc.h>
 #endif
 
+#if VULKAN_USE_SPIRV_REFLECT
+///usr/include/spirv-reflect/spirv_reflect.h
+	#include <spirv-reflect/spirv_reflect.h>
+#endif
+
 /*
  * Inspired by https://gitee.com/sumcai/MiniVulkanTriangle to load vulkan api during runtime
  */

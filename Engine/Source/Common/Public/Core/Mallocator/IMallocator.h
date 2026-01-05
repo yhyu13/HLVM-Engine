@@ -42,7 +42,8 @@ public:
 	HLVM_NODISCARD virtual EFreeRetType FreeSizeAligned(void* ptr, size_t size, size_t alignment) noexcept = 0;
 
 	/**
-	 * Collect memory (optional feature)
+	 * Collect memory (optional feature), inspired by below mimalloc bug to collect memory in thread pools
+	 * https://pwy.io/posts/mimalloc-cigarette/
 	 * https://microsoft.github.io/mimalloc/group__extended.html#ga421430e2226d7d468529cec457396756
 	 * It can be beneficial in very narrow circumstances;
 	 * in particular, when a long running thread allocates a lot of blocks that are freed by other threads it may improve resource usage by calling this every once in a while.

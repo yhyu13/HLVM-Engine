@@ -39,6 +39,9 @@ DECLARE_LOG_CATEGORY(LogVulkanRHI)
 	#define VMA_DYNAMIC_VULKAN_FUNCTIONS 0
 #endif
 
+/// @brief Use Spirv-Reflect for shader reflection
+#define VULKAN_USE_SPIRV_REFLECT 1
+
 // vulkan option definition start---------------------------------------------------------------------------------------------------------------------------------------
 
 /// @brief Enable validation layers

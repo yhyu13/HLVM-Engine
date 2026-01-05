@@ -66,7 +66,7 @@ FVulkanTexture::FVulkanTexture(VkImage InImage, const FRHITextureCreateInfo& InC
 	OwnerShip = EOwnerShip::Owner;
 
 	PostInit();
-	HLVM_LOG(LogVulkanRHI, trace, TXT("Create Texture {} {}"), *ToString(), HLVM_ENUM_TO_TCHAR(OwnerShip));
+	HLVM_LOG(LogVulkanRHI, trace, TXT("Create Texture {} {}"), *this->ToString(), HLVM_ENUM_TO_TCHAR(OwnerShip));
 }
 
 FVulkanTexture::~FVulkanTexture()
@@ -74,11 +74,11 @@ FVulkanTexture::~FVulkanTexture()
 	if (OwnerShip == EOwnerShip::Owner)
 	{
 		RHI::GetDynamicRHI<IVulkanDynamicRHI>()->DestroyVulkanImage(Image);
-		HLVM_LOG(LogVulkanRHI, trace, TXT("Destroy Texture {}"), *ToString());
+		HLVM_LOG(LogVulkanRHI, trace, TXT("Destroy Texture {}"), *this->ToString());
 	}
 	else
 	{
-		HLVM_LOG(LogVulkanRHI, trace, TXT("No Destroy Texture {} since {}"), *ToString(), HLVM_ENUM_TO_TCHAR(OwnerShip));
+		HLVM_LOG(LogVulkanRHI, trace, TXT("No Destroy Texture {} {}"), *this->ToString(), HLVM_ENUM_TO_TCHAR(OwnerShip));
 	}
 }
 

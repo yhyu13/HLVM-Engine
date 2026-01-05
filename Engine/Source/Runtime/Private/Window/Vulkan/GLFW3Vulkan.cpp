@@ -2,11 +2,11 @@
  * Copyright (c) 2025. MIT License. All rights reserved.
  */
 
-#include "Window/Vulkan/GLFW3Vulkan.h"
+#include "Window/Vulkan/GLFW3VulkanWindow.h"
 
 DECLARE_LOG_CATEGORY(LogGLFW3Vulkan)
 
-FGLFW3Vulkan::FGLFW3Vulkan(const IWindow::Properties& InProperties)
+FGLFW3VulkanWindow::FGLFW3VulkanWindow(const IWindow::Properties& InProperties)
 	: FGLFW3Window(InProperties)
 {
 	Type = EWindowType::GLFW3Vulkan;
@@ -33,12 +33,12 @@ FGLFW3Vulkan::FGLFW3Vulkan(const IWindow::Properties& InProperties)
 	HLVM_LOG(LogGLFW3Vulkan, debug, TXT("GLFW3Vulkan Init"));
 }
 
-FGLFW3Vulkan::~FGLFW3Vulkan()
+FGLFW3VulkanWindow::~FGLFW3VulkanWindow()
 {
 	HLVM_LOG(LogGLFW3Vulkan, debug, TXT("GLFW3Vulkan Destroy"));
 }
 
-VkSurfaceKHR FGLFW3Vulkan::CreateSurface(VkInstance instance)
+VkSurfaceKHR FGLFW3VulkanWindow::CreateSurface(VkInstance instance)
 {
 	if (instance == VK_NULL_HANDLE || !Window)
 	{
@@ -50,7 +50,7 @@ VkSurfaceKHR FGLFW3Vulkan::CreateSurface(VkInstance instance)
 	return surface;
 }
 
-TVector<FString> FGLFW3Vulkan::GetRequiredExtensions() const
+TVector<FString> FGLFW3VulkanWindow::GetRequiredExtensions() const
 {
 	TUINT32 glfwExtensionCount = 0;
 	const char** glfwExtensions;

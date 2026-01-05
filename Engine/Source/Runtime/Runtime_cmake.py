@@ -2,25 +2,26 @@ from PyCMake.cmakecpp import *
 
 # Create a VcpkgContext object with the specified path for vcpkg root and version
 vcpkg_ctx_runtime = VcpkgContenxt(vcpkg_root_path='../Dependency/vcpkg',
-                          vcpkg_config=VcpkgConfigModel(name='Runtime',
-                                                        version='0.2.1',
-                                                        dependencies=[
-                                                            "glfw3",
-                                                            "glm",
-                                                            "dylib",
-                                                            #"vulkan-headers",
-                                                            "vulkan-memory-allocator",
-                                                            "assimp",
-                                                            "bullet3",
-                                                        ]))
+                                  vcpkg_config=VcpkgConfigModel(name='Runtime',
+                                                                version='0.2.1',
+                                                                dependencies=[
+                                                                    "glfw3",
+                                                                    "glm",
+                                                                    "dylib",
+                                                                    "vulkan-memory-allocator",
+                                                                    "glslang",
+                                                                    "assimp",
+                                                                    "bullet3",
+                                                                ]))
 
 # 导入 Common_cmake.py 中的 vcpkg_ctx_common 变量
 import sys
 from os import path
-sys.path.append( path.dirname( path.dirname( path.abspath(__file__) ) ) )
-from Common import Common_cmake
-vcpkg_ctx_runtime.merge_vckpkg_context(Common_cmake.vcpkg_cxt_common)
 
+sys.path.append(path.dirname(path.dirname(path.abspath(__file__))))
+from Common import Common_cmake
+
+vcpkg_ctx_runtime.merge_vckpkg_context(Common_cmake.vcpkg_cxt_common)
 
 # Find the glfw package with the specified options
 glfw3 = FindPackage(name='glfw3',
@@ -43,19 +44,29 @@ dylib = FindPackage(name='dylib',
                     dependant_target_include_dirs=[
                         DomainValueModel(domain=DomainEnum.PUBLIC, values=['${DYLIB_INCLUDE_DIRS}'])])
 
-# # Find the vulkan-headers package with the specified options
-# vulkan_header = FindPackage(name='VulkanHeaders',
-#                             config=True,
-#                             required=False,
-#                             dependant_target_link_libs=[
-#                                 DomainValueModel(domain=DomainEnum.PUBLIC, values=['Vulkan::Headers'])])
-
 # Find the vma package with the specified options
 vulkan_memory_allocator = FindPackage(name='VulkanMemoryAllocator',
-                            config=True,
-                            required=True,
-                            dependant_target_link_libs=[
-                                DomainValueModel(domain=DomainEnum.PUBLIC, values=['GPUOpen::VulkanMemoryAllocator'])])
+                                      config=True,
+                                      required=True,
+                                      dependant_target_link_libs=[
+                                          DomainValueModel(domain=DomainEnum.PUBLIC,
+                                                           values=['GPUOpen::VulkanMemoryAllocator'])])
+
+# Find the glslang package with the specified options
+glslang = FindPackage(name='glslang',
+                      config=True,
+                      required=True,
+                      dependant_target_link_libs=[
+                          DomainValueModel(domain=DomainEnum.PUBLIC, values=[
+                              'glslang::OSDependent',
+                              'glslang::glslang',
+                              'glslang::MachineIndependent',
+                              'glslang::GenericCodeGen',
+                              'glslang::glslang-default-resource-limits',
+                              'glslang::OGLCompiler',
+                              'glslang::SPVRemapper',
+                              'glslang::SPIRV',
+                              'glslang::HLSL'])])
 
 """
 Global Config :
@@ -63,22 +74,24 @@ Global Config :
 bThreadSanitizer = False
 bBuildShared = False
 
+
 # Create a RuntimeModule object with the specified options
 class RuntimeModule(BaseModule):
     def __init__(self):
         super().__init__(module=ModuleTargetModel(target='Runtime',
                                                   type=ModuleEnum.SHARED if bBuildShared else ModuleEnum.STATIC,
-                                                  source_files=PyCMakeUtil.glob([PyCMakeUtil.GlobModel(path='./Private/**/*.cpp',
-                                                                                           recursive=True)
-                                                                                 ]),
-                                                  unity_build=True, unity_build_exclusion_patterns = ['*VulkanLoader*']),
-                                                  #unity_build=False),
+                                                  source_files=PyCMakeUtil.glob(
+                                                      [PyCMakeUtil.GlobModel(path='./Private/**/*.cpp',
+                                                                             recursive=True)
+                                                       ]),
+                                                  unity_build=True, unity_build_exclusion_patterns=['*VulkanLoader*']),
+                         # unity_build=False),
                          fetch_packages=[],
                          find_packages=[glfw3,
                                         glm,
                                         dylib,
-                                        #vulkan_header,
                                         vulkan_memory_allocator,
+                                        glslang,
                                         ]
                          )
         self.target_interface.add_compile_options(domain=DomainEnum.PUBLIC, values=[
@@ -90,15 +103,15 @@ class RuntimeModule(BaseModule):
 
         # Do we have to include subdirectory's include paths? probably not
         self.target_interface.add_include_dirs(domain=DomainEnum.PUBLIC,
-                                       values=['./../Common/Public'])
+                                               values=['./../Common/Public'])
         self.target_interface.add_include_dirs(domain=DomainEnum.PUBLIC,
-                                               values=['./../Common/Test']) # for testing, we just need Common/Test/Test.h
+                                               values=[
+                                                   './../Common/Test'])  # for testing, we just need Common/Test/Test.h
         self.target_interface.add_include_dirs(domain=DomainEnum.PUBLIC,
                                                values=['./Public'])
         self.target_interface.add_pch_files(domain=DomainEnum.PUBLIC,
                                             values=['./Public/Runtime.shared.pch'])
         self.target_interface.add_link_libs(domain=DomainEnum.PUBLIC, values=['Common'])
-
 
         if bThreadSanitizer:
             self.target_interface.add_compile_options(domain=DomainEnum.PUBLIC, values=['${HLVM_CMAKE_CXX_FLAGS_TSAN}'])
@@ -125,7 +138,6 @@ class TestRuntimeModule(BaseModule):
             self.target_interface.add_compile_options(domain=DomainEnum.PRIVATE, values=['-fPIC'])
 
 
-
 # Create a RuntimeProject object with the specified options
 class RuntimeProject(BaseProject):
     def __init__(self, **kwargs):
@@ -135,8 +147,8 @@ class RuntimeProject(BaseProject):
 
         # add sub directory
         self.sub_directories.append(SubDirectoryModel(path='./../Common',
-                                                    output_dir="Common.output",
-                                                    exclude_by_default=True))
+                                                      output_dir="Common.output",
+                                                      exclude_by_default=True))
 
         # Proxy
         self.global_interface.add_global_set('ENV{HTTP_PROXY}', ["http://127.0.0.1:8889"])
@@ -172,7 +184,6 @@ class RuntimeProject(BaseProject):
                                                               "$<$<CONFIG:Release>:HLVM_BUILD_RELEASE=1>",
                                                               "$<$<CONFIG:MinSizeRel>:HLVM_BUILD_RELEASE=1>",
                                                               f"HLVM_COMMON_DYNAMIC_LINKED={bBuildShared * 1}"])
-
 
         self.modules.append(RuntimeModule())
         self.modules.extend([TestRuntimeModule(path) for path in glob.glob("./Test/*.cpp")])
