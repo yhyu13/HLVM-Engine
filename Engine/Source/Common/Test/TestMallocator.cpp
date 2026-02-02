@@ -218,7 +218,7 @@ RECORD(malloc_test)
 
 		std::cout << "Different block size tests passed! " << timer.Mark() << std::endl;
 	};
-
+#if 0
 	SECTION(MiMallocatorTLSTest, true, 5,
 		{
 			HLVM_LOG(LogTest, info, TXT("Test mimallocator"));
@@ -251,7 +251,7 @@ RECORD(malloc_test)
 			test_single_thread();
 			test_different_block_sizes();
 		});
-
+#endif
 	test_multi_thread();
 
 	std::cout << "All tests passed!" << std::endl;

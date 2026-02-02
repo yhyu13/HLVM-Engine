@@ -6,10 +6,6 @@
 
 #include "Core/Mallocator/MallocatorDefinition.h"
 
-#ifndef HLVM_ENABLE_GLOBAL_VMMALLOCATOR
-	#define HLVM_ENABLE_GLOBAL_VMMALLOCATOR 0 // We should not use vm mallocator golbally until it is stable
-#endif
-
 #ifndef HLVM_VMA_OSPAGE_SMALL_HEAP_SIZE
 	#define HLVM_VMA_OSPAGE_SMALL_HEAP_SIZE (1 << 11) // Must be power of 2
 #endif

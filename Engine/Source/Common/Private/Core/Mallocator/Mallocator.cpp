@@ -141,19 +141,6 @@ HLVM_STATIC_FUNC IMallocator* _GFallBacllMallocatorTLS() noexcept
 		}
 }
 
-//	#if !HLVM_ENABLE_GLOBAL_VMMALLOCATOR
-//		#if HLVM_MALLOC_USE_MIMALLOC_OVER_STD
-// HLVM_THREAD_LOCAL_VAR IMallocator* GMallocatorTLS = &GMiMallocatorTLS;			// Extern
-// HLVM_THREAD_LOCAL_VAR IMallocator* GFallBacllMallocatorTLS = &GMiMallocatorTLS; // Extern
-//		#else
-// HLVM_THREAD_LOCAL_VAR IMallocator* GMallocatorTLS = &GStdMallocatorTLS;			 // Extern
-// HLVM_THREAD_LOCAL_VAR IMallocator* GFallBacllMallocatorTLS = &GStdMallocatorTLS; // Extern
-//		#endif
-//	#else
-// HLVM_THREAD_LOCAL_VAR IMallocator* GMallocatorTLS = &GVMArenaMallocatorTLS;			 // Extern
-// HLVM_THREAD_LOCAL_VAR IMallocator* GFallBacllMallocatorTLS = &GVMArenaMallocatorTLS; // Extern
-//	#endif
-
 void SwapMallocator(IMallocator* Mallocator) // Extern
 {
 	if (hlvm_private::GMallocatorTLSSwap == nullptr && Mallocator != nullptr)
