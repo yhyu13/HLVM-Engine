@@ -25,11 +25,11 @@
 #endif
 
 /**
- * If HLVM_SHIPPING is defined, then the code will be compiled in a way that
+ * If HLVM_SHIPPING_CODE is defined, then the code will be compiled in a way that
  * is optimized for shipping. e.g. disable profiling and other developer only features
  */
-#ifndef HLVM_SHIPPING
-	#define HLVM_SHIPPING 0 // TODO modify Common_cmake.py to define HLVM_SHIPPING in certain configuration
+#ifndef HLVM_SHIPPING_CODE
+	#define HLVM_SHIPPING_CODE 0 // TODO modify Common_cmake.py to define HLVM_SHIPPING_CODE in certain configuration
 #endif
 
 #include "Definition/KeywordDefinition.h"

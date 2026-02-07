@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "RHI/RHIPipeline.h"
+#include "RHI/_Deprecated/RHIPipeline.h"
 #include "VulkanResourcePre.h"
 
 // Vulkan-specific RHI sampler state

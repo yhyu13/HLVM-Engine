@@ -8,7 +8,7 @@
 
 #if HLVM_WINDOW_USE_VULKAN
 	// We have to preload vulkan header before glfw to enable glfw's vulkan api
-	#include "RHI/Vulkan/VulkanLoader.h"
+	#include "RHI/_Deprecated/Vulkan/VulkanLoader.h"
 #endif
 
 #pragma clang diagnostic push

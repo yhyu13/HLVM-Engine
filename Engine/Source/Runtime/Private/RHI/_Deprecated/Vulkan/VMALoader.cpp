@@ -8,7 +8,7 @@
  * Inspired by https://gitee.com/sumcai/MiniVulkanTriangle to load vulkan api during runtime
  */
 
-#include "RHI/Vulkan/VulkanDefinition.h"
+#include "RHI/_Deprecated/Vulkan/VulkanDefinition.h"
 
 #if VULKAN_USE_VMA
 // Reference to setup custom loading single header vma

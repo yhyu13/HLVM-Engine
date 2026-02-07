@@ -3,7 +3,7 @@
  */
 
 #include "VulkanBuffer.h"
-#include "RHI/Vulkan/IVulkanDynamicRHI.h"
+#include "RHI/_Deprecated/Vulkan/IVulkanDynamicRHI.h"
 
 FVulkanBuffer::FVulkanBuffer(const FRHIBufferCreateInfo& InCreateInfo)
 	: FRHIBuffer(InCreateInfo), Buffer(this)

@@ -162,7 +162,7 @@ class RuntimeProject(BaseProject):
         else:
             self.global_interface.add_global_set('CMAKE_POLICY_DEFAULT_CMP0069', ['NEW'])
             self.global_interface.add_global_set('CMAKE_INTERPROCEDURAL_OPTIMIZATION', ['ON'])
-        self.global_interface.add_global_set('CMAKE_LINKER_TYPE', ['GOLD'])
+        #self.global_interface.add_global_set('CMAKE_LINKER_TYPE', ['GOLD'])
 
         # Compiler
         self.global_interface.add_global_set('CMAKE_EXPORT_COMPILE_COMMANDS', ['ON'])

@@ -2,7 +2,7 @@
  * Copyright (c) 2025. MIT License. All rights reserved.
  */
 
-#include "RHI/Vulkan/VulkanLoader.h"
+#include "RHI/_Deprecated/Vulkan/VulkanLoader.h"
 #include <mutex>
 
 namespace VulkanRHI

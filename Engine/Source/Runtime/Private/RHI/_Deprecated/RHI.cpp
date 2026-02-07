@@ -2,8 +2,8 @@
  * Copyright (c) 2025. MIT License. All rights reserved.
  */
 
-#include <RHI/RHIResourcePost.h>
-#include "RHI/DynamicRHI.h"
+#include <RHI/_Deprecated/RHIResourcePost.h>
+#include "RHI/_Deprecated/DynamicRHI.h"
 
 namespace RHI
 {

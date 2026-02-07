@@ -2,8 +2,8 @@
  * Copyright (c) 2025. MIT License. All rights reserved.
  */
 
-#include "Core/Mallocator/VMMallocator/VMArena.h"
-#include "Core/Mallocator/VMMallocator/SmallBinnedMallocator.h"
+#include "Core/Mallocator/_Deprecated/VMMallocator/VMArena.h"
+#include "Core/Mallocator/_Deprecated/VMMallocator/SmallBinnedMallocator.h"
 #include "Core/Assert.h"
 #include "Core/Log.h"
 #include "Core/Delegate.h"

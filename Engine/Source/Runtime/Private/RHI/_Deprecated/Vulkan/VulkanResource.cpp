@@ -3,7 +3,7 @@
  */
 
 #include "VulkanResourcePost.h"
-#include "RHI/Vulkan/IVulkanDynamicRHI.h"
+#include "RHI/_Deprecated/Vulkan/IVulkanDynamicRHI.h"
 
 FVulkanMinimalContext::FVulkanMinimalContext()
 {

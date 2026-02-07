@@ -3,7 +3,7 @@
 */
 
 #include "VulkanShader.h"
-#include "RHI/Vulkan/IVulkanDynamicRHI.h"
+#include "RHI/_Deprecated/Vulkan/IVulkanDynamicRHI.h"
 
 FVulkanShader::FVulkanShader(const FShaderCreateInfo& InCreateInfo)
 	: FRHIShader(InCreateInfo), ShaderModule(this)

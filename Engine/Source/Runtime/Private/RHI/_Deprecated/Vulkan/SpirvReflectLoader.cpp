@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "RHI/Vulkan/VulkanDefinition.h"
+#include "RHI/_Deprecated/Vulkan/VulkanDefinition.h"
 
 #if VULKAN_USE_SPIRV_REFLECT
 #define SPIRV_REFLECT_ENABLE_ASSERTS

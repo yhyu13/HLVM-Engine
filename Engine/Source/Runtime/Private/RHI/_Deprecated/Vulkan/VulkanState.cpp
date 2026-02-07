@@ -3,7 +3,7 @@
  */
 
 #include "VulkanState.h"
-#include "RHI/Vulkan/IVulkanDynamicRHI.h"
+#include "RHI/_Deprecated/Vulkan/IVulkanDynamicRHI.h"
 
 FVulkanSamplerState::FVulkanSamplerState(const FRHISamplerStateCreateInfo& InCreateInfo)
 	: FRHISamplerState(InCreateInfo)

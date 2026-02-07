@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "RHI/RHIResource.h"
+#include "RHI/_Deprecated/RHIResource.h"
 #include "VulkanResource.h"
 
 // Vulkan-specific RHI texture

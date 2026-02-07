@@ -29,7 +29,7 @@ private:
 	FTimer	mTimer;
 };
 
-#if !HLVM_SHIPPING
+#if !HLVM_SHIPPING_CODE
 	#define HLVM_SCOPED_TIMER_LOG(Msg)             \
 		FScopedTimerLog TOKENPASTE2LINE(__timer_){ \
 			Msg                                    \
@@ -60,7 +60,7 @@ private:
 	FTimer		   mTimer;
 };
 
-#if !HLVM_SHIPPING
+#if !HLVM_SHIPPING_CODE
 	#define HLVM_SCOPED_TIMER(Duration)         \
 		FScopedTimer TOKENPASTE2LINE(__timer_){ \
 			Duration                            \
@@ -91,7 +91,7 @@ private:
 	FTimer		   mTimer;
 };
 
-#if !HLVM_SHIPPING
+#if !HLVM_SHIPPING_CODE
 	#define HLVM_SCOPED_TIMER_CUMULATIVE(Duration)  \
 		FScopedTimerCumu TOKENPASTE2LINE(__timer_){ \
 			Duration                                \
@@ -122,7 +122,7 @@ private:
 	FTimer						mTimer;
 };
 
-#if !HLVM_SHIPPING
+#if !HLVM_SHIPPING_CODE
 	#define HLVM_SCOPED_TIMER_CUMULATIVE_ATOMIC(Duration, ratio)                                 \
 		FScopedTimerCumuAtomic<ratio, decltype(Duration)::value_type> TOKENPASTE2LINE(__timer_){ \
 			Duration                                                                             \

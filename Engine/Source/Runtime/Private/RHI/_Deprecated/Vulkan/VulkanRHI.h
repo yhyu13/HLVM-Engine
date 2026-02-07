@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "RHI/Vulkan/IVulkanDynamicRHI.h"
+#include "RHI/_Deprecated/Vulkan/IVulkanDynamicRHI.h"
 #include "VulkanResourcePost.h"
 
 struct FVulkanRHIInitializer

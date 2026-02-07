@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "RHI/Vulkan/VulkanLoader.h"
+#include "RHI/_Deprecated/Vulkan/VulkanLoader.h"
 
 class FVulkanPhysicalDevice : public FRefCountable
 {

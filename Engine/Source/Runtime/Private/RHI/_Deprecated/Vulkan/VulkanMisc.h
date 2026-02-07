@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "RHI/Vulkan/VulkanDefinition.h"
+#include "RHI/_Deprecated/Vulkan/VulkanDefinition.h"
 
 namespace VulkanRHI
 {

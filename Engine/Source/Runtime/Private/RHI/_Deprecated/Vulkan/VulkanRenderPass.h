@@ -5,7 +5,7 @@
 #pragma once
 
 #include "Core/Container/ContainerDefinition.h"
-#include "RHI/RHIResource.h"
+#include "RHI/_Deprecated/RHIResource.h"
 #include "VulkanResourcePre.h"
 
 class FVulkanRenderPass : public FRHIRenderPass, public FVulkanResource, public FVulkanMinimalContext

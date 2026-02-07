@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "RHI/RHIPipeline.h"
+#include "RHI/_Deprecated/RHIPipeline.h"
 #include "VulkanResource.h"
 
 // Information for the layout of descriptor sets; does not hold runtime objects

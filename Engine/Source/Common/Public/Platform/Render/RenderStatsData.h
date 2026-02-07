@@ -7,7 +7,7 @@
 #include "GlobalDefinition.h"
 
 #ifndef HLVM_COMPILE_WITH_RENDER_STATS
-	#define HLVM_COMPILE_WITH_RENDER_STATS !HLVM_SHIPPING
+	#define HLVM_COMPILE_WITH_RENDER_STATS !HLVM_SHIPPING_CODE
 #endif
 
 #include <atomic>

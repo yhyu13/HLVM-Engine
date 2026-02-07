@@ -179,17 +179,30 @@ for config in "${buildConfigs[@]}"; do
     # 构建参数s
     cbuild_param="-j ${Jobs}"
     if [ ${Verbose} -eq 1 ]; then
-        cbuild_param="--verbose"
-    fi
-    if [ ${RunRebuild} -eq 1 ]; then
-        cbuild_param="--clean-first ${cbuild_param}"
-    fi
-    if [ ${RunClean} -eq 1 ]; then
-        cbuild_param="--target clean ${cbuild_param}"
+        cbuild_param+="--verbose"
     fi
     if [ -n "${BuildTarget}" ]; then
-        cbuild_param="--target ${BuildTarget} ${cbuild_param}"
+        cbuild_param+="--target ${BuildTarget} ${cbuild_param}"
     fi
+    if [ ${RunRebuild} -eq 1 ]; then
+        cbuild_param1="--clean-first ${cbuild_param}"
+        # re构建项目
+        build_cmd="${CMAKE_BIN} --build . ${cbuild_param1}"
+        echo_color 34 "Rebuild cmd: ${build_cmd}"
+        (${build_cmd} || exit 1) | tee "${CWD_DIR}/rebuild_${config}.log" 2>&1
+    fi
+    if [ ${RunClean} -eq 1 ]; then
+        cbuild_param1="--target clean ${cbuild_param}"
+        # clean构建项目
+        build_cmd="${CMAKE_BIN} --build . ${cbuild_param1}"
+        echo_color 34 "Clean cmd: ${build_cmd}"
+        (${build_cmd} || exit 1) | tee "${CWD_DIR}/clean_${config}.log" 2>&1
+    fi
+
+    # 构建项目
+    build_cmd="${CMAKE_BIN} --build . ${cbuild_param}"
+    echo_color 34 "Build cmd: ${build_cmd}"
+    (${build_cmd} || exit 1) | tee "${CWD_DIR}/build_${config}.log" 2>&1
 
     # 构建项目
     build_cmd="${CMAKE_BIN} --build . ${cbuild_param}"

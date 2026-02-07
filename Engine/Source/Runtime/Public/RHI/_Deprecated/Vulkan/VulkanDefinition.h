@@ -6,7 +6,7 @@
 
 #include "Core/Assert.h"
 #include "Core/Object/RefCountPtr.h"
-#include "RHI/DynamicRHI.h"
+#include "RHI/_Deprecated/DynamicRHI.h"
 
 DECLARE_LOG_CATEGORY(LogVulkan)
 DECLARE_LOG_CATEGORY(LogVulkanRHI)

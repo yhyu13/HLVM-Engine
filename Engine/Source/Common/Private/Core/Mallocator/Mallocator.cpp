@@ -5,7 +5,6 @@
 #include "Core/Mallocator/MiMallocator.h"
 #include "Core/Mallocator/StdMallocator.h"
 #include "Core/Mallocator/StackMallocator.h"
-#include "Core/Mallocator/VMMallocator/VMMallocator.h"
 #include "Core/Log.h"
 #include "Core/Delegate.h"
 #include "Template/PrintTemplate.tpp"
@@ -49,7 +48,7 @@ HLVM_STATIC_VAR std::atomic<double> GMallocDurationCounter;
 HLVM_STATIC_VAR std::atomic_uint_fast64_t GMallocCounter;
 HLVM_STATIC_VAR std::atomic<double> GFreeDurationCounter;
 HLVM_STATIC_VAR std::atomic_uint_fast64_t GFreeCounter;
-#if !HLVM_SHIPPING
+#if !HLVM_SHIPPING_CODE
 	#define _PROFILE_MALLOC_CUMULATIVE()                        \
 		GMallocCounter.fetch_add(1, std::memory_order_relaxed); \
 		HLVM_SCOPED_TIMER_CUMULATIVE_ATOMIC(GMallocDurationCounter, std::micro)

@@ -3,7 +3,7 @@
  */
 
 #include "VulkanTexture.h"
-#include "RHI/Vulkan/IVulkanDynamicRHI.h"
+#include "RHI/_Deprecated/Vulkan/IVulkanDynamicRHI.h"
 
 HLVM_STATIC_FUNC VkImageUsageFlags GetImageUsageFlags(const ETextureCreateFlags& TexFlags)
 {
