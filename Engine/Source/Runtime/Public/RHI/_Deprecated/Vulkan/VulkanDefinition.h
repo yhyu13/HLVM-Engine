@@ -11,17 +11,22 @@
 DECLARE_LOG_CATEGORY(LogVulkan)
 DECLARE_LOG_CATEGORY(LogVulkanRHI)
 
-#define VK_NO_PROTOTYPES
+#ifndef VK_NO_PROTOTYPES
+	#define VK_NO_PROTOTYPES
+#endif
+
 #include <vulkan/vulkan_core.h>
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wswitch-enum"
 #include <vulkan/vk_enum_string_helper.h>
+#pragma clang diagnostic pop
 
 // workaround for removed defines in sdk 141 (copy from UE5)
 #define VK_DESCRIPTOR_TYPE_BEGIN_RANGE (S_C(TUINT32, VkDescriptorType::VK_DESCRIPTOR_TYPE_SAMPLER))
 #define VK_DESCRIPTOR_TYPE_END_RANGE (S_C(TUINT32, VkDescriptorType::VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT))
 #define VK_DESCRIPTOR_TYPE_RANGE_SIZE (S_C(TUINT32, VkDescriptorType::VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT) - S_C(TUINT32, VkDescriptorType::VK_DESCRIPTOR_TYPE_SAMPLER) + 1)
 
-#define VULKAN_API_VERSION VK_API_VERSION_1_3
-
+#define VULKAN_API_VERSION (VK_API_VERSION_1_3)
 // vulkan feature definition start---------------------------------------------------------------------------------------------------------------------------------------
 
 /// @brief Since we used glfw, no need to use VK display api (unless we want to take over window management)

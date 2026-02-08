@@ -24,9 +24,12 @@ FVulkanPhysicalDevice::FVulkanPhysicalDevice(VkPhysicalDevice InDevice)
 	mVendorId = RHI::GetVenderId(mProperties.vendorID);
 
 	HLVM_LOG(LogVulkanRHI, debug, TXT("- DeviceName: {}"), TO_TCHAR_CSTR(mProperties.deviceName));
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wold-style-cast"
 	HLVM_LOG(LogVulkanRHI, debug, TXT("- API={:d}.{:d}.{:d} (0x{:x}) Driver=0x{:x} VendorId=0x{:x}"),
 		VK_VERSION_MAJOR(mProperties.apiVersion), VK_VERSION_MINOR(mProperties.apiVersion), VK_VERSION_PATCH(mProperties.apiVersion),
 		mProperties.apiVersion, mProperties.driverVersion, mProperties.vendorID);
+#pragma clang diagnostic pop
 	HLVM_LOG(LogVulkanRHI, debug, TXT("- DeviceID=0x{:x} Type={:s}"), mProperties.deviceID, *VULKAN_TYPE_TO_FSTRING(VkPhysicalDeviceType, mProperties.deviceType));
 	HLVM_LOG(LogVulkanRHI, debug, TXT("- Max Descriptor Sets Bound {:d}, Timestamps {:d}"), mProperties.limits.maxBoundDescriptorSets, mProperties.limits.timestampComputeAndGraphics);
 }

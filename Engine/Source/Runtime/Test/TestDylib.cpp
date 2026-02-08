@@ -5,7 +5,9 @@
 #include "Test.h"
 
 #include <dylib.hpp>
-#define VK_NO_PROTOTYPES
+#ifndef VK_NO_PROTOTYPES
+	#define VK_NO_PROTOTYPES
+#endif
 #include <vulkan/vulkan_core.h>
 
 DECLARE_LOG_CATEGORY(LogTest)

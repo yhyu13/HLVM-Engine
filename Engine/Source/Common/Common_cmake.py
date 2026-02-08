@@ -237,8 +237,8 @@ class CommonModule(BaseModule):
             self.target_interface.add_link_libs(domain=DomainEnum.PUBLIC, values=['tsan'])
 
 
-# Create a TestCommonModule object with the specified options
-class TestCommonModule(BaseModule):
+# Create a CommonTestModule object with the specified options
+class CommonTestModule(BaseModule):
     def __init__(self, cpp_path: str):
         super().__init__(module=ModuleTargetModel(target=os.path.basename(cpp_path).split('.')[0],
                                                   type=ModuleEnum.EXECUTABLE_AND_TEST,
@@ -300,8 +300,8 @@ class CommonProject(BaseProject):
 
         # Create a CommonModule object for the main project
         self.modules.append(CommonModule())
-        # Create TestCommonModule objects for all tests
-        self.modules.extend([TestCommonModule(path) for path in glob.glob("./Test/*.cpp")])
+        # Create CommonTestModule objects for all tests
+        self.modules.extend([CommonTestModule(path) for path in glob.glob("./Test/*.cpp")])
 
 
 # Main function

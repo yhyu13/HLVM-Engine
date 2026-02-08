@@ -5,7 +5,9 @@
 #include "Test.h"
 
 #include <dylib.hpp>
-#define VK_NO_PROTOTYPES
+#ifndef VK_NO_PROTOTYPES
+	#define VK_NO_PROTOTYPES
+#endif
 #include <vulkan/vulkan_core.h>
 
 DECLARE_LOG_CATEGORY(LogTest)
@@ -254,6 +256,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityF
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wcast-function-type-strict"
+#pragma clang diagnostic ignored "-Wold-style-cast"
 // 使用vkGetInstanceProcAddr获取某个api的函数指针
 static VkResult createDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDebugUtilsMessengerEXT* pDebugMessenger) {
 	auto func = reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>(
@@ -272,7 +275,6 @@ static void destroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMesse
 		func(instance, debugMessenger, pAllocator);
 	}
 }
-#pragma clang diagnostic pop
 
 #define CHECK_VK_RESULT(result, message)       \
 	do                                         \
@@ -629,3 +631,4 @@ RECORD_BOOL(vulkan_test1)
 
 	return true;
 }
+#pragma clang diagnostic pop

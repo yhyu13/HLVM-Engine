@@ -452,6 +452,7 @@ FUnorderedAccessViewRHIRef FVulkanRHI::CreateUnorderedAccessView(FRHIBuffer* Buf
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunused-parameter"
+#pragma clang diagnostic ignored "-Wold-style-cast"
 
 FVertexDeclarationRHIRef FVulkanRHI::CreateVertexDeclaration(const FVertexDeclarationElementList& Elements)
 {
@@ -636,8 +637,8 @@ void FVulkanRHI::CreateVulkanInstance()
 	VkApplicationInfo AppInfo = {};
 	AppInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
 	AppInfo.pApplicationName = "HLVM";
-	AppInfo.applicationVersion = VK_MAKE_VERSION(HLVM_MAJOR_VERSION, HLVM_MINOR_VERSION, HLVM_PATCH_VERSION);
 	AppInfo.pEngineName = "HLVM";
+	AppInfo.applicationVersion = VK_MAKE_VERSION(HLVM_MAJOR_VERSION, HLVM_MINOR_VERSION, HLVM_PATCH_VERSION);
 	AppInfo.engineVersion = VK_MAKE_VERSION(HLVM_MAJOR_VERSION, HLVM_MINOR_VERSION, HLVM_PATCH_VERSION);
 	AppInfo.apiVersion = VULKAN_API_VERSION;
 

@@ -16,12 +16,23 @@ vcpkg_ctx_runtime = VcpkgContenxt(vcpkg_root_path='../Dependency/vcpkg',
 
 # 导入 Common_cmake.py 中的 vcpkg_ctx_common 变量
 import sys
-from os import path
+import os
 
-sys.path.append(path.dirname(path.dirname(path.abspath(__file__))))
+# 添加 Common_cmake.py 到 sys.path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from Common import Common_cmake
 
+# 合并 vcpkg_ctx_common
 vcpkg_ctx_runtime.merge_vckpkg_context(Common_cmake.vcpkg_cxt_common)
+
+# Find the glfw package with the specified options
+vulkan = FindPackage(name='Vulkan',
+                     required=True,
+                     config=False,
+                     dependant_target_include_dirs=[
+                         DomainValueModel(domain=DomainEnum.PUBLIC, values=['${Vulkan_INCLUDE_DIRS}'])],
+                     dependant_target_link_libs=[
+                         DomainValueModel(domain=DomainEnum.PUBLIC, values=['${Vulkan_LIBRARIES}'])])
 
 # Find the glfw package with the specified options
 glfw3 = FindPackage(name='glfw3',
@@ -44,13 +55,14 @@ dylib = FindPackage(name='dylib',
                     dependant_target_include_dirs=[
                         DomainValueModel(domain=DomainEnum.PUBLIC, values=['${DYLIB_INCLUDE_DIRS}'])])
 
-# Find the vma package with the specified options
+# Find the vma package with the specified options, load after vulkan is found
 vulkan_memory_allocator = FindPackage(name='VulkanMemoryAllocator',
                                       config=True,
                                       required=True,
                                       dependant_target_link_libs=[
                                           DomainValueModel(domain=DomainEnum.PUBLIC,
-                                                           values=['GPUOpen::VulkanMemoryAllocator'])])
+                                                           values=['Vulkan::Vulkan',
+                                                                   'GPUOpen::VulkanMemoryAllocator'])])
 
 # Find the glslang package with the specified options
 glslang = FindPackage(name='glslang',
@@ -68,11 +80,42 @@ glslang = FindPackage(name='glslang',
                               'glslang::SPIRV',
                               'glslang::HLSL'])])
 
+assimp = FindPackage(name='assimp',
+                     config=True,
+                     required=True,
+                     dependant_target_link_libs=[
+                         DomainValueModel(domain=DomainEnum.PUBLIC, values=['assimp::assimp'
+                                                                            ])
+                     ])
+
+bullet3 = FindPackage(name='Bullet',
+                      config=True,
+                      required=True,
+                      dependant_target_link_libs=[
+                          DomainValueModel(domain=DomainEnum.PUBLIC, values=['${BULLET_LIBRARIES}'
+                                                                             ])
+                      ])
+
+##########################################################
+
+# Fetch the parallel-hashmap package from GitHub with the specified options
+nvrhi = FetchContent(name='nvrhi',
+                     git_repo_url='https://github.com/yhyu13/NVRHI.git',
+                     git_tag='2ac4b58c355f53827c2e1d0740849ce4d09d5dd6',
+                     dependant_target_link_libs=[
+                         # link nvrhi_vk before nvrhi otherwise link error
+                         DomainValueModel(domain=DomainEnum.PUBLIC, values=['nvrhi_vk', 'nvrhi'])]
+                     )
+
 """
 Global Config :
 """
-bThreadSanitizer = False
-bBuildShared = False
+bThreadSanitizer = False  # Supers low performance, not even debuggable lol
+bBuildShared = False  # Not working on ubuntu/linux, shared lib is PITA
+bVulkanNoPrototype = True  # True : Dynamic loading vk api on startup from shared lib
+# True : Use Vulkan SDK include path instead of system include path
+# False : Use system include path, but we may use wrong vulkan sdk version due to Ubuntu apt package management lag behind
+bVulkanSDKOVerridePath = True
 
 
 # Create a RuntimeModule object with the specified options
@@ -85,13 +128,16 @@ class RuntimeModule(BaseModule):
                                                                              recursive=True)
                                                        ]),
                                                   unity_build=True, unity_build_exclusion_patterns=['*VulkanLoader*']),
-                         # unity_build=False),
-                         fetch_packages=[],
-                         find_packages=[glfw3,
+                         fetch_packages=[nvrhi
+                                         ],
+                         find_packages=[vulkan,
+                                        glfw3,
                                         glm,
                                         dylib,
                                         vulkan_memory_allocator,
                                         glslang,
+                                        assimp,
+                                        bullet3
                                         ]
                          )
         self.target_interface.add_compile_options(domain=DomainEnum.PUBLIC, values=[
@@ -117,9 +163,12 @@ class RuntimeModule(BaseModule):
             self.target_interface.add_compile_options(domain=DomainEnum.PUBLIC, values=['${HLVM_CMAKE_CXX_FLAGS_TSAN}'])
             self.target_interface.add_link_libs(domain=DomainEnum.PUBLIC, values=['tsan'])
 
+        if bVulkanNoPrototype:
+            self.target_interface.add_compile_options(domain=DomainEnum.PUBLIC, values=['-DVK_NO_PROTOTYPES'])
 
-# Create a TestRuntimeModule object with the specified options
-class TestRuntimeModule(BaseModule):
+
+# Create a RuntimeTestModule object with the specified options
+class RuntimeTestModule(BaseModule):
     def __init__(self, cpp_path: str):
         super().__init__(module=ModuleTargetModel(target=os.path.basename(cpp_path).split('.')[0],
                                                   type=ModuleEnum.EXECUTABLE_AND_TEST,
@@ -162,7 +211,7 @@ class RuntimeProject(BaseProject):
         else:
             self.global_interface.add_global_set('CMAKE_POLICY_DEFAULT_CMP0069', ['NEW'])
             self.global_interface.add_global_set('CMAKE_INTERPROCEDURAL_OPTIMIZATION', ['ON'])
-        #self.global_interface.add_global_set('CMAKE_LINKER_TYPE', ['GOLD'])
+        self.global_interface.add_global_set('CMAKE_LINKER_TYPE', ['GOLD'])
 
         # Compiler
         self.global_interface.add_global_set('CMAKE_EXPORT_COMPILE_COMMANDS', ['ON'])
@@ -185,8 +234,17 @@ class RuntimeProject(BaseProject):
                                                               "$<$<CONFIG:MinSizeRel>:HLVM_BUILD_RELEASE=1>",
                                                               f"HLVM_COMMON_DYNAMIC_LINKED={bBuildShared * 1}"])
 
+        if bVulkanSDKOVerridePath:
+            # env get $Vulkan_SDK
+            vulkan_sdk_path = os.getenv('VULKAN_SDK')
+            # check 1.4.328.1 in path
+            if "1.4.328.1" not in vulkan_sdk_path:
+                # throw exception
+                raise RuntimeError("Vulkan SDK 1.4.328.1 not found")
+            self.global_interface.add_global_set('ENV{VULKAN_SDK}', [vulkan_sdk_path])
+
         self.modules.append(RuntimeModule())
-        self.modules.extend([TestRuntimeModule(path) for path in glob.glob("./Test/*.cpp")])
+        self.modules.extend([RuntimeTestModule(path) for path in glob.glob("./Test/*.cpp")])
 
 
 # Main function
