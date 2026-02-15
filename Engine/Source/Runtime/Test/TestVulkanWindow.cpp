@@ -257,6 +257,10 @@ private:
 		auto extensions = getRequiredExtensions();
 		createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
 		createInfo.ppEnabledExtensionNames = extensions.data();
+		for (unsigned int i = 0; i < extensions.size(); i++)
+		{
+			HLVM_LOG(LogTest, info, TXT("getRequiredExtensions: {}"), TO_TCHAR_CSTR(extensions[i]));
+		}
 
 		VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo;
 		if (enableValidationLayers)
