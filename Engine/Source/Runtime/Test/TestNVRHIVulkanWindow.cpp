@@ -19,17 +19,17 @@
 
 DECLARE_LOG_CATEGORY(LogTest)
 
-#include "Window/WindowDefinition.h"
+#include "Renderer/Window/WindowDefinition.h"
 #if HLVM_WINDOW_USE_VULKAN
-	#include "Window/Vulkan/GLFW3VulkanWindow.h"
+	#include "Renderer/Window/GLFW3/Vulkan/VulkanWindow.h"
 
-// First load vulkan hpp with dynamic dispatch (aka VK_NO_PROTOTYPE)
-	#define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
-	#include <vulkan/vulkan.hpp>
-static_assert(VULKAN_HPP_DISPATCH_LOADER_DYNAMIC == 1, "VULKAN_HPP_DISPATCH_LOADER_DYNAMIC must be defined to 1");
-	#if (VULKAN_HPP_DISPATCH_LOADER_DYNAMIC == 1)
-VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
-	#endif
+//// First load vulkan hpp with dynamic dispatch (aka VK_NO_PROTOTYPE)
+//	#define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
+//	#include <vulkan/vulkan.hpp>
+//static_assert(VULKAN_HPP_DISPATCH_LOADER_DYNAMIC == 1, "VULKAN_HPP_DISPATCH_LOADER_DYNAMIC must be defined to 1");
+//	#if (VULKAN_HPP_DISPATCH_LOADER_DYNAMIC == 1)
+//VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
+//	#endif
 
 	#if 1 // Test Vulkan triangle program with NVRHI-style Vulkan-HPP API
 		#pragma clang diagnostic push
@@ -1466,8 +1466,6 @@ private:
 
 RECORD_BOOL(test_NVRHI_Style_Vulkan)
 {
-		// VulkanLoader::LoadOnce();
-
 		#if (VULKAN_HPP_DISPATCH_LOADER_DYNAMIC == 1)
 	static vk::detail::DynamicLoader dl(VULKAN_LIB);
 	PFN_vkGetInstanceProcAddr		 vkGetInstanceProcAddr = dl.getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr");
