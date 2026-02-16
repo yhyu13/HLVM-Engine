@@ -26,7 +26,7 @@ struct IRHICreateInfo
 // Structure for describing texture creation parameters
 struct FRHITextureCreateInfo : public IRHICreateInfo
 {
-	FUIntVec3			Extent;								  // Width, Height, Depth
+	FUInt3			Extent;								  // Width, Height, Depth
 	TUINT8				ArraySize{ 0 };						  // Number of array slices (for texture arrays)
 	ETextureDimension	Dimension{ ETextureDimension::None }; // Texture dimension
 	EPixelFormat		Format{ EPixelFormat::None };		  // Pixel format of the texture
@@ -37,7 +37,7 @@ struct FRHITextureCreateInfo : public IRHICreateInfo
 
 	FRHITextureCreateInfo() = default;
 	// Constructor for easy initialization
-	FRHITextureCreateInfo(const FString& InDebugName, const FIntVec3& InExtent, EPixelFormat InFormat, TUINT8 InNumMips = 1, TUINT8 InNumSamples = 1, ETextureCreateFlags InFlags = ETextureCreateFlag::None, const FClearValueBinding& InClearValue = FClearValueBinding::None())
+	FRHITextureCreateInfo(const FString& InDebugName, const FInt3& InExtent, EPixelFormat InFormat, TUINT8 InNumMips = 1, TUINT8 InNumSamples = 1, ETextureCreateFlags InFlags = ETextureCreateFlag::None, const FClearValueBinding& InClearValue = FClearValueBinding::None())
 		: IRHICreateInfo(InDebugName)
 		, Extent(InExtent)
 		, Format(InFormat)
@@ -242,7 +242,7 @@ struct FRHIQueryCreateInfo : public IRHICreateInfo
 //// Structure for describing swap chain creation parameters
 // struct FRHISwapChainCreateInfo : public IRHICreateInfo
 //{
-//	FIntVec2		Extent;	   // Width and height of the swap chain buffers
+//	FInt2		Extent;	   // Width and height of the swap chain buffers
 //	EPixelFormat	Format;		   // Pixel format of the swap chain buffers
 //	TUINT32			NumBuffers;	   // Number of buffers in the swap chain (e.g., double or triple buffering)
 //	TUINT32			NumSamples;	   // Number of samples (for MSAA)
@@ -255,7 +255,7 @@ struct FRHIQueryCreateInfo : public IRHICreateInfo
 //	// Constructor for easy initialization
 //	FRHISwapChainCreateInfo(
 //		const FString&	InDebugName,
-//		const FIntVec2& InExtent,
+//		const FInt2& InExtent,
 //		EPixelFormat	InFormat = EPixelFormat::R8G8B8A8_UNorm,
 //		TUINT32			InNumBuffers = 2, // Default to double buffering
 //		TUINT32			InNumSamples = 1, // Default to no MSAA
@@ -276,7 +276,7 @@ class IWindow;
 // Structure for describing viewport creation parameters
 struct FRHIViewportCreateInfo : public IRHICreateInfo
 {
-	FUIntVec2				Extent;		  // Width and height of the viewport
+	FUInt2				Extent;		  // Width and height of the viewport
 	ERHIViewportType		ViewportType; // Type of the viewport (e.g., windowed, fullscreen)
 	EPixelFormat			Format;		  // Pixel format of the viewport's back buffer
 	TNoNullablePtr<IWindow> NativeWindowHandle;
@@ -288,7 +288,7 @@ struct FRHIViewportCreateInfo : public IRHICreateInfo
 	// Constructor for easy initialization
 	FRHIViewportCreateInfo(
 		const FString&	 InDebugName,
-		const FUIntVec2& InExtent,
+		const FUInt2& InExtent,
 		IWindow*		 InWindowHandle,
 		ERHIViewportType InViewportType = ERHIViewportType::Fullscreen,
 		EPixelFormat	 InFormat = EPixelFormat::R8G8B8A8_UNorm,

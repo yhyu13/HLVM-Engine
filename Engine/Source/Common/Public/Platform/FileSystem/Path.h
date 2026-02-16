@@ -37,11 +37,11 @@ public:
 	{
 		ResolvePath();
 	}
-	FPath(const FString& str, EPlatformFileType FileType = EPlatformFileType::Unspecified)
-		: boost::filesystem::path(str.ToCharCStr()), mFileType(FileType)
-	{
-		ResolvePath();
-	}
+//	FPath(const FString& str, EPlatformFileType FileType = EPlatformFileType::Unspecified)
+//		: boost::filesystem::path(str.ToCharCStr()), mFileType(FileType)
+//	{
+//		ResolvePath();
+//	}
 
 	// Move, copy constructor
 	FPath(FPath&& other) noexcept

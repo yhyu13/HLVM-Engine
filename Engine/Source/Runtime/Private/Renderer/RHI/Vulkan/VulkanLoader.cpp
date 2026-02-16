@@ -5,6 +5,10 @@
 #include "Renderer/RHI/Vulkan/VulkanLoader.h"
 #include <mutex>
 
+#if (VULKAN_HPP_DISPATCH_LOADER_DYNAMIC == 1)
+VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
+#endif
+
 static std::once_flag flag;
 void InitVulkanLoaderOnce()
 {

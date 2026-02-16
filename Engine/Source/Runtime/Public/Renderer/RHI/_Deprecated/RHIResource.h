@@ -178,7 +178,7 @@ public:
 	DECLARE_RHI_RESOURCE(FRHITexture, FRHITextureCreateInfo)
 
 	// Returns the extent of the texture
-	FUIntVec3 GetExtent() const { return CreateInfo.Extent; }
+	FUInt3 GetExtent() const { return CreateInfo.Extent; }
 
 	// Return dimension of the texture
 	ETextureDimension GetDimension() const { return CreateInfo.Dimension; }
@@ -321,7 +321,7 @@ public:
 	virtual ERHIResourceType GetResourceType() const override { return ERHIResourceType::Viewport; }
 
 	// Returns the dimensions of the viewport
-	virtual FUIntVec2 GetSize() const { return CreateInfo.Extent; }
+	virtual FUInt2 GetSize() const { return CreateInfo.Extent; }
 
 	// Returns the viewport type (e.g., windowed, fullscreen)
 	virtual ERHIViewportType GetViewportType() const { return CreateInfo.ViewportType; }
@@ -330,7 +330,7 @@ public:
 	virtual void* GetSwapChain() const = 0;
 
 	// Resizes the viewport and swap chain
-	virtual void Resize(const FUIntVec2& NewExtent) = 0;
+	virtual void Resize(const FUInt2& NewExtent) = 0;
 
 	// Begins a frame, acquire next back buffer
 	virtual void BeginFrame() = 0;

@@ -27,6 +27,10 @@ public:
 		: std::basic_string<TCHAR>(str)
 	{
 	}
+	FString(const std::string& str)
+		: std::basic_string<TCHAR>(reinterpret_cast<const TCHAR*>(str.c_str()))
+	{
+	}
 
 	// Move, copy constructor
 	FString(FString&& other) noexcept
@@ -100,9 +104,50 @@ public:
 	}
 };
 
+namespace std
+{
+	template <>
+	struct hash<FString>
+	{
+		size_t operator()(const FString& str) const
+		{
+			return std::hash<std::basic_string<TCHAR>>{}(str);
+		}
+	};
+
+	// template for ostream, istream
+	inline std::ostream&& operator<<(std::ostream& os, const FString& str)
+	{
+		os << str.ToCharCStr();
+		return std::move(os);
+	}
+	inline std::istream&& operator>>(std::istream& is, FString& str)
+	{
+		std::string temp;
+		is >> temp;
+		str = FString(temp.c_str());
+		return std::move(is);
+	}
+} // namespace std
+
+HLVM_INLINE_FUNC bool operator==(const FString& lhs, const FString& rhs)
+{
+	return std::strcmp(lhs.ToCharCStr(), rhs.ToCharCStr()) == 0;
+}
+
+HLVM_INLINE_FUNC bool operator==(const FString& lhs, const char* rhs)
+{
+	return std::strcmp(lhs.ToCharCStr(), rhs) == 0;
+}
+
+HLVM_INLINE_FUNC bool operator==(const char* lhs, const FString& rhs)
+{
+	return std::strcmp(lhs, rhs.ToCharCStr()) == 0;
+}
+
 /**
  * FStdString is just a wrapper around a already allocated std::string
- * with our custom string api in addition
+ * with our custom string api in addition, do not create a standalone FStdString
  */
 class FStdString final : public std::basic_string<char>
 {

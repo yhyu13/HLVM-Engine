@@ -5,6 +5,8 @@
 #pragma once
 #include "RHIDefinition.h"
 
+DECLARE_LOG_CATEGORY(LogRHI)
+
 namespace RHI
 {
 	enum class EGpuVendorId : TUINT32
@@ -32,7 +34,7 @@ namespace RHI
 
 	// Get venderid from TUINT32
 
-	HLVM_INLINE_FUNC EGpuVendorId GetVenderId(TUINT32 VenderId)
+	HLVM_INLINE_FUNC EGpuVendorId VenderId2Enum(TUINT32 VenderId)
 	{
 		switch (S_C(EGpuVendorId, VenderId))
 		{

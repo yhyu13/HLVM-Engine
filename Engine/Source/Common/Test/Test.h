@@ -41,7 +41,7 @@ std::function<void()> _make_test_wrapper(const FString& name, Func test_function
 	return [name, test_function, ctx]() {
 		if (!ctx.bEnabled)
 		{
-			HLVM_LOG(LogTemp, info, TXT("Skipping {} bc it is disabled"), *name);
+			HLVM_LOG(LogTemp, info, TXT("Skipping test {} due to it is disabled"), *name);
 			return;
 		}
 
@@ -152,24 +152,29 @@ std::function<void()> _make_test_wrapper(const FString& name, Func test_function
 	RECORD_TEST_FUNC(test_function, ##__VA_ARGS__); \
 	int test_##test_function()
 
-#define SECTION(section_name, enabled, repeat, ...)             \
-	do                                                          \
-	{                                                           \
-		if (enabled)                                            \
-		{                                                       \
-			std::function<void()> func_##section_name = [&]() { \
-				do                                              \
-				{                                               \
-					__VA_ARGS__                                 \
-				}                                               \
-				while (0);                                      \
-			};                                                  \
-			for (uint32_t _i = 0u; _i < repeat; ++_i)           \
-			{                                                   \
-				func_##section_name();                          \
-			}                                                   \
-		}                                                       \
-	}                                                           \
+#define SECTION(section_name, enabled, repeat, ...)                                                                              \
+	do                                                                                                                           \
+	{                                                                                                                            \
+		if (enabled)                                                                                                             \
+		{                                                                                                                        \
+			std::function<void()> func_##section_name = [&]() {                                                                  \
+				do                                                                                                               \
+				{                                                                                                                \
+					__VA_ARGS__                                                                                                  \
+				}                                                                                                                \
+				while (0);                                                                                                       \
+			};                                                                                                                   \
+			for (uint32_t _i = 0u; _i < repeat; ++_i)                                                                            \
+			{                                                                                                                    \
+				HLVM_LOG(LogTemp, info, TXT("Running section {} for {} of {} times"), TXT(#section_name), _i + 1, TXT(#repeat)); \
+				func_##section_name();                                                                                           \
+			}                                                                                                                    \
+		}                                                                                                                        \
+		else                                                                                                                     \
+		{                                                                                                                        \
+			HLVM_LOG(LogTemp, info, TXT("Skipping section {} due to it is disabled"), TXT(#section_name));                       \
+		}                                                                                                                        \
+	}                                                                                                                            \
 	while (0)
 
 // Implement smoothed average time measurement
@@ -220,11 +225,7 @@ int main(int ac, char* av[])
 	try
 	{
 		po::options_description desc("Allowed options");
-		desc.add_options()
-			("help", "produce help message")
-			("v-lvl", po::value<int>()->implicit_value(-1), "enable verbosity override to specify level")
-				("gperf", po::value<int>()->implicit_value(0), "enable gerpftools profiling by cpu sample (linux only!)")
-						("no-cpu-profile", po::value<int>()->implicit_value(0), "disable cpu profiling (tracy)");
+		desc.add_options()("help", "produce help message")("v-lvl", po::value<int>()->implicit_value(-1), "enable verbosity override to specify level")("gperf", po::value<int>()->implicit_value(0), "enable gerpftools profiling by cpu sample (linux only!)")("no-cpu-profile", po::value<int>()->implicit_value(0), "disable cpu profiling (tracy)");
 
 		po::store(po::command_line_parser(ac, av).options(desc).run(), GVariableMap);
 		po::notify(GVariableMap);
@@ -325,13 +326,13 @@ int main(int ac, char* av[])
 		FinlMallocator();
 	}
 
-//	tracy::GetProfiler().RequestShutdown();
-//	std::this_thread::sleep_for( std::chrono::milliseconds( 10 ) );
-//	while( !tracy::GetProfiler().HasShutdownFinished() )
-//	{
-//		HLVM_LOG(LogTemp, info, TXT("Waiting for tracy to shutdown..."));
-//		std::this_thread::sleep_for( std::chrono::milliseconds( 1000 ) );
-//	}
+	//	tracy::GetProfiler().RequestShutdown();
+	//	std::this_thread::sleep_for( std::chrono::milliseconds( 10 ) );
+	//	while( !tracy::GetProfiler().HasShutdownFinished() )
+	//	{
+	//		HLVM_LOG(LogTemp, info, TXT("Waiting for tracy to shutdown..."));
+	//		std::this_thread::sleep_for( std::chrono::milliseconds( 1000 ) );
+	//	}
 
 	return 0;
 }

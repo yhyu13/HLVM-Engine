@@ -30,7 +30,7 @@ FVulkanViewport::~FVulkanViewport()
 	SwapChain.Reset();
 }
 
-void FVulkanViewport::Resize(const FUIntVec2& NewDimensions)
+void FVulkanViewport::Resize(const FUInt2& NewDimensions)
 {
 	// Reset back buffer
 	IntermediateBackBuffer.Reset();

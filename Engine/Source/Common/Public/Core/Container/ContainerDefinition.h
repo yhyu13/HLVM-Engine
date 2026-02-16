@@ -382,10 +382,10 @@ public:
 };
 
 template <typename Key, typename Value, typename Allocator = std::allocator<std::pair<Key, Value>>>
-class TMap : public phmap::flat_hash_map<Key, Value, std::hash<Key>, std::equal_to<Key>, Allocator>
+class TMap : public phmap::node_hash_map<Key, Value, std::hash<Key>, std::equal_to<Key>, Allocator>
 {
 public:
-	using phmap::flat_hash_map<Key, Value, std::hash<Key>, std::equal_to<Key>, Allocator>::flat_hash_map;
+	using phmap::node_hash_map<Key, Value, std::hash<Key>, std::equal_to<Key>, Allocator>::node_hash_map;
 
 	// Num
 	TUINT32 Num() const
@@ -500,3 +500,9 @@ using FConstByteBuffer = std::span<const TBYTE>;
 
 template <typename T, typename Allocator = boost::container::new_allocator<T>>
 using TRingBuffer = boost::circular_buffer<T, Allocator>;
+
+template<typename T>
+using TArray = TVector<T>;
+
+template<typename T>
+using TArrayView = TVectorView<T>;

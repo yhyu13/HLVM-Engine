@@ -22,9 +22,7 @@
 #define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
 #include <vulkan/vulkan.hpp>
 static_assert(VULKAN_HPP_DISPATCH_LOADER_DYNAMIC == 1, "VULKAN_HPP_DISPATCH_LOADER_DYNAMIC must be defined to 1");
-#if (VULKAN_HPP_DISPATCH_LOADER_DYNAMIC == 1)
-VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
-#endif
+
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wswitch-enum"
 #include <vulkan/vk_enum_string_helper.h>
@@ -33,6 +31,11 @@ VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 // load nvrhi after vulkan stuff
 #include <nvrhi/vulkan.h>
 #include <nvrhi/validation.h>
+
+// vulkan feature definition start---------------------------------------------------------------------------------------------------------------------------------------
+
+/// @brief Use VMA for memory management
+#define VULKAN_USE_VMA 1
 
 // vulkan option definition start---------------------------------------------------------------------------------------------------------------------------------------
 
@@ -49,7 +52,6 @@ VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 
 #define VULKAN_TYPE_TO_FSTRING(Type, Value) FString::Format(TXT("{} {}"), TXT("Type"), S_C(TUINT32, Value))
 #define VULKAN_FLAGS_TO_FSTRING(Type, Value) FString::Format(TXT("{} {}"), TXT("Type"), S_C(TUINT32, Value))
-
 
 /// @brief Helper macro to test the result of Vulkan calls which can return an error. (HLVM_ENSURE_F)
 #define VULKAN_ENSURE(x)                                                                                                                \

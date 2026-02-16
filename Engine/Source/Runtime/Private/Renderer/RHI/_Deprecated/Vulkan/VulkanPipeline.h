@@ -275,7 +275,7 @@ struct FVulkanGraphicsPSODescription
 		TUINT8		bHasFragmentDensityAttachment;
 		TUINT8		NumUsedClearValues;
 		FVulkanHash RenderPassCompatibleHash;
-		FUIntVec3	Extent3D;
+		FUInt3	Extent3D;
 
 		void ReadFrom(const FVulkanRenderTargetLayout& InState);
 		void WriteInto(FVulkanRenderTargetLayout& OutState) const;

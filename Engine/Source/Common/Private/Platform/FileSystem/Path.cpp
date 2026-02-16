@@ -77,5 +77,5 @@ FPath FPath::AppendExtension(const FString& new_ext) const
 	HLVM_ASSERT_F(new_ext[0] == TXT('.'), TXT("{} must start with '.'"), new_ext);
 	std::string new_path = this->string();
 	new_path += new_ext;
-	return FPath{ new_path, this->mFileType };
+	return FPath{ boost::filesystem::path{new_path}, this->mFileType };
 }

@@ -16,10 +16,10 @@ using FVec4 = glm::vec4;
 using FMat3 = glm::mat3;
 using FMat4 = glm::mat4;
 
-using FIntVec2 = glm::ivec2;
-using FUIntVec2 = glm::uvec2;
-using FIntVec3 = glm::ivec3;
-using FUIntVec3 = glm::uvec3;
+using FInt2 = glm::ivec2;
+using FUInt2 = glm::uvec2;
+using FInt3 = glm::ivec3;
+using FUInt3 = glm::uvec3;
 
 // Define a mathematical structure using GLM types
 struct FTransform

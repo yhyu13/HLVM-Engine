@@ -50,7 +50,7 @@ public:
 	void* GetSwapChain() const override { return SwapChain.Get(); }
 
 	// Resizes the viewport and swap chain
-	virtual void Resize(const FUIntVec2& NewDimensions) override;
+	virtual void Resize(const FUInt2& NewDimensions) override;
 
 	// Begins a frame, acquire next back buffer
 	virtual void BeginFrame() override;

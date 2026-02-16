@@ -87,7 +87,7 @@ private:
 	T* mLock;
 };
 
-// @brief Lock/Unlock guard for lockable types
+// @brief Lock/Unlock guard for lockable types (that implement Lock() & Unlock())
 #define ATOMIC_LOCK_GUARD(x)                                                                           \
 	TAtomicLockGuard<typename TOptionalRemoved<typename TReferenceRemoved<decltype((x))>::Type>::Type> \
 		__lock_guard((x));                                                                             \
@@ -108,6 +108,7 @@ template <typename T>
 class FAtomicFlagS
 {
 public:
+// @brief Lock/Unlock guard for class that inherit FAtomicFlagS
 #define LOCK_GUARD_S()                                          \
 	FAtomicLockGuard TOKENPASTE2LINE(__lock_guard_s_)(sc_flag); \
 	HLVM_ATOMIC_THREAD_FENCE()
@@ -140,6 +141,8 @@ class FAtomicFlagNI
 {
 public:
 	NOINSTANT(FAtomicFlagNI)
+
+	// @brief Lock/Unlock guard for class that inherit FAtomicFlagNI
 #define LOCK_GUARD_NI()                                          \
 	FAtomicLockGuard TOKENPASTE2LINE(__lock_guard_ni_)(ni_flag); \
 	HLVM_ATOMIC_THREAD_FENCE()
@@ -171,6 +174,7 @@ class FAtomicFlagNC
 public:
 	NOCOPYMOVE(FAtomicFlagNC)
 
+	// @brief Lock/Unlock guard for class that inherit FAtomicFlagNC
 #define LOCK_GUARD_NC()                                          \
 	FAtomicLockGuard TOKENPASTE2LINE(__lock_guard_nc_)(nc_flag); \
 	HLVM_ATOMIC_THREAD_FENCE()
@@ -201,6 +205,7 @@ private:
 class FAtomicFlag
 {
 public:
+	// @brief Lock/Unlock guard for class that inherit FAtomicFlag
 #define LOCK_GUARD()                                          \
 	FAtomicLockGuard TOKENPASTE2LINE(__lock_guard_m_)(mFlag); \
 	HLVM_ATOMIC_THREAD_FENCE()
@@ -256,6 +261,7 @@ private:
 class FRecursiveAtomicFlag
 {
 public:
+	// @brief Lock/Unlock guard for class that inherit FRecursiveAtomicFlag
 #define LOCK_GUARD_RECURSIVE()                                                                                                                                                        \
 	TScopedVariable<std::function<void()>, std::function<void()>> TOKENPASTE2LINE(__lock_guard_recursive_)([this]() -> void { this->Lock(); }, [this]() -> void { this->Unlock(); }); \
 	HLVM_ATOMIC_THREAD_FENCE()
@@ -357,9 +363,9 @@ private:
 	BIT_FLAG(mEnabled);
 };
 
-#define LOCK_GUARD_RWRival(lock, group, ...)                                                              \
-	RivialLockGuardCond<FRWRivalLock> TOKENPASTE2LINE(__lock_guard_rwrival_)(lock, group, ##__VA_ARGS__); \
-	HLVM_ATOMIC_THREAD_FENCE()
+//#define LOCK_GUARD_RWRival(lock, group, ...)                                                              \
+//	RivialLockGuardCond<FRWRivalLock> TOKENPASTE2LINE(__lock_guard_rwrival_)(lock, group, ##__VA_ARGS__); \
+//	HLVM_ATOMIC_THREAD_FENCE()
 
 /**
  * Similar to FRWRivalLock, but it is not a rival lock, all readers could enter the critical section,

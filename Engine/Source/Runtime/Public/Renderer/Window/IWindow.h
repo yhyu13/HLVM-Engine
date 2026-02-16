@@ -7,10 +7,7 @@
 #include "WindowDefinition.h"
 
 HLVM_ENUM(EWindowType, TUINT8,
-	NoRender,
-	HeadlessVulkan,
-	GLFW3Vulkan
-	);
+	GLFW3Vulkan);
 
 /**
  * @brief An interface class, declaring the behavior of a Window
@@ -20,45 +17,27 @@ class IWindow
 public:
 	enum class EDisplayMode
 	{
-		NoRender,
-		Headless,
 		Fullscreen,
 		FullscreenBorderless,
-		FullscreenStretch,
 		Windowed,
-		Default = FullscreenBorderless
 	};
 
 	enum class EVsync
 	{
 		Off,
 		On,
-		Default = Off
 	};
 
 	struct Properties
 	{
-		FString Title = TXT("HLVM Window");
-		EDisplayMode Mode = EDisplayMode::Default;
-		bool	Resizable = true;
-		EVsync	VSync = EVsync::Default;
-		FUIntVec2 Extent = { 1280, 720 };
-		// Add more properties, e.g. monitor perference
-	};
-
-	struct OptionalExtent
-	{
-		TOptional<TUINT32> Width;
-		TOptional<TUINT32> Height;
-	};
-
-	struct OptionalProperties
-	{
-		TOptional<FString> Title;
-		TOptional<EDisplayMode>   Mode;
-		TOptional<bool>	   Resizable;
-		TOptional<EVsync>  VSync;
-		OptionalExtent	   Extent;
+		FString		 Title = TXT("HLVM Window");
+		EDisplayMode DisplayMode = EDisplayMode::Windowed;
+		bool		 Resizable = true;
+		bool		 StartMinimized = false;
+		EVsync		 VSync = EVsync::Off;
+		FUInt2		 Extent = { 1280, 720 };
+		FUInt2		 XY = { 100, 100 }; // Window position at start
+										// Add more properties, e.g. monitor perference
 	};
 
 public:
@@ -97,7 +76,7 @@ public:
 	 * @param InExtent The preferred window extent
 	 * @return FExtent The new window extent
 	 */
-	HLVM_INLINE_FUNC FUIntVec2 Resize(const FUIntVec2& InExtent)
+	HLVM_INLINE_FUNC FUInt2 Resize(const FUInt2& InExtent)
 	{
 		if (Property.Resizable)
 		{
@@ -106,14 +85,14 @@ public:
 		return Property.Extent;
 	}
 
-	HLVM_INLINE_FUNC const FUIntVec2& GetExtent() const
+	HLVM_INLINE_FUNC const FUInt2& GetExtent() const
 	{
 		return Property.Extent;
 	}
 
-	HLVM_INLINE_FUNC EDisplayMode GetWindowMode() const
+	HLVM_INLINE_FUNC EDisplayMode GetDisplayMode() const
 	{
-		return Property.Mode;
+		return Property.DisplayMode;
 	}
 
 	HLVM_INLINE_FUNC const Properties& GetProperties() const
@@ -127,6 +106,6 @@ public:
 	}
 
 protected:
-	Properties Property;
+	Properties	Property;
 	EWindowType Type;
 };
