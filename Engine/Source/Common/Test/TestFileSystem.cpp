@@ -18,6 +18,12 @@ DECLARE_LOG_CATEGORY(LogTest)
 #define TEST_STACK_ALLOCATOR 0
 #define TEST_FIBER_POOL 0
 
+#define VECTOR_TO_CONST_BYTE_BUFFER(vec)              \
+	FConstByteBuffer                                  \
+	{                                                 \
+		R_C(const TBYTE*, (vec).data()), (vec).size() \
+	}
+
 /*
 	<test method>
 */
@@ -65,9 +71,8 @@ RECORD(boostfile_test, true, 1, 1)
 		HLVM_ENSURE_F(!FPath::IsDirectory("./test.txt"), TXT("Test failed"));
 		HLVM_ENSURE_F(FPath::Exists("./test.txt"), TXT("Test failed"));
 
-		auto all_matches = FPath::Glob("./", R"(.*Test.*)", true);
-		static auto DumpJson = [](const TSmallVector32<FPath>& paths) -> FString
-		{
+		auto		all_matches = FPath::Glob("./", R"(.*Test.*)", true);
+		static auto DumpJson = [](const TSmallVector32<FPath>& paths) -> FString {
 			return FString::Join(
 				paths, [](auto& item) { return FString::Format(TXT("\"{}\""), *item); }, TXT(",\n"));
 		};
@@ -183,7 +188,7 @@ RECORD(packed_test)
 			{
 				fileCotHandle.Write(CotData.data(), CotData.size());
 #if HLVM_PACKED_FILE_WITH_SIGNATURE
-				FRSA::SignToFile(TO_CONST_BYTE_BUFFER(CotData), PackedCotFile.AppendExtension(HLVM_RSA_SIGNATURE_EXT));
+				FRSA::SignToFile(VECTOR_TO_CONST_BYTE_BUFFER(CotData), PackedCotFile.AppendExtension(HLVM_RSA_SIGNATURE_EXT));
 #endif
 			}
 
@@ -196,7 +201,7 @@ RECORD(packed_test)
 #endif
 				fileTokHandle.Write(Encrypted.data(), Encrypted.size());
 #if HLVM_PACKED_FILE_WITH_SIGNATURE
-				FRSA::SignToFile(TO_CONST_BYTE_BUFFER(Encrypted), PackedTokFile.AppendExtension(HLVM_RSA_SIGNATURE_EXT));
+				FRSA::SignToFile(VECTOR_TO_CONST_BYTE_BUFFER(Encrypted), PackedTokFile.AppendExtension(HLVM_RSA_SIGNATURE_EXT));
 #endif
 				/**
 				 * Compress, Encrypt and sign must be in the same thread
@@ -205,7 +210,7 @@ RECORD(packed_test)
 				//					auto Compressed = FZstd::Compress(TokenData);
 				//					auto Encrypted = FRSA::Encrypt(Compressed);
 				//					fileTokHandle.Write(Encrypted.data(), Encrypted.size());
-				//					FRSA::SignToFile(TO_CONST_BYTE_BUFFER(Encrypted), PackedTokFile.AppendExtension(HLVM_RSA_SIGNATURE_EXT));
+				//					FRSA::SignToFile(VECTOR_TO_CONST_BYTE_BUFFER(Encrypted), PackedTokFile.AppendExtension(HLVM_RSA_SIGNATURE_EXT));
 				//				});
 			}
 

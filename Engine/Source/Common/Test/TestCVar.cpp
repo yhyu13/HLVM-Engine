@@ -6,11 +6,12 @@
 
 #include "Core/Assert.h"
 
-#include "Utility/CVar/CVar.h"
-#include "Utility/CVar/CVarTypes.h"
-#include "Utility/CVar/CVarMacros.h"
-#include "Utility/CVar/IniParser.h"
-#include "Utility/CVar/ConsoleCommand.h"
+//#include "Utility/CVar/CVar.h"
+//#include "Utility/CVar/CVarTypes.h"
+//#include "Utility/CVar/CVarMacros.h"
+//#include "Utility/CVar/IniParser.h"
+//#include "Utility/CVar/ConsoleCommand.h"
+#include "Utility/CVar/CVarMacros.h" // CVarMacros is the main header
 
 #include <fstream>
 #include <thread>
@@ -122,16 +123,16 @@ RECORD(CVar_BasicFunctionality, true, 0, 1)
             HLVM_ENSURE_F(g_RefString == "RefDefault", TXT("Reference string should be initialized to 'RefDefault'"));
             
             // Test modifying through CVar
-			CVarRef_Test_RefBool.SetValue(true);
+			CVar_Test_RefBool.SetValue(true);
             HLVM_ENSURE_F(g_RefBool == true, TXT("Reference bool should be updated through CVar"));
             
-			CVarRef_Test_RefInt.SetValue(200);
+			CVar_Test_RefInt.SetValue(200);
             HLVM_ENSURE_F(g_RefInt == 200, TXT("Reference int should be updated through CVar"));
             
-			CVarRef_Test_RefFloat.SetValue(3.14f);
+			CVar_Test_RefFloat.SetValue(3.14f);
             HLVM_ENSURE_F(std::abs(g_RefFloat - 3.14f) < 0.001f, TXT("Reference float should be updated through CVar"));
             
-			CVarRef_Test_RefString.SetValue("Updated");
+			CVar_Test_RefString.SetValue("Updated");
             HLVM_ENSURE_F(g_RefString == "Updated", TXT("Reference string should be updated through CVar"));
         });
 }

@@ -50,24 +50,39 @@ static_assert(VULKAN_HPP_DISPATCH_LOADER_DYNAMIC == 1, "VULKAN_HPP_DISPATCH_LOAD
 /// @brief Helper macro to convert VkFormat to TCHAR string
 #define VULKAN_FORMAT_TO_TCHAR(x) TO_TCHAR_CSTR(string_VkFormat(x))
 
-#define VULKAN_TYPE_TO_FSTRING(Type, Value) FString::Format(TXT("{} {}"), TXT("Type"), S_C(TUINT32, Value))
-#define VULKAN_FLAGS_TO_FSTRING(Type, Value) FString::Format(TXT("{} {}"), TXT("Type"), S_C(TUINT32, Value))
+#define VULKAN_TYPE_TO_FSTRING(_Type, _Value) FString::Format(TXT("{} {}"), STRTIFY(_Type), S_C(TUINT32, _Value))
+#define VULKAN_FLAGS_TO_FSTRING(_Type, _Value) FString::Format(TXT("{} {}"), STRTIFY(_Type), S_C(TUINT32, _Value))
+#define VULKAN_ENUM_TO_FSTRING(x) FString(magic_enum::enum_name(x).data())
 
 /// @brief Helper macro to test the result of Vulkan calls which can return an error. (HLVM_ENSURE_F)
-#define VULKAN_ENSURE(x)                                                                                                                \
-	do                                                                                                                                  \
-	{                                                                                                                                   \
-		VkResult _result = (x);                                                                                                         \
+#define VULKAN_ENSURE(x)                                                                                                       \
+	do                                                                                                                         \
+	{                                                                                                                          \
+		VkResult _result = (x);                                                                                                \
 		HLVM_ENSURE_F(_result == VK_SUCCESS, TXT("Vulkan ensure {} failed: {}"), STRTIFY(x), VULKAN_RESULT_TO_TCHAR(_result)); \
-	}                                                                                                                                   \
+	}                                                                                                                          \
 	while (0)
 
 /// @brief Helper macro to test the result of Vulkan calls which can return an error. (HLVM_ASSERT_F)
-#define VULKAN_ASSERT(x)                                                                                                                \
-	do                                                                                                                                  \
-	{                                                                                                                                   \
-		VkResult _result = (x);                                                                                                         \
+#define VULKAN_ASSERT(x)                                                                                                       \
+	do                                                                                                                         \
+	{                                                                                                                          \
+		VkResult _result = (x);                                                                                                \
 		HLVM_ASSERT_F(_result == VK_SUCCESS, TXT("Vulkan assert {} failed: {}"), STRTIFY(x), VULKAN_RESULT_TO_TCHAR(_result)); \
-	}                                                                                                                                   \
+	}                                                                                                                          \
 	while (0)
 
+/// @brief Helper macro to test the result of Vulkan calls which can return an error. (HLVM_ASSERT_F)
+#define VULKAN_HPP_TRY(...)                                      \
+	do                                                           \
+	{                                                            \
+		try                                                      \
+		{                                                        \
+			__VA_ARGS__;                                         \
+		}                                                        \
+		catch (std::system_error & e)                            \
+		{                                                        \
+			HLVM_LOG(LogRHI, critical, TO_TCHAR_CSTR(e.what())); \
+		}                                                        \
+	}                                                            \
+	while (0)

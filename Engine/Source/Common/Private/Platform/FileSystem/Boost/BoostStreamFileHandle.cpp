@@ -125,7 +125,7 @@ IFileHandle::OpRetType FBoostStreamFileHandle::Close()
 		}
 
 		{
-			HLVM_DELETE(mFileLock);
+			HLVM_SAFE_DELETE_RAW_PTR(mFileLock);
 			mRecursiveLock.reset();
 		}
 

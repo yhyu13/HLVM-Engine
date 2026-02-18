@@ -7,6 +7,11 @@
 
 DECLARE_LOG_CATEGORY(LogFPath)
 
+// Static
+const std::regex FPath::PathReplacePattern{ R"(\$\{([^}]+)\})" };
+// Static
+TMap<std::string, std::string> FPath::PathReplaceMap;
+
 bool FPath::IsDirectory(const FPath& path)
 {
 	return FGenericPlatformFile::Get()->IsDirectory(path);
@@ -77,5 +82,5 @@ FPath FPath::AppendExtension(const FString& new_ext) const
 	HLVM_ASSERT_F(new_ext[0] == TXT('.'), TXT("{} must start with '.'"), new_ext);
 	std::string new_path = this->string();
 	new_path += new_ext;
-	return FPath{ boost::filesystem::path{new_path}, this->mFileType };
+	return FPath{ boost::filesystem::path{ new_path }, this->mFileType };
 }

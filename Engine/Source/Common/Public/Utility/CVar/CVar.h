@@ -1,10 +1,10 @@
 #pragma once
 
 #include "Core/String.h"
+#include "IniParser.h"
 
 class ICVar;
 class CVarManager;
-class IniParser;
 
 enum class EConsoleVariableFlag : uint32_t
 {
@@ -36,9 +36,9 @@ public:
 class CVarManager
 {
 private:
-	TMap<FString, ICVar*>		 RegisteredCVars;
-	TArray<FString>				 IniSearchPaths;
-	//mutable std::recursive_mutex CVarMutex;
+	TMap<FString, ICVar*> RegisteredCVars;
+	TArray<FString>		  IniSearchPaths;
+	// mutable std::recursive_mutex CVarMutex;
 	mutable FRecursiveAtomicFlag CVarMutex;
 
 	CVarManager();

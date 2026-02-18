@@ -8,6 +8,7 @@
 #include "Platform/GenericPlatformDebuggerUtil.h"
 #include "Core/Mallocator/StackMallocator.h"
 
+// Default stack trace depth
 #ifndef HLVM_STACK_TRACE_DEPTH
 	#define HLVM_STACK_TRACE_DEPTH 8
 #endif
@@ -15,7 +16,7 @@
 namespace hlvm_private
 {
 	/**
-	 * Assert stack mallocator, adjust reserved memory size to your needs
+	 * Assert stack mallocator, adjust reserved memory size to your needs (default 64Kb)
 	 */
 	HLVM_STATIC_VAR TStackMallocator<64 * 1024, false, true, false, false, false> stack_mallocator{};
 	IMallocator*																  AssertionStackMallocator{ &stack_mallocator }; // extern	    // extern

@@ -12,6 +12,7 @@
 #include <boost/container/small_vector.hpp>
 #include <boost/algorithm/string/join.hpp>
 #include <boost/container/static_vector.hpp>
+#include <boost/range/algorithm/find.hpp>
 
 #include "Core/Mallocator/PMR.h"
 #include "Core/Assert.h"
@@ -487,16 +488,6 @@ using TSet = phmap::node_hash_set<T, std::hash<T>, std::equal_to<T>, Allocator>;
 using FByteVector = TVector<TBYTE>;
 using FByteBuffer = std::span<TBYTE>;
 using FConstByteBuffer = std::span<const TBYTE>;
-#define TO_SPAN(array, size) \
-	std::span                \
-	{                        \
-		(array), size        \
-	}
-#define TO_CONST_BYTE_BUFFER(vec)                     \
-	FConstByteBuffer                                  \
-	{                                                 \
-		R_C(const TBYTE*, (vec).data()), (vec).size() \
-	}
 
 template <typename T, typename Allocator = boost::container::new_allocator<T>>
 using TRingBuffer = boost::circular_buffer<T, Allocator>;

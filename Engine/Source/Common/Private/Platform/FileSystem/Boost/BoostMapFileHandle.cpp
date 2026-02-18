@@ -145,7 +145,7 @@ IFileHandle::OpRetType FBoostMapFileHandle::Close()
 
 		{
 			mMappedSeekPos = 0;
-			HLVM_DELETE(mFileLock);
+			HLVM_SAFE_DELETE_RAW_PTR(mFileLock);
 			mRecursiveLock.reset();
 			mMappedLazyInit = false;
 		}

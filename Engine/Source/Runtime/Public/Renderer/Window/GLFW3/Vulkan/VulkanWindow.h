@@ -7,8 +7,7 @@
 #include "Renderer/Window/GLFW3/GLFW3Window.h"
 
 // Only include when HLVM_WINDOW_USE_VULKAN is true
-static_assert(HLVM_WINDOW_USE_VULKAN);
-
+#if (HLVM_WINDOW_USE_VULKAN)
 class FGLFW3VulkanWindow final : public FGLFW3Window
 {
 public:
@@ -29,5 +28,6 @@ public:
 	 * @brief Gets the required extensions for Vulkan
 	 * @return A vector of extension names
 	 */
-	TVector<FString> GetRequiredExtensions() const;
+	HLVM_STATIC_FUNC TVector<std::string> GetRequiredExtensions();
 };
+#endif

@@ -79,14 +79,17 @@ private:
 	FuncDestruct Func2;
 };
 
+// scoped variable with constructor and destructor function
 #define HLVM_SCOPED_VARIABLE(var, FuncConstruct, FuncDestruct)                                                         \
 	TScopedVariable<std::function<void()>, std::function<void()>> TOKENPASTE2LINE(var){ FuncConstruct, FuncDestruct }; \
 	HLVM_ATOMIC_THREAD_FENCE()
 
+// scoped variable with constructor and destructor function the same return type
 #define HLVM_SCOPED_VARIABLE1(var, FuncType, FuncConstruct, FuncDestruct)                                                  \
 	TScopedVariable<std::function<FuncType>, std::function<FuncType>> TOKENPASTE2LINE(var){ FuncConstruct, FuncDestruct }; \
 	HLVM_ATOMIC_THREAD_FENCE()
 
+// scoped variable with constructor and destructor function the different return type
 #define HLVM_SCOPED_VARIABLE2(var, FuncType1, FuncConstruct, FuncType2, FuncDestruct)                                        \
 	TScopedVariable<std::function<FuncType1>, std::function<FuncType2>> TOKENPASTE2LINE(var){ FuncConstruct, FuncDestruct }; \
 	HLVM_ATOMIC_THREAD_FENCE()

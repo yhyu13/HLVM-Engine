@@ -25,7 +25,7 @@
  */
 #define HLVM_NOT_IMPLEMENTED() HLVM_SEGFAULT_INLINE()
 
-#define HLVM_DELETE(ptr)    \
+#define HLVM_SAFE_DELETE_RAW_PTR(ptr)    \
 	do                      \
 	{                       \
 		if (ptr != nullptr) \

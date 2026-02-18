@@ -189,25 +189,35 @@ for config in "${buildConfigs[@]}"; do
         # re构建项目
         build_cmd="${CMAKE_BIN} --build . ${cbuild_param1}"
         echo_color 34 "Rebuild cmd: ${build_cmd}"
-        (${build_cmd} || exit 1) | tee "${CWD_DIR}/rebuild_${config}.log" 2>&1
+        output_log="${CWD_DIR}/rebuild_${config}.log"
+        (${build_cmd} || exit 1) | tee "${output_log}" 2>&1
+        if grep -q "error generated" "${output_log}" || grep -q "errors generated" "${output_log}"; then
+            echo_color 31 "Rebuilding Config ${config} failed, checkout ${output_log}, rebuild command ${build_cmd}"
+            bash -c "code ${output_log}" &
+        fi
     fi
     if [ ${RunClean} -eq 1 ]; then
         cbuild_param1="--target clean ${cbuild_param}"
         # clean构建项目
         build_cmd="${CMAKE_BIN} --build . ${cbuild_param1}"
         echo_color 34 "Clean cmd: ${build_cmd}"
-        (${build_cmd} || exit 1) | tee "${CWD_DIR}/clean_${config}.log" 2>&1
+        output_log="${CWD_DIR}/clean_${config}.log"
+        (${build_cmd} || exit 1) | tee "${output_log}" 2>&1
+        if grep -q "error generated" "${output_log}" || grep -q "errors generated" "${output_log}"; then
+            echo_color 31 "Cleaning Config ${config} failed, checkout ${output_log}, clean command ${build_cmd}"
+            bash -c "code ${output_log}" &
+        fi
     fi
 
     # 构建项目
     build_cmd="${CMAKE_BIN} --build . ${cbuild_param}"
     echo_color 34 "Build cmd: ${build_cmd}"
-    (${build_cmd} || exit 1) | tee "${CWD_DIR}/build_${config}.log" 2>&1
-
-    # 构建项目
-    build_cmd="${CMAKE_BIN} --build . ${cbuild_param}"
-    echo_color 34 "Build cmd: ${build_cmd}"
-    (${build_cmd} || exit 1) | tee "${CWD_DIR}/build_${config}.log" 2>&1
+    output_log="${CWD_DIR}/build_${config}.log"
+    (${build_cmd} || exit 1) | tee "${output_log}" 2>&1
+    if grep -q "error generated" "${output_log}" || grep -q "errors generated" "${output_log}"; then
+        echo_color 31 "Building Config ${config} failed, checkout ${output_log}, build command ${build_cmd}"
+        bash -c "code ${output_log}" &
+    fi
 
     # 测试项目
     if [ ${RunTest} -eq 1 ]; then
@@ -286,7 +296,7 @@ for config in "${buildConfigs[@]}"; do
         # Wait all tests finish
         wait
 
-        all_success=1
+        test_all_success=1
         for i in "${!test_logs[@]}"; do
             test_cmd=${test_cmds[$i]}
             test_log=${test_logs[$i]}
@@ -296,10 +306,10 @@ for config in "${buildConfigs[@]}"; do
             if ! grep -q "100% tests passed, 0 tests failed" "${test_log}"; then
                 echo_color 31 "Testing Config ${config} Target ${test_target} failed, checkout ${test_log}, test command ${test_cmd}"
                 bash -c "code ${test_log}" &
-                all_success=0
+                test_all_success=0
             fi
         done
-        if [ ${all_success} -eq 0 ]; then
+        if [ ${test_all_success} -eq 0 ]; then
             echo_color 31 "Testing Config ${config} failed, log at ${CWD_DIR}/Testing/build_test_${config}_*.log"
             exit 1
         #else

@@ -12,6 +12,7 @@
 // bool x : 1 // May not be reliable for all compilers (e.g. msvc, gnu, clang), so disable, padding for bool may generally be a bad idea
 #define BIT_FLAG(x) bool x
 
-#define INVALID_INDEX_SIZE_T() std::numeric_limits<size_t>::max()
+#define INVALID_INDEX_SIZE_T std::numeric_limits<size_t>::max()
+#define INVALID_INDEX_UINT32 std::numeric_limits<uint32_t>::max()
 
 #define DEPRECATED(Version, Message) [[deprecated(Message)]]

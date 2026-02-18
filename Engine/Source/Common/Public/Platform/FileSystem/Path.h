@@ -22,26 +22,46 @@ class FPath final : public boost::filesystem::path
 {
 public:
 	FPath() = default;
-	FPath(const char* str, EPlatformFileType FileType = EPlatformFileType::Unspecified)
+	FPath(const char* str)
+		: boost::filesystem::path(str)
+	{
+		ResolvePath();
+	}
+	FPath(const TCHAR* str)
+		: boost::filesystem::path(reinterpret_cast<const char*>(str))
+	{
+		ResolvePath();
+	}
+	FPath(const boost::filesystem::path& str)
+		: boost::filesystem::path(str)
+	{
+		ResolvePath();
+	}
+	FPath(const FString& str)
+		: boost::filesystem::path(str.ToCharCStr())
+	{
+		ResolvePath();
+	}
+	FPath(const char* str, EPlatformFileType FileType)
 		: boost::filesystem::path(str), mFileType(FileType)
 	{
 		ResolvePath();
 	}
-	FPath(const TCHAR* str, EPlatformFileType FileType = EPlatformFileType::Unspecified)
+	FPath(const TCHAR* str, EPlatformFileType FileType)
 		: boost::filesystem::path(reinterpret_cast<const char*>(str)), mFileType(FileType)
 	{
 		ResolvePath();
 	}
-	FPath(const boost::filesystem::path& str, EPlatformFileType FileType = EPlatformFileType::Unspecified)
+	FPath(const boost::filesystem::path& str, EPlatformFileType FileType)
 		: boost::filesystem::path(str), mFileType(FileType)
 	{
 		ResolvePath();
 	}
-//	FPath(const FString& str, EPlatformFileType FileType = EPlatformFileType::Unspecified)
-//		: boost::filesystem::path(str.ToCharCStr()), mFileType(FileType)
-//	{
-//		ResolvePath();
-//	}
+	FPath(const FString& str, EPlatformFileType FileType)
+		: boost::filesystem::path(str.ToCharCStr()), mFileType(FileType)
+	{
+		ResolvePath();
+	}
 
 	// Move, copy constructor
 	FPath(FPath&& other) noexcept
@@ -129,7 +149,8 @@ public:
 	template <typename... Args>
 	static FPath Combine(const FPath& path1, const FPath& path2, Args&&... args)
 	{
-		FPath result = path1 / path2;
+		auto  path = path1 / path2;
+		FPath result{ path, (path1.mFileType == path2.mFileType ? path2.mFileType : EPlatformFileType::Unspecified) };
 		if constexpr (sizeof...(args) > 0)
 		{
 			return Combine(result, ForwardTemp<Args>(args)...);
@@ -154,6 +175,11 @@ private:
 
 	mutable FPathHash mHash{ 0 };
 	EPlatformFileType mFileType{ EPlatformFileType::Unspecified };
+
+	// Path replace pattern, inspired by linux bash variable: ${...}, e.g. ${PROJECT_DIR}
+	HLVM_STATIC_VAR const std::regex PathReplacePattern;
+	// Path replace map: replace pattern with value, e.g. ${PROJECT_DIR} -> /Users/xxx/project
+	HLVM_STATIC_VAR TMap<std::string, std::string> PathReplaceMap;
 };
 
 /*
@@ -170,8 +196,3 @@ namespace std
 		}
 	};
 } // namespace std
-
-// Path replace pattern, inspired by linux bash variable: ${...}, e.g. ${PROJECT_DIR}
-HLVM_INLINE_VAR const std::regex PathReplacePattern{ R"(\$\{([^}]+)\})" };
-// Path replace map: replace pattern with value, e.g. ${PROJECT_DIR} -> /Users/xxx/project
-HLVM_INLINE_VAR TMap<std::string, std::string> PathReplaceMap;

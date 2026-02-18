@@ -153,7 +153,7 @@ size_t FProfilerCPU::BeginEvent(const TCHAR* name)
 {
 	if (!bEnabled)
 	{
-		return INVALID_INDEX_SIZE_T();
+		return INVALID_INDEX_SIZE_T;
 	}
 	else
 	{
@@ -174,7 +174,7 @@ void FProfilerCPU::EndEvent(size_t index)
 		return;
 	}
 	FTrackedThread* thread = CurrentThread.Get();
-	if (thread && index != INVALID_INDEX_SIZE_T())
+	if (thread && index != INVALID_INDEX_SIZE_T)
 	{
 		thread->EndEvent(index);
 	}

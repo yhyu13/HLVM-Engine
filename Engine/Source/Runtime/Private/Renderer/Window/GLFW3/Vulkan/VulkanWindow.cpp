@@ -4,6 +4,7 @@
 
 #include "Renderer/Window/GLFW3/Vulkan/VulkanWindow.h"
 
+#if (HLVM_WINDOW_USE_VULKAN)
 DECLARE_LOG_CATEGORY(LogGLFW3Vulkan)
 
 FGLFW3VulkanWindow::FGLFW3VulkanWindow(const IWindow::Properties& InProperties)
@@ -11,6 +12,7 @@ FGLFW3VulkanWindow::FGLFW3VulkanWindow(const IWindow::Properties& InProperties)
 {
 	Type = EWindowType::GLFW3Vulkan;
 
+	// 初始化Vulkan加载器
 	InitVulkanLoaderOnce();
 
 	glfwInit(); // 初始化图形库框架：Graphics Libraries Framework
@@ -50,11 +52,12 @@ VkSurfaceKHR FGLFW3VulkanWindow::CreateSurface(VkInstance instance)
 	return surface;
 }
 
-TVector<FString> FGLFW3VulkanWindow::GetRequiredExtensions() const
+TVector<std::string> FGLFW3VulkanWindow::GetRequiredExtensions()
 {
 	TUINT32 glfwExtensionCount = 0;
 	const char** glfwExtensions;
 	glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
-	TVector<FString> Exts(glfwExtensions, glfwExtensions + glfwExtensionCount);
+	TVector<std::string> Exts(glfwExtensions, glfwExtensions + glfwExtensionCount);
 	return Exts;
 }
+#endif
