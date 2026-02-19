@@ -72,8 +72,12 @@ DECLARE_LOG_CATEGORY(LogVulkanRHI)
 /// @brief Helper macro to convert VkFormat to TCHAR string
 #define VULKAN_FORMAT_TO_TCHAR(x) TO_TCHAR_CSTR(string_VkFormat(x))
 
-#define VULKAN_TYPE_TO_FSTRING(Type, Value) FString::Format(TXT("{} {}"), TXT("Type"), S_C(TUINT32, Value))
-#define VULKAN_FLAGS_TO_FSTRING(Type, Value) FString::Format(TXT("{} {}"), TXT("Type"), S_C(TUINT32, Value))
+#ifndef VULKAN_TYPE_TO_FSTRING
+#define VULKAN_TYPE_TO_FSTRING(Type, Value) FString::Format(TXT("{} {}"), STRTIFY(Type), S_C(TUINT32, Value))
+#endif
+#ifndef VULKAN_FLAGS_TO_FSTRING
+#define VULKAN_FLAGS_TO_FSTRING(Type, Value) FString::Format(TXT("{} {}"), STRTIFY(Type), S_C(TUINT32, Value))
+#endif
 
 #ifndef VULKAN_ENSURE
 /// @brief Helper macro to test the result of Vulkan calls which can return an error. (HLVM_ENSURE_F)

@@ -5,3 +5,6 @@
 #pragma once
 
 #include "GlobalDefinition.h"
+
+/// @brief 默认使用Vulkan
+#define USE_VK_BACKEND 1

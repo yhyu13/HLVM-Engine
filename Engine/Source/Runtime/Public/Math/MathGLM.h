@@ -109,3 +109,57 @@ public:
 		return value < 0 ? -value : value;
 	}
 };
+
+namespace
+{
+	// Math type print to FString
+	HLVM_INLINE_FUNC FString ToString(const FVec2& vec)
+	{
+		return FString::Format(TXT("FVec2(%f, %f)"), vec.x, vec.y);
+	}
+
+	HLVM_INLINE_FUNC FString ToString(const FVec3& vec)
+	{
+		return FString::Format(TXT("FVec3(%f, %f, %f)"), vec.x, vec.y, vec.z);
+	}
+
+	HLVM_INLINE_FUNC FString ToString(const FVec4& vec)
+	{
+		return FString::Format(TXT("FVec4(%f, %f, %f, %f)"), vec.x, vec.y, vec.z, vec.w);
+	}
+
+	HLVM_INLINE_FUNC FString ToString(const FMat3& mat)
+	{
+		return FString::Format(TXT("FMat3(%f, %f, %f,\n%f, %f, %f,\n%f, %f, %f)"), mat[0][0], mat[0][1], mat[0][2], mat[1][0], mat[1][1], mat[1][2], mat[2][0], mat[2][1], mat[2][2]);
+	}
+
+	HLVM_INLINE_FUNC FString ToString(const FMat4& mat)
+	{
+		return FString::Format(TXT("FMat4(%f, %f, %f, %f,\n%f, %f, %f, %f,\n%f, %f, %f, %f,\n%f, %f, %f, %f)"), mat[0][0], mat[0][1], mat[0][2], mat[0][3], mat[1][0], mat[1][1], mat[1][2], mat[1][3], mat[2][0], mat[2][1], mat[2][2], mat[2][3], mat[3][0], mat[3][1], mat[3][2], mat[3][3]);
+	}
+
+	HLVM_INLINE_FUNC FString ToString(const FInt2& vec)
+	{
+		return FString::Format(TXT("FInt2(%d, %d)"), vec.x, vec.y);
+	}
+
+	HLVM_INLINE_FUNC FString ToString(const FInt3& vec)
+	{
+		return FString::Format(TXT("FInt3(%d, %d, %d)"), vec.x, vec.y, vec.z);
+	}
+
+	HLVM_INLINE_FUNC FString ToString(const FUInt2& vec)
+	{
+		return FString::Format(TXT("FUInt2(%u, %u)"), vec.x, vec.y);
+	}
+
+	HLVM_INLINE_FUNC FString ToString(const FUInt3& vec)
+	{
+		return FString::Format(TXT("FUInt3(%u, %u, %u)"), vec.x, vec.y, vec.z);
+	}
+
+	HLVM_INLINE_FUNC FString ToString(const FTransform& transform)
+	{
+		return FString::Format(TXT("FTransform(%s, %s, %s)"), ToString(transform.position).c_str(), ToString(transform.scale).c_str(), ToString(transform.rotation).c_str());
+	}
+}

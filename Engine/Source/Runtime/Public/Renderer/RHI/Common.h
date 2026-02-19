@@ -9,6 +9,9 @@ DECLARE_LOG_CATEGORY(LogRHI)
 
 namespace RHI
 {
+	// Triple buffering
+	static constexpr TUINT32 MAX_FRAMES_IN_FLIGHT = 3;
+
 	enum class EGpuVendorId : TUINT32
 	{
 		Unknown = 0xffffffff,

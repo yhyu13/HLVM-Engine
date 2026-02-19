@@ -17,13 +17,14 @@ class IWindow
 public:
 	enum class EDisplayMode
 	{
+		Windowed,
 		Fullscreen,
 		FullscreenBorderless,
-		Windowed,
 	};
 
 	enum class EVsync
 	{
+		Auto,
 		Off,
 		On,
 	};
@@ -34,10 +35,23 @@ public:
 		EDisplayMode DisplayMode = EDisplayMode::Windowed;
 		bool		 Resizable = true;
 		bool		 StartMinimized = false;
-		EVsync		 VSync = EVsync::Off;
+		EVsync		 VSync = EVsync::Auto;
 		FUInt2		 Extent = { 1280, 720 };
 		FUInt2		 XY = { 100, 100 }; // Window position at start
 										// Add more properties, e.g. monitor perference
+
+		FString ToString() const
+		{
+			return FString::Format(
+				TXT("Title: {0}, DisplayMode: {1}, Resizable: {2}, StartMinimized: {3}, VSync: {4}, Extent: {5}, XY: {6}"),
+				Title,
+				HLVM_ENUM_TO_TCHAR(DisplayMode),
+				Resizable,
+				StartMinimized,
+				HLVM_ENUM_TO_TCHAR(VSync),
+				::ToString(Extent),
+				::ToString(XY));
+		}
 	};
 
 public:
