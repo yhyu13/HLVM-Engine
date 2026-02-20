@@ -2,6 +2,8 @@
  * Copyright (c) 2025. MIT License. All rights reserved.
  */
 
+// Reference https://github.com/RobertBeckebans/RBDOOM-3-BFG/blob/4310fbd200b578014b22dce5fa82a48977eb149a/neo/sys/DeviceManager.h
+
 #pragma once
 
 #include "Renderer/Window/WindowDefinition.h"
