@@ -9,7 +9,6 @@
 #include "Renderer/Window/WindowDefinition.h"
 
 #if HLVM_WINDOW_USE_VULKAN
-	#include "Renderer/RHI/Vulkan/VulkanDefinition.h"
 	#include "Renderer/Window/GLFW3/Vulkan/VulkanWindow.h"
 #endif
 
@@ -175,7 +174,7 @@ protected:
 	TUINT32 FrameIndex = 0;
 
 	// Helper methods
-	RHI::EGpuVendorId GetGPUVendor(TUINT32 VendorID) const;
+	::EGpuVendorID GetGPUVendor(TUINT32 VendorID) const;
 	void			  BackBufferResizing();
 	void			  BackBufferResized();
 

@@ -6,7 +6,7 @@
 
 #include "Core/Container/ContainerDefinition.h"
 #include "Renderer/RHI/_Deprecated/RHIResource.h"
-#include "VulkanResourcePre.h"
+#include "VulkanResourcePost.h"
 
 class FVulkanRenderPass : public FRHIRenderPass, public FVulkanResource, public FVulkanMinimalContext
 {

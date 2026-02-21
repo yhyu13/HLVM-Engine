@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "Renderer/RHI/_Deprecated/DynamicRHI.h"
+#include "../DynamicRHI.h"
 #include "VulkanLoader.h"
 
 class IVulkanDynamicRHI : public FDynamicRHI

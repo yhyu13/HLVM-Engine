@@ -205,6 +205,11 @@ public:
 		return *this;
 	}
 
+	const char* ToCharCStr() const
+	{
+		return reinterpret_cast<const char*>(c_str());
+	}
+
 	// 获取字符串内容
 	const CHAR* c_str() const
 	{
@@ -221,8 +226,13 @@ public:
 		return Size;
 	}
 
+	bool empty() const
+	{
+		return Size == 0;
+	}
+
 private:
-	static_assert(sizeof(CHAR) / sizeof(char) == 1, "Only support same size as char");
-	TCHAR  Buffer[Capacity + 1];
+	static_assert(sizeof(CHAR) / sizeof(char) == 1, "CHAR only support same size as char");
+	CHAR  Buffer[Capacity + 1] { 0 };
 	size_t Size{ 0 };
 });

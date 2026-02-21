@@ -5,14 +5,99 @@
 #pragma once
 #include "RHIDefinition.h"
 
+#if USE_VK_BACKEND
+	#include "Renderer/RHI/Vulkan/VulkanDefinition.h"
+#endif
+
+#include <nvrhi/nvrhi.h>
+
+#include "Core/Assert.h"
+#include "Core/Log.h"
+
 DECLARE_LOG_CATEGORY(LogRHI)
 
-namespace RHI
-{
-	// Triple buffering
-	static constexpr TUINT32 MAX_FRAMES_IN_FLIGHT = 3;
+/*-----------------------------------------------------------------------------
+   Forward Declarations
+-----------------------------------------------------------------------------*/
 
-	enum class EGpuVendorId : TUINT32
+class FDeviceManager;
+
+namespace
+{
+	/*-----------------------------------------------------------------------------
+	   Texture Dimension Types
+	-----------------------------------------------------------------------------*/
+
+	enum class ETextureDimension : TUINT8
+	{
+		Texture2D,
+		Texture2DArray,
+		Texture3D,
+		TextureCube,
+		TextureCubeArray,
+	};
+
+	/*-----------------------------------------------------------------------------
+	   Texture Format
+	-----------------------------------------------------------------------------*/
+
+	enum class ETextureFormat : TUINT8
+	{
+		// Color formats
+		R8,
+		RG8,
+		RGBA8,
+		SRGBA8,
+
+		// Depth formats
+		D16,
+		D24S8,
+		D32,
+		D32S8,
+
+		// Compressed formats
+		BC1,
+		BC4,
+		BC6H,
+		BC7,
+
+		// Float formats
+		R16F,
+		RG16F,
+		RGBA16F,
+		R32F,
+		RGBA32F,
+	};
+
+	/*-----------------------------------------------------------------------------
+	   Texture Filter Modes
+	-----------------------------------------------------------------------------*/
+
+	enum class ETextureFilter : TUINT8
+	{
+		Nearest,
+		Linear,
+		NearestMipmapNearest,
+		NearestMipmapLinear,
+		LinearMipmapNearest,
+		LinearMipmapLinear,
+		Anisotropic,
+	};
+
+	/*-----------------------------------------------------------------------------
+	   Texture Address Modes
+	-----------------------------------------------------------------------------*/
+
+	enum class ETextureAddress : TUINT8
+	{
+		Wrap,
+		Mirror,
+		Clamp,
+		Border,
+		MirrorOnce,
+	};
+
+	enum class EGpuVendorID : TUINT32
 	{
 		Unknown = 0xffffffff,
 		NotQueried = 0,
@@ -34,34 +119,40 @@ namespace RHI
 		Codeplay = 0x10004, // VkVendorId
 		Mesa = 0x10005,		// VkVendorId
 	};
+} // namespace
+
+namespace RHI
+{
+	// Triple buffering
+	static constexpr TUINT32 MAX_FRAMES_IN_FLIGHT = 3;
 
 	// Get venderid from TUINT32
 
-	HLVM_INLINE_FUNC EGpuVendorId VenderId2Enum(TUINT32 VenderId)
+	HLVM_INLINE_FUNC EGpuVendorID VenderId2Enum(TUINT32 VenderId)
 	{
-		switch (S_C(EGpuVendorId, VenderId))
+		switch (S_C(EGpuVendorID, VenderId))
 		{
-			case EGpuVendorId::NotQueried:
-				return EGpuVendorId::NotQueried;
-			case EGpuVendorId::Amd:
-			case EGpuVendorId::ImgTec:
-			case EGpuVendorId::Nvidia:
-			case EGpuVendorId::Arm:
-			case EGpuVendorId::Broadcom:
-			case EGpuVendorId::Qualcomm:
-			case EGpuVendorId::Intel:
-			case EGpuVendorId::Apple:
-			case EGpuVendorId::Vivante:
-			case EGpuVendorId::VeriSilicon:
-			case EGpuVendorId::SamsungAMD:
-			case EGpuVendorId::Microsoft:
-			case EGpuVendorId::Kazan:
-			case EGpuVendorId::Codeplay:
-			case EGpuVendorId::Mesa:
-				return S_C(EGpuVendorId, VenderId);
-			case EGpuVendorId::Unknown:
+			case EGpuVendorID::NotQueried:
+				return EGpuVendorID::NotQueried;
+			case EGpuVendorID::Amd:
+			case EGpuVendorID::ImgTec:
+			case EGpuVendorID::Nvidia:
+			case EGpuVendorID::Arm:
+			case EGpuVendorID::Broadcom:
+			case EGpuVendorID::Qualcomm:
+			case EGpuVendorID::Intel:
+			case EGpuVendorID::Apple:
+			case EGpuVendorID::Vivante:
+			case EGpuVendorID::VeriSilicon:
+			case EGpuVendorID::SamsungAMD:
+			case EGpuVendorID::Microsoft:
+			case EGpuVendorID::Kazan:
+			case EGpuVendorID::Codeplay:
+			case EGpuVendorID::Mesa:
+				return S_C(EGpuVendorID, VenderId);
+			case EGpuVendorID::Unknown:
 			default:
-				return EGpuVendorId::Unknown;
+				return EGpuVendorID::Unknown;
 		}
 	}
 } // namespace RHI

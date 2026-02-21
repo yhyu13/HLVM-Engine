@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include "Core/Assert.h"
 #include "Renderer/RHI/RHIDefinition.h"
 
 #ifndef VK_NO_PROTOTYPE

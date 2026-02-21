@@ -8,6 +8,7 @@
 DECLARE_LOG_CATEGORY(LogTest)
 
 #include "Renderer/Window/WindowDefinition.h"
+#if 0 // Deprecated, remove later
 #if HLVM_WINDOW_USE_VULKAN
 	#include "Renderer/RHI/_Deprecated/Vulkan/VulkanLoader.h"
 	#pragma clang diagnostic push
@@ -1416,4 +1417,5 @@ RECORD_BOOL(test_GLFW3VulkanWindowRaw)
 //	return true;
 //}
 
+#endif
 #endif

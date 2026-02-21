@@ -12,7 +12,7 @@ void FDeviceManager::GetWindowDimensions(TUINT32& width, TUINT32& height) const
 	height = DeviceParams.BackBufferHeight;
 }
 
-RHI::EGpuVendorId FDeviceManager::GetGPUVendor(TUINT32 vendorID) const
+EGpuVendorID FDeviceManager::GetGPUVendor(TUINT32 vendorID) const
 {
 	return RHI::VenderId2Enum(vendorID);
 }

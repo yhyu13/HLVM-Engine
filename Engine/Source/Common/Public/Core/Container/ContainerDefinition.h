@@ -311,7 +311,7 @@ public:
 		{
 			return nullptr;
 		}
-		return &Iter->second;
+		return std::addressof(Iter->second);
 	}
 
 	const Value* Find(const Key& key) const
@@ -321,7 +321,7 @@ public:
 		{
 			return nullptr;
 		}
-		return &Iter->second;
+		return std::addressof(Iter->second);
 	}
 
 	bool Contains(const Key& key) const
@@ -335,7 +335,7 @@ public:
 		auto Iter = this->find(key);
 		if (Iter == this->end())
 		{
-			auto result = this->insert({ key, value });
+			auto result = this->insert(std::pair<Key, Value>{ key, value });
 			Iter = result.first;
 			HLVM_ASSERT(result.second);
 		}
@@ -343,7 +343,7 @@ public:
 		{
 			Iter->second = value;
 		}
-		return &Iter->second;
+		return std::addressof(Iter->second);
 	}
 
 	// Add move
@@ -352,26 +352,27 @@ public:
 		auto Iter = this->find(key);
 		if (Iter == this->end())
 		{
-			auto result = this->insert({ key, value });
+			auto result = this->insert(MoveTemp(std::pair<Key, Value>{ key, MoveTemp(value) }));
 			Iter = result.first;
 			HLVM_ASSERT(result.second);
 		}
 		else
 		{
-			Iter->second = value;
+			Iter->second = MoveTemp(value);
 		}
-		return &Iter->second;
+		return std::addressof(Iter->second);
+	}
+
+	void Remove(const Key& key)
+	{
+		this->erase(key);
 	}
 
 	void Empty(TSIZE NewCapacity = 0)
 	{
-		this->clear();
-		if (this->capacity() < NewCapacity)
-		{
-			this->shrink_to_fit();
-		}
-		this->reserve(NewCapacity);
-		HLVM_ASSERT(this->capacity() >= NewCapacity);
+		// Node hash map has no shrink_to_fit(), so we don't need to call it
+		// Equivalent to Rest
+		Reset(NewCapacity);
 	}
 
 	void Reset(TSIZE NewCapacity = 0)
@@ -408,7 +409,7 @@ public:
 		{
 			return nullptr;
 		}
-		return &Iter->second;
+		return std::addressof(Iter->second);
 	}
 
 	const Value* Find(const Key& key) const
@@ -418,7 +419,7 @@ public:
 		{
 			return nullptr;
 		}
-		return &Iter->second;
+		return std::addressof(Iter->second);
 	}
 
 	bool Contains(const Key& key) const
@@ -432,7 +433,7 @@ public:
 		auto Iter = this->find(key);
 		if (Iter == this->end())
 		{
-			auto result = this->insert({ key, value });
+			auto result = this->insert(std::pair<Key, Value>{ key, value });
 			Iter = result.first;
 			HLVM_ASSERT(result.second);
 		}
@@ -440,7 +441,7 @@ public:
 		{
 			Iter->second = value;
 		}
-		return &Iter->second;
+		return std::addressof(Iter->second);
 	}
 
 	// Add move
@@ -449,26 +450,27 @@ public:
 		auto Iter = this->find(key);
 		if (Iter == this->end())
 		{
-			auto result = this->insert({ key, value });
+			auto result = this->insert(MoveTemp(std::pair<Key, Value>{ key, MoveTemp(value) }));
 			Iter = result.first;
 			HLVM_ASSERT(result.second);
 		}
 		else
 		{
-			Iter->second = value;
+			Iter->second = MoveTemp(value);
 		}
-		return &Iter->second;
+		return std::addressof(Iter->second);
+	}
+
+	void Remove(const Key& key)
+	{
+		this->erase(key);
 	}
 
 	void Empty(TSIZE NewCapacity = 0)
 	{
-		this->clear();
-		if (this->capacity() < NewCapacity)
-		{
-			this->shrink_to_fit();
-		}
-		this->reserve(NewCapacity);
-		HLVM_ASSERT(this->capacity() >= NewCapacity);
+		// Node hash map has no shrink_to_fit(), so we don't need to call it
+		// Equivalent to Rest
+		Reset(NewCapacity);
 	}
 
 	void Reset(TSIZE NewCapacity = 0)
@@ -492,8 +494,8 @@ using FConstByteBuffer = std::span<const TBYTE>;
 template <typename T, typename Allocator = boost::container::new_allocator<T>>
 using TRingBuffer = boost::circular_buffer<T, Allocator>;
 
-template<typename T>
+template <typename T>
 using TArray = TVector<T>;
 
-template<typename T>
+template <typename T>
 using TArrayView = TVectorView<T>;

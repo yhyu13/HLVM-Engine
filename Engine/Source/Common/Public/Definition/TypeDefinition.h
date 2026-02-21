@@ -67,7 +67,7 @@ static_assert(sizeof(TFP64) == 8 * sizeof(char), "double_t is not 8 char in size
 #define TFP64_MAX std::numeric_limits<TFP64>::max()
 
 // Alias for float and double being both double precision
-#define TFLOAT TFP64
+#define TFLOAT TFP32
 #define TDOUBLE TFP64
 
 #define TTimePoint std::chrono::steady_clock::time_point
