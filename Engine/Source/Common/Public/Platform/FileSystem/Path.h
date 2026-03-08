@@ -145,6 +145,11 @@ public:
 	static bool					 Exists(const FPath& path);
 	static TSmallVector32<FPath> Glob(const FPath& root_dir, const FString& regex, bool recursive = false);
 
+	static FPath GetParentPath(const FPath& path)
+	{
+		return FPath(path.parent_path());
+	}
+
 	// variadic template of combining N paths
 	template <typename... Args>
 	static FPath Combine(const FPath& path1, const FPath& path2, Args&&... args)

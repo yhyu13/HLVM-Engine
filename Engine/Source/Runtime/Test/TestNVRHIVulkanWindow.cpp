@@ -20,8 +20,8 @@
 DECLARE_LOG_CATEGORY(LogTest)
 
 #include "Renderer/Window/WindowDefinition.h"
-#if HLVM_WINDOW_USE_VULKAN
-	#include "Renderer/Window/GLFW3/Vulkan/VulkanWindow.h"
+#if HLVM_VULKAN_RENDERER
+	#include "Renderer/Window/GLFW3/GLFW3VulkanWindow.h"
 
 //// First load vulkan hpp with dynamic dispatch (aka VK_NO_PROTOTYPE)
 //	#define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1

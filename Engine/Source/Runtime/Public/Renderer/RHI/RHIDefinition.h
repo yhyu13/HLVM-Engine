@@ -4,7 +4,8 @@
 
 #pragma once
 
-#include "GlobalDefinition.h"
+#include "Core/CoreMinimal.h"
+#include "Renderer/RendererDefinition.h"
 
 /// @brief 默认使用Vulkan
-#define USE_VK_BACKEND 1
+#define HLVM_RHI_VK_BACKEND (HLVM_VULKAN_RENDERER)

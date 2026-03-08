@@ -72,18 +72,3 @@ static_assert(VULKAN_HPP_DISPATCH_LOADER_DYNAMIC == 1, "VULKAN_HPP_DISPATCH_LOAD
 		HLVM_ASSERT_F(_result == VK_SUCCESS, TXT("Vulkan assert {} failed: {}"), STRTIFY(x), VULKAN_RESULT_TO_TCHAR(_result)); \
 	}                                                                                                                          \
 	while (0)
-
-/// @brief Helper macro to test the result of Vulkan calls which can return an error. (HLVM_ASSERT_F)
-#define VULKAN_HPP_TRY(...)                                      \
-	do                                                           \
-	{                                                            \
-		try                                                      \
-		{                                                        \
-			__VA_ARGS__;                                         \
-		}                                                        \
-		catch (std::system_error & e)                            \
-		{                                                        \
-			HLVM_LOG(LogRHI, critical, TO_TCHAR_CSTR(e.what())); \
-		}                                                        \
-	}                                                            \
-	while (0)

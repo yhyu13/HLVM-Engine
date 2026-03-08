@@ -5,6 +5,7 @@
 #pragma once
 
 #include "WindowDefinition.h"
+#include "Math/MathGLM.h"
 
 HLVM_ENUM(EWindowType, TUINT8,
 	GLFW3Vulkan);

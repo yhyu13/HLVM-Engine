@@ -15,6 +15,7 @@ public:
 	FGenericPlatformFile() = default;
 	virtual ~FGenericPlatformFile() = default;
 
+	// TODO : Return value should contain processed file type (e.g. disk, packed)
 	virtual bool				  IsDirectory(const FPath& path);
 	virtual bool				  Exists(const FPath& path);
 	virtual TSmallVector32<FPath> Glob(const FPath& root_dir, const FString& regex, bool recursive = false);

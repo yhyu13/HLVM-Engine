@@ -6,4 +6,14 @@
 
 #include "VulkanDefinition.h"
 
-HLVM_EXTERN_FUNC void InitVulkanLoaderOnce();
+namespace hlvm_vk
+{
+	HLVM_EXTERN_FUNC bool IsVulkanLoaderAPIInitialized();
+	HLVM_EXTERN_FUNC void InitVulkanLoaderAPIOnce();
+
+	HLVM_EXTERN_FUNC bool IsVulkanLoaderInstanceAPIInitialized();
+	HLVM_EXTERN_FUNC void InitVulkanLoaderInstance(vk::Instance& instance);
+
+	HLVM_EXTERN_FUNC bool IsVulkanLoaderDeviceAPIInitialized();
+	HLVM_EXTERN_FUNC void InitVulkanLoaderDevice(vk::Device& device);
+} // namespace hlvm_vk

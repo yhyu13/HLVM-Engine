@@ -7,7 +7,7 @@
 #include "Renderer/Window/GLFW3/GLFW3Window.h"
 
 // Only include when HLVM_WINDOW_USE_VULKAN is true
-#if (HLVM_WINDOW_USE_VULKAN)
+#if HLVM_WINDOW_USE_VULKAN
 class FGLFW3VulkanWindow final : public FGLFW3Window
 {
 public:

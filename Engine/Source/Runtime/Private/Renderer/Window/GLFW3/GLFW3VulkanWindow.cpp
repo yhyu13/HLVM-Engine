@@ -2,10 +2,9 @@
  * Copyright (c) 2025. MIT License. All rights reserved.
  */
 
-#include "Renderer/Window/GLFW3/Vulkan/VulkanWindow.h"
+#include "Renderer/Window/GLFW3/GLFW3VulkanWindow.h"
 
-#if (HLVM_WINDOW_USE_VULKAN)
-DECLARE_LOG_CATEGORY(LogGLFW3Vulkan)
+#if HLVM_WINDOW_USE_VULKAN
 
 FGLFW3VulkanWindow::FGLFW3VulkanWindow(const IWindow::Properties& InProperties)
 	: FGLFW3Window(InProperties)
@@ -13,7 +12,7 @@ FGLFW3VulkanWindow::FGLFW3VulkanWindow(const IWindow::Properties& InProperties)
 	Type = EWindowType::GLFW3Vulkan;
 
 	// 初始化Vulkan加载器
-	InitVulkanLoaderOnce();
+	hlvm_vk::InitVulkanLoaderAPIOnce();
 
 	glfwInit(); // 初始化图形库框架：Graphics Libraries Framework
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API); // GLFW会默认创建OpenGL的Context，但是，我们使用的是Vulkan，所以需要取消
@@ -32,12 +31,12 @@ FGLFW3VulkanWindow::FGLFW3VulkanWindow(const IWindow::Properties& InProperties)
 		nullptr,
 		nullptr); // 创建窗口
 	HLVM_ENSURE_F(Window, TXT("Failed to create GLFW window"));
-	HLVM_LOG(LogGLFW3Vulkan, debug, TXT("GLFW3Vulkan Init"));
+	HLVM_LOG(LogGLFW3Window, debug, TXT("GLFW3Vulkan Init"));
 }
 
 FGLFW3VulkanWindow::~FGLFW3VulkanWindow()
 {
-	HLVM_LOG(LogGLFW3Vulkan, debug, TXT("GLFW3Vulkan Destroy"));
+	HLVM_LOG(LogGLFW3Window, debug, TXT("GLFW3Vulkan Destroy"));
 }
 
 VkSurfaceKHR FGLFW3VulkanWindow::CreateSurface(VkInstance instance)
@@ -60,4 +59,5 @@ TVector<std::string> FGLFW3VulkanWindow::GetRequiredExtensions()
 	TVector<std::string> Exts(glfwExtensions, glfwExtensions + glfwExtensionCount);
 	return Exts;
 }
+
 #endif

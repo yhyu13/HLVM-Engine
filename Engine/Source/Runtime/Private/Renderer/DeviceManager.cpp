@@ -2,8 +2,9 @@
  * Copyright (c) 2025. MIT License. All rights reserved.
  */
 
- // Reference https://github.com/RobertBeckebans/RBDOOM-3-BFG/blob/4310fbd200b578014b22dce5fa82a48977eb149a/neo/sys/DeviceManager.cpp
-
+// Reference
+// https://github.com/RobertBeckebans/RBDOOM-3-BFG/blob/4310fbd200b578014b22dce5fa82a48977eb149a/neo/sys/DeviceManager.cpp
+// https://github.com/NVIDIA-RTX/Donut/blob/2c1077673edb0e0d814c202e6ce8e502d245c2da/src/app/DeviceManager.cpp
 #include "Renderer/DeviceManager.h"
 
 void FDeviceManager::GetWindowDimensions(TUINT32& width, TUINT32& height) const
@@ -14,38 +15,24 @@ void FDeviceManager::GetWindowDimensions(TUINT32& width, TUINT32& height) const
 
 EGpuVendorID FDeviceManager::GetGPUVendor(TUINT32 vendorID) const
 {
-	return RHI::VenderId2Enum(vendorID);
+	return hlvm_rhi::VenderId2Enum(vendorID);
 }
 
 void FDeviceManager::BackBufferResizing()
 {
-	// TODO
-	// Framebuffer::Shutdown();
+	// Notify derived class that swapchain is about to be recreated
+	OnBeforeSwapchainRecreate();
 }
 
 void FDeviceManager::BackBufferResized()
 {
-	// TODO
-	//	if (tr.IsInitialized())
-	//	{
-	//		Framebuffer::ResizeFramebuffers();
-	//	}
+	// Notify derived class that swapchain has been recreated
+	OnAfterSwapchainRecreate();
 }
 
 nvrhi::IFramebuffer* FDeviceManager::GetCurrentFramebuffer()
 {
 	return GetFramebuffer(GetCurrentBackBufferIndex());
-}
-
-nvrhi::IFramebuffer* FDeviceManager::GetFramebuffer(uint32_t /*index*/)
-{
-	// TODO
-	//	if (index < (uint32_t)globalFramebuffers.swapFramebuffers.Num())
-	//	{
-	//		return globalFramebuffers.swapFramebuffers[index]->GetApiObject();
-	//	}
-
-	return nullptr;
 }
 
 FNVRHIMessageCallback& FNVRHIMessageCallback::GetInstance()

@@ -2,17 +2,18 @@
  * Copyright (c) 2025. MIT License. All rights reserved.
  */
 
-// Reference https://github.com/RobertBeckebans/RBDOOM-3-BFG/blob/4310fbd200b578014b22dce5fa82a48977eb149a/neo/sys/DeviceManager.h
-
+// Reference
+// https://github.com/RobertBeckebans/RBDOOM-3-BFG/blob/4310fbd200b578014b22dce5fa82a48977eb149a/neo/sys/DeviceManager.h
+// https://github.com/NVIDIA-RTX/Donut/blob/2c1077673edb0e0d814c202e6ce8e502d245c2da/include/donut/app/DeviceManager.h
 #pragma once
 
 #include "Renderer/Window/WindowDefinition.h"
 
-#if HLVM_WINDOW_USE_VULKAN
-	#include "Renderer/Window/GLFW3/Vulkan/VulkanWindow.h"
+#if HLVM_VULKAN_RENDERER
+	#include "Renderer/Window/GLFW3/GLFW3VulkanWindow.h"
 #endif
 
-#include "Renderer/RHI/Common.h"
+#include "Renderer/RHI/RHICommon.h"
 
 /*-----------------------------------------------------------------------------
    Device Creation Parameters
@@ -33,7 +34,7 @@ struct FDeviceCreationParameters
 	TUINT32		  BackBufferHeight = 720;
 	TUINT32		  BackBufferSampleCount = 1; // optional HDR Framebuffer MSAA
 	TUINT32		  RefreshRate = 0;
-	TUINT32		  SwapChainBufferCount = RHI::MAX_FRAMES_IN_FLIGHT; // SRS - default matches GPU frames, can be overridden by renderer
+	TUINT32		  SwapChainBufferCount = hlvm_rhi::MAX_FRAMES_IN_FLIGHT; // SRS - default matches GPU frames, can be overridden by renderer
 	nvrhi::Format SwapChainFormat = nvrhi::Format::RGBA8_UNORM;		// RB: don't do the sRGB gamma ramp with the swapchain
 	TUINT32		  SwapChainSampleCount = 1;
 	TUINT32		  SwapChainSampleQuality = 0;
@@ -54,7 +55,7 @@ struct FDeviceCreationParameters
 	// DPI scaling
 	bool bEnablePerMonitorDPI = false;
 
-#if HLVM_WINDOW_USE_VULKAN
+#if HLVM_VULKAN_RENDERER
 	// Vulkan-specific extensions and layers
 	TVector<std::string> RequiredVulkanInstanceExtensions;
 	TVector<std::string> RequiredVulkanDeviceExtensions;
@@ -112,9 +113,9 @@ public:
 	virtual void UpdateWindowSize(const FUInt2& Params) = 0;
 
 	// Rendering interface
-	virtual void BeginFrame() = 0;
-	virtual void EndFrame() = 0;
-	virtual void Present() = 0;
+	virtual bool BeginFrame() = 0;
+	virtual bool EndFrame() = 0;
+	virtual bool Present() = 0;
 
 	// Resource access
 	[[nodiscard]] virtual nvrhi::IDevice*	 GetDevice() const = 0;
@@ -128,7 +129,7 @@ public:
 
 	// Framebuffer management
 	nvrhi::IFramebuffer* GetCurrentFramebuffer();
-	nvrhi::IFramebuffer* GetFramebuffer(TUINT32 Index);
+	virtual nvrhi::IFramebuffer* GetFramebuffer(TUINT32 Index) = 0;
 
 	// Configuration
 	const FDeviceCreationParameters& GetDeviceParams() const { return DeviceParams; }
@@ -139,7 +140,7 @@ public:
 	TUINT32				  GetMaxPushConstantSize() const { return DeviceParams.MaxPushConstantSize; }
 
 	// Vulkan-specific extension queries (only meaningful when using Vulkan)
-#if HLVM_WINDOW_USE_VULKAN
+#if HLVM_VULKAN_RENDERER
 	virtual bool IsVulkanInstanceExtensionEnabled(const char* /*ExtensionName*/) const { return false; }
 	virtual bool IsVulkanDeviceExtensionEnabled(const char* /*ExtensionName*/) const { return false; }
 	virtual bool IsVulkanLayerEnabled(const char* /*LayerName*/) const { return false; }
@@ -162,7 +163,7 @@ protected:
 	friend class FImage;
 
 	// Protected members
-	TSharedPtr<IWindow> WindowHandle = nullptr;
+	TUniquePtr<IWindow> WindowHandle = nullptr;
 	bool				bWindowVisible = false;
 
 	FDeviceCreationParameters DeviceParams;
@@ -173,7 +174,9 @@ protected:
 	TINT32	RequestedVSync = 0;
 	TUINT32 FrameIndex = 0;
 
-	// Helper methods
+	// Framebuffer lifecycle management (called by derived classes)
+	virtual void OnBeforeSwapchainRecreate() {}
+	virtual void OnAfterSwapchainRecreate() {}
 	::EGpuVendorID GetGPUVendor(TUINT32 VendorID) const;
 	void			  BackBufferResizing();
 	void			  BackBufferResized();

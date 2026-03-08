@@ -48,7 +48,16 @@ bool FGenericPlatformFile::IsDirectory(const FPath& path)
 	}
 	else
 	{
-		return S_C(FBoostPlatformFile*, sPlatformFileRedirector[HLVM_ENUM_VALUE(EPlatformFileType::Disk)])->IsDirectory(path);
+		bool ret;
+		for (TUINT8 i = HLVM_ENUM_VALUE(EPlatformFileType::Unspecified) + 1; i < EPlatformFileType_NUM; i++)
+		{
+			ret = sPlatformFileRedirector[i]->IsDirectory(path);
+			if (ret)
+			{
+				return true;
+			}
+		}
+		return false;
 	}
 }
 
@@ -64,7 +73,18 @@ bool FGenericPlatformFile::Exists(const FPath& path)
 	}
 	else
 	{
-		return S_C(FBoostPlatformFile*, sPlatformFileRedirector[HLVM_ENUM_VALUE(EPlatformFileType::Disk)])->Exists(path);
+		bool ret;
+		for (TUINT8 i = HLVM_ENUM_VALUE(EPlatformFileType::Unspecified) + 1; i < EPlatformFileType_NUM; i++)
+		{
+
+			ret = sPlatformFileRedirector[i]->Exists(path);
+			if (ret)
+			{
+				return true;
+			}
+		}
+
+		return false;
 	}
 }
 
@@ -80,7 +100,13 @@ TSmallVector32<FPath> FGenericPlatformFile::Glob(const FPath& path, const FStrin
 	}
 	else
 	{
-		return S_C(FBoostPlatformFile*, sPlatformFileRedirector[HLVM_ENUM_VALUE(EPlatformFileType::Disk)])->Glob(path, regex, recursive);
+		TSmallVector32<FPath> ret;
+		for (TUINT8 i = HLVM_ENUM_VALUE(EPlatformFileType::Unspecified) + 1; i < EPlatformFileType_NUM; i++)
+		{
+			TSmallVector32<FPath> ret1 = (sPlatformFileRedirector[i]->Glob(path, regex, recursive));
+			ret.insert(ret.end(), ret1.begin(), ret1.end());
+		}
+		return ret;
 	}
 }
 
@@ -115,4 +141,3 @@ TVector<TBYTE> FGenericPlatformFile::ReadContent(const FPath& path)
 		return S_C(FBoostPlatformFile*, sPlatformFileRedirector[HLVM_ENUM_VALUE(EPlatformFileType::Disk)])->ReadContent(path);
 	}
 }
-

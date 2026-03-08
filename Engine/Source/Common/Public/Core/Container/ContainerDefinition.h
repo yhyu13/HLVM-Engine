@@ -28,7 +28,10 @@
 #include <parallel_hashmap/phmap.h>
 #pragma clang diagnostic pop
 
-#define HLVM_CONTAINER_SHRINK false
+// Auto shrink
+#define HLVM_CONTAINER_SHRINK 0
+// Num() shoue return uint64
+#define HLVM_CONTAINER_NUM_64 1
 
 // TODO : set all container growth factor to 1
 template <typename T, size_t N, typename Allocator = boost::container::new_allocator<T>>
@@ -46,11 +49,22 @@ class TVectorView : public std::span<T>
 public:
 	using std::span<T>::span;
 
-	TUINT32 Num() const
+	TUINT32 Num32() const
 	{
 		HLVM_ASSERT(this->size() <= S_C(size_t, TUINT32_MAX));
 		return S_C(TUINT32, this->size());
 	}
+#if HLVM_CONTAINER_NUM_64
+	TUINT64 Num() const
+	{
+		return this->size();
+	}
+#else
+	TUINT32 Num() const
+	{
+		return this->Num32();
+	}
+#endif
 
 	T* GetData() const
 	{
@@ -71,11 +85,22 @@ public:
 	// https://stackoverflow.com/a/434784
 	using boost::container::vector<T, Allocator>::vector;
 
-	TUINT32 Num() const
+	TUINT32 Num32() const
 	{
 		HLVM_ASSERT(this->size() <= S_C(size_t, TUINT32_MAX));
 		return S_C(TUINT32, this->size());
 	}
+#if HLVM_CONTAINER_NUM_64
+	TUINT64 Num() const
+	{
+		return this->size();
+	}
+#else
+	TUINT32 Num() const
+	{
+		return this->Num32();
+	}
+#endif
 
 	TUINT32 SetNum(TUINT32 Num)
 	{
@@ -131,10 +156,7 @@ public:
 	 */
 	TSIZE Reserve(TSIZE NewCapacity)
 	{
-		if (NewCapacity > 0)
-		{
-			this->reserve(NewCapacity);
-		}
+		this->reserve(NewCapacity);
 		return this->capacity();
 	}
 
@@ -181,6 +203,11 @@ public:
 		}
 	}
 
+	bool IsEmpty() const
+	{
+		return this->size() == 0;
+	}
+
 	void Empty(TSIZE NewCapacity = 0)
 	{
 		this->clear();
@@ -199,6 +226,18 @@ public:
 		HLVM_ASSERT(this->capacity() >= NewCapacity);
 	}
 
+	T& Last()
+	{
+		HLVM_ASSERT(this->size() > 0);
+		return this->back();
+	}
+
+	const T& Last() const
+	{
+		HLVM_ASSERT(this->size() > 0);
+		return this->back();
+	}
+
 	operator TVectorView<T>() const
 	{
 		return TVectorView<T>(this->data(), this->size());
@@ -211,11 +250,22 @@ class TStaticVector : public boost::container::static_vector<T, N>
 public:
 	using boost::container::static_vector<T, N>::static_vector;
 
-	TUINT32 Num() const
+	TUINT32 Num32() const
 	{
 		HLVM_ASSERT(this->size() <= S_C(size_t, TUINT32_MAX));
 		return S_C(TUINT32, this->size());
 	}
+#if HLVM_CONTAINER_NUM_64
+	TUINT64 Num() const
+	{
+		return this->size();
+	}
+#else
+	TUINT32 Num() const
+	{
+		return this->Num32();
+	}
+#endif
 
 	TSIZE Size() const
 	{
@@ -291,12 +341,22 @@ class TMapSmall : public phmap::flat_hash_map<Key, Value, std::hash<Key>, std::e
 public:
 	using phmap::flat_hash_map<Key, Value, std::hash<Key>, std::equal_to<Key>, Allocator>::flat_hash_map;
 
-	// Num
-	TUINT32 Num() const
+	TUINT32 Num32() const
 	{
 		HLVM_ASSERT(this->size() <= S_C(size_t, TUINT32_MAX));
 		return S_C(TUINT32, this->size());
 	}
+#if HLVM_CONTAINER_NUM_64
+	TUINT64 Num() const
+	{
+		return this->size();
+	}
+#else
+	TUINT32 Num() const
+	{
+		return this->Num32();
+	}
+#endif
 
 	// Size
 	TSIZE Size() const
@@ -389,12 +449,22 @@ class TMap : public phmap::node_hash_map<Key, Value, std::hash<Key>, std::equal_
 public:
 	using phmap::node_hash_map<Key, Value, std::hash<Key>, std::equal_to<Key>, Allocator>::node_hash_map;
 
-	// Num
-	TUINT32 Num() const
+	TUINT32 Num32() const
 	{
 		HLVM_ASSERT(this->size() <= S_C(size_t, TUINT32_MAX));
 		return S_C(TUINT32, this->size());
 	}
+#if HLVM_CONTAINER_NUM_64
+	TUINT64 Num() const
+	{
+		return this->size();
+	}
+#else
+	TUINT32 Num() const
+	{
+		return this->Num32();
+	}
+#endif
 
 	// Size
 	TSIZE Size() const

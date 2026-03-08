@@ -7,8 +7,9 @@ vcpkg_cxt_common = VcpkgContenxt(vcpkg_root_path='../Dependency/vcpkg',
                                                                dependencies=[
                                                                    "spdlog",
                                                                    VcpkgPackage(name="mimalloc",
-                                                                                features=["asm", "secure"],# asm no longer work on mimalloc2.2.3
-                                                                                #features=["secure"],
+                                                                                features=["asm", "secure"],
+                                                                                # asm no longer work on mimalloc2.2.3
+                                                                                # features=["secure"],
                                                                                 default_features=False),
                                                                    "magic-enum",
                                                                    "boost",
@@ -187,8 +188,9 @@ tracy = FetchContent(name='Tracy',
 """
 Global Config :
 """
-bThreadSanitizer = False
-bBuildShared = False
+bThreadSanitizer = False  # Supers low performance, not even debuggable lol
+bBuildShared = False  # Not working on ubuntu/linux, shared lib is PITA
+bLinkByGold = True  # Using llvm GOLD linker for link time optimization
 
 
 # Create a CommonModule object with the specified options
@@ -275,7 +277,8 @@ class CommonProject(BaseProject):
         else:
             self.global_interface.add_global_set('CMAKE_POLICY_DEFAULT_CMP0069', ['NEW'])
             self.global_interface.add_global_set('CMAKE_INTERPROCEDURAL_OPTIMIZATION', ['ON'])
-        self.global_interface.add_global_set('CMAKE_LINKER_TYPE', ['GOLD'])
+        if bLinkByGold:
+            self.global_interface.add_global_set('CMAKE_LINKER_TYPE', ['GOLD'])
 
         # Compiler
         self.global_interface.add_global_set('CMAKE_EXPORT_COMPILE_COMMANDS', ['ON'])

@@ -63,19 +63,59 @@ public:
 	{
 		return this->c_str();
 	}
+
+	// operator *this
 	friend const TCHAR* operator*(const FString& fs)
 	{
 		return static_cast<const TCHAR*>(fs);
 	}
 
-	// Convert to const TCHAR*
+	// Convert to const char*
 	operator const char*() const
 	{
 		return reinterpret_cast<const char*>(this->c_str());
 	}
+
 	const char* ToCharCStr() const
 	{
 		return static_cast<const char*>(*this);
+	}
+
+	bool IsEmpty() const
+	{
+		return this->size() == 0;
+	}
+
+	FString ToLower() const
+	{
+		FString result = *this;
+		for (auto& c : result)
+		{
+			c = static_cast<TCHAR>(std::tolower(c));
+		}
+		return result;
+	}
+
+	FString ToUpper() const
+	{
+		FString result = *this;
+		for (auto& c : result)
+		{
+			c = static_cast<TCHAR>(std::toupper(c));
+		}
+		return result;
+	}
+
+	bool EndsWith(const FString& str) const
+	{
+		return this->size() >= str.size() &&
+			std::equal(str.rbegin(), str.rend(), this->rbegin());
+	}
+
+	bool StartsWith(const FString& str) const
+	{
+		return this->size() >= str.size() &&
+			std::equal(str.begin(), str.end(), this->begin());
 	}
 
 	template <typename... Args>
@@ -221,14 +261,36 @@ public:
 		return Buffer;
 	}
 
+	const CHAR* data() const
+	{
+		return Buffer;
+	}
+
 	size_t size() const
 	{
 		return Size;
 	}
 
-	bool empty() const
+	bool IsEmpty() const
 	{
 		return Size == 0;
+	}
+
+	// Convert to const CHAR*
+	operator const CHAR*() const
+	{
+		return this->c_str();
+	}
+
+	// Convert to const char*
+	operator const char*() const
+	{
+		return reinterpret_cast<const char*>(this->c_str());
+	}
+
+	friend const CHAR* operator*(const TCharArray<N, CHAR>& fs)
+	{
+		return fs.c_str();
 	}
 
 private:

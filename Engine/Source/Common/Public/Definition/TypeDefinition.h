@@ -31,7 +31,6 @@ static_assert(sizeof(TUINT64) == 8 * sizeof(char), "uint64_t is not 8 char in si
 #define TUINT64_MIN std::numeric_limits<TUINT64>::min()
 #define TUINT64_MAX std::numeric_limits<TUINT64>::max()
 
-#define TUINT TUINT64
 #define TSIZE TUINT64
 
 #define TINT8 std::int8_t
@@ -53,8 +52,6 @@ static_assert(sizeof(TINT32) == 4 * sizeof(char), "int32_t is not 4 char in size
 static_assert(sizeof(TINT64) == 8 * sizeof(char), "int64_t is not 8 char in size");
 #define TINT64_MIN std::numeric_limits<TINT64>::min()
 #define TINT64_MAX std::numeric_limits<TINT64>::max()
-
-#define TINT TINT64
 
 #define TFP32 std::float_t
 static_assert(sizeof(TFP32) == 4 * sizeof(char), "float_t is not 4 char in size");

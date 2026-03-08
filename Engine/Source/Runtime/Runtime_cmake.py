@@ -112,11 +112,11 @@ Global Config :
 """
 bThreadSanitizer = False  # Supers low performance, not even debuggable lol
 bBuildShared = False  # Not working on ubuntu/linux, shared lib is PITA
+bLinkByGold = True  # Using llvm GOLD linker for link time optimization
 bVulkanNoPrototype = True  # True : Dynamic loading vk api on startup from shared lib
 # True : Use Vulkan SDK include path instead of system include path
 # False : Use system include path, but we may use wrong vulkan sdk version due to Ubuntu apt package management lag behind
 bVulkanSDKOVerridePath = True
-
 
 # Create a RuntimeModule object with the specified options
 class RuntimeModule(BaseModule):
@@ -211,7 +211,8 @@ class RuntimeProject(BaseProject):
         else:
             self.global_interface.add_global_set('CMAKE_POLICY_DEFAULT_CMP0069', ['NEW'])
             self.global_interface.add_global_set('CMAKE_INTERPROCEDURAL_OPTIMIZATION', ['ON'])
-        self.global_interface.add_global_set('CMAKE_LINKER_TYPE', ['GOLD'])
+        if bLinkByGold:
+            self.global_interface.add_global_set('CMAKE_LINKER_TYPE', ['GOLD'])
 
         # Compiler
         self.global_interface.add_global_set('CMAKE_EXPORT_COMPILE_COMMANDS', ['ON'])

@@ -4,8 +4,6 @@
 
 #include "Renderer/Window/GLFW3/GLFW3Window.h"
 
-DECLARE_LOG_CATEGORY(LogGLFW3Window)
-
 FGLFW3Window::FGLFW3Window(const Properties& InProperties)
 {
 	Property = InProperties;

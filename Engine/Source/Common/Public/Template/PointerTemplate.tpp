@@ -116,6 +116,9 @@ struct TNoNullablePtr
 	using ValueType = T*;
 
 	TNoNullablePtr() = default;
+	explicit TNoNullablePtr(std::nullptr_t)
+	{
+	}
 	TNoNullablePtr(T* handle)
 		: m_ptr(handle)
 	{
@@ -146,6 +149,23 @@ struct TNoNullablePtr
 		return m_ptr != other.m_ptr;
 	}
 
+	friend T& operator*(const TNoNullablePtr& handle)
+	{
+		if (handle.m_ptr == nullptr)
+		{
+			HLVM_SEGFAULT_INLINE();
+		}
+		return *(handle.m_ptr);
+	}
+
+	TNoNullablePtr& operator=(const TNoNullablePtr& other)
+	{
+		if (this != &other)
+		{
+			m_ptr = other.m_ptr;
+		}
+		return *this;
+	}
 	// Compare with nullptr
 	bool operator==(std::nullptr_t) const
 	{
@@ -171,18 +191,12 @@ struct TNoNullablePtr
 		return m_ptr;
 	}
 
-	friend T& operator*(const TNoNullablePtr& handle)
-	{
-		if (handle.m_ptr == nullptr)
-		{
-			HLVM_SEGFAULT_INLINE();
-		}
-		return *(handle.m_ptr);
-	}
-
 private:
 	T* m_ptr{ nullptr };
 };
+
+template <typename T>
+using TNNPtr = TNoNullablePtr<T>;
 
 /**
  * Template for nullable pointers
@@ -241,11 +255,6 @@ struct TNullablePtr
 		return m_ptr;
 	}
 
-	T* Get() const
-	{
-		return m_ptr;
-	}
-
 	friend T& operator*(const TNullablePtr& handle)
 	{
 		if (handle.m_ptr == nullptr)
@@ -255,6 +264,22 @@ struct TNullablePtr
 		return *(handle.m_ptr);
 	}
 
+	TNullablePtr& operator=(const TNullablePtr& other)
+	{
+		if (this != &other)
+		{
+			m_ptr = other.m_ptr;
+		}
+		return *this;
+	}
+
+	T* Get() const
+	{
+		return m_ptr;
+	}
+
 private:
 	T* m_ptr{ nullptr };
 };
+template <typename T>
+using TNPtr = TNullablePtr<T>;

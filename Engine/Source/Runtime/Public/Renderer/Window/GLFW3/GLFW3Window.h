@@ -24,6 +24,8 @@
 #include <GLFW/glfw3.h>
 #pragma clang diagnostic pop
 
+DECLARE_LOG_CATEGORY(LogGLFW3Window)
+
 class FGLFW3Window : public IWindow
 {
 public:
