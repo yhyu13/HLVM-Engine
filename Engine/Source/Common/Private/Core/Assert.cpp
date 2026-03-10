@@ -19,8 +19,10 @@ namespace hlvm_private
 	 * Assert stack mallocator, adjust reserved memory size to your needs (default 64Kb)
 	 */
 	HLVM_STATIC_VAR TStackMallocator<64 * 1024, false, true, false, false, false> stack_mallocator{};
-	IMallocator*																  AssertionStackMallocator{ &stack_mallocator }; // extern	    // extern
-	FAtomicFlagNC																  AssertionStackLock{};
+	// extern
+	IMallocator* AssertionStackMallocator{ &stack_mallocator };
+	// extern
+	FAtomicFlagNC AssertionStackLock{};
 
 	void InitAssertionStackMallocator() // extern
 	{

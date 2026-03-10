@@ -5,6 +5,7 @@
 #pragma once
 #include <iostream>
 
+// Forward declaration
 template <typename T, typename... Args>
 const char* StreamPrintf(T* ostream, const char* format, Args... args);
 

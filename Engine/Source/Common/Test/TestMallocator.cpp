@@ -10,7 +10,7 @@
 
 DECLARE_LOG_CATEGORY(LogTest)
 
-RECORD(mallocator_test, false)
+RECORD(mallocator_test, true)
 {
 	HLVM_PROFILE_CPU_NAMED("mallocator_test");
 
@@ -65,7 +65,7 @@ RECORD(mallocator_test, false)
 		});
 }
 
-RECORD(malloc_test, false)
+RECORD(malloc_test, true)
 {
 	const size_t MAX_THREADS = 10;
 	const size_t MAX_ITERATIONS = 10000;
