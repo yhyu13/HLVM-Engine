@@ -185,9 +185,9 @@ inline double RunTestAndCalculateAvg(const TestFuncType& func, uint32_t num_iter
 	std::vector<double> times;
 	for (uint32_t _i = 0u; _i < num_iterations; ++_i)
 	{
-		double duration;
+		double duration = std::numeric_limits<double>::max(); // Initialize duration to the maximum possible value
 		HLVM_ENSURE_F(func(duration), TXT("Test case failed"));
-		times.emplace_back(duration);
+		times.emplace_back(duration); // Store the duration in the vector
 	}
 	// Remove max and min duration from data collected (by moving them to the end of the array)
 	{

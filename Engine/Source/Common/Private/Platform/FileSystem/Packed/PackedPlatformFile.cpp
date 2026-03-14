@@ -10,8 +10,8 @@ static FPackedPlatformFile SPackedPlatformFile{};
 
 void FPackedPlatformFile::_Init()
 {
-	HLVM_ASSERT_F(!sPlatformFileRedirector[HLVM_ENUM_VALUE(EPlatformFileType::Packed)], TXT("Packed Platform file is already registered"));
-	sPlatformFileRedirector[HLVM_ENUM_VALUE(EPlatformFileType::Packed)] = FPackedPlatformFile::Get();
+	HLVM_ASSERT_F(!sPlatformFileRedirector[HLVM_E2VALUE(EPlatformFileType::Packed)], TXT("Packed Platform file is already registered"));
+	sPlatformFileRedirector[HLVM_E2VALUE(EPlatformFileType::Packed)] = FPackedPlatformFile::Get();
 	HLVM_LOG(LogPackedPlatformFile, debug, TXT("Init FPackedPlatformFile"));
 }
 

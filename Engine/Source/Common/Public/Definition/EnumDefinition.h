@@ -14,13 +14,18 @@
 	};                                   \
 	HLVM_INLINE_VAR constexpr size_t enum_class##_NUM = static_cast<size_t>(enum_class::_NUM)
 
-#define HLVM_ENUM_UNDERLYING(enum_class) std::underlying_type_t<enum_class>
-#define HLVM_ENUM_VALUE(enum_value) magic_enum::enum_underlying(enum_value)
+// magic enum don't enum class underlying type
+#define HLVM_ENUM_TO_UNDERLYING(enum_class) std::underlying_type_t<enum_class>
+#define HLVM_E2UNDERLYING(enum_class) HLVM_ENUM_TO_UNDERLYING(enum_class)
+
+#define HLVM_ENUM_TO_VALUE(enum_value) magic_enum::enum_underlying(enum_value)
+#define HLVM_E2VALUE(enum_value) HLVM_ENUM_TO_VALUE(enum_value)
 
 #define HLVM_ENUM_TO_TCHAR(enum_value) TO_TCHAR_CSTR(magic_enum::enum_name((enum_value)).data())
+#define HLVM_E2TCHAR(enum_value) HLVM_ENUM_TO_TCHAR(enum_value)
 
 // Reference https://www.reddit.com/r/cpp/comments/13psi6f/comment/jleje26/?utm_source=share&utm_medium=web3x&utm_name=web3xcss&utm_term=1&utm_content=share_button
-#define HLVM_DECLARE_FLAGS_OPERATOR(enum_class, Flags, op)          \
+#define _HLVM_DECLARE_FLAGS_OPERATOR(enum_class, Flags, op)          \
 	inline Flags operator op(enum_class a, enum_class b)            \
 	{                                                               \
 		return Flags((Flags::EnumValue(a) op Flags::EnumValue(b))); \
@@ -38,7 +43,7 @@
 		return Flags((a.value op b.value));                         \
 	}
 
-#define HLVM_DECLARE_FLAGS_OPERATOR2(enum_class, Flags, op) \
+#define _HLVM_DECLARE_FLAGS_OPERATOR2(enum_class, Flags, op) \
 	inline Flags& operator op(Flags & a, enum_class b)      \
 	{                                                       \
 		return a = Flags(a.value op Flags::EnumValue(b));   \
@@ -48,7 +53,7 @@
 		return a = Flags(a.value op b.value);               \
 	}
 
-#define HLVM_DECLARE_FLAGS_OPERATOR3(enum_class, Flags) \
+#define _HLVM_DECLARE_FLAGS_OPERATOR3(enum_class, Flags) \
 	inline bool operator==(Flags a, enum_class b)       \
 	{                                                   \
 		return a.value == Flags::EnumValue(b);          \
@@ -70,7 +75,7 @@
 	struct Flags                                                    \
 	{                                                               \
 		using EnumType = enum_class;                                \
-		using EnumValue = HLVM_ENUM_UNDERLYING(enum_class);         \
+		using EnumValue = HLVM_ENUM_TO_UNDERLYING(enum_class);         \
 		EnumValue value{ 0 };                                       \
 		inline constexpr Flags() {}                                 \
 		inline constexpr Flags(EnumType v) : value(EnumValue(v)) {} \
@@ -80,11 +85,11 @@
 			return value;                                           \
 		}                                                           \
 	};                                                              \
-	HLVM_DECLARE_FLAGS_OPERATOR(enum_class, Flags, &)               \
-	HLVM_DECLARE_FLAGS_OPERATOR2(enum_class, Flags, &=)             \
-	HLVM_DECLARE_FLAGS_OPERATOR(enum_class, Flags, |)               \
-	HLVM_DECLARE_FLAGS_OPERATOR2(enum_class, Flags, |=)             \
-	HLVM_DECLARE_FLAGS_OPERATOR3(enum_class, Flags)
+	_HLVM_DECLARE_FLAGS_OPERATOR(enum_class, Flags, &)               \
+	_HLVM_DECLARE_FLAGS_OPERATOR2(enum_class, Flags, &=)             \
+	_HLVM_DECLARE_FLAGS_OPERATOR(enum_class, Flags, |)               \
+	_HLVM_DECLARE_FLAGS_OPERATOR2(enum_class, Flags, |=)             \
+	_HLVM_DECLARE_FLAGS_OPERATOR3(enum_class, Flags)
 
 template <typename EnumFlags>
 bool EnumHasAnyFlags(EnumFlags&& GivenFlags, EnumFlags&& FlagsToCheck)
@@ -113,7 +118,7 @@ bool EnumHasAllFlags(EnumFlags&& GivenFlags, EnumType&& FlagsToCheck)
 template <class EnumType>
 class TEnumAsUnderlying
 {
-	using EnumValue = HLVM_ENUM_UNDERLYING(EnumType);
+	using EnumValue = HLVM_ENUM_TO_UNDERLYING(EnumType);
 	static_assert(std::is_enum_v<EnumType>, "TEnumAsUnderlying is not intended for use with enum classes");
 
 public:

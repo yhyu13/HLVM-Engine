@@ -36,7 +36,8 @@ public:
 	bool Push(ETaskPriority Priority, TaskType&& Task) noexcept
 		requires(std::is_move_constructible_v<TaskType>)
 	{
-		const bool bPushed = mTaskQueues[HLVM_ENUM_VALUE(Priority)].template Push<bTryPush>(MoveTemp(Task));
+		auto& Queue = mTaskQueues[HLVM_E2VALUE(Priority)];
+		const bool bPushed = Queue.template Push<bTryPush>(MoveTemp(Task));
 		if (bPushed)
 		{
 			mCV.notify_one();
@@ -45,12 +46,51 @@ public:
 	}
 
 	/**
+	 * Push tasks with Default priority
+	 */
+	template <bool bTryPush = false>
+	bool PushIfEmpty(TaskType&& Task) noexcept
+		requires(std::is_move_constructible_v<TaskType>)
+	{
+		return PushIfEmpty(ETaskPriority::Default, FwdTemp<TaskType>(Task));
+	}
+
+	/**
+	 * Push tasks with specific priority only if queue is empty
+	 */
+	template <bool bTryPush = false>
+	bool PushIfEmpty(ETaskPriority Priority, TaskType&& Task) noexcept
+		requires(std::is_move_constructible_v<TaskType>)
+	{
+		auto& Queue = mTaskQueues[HLVM_E2VALUE(Priority)];
+		if (Queue.IsEmpty())
+		{
+			const bool bPushed = Queue.template Push<bTryPush>(MoveTemp(Task));
+			if (bPushed)
+			{
+				// If push success, but we are in a race condition, pop one and return false
+				if (Queue.NumGreaterThanOne())
+				{
+					TaskType _wasted;
+					Queue.PopFront(_wasted);
+					return false;
+				}
+
+				mCV.notify_one();
+			}
+			return bPushed;
+		}
+		return false;
+	}
+
+	/**
 	 * Pop tasks with specific priority
 	 */
 	template <bool bTryPop = true>
-	bool PopFront(ETaskPriority Priority, TaskType& Task) noexcept
+	bool PopFront(ETaskPriority Priority, TaskType& Task, std::chrono::milliseconds Timeout = std::chrono::milliseconds::zero()) noexcept
 	{
-		if (mTaskQueues[Priority].template PopFront<bTryPop>(Task))
+		auto& Queue = mTaskQueues[HLVM_E2VALUE(Priority)];
+		if (Queue.template PopFront<bTryPop>(Task, Timeout))
 		{
 			return true;
 		}
@@ -61,7 +101,7 @@ public:
 	 * Pop tasks from higher priority to lower
 	 */
 	template <bool bTryPop = true>
-	bool PopFront(TaskType& Task) noexcept
+	bool PopFront(TaskType& Task, std::chrono::milliseconds Timeout = std::chrono::milliseconds::zero()) noexcept
 	{
 	TRY_POP:
 		// Regardless "bTryPop" is true or not, try to pop from higher priority to lower
@@ -79,9 +119,22 @@ public:
 			std::this_thread::yield();
 			{
 				std::unique_lock<std::mutex> lock(mMutex);
-				mCV.wait(lock, [] {
-					return true;
-				});
+				if (Timeout > std::chrono::milliseconds::zero())
+				{
+					auto endTime = std::chrono::steady_clock::now() + Timeout;
+					auto res = mCV.wait_until(lock, endTime);
+					if (res == std::cv_status::timeout)
+					{
+						// Add Timeout logic here
+						return false;
+					}
+				}
+				else
+				{
+					mCV.wait(lock, [] {
+						return true;
+					});
+				}
 			}
 			// if not stop pop, try pop again
 			if (!ShouldStopPop())
@@ -116,6 +169,12 @@ public:
 		{
 			mTaskQueues[i].SignalStop();
 		}
+	}
+
+	bool IsEmpty(ETaskPriority Priority) const noexcept
+	{
+		auto& Queue = mTaskQueues[HLVM_E2VALUE(Priority)];
+		return Queue.IsEmpty();
 	}
 
 private:

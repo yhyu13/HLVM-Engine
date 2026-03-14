@@ -34,6 +34,8 @@
 	#define PACK(__class__) __class__ __attribute__((__packed__))
 	#define MS_ALIGN(N)
 	#define GCC_ALIGN(N) __attribute__((aligned(N)))
+	#define ALIGN_PRE(N) MS_ALIGN(N)
+	#define ALIGN_POST(N) GCC_ALIGN(N)
 
 	#define HLVM_CACHE_LINE_SIZE 64
 	#define HLVM_CACHE_ALIGN alignas(HLVM_CACHE_LINE_SIZE)

@@ -46,10 +46,10 @@ public:
 			return FString::Format(
 				TXT("Title: {0}, DisplayMode: {1}, Resizable: {2}, StartMinimized: {3}, VSync: {4}, Extent: {5}, XY: {6}"),
 				Title,
-				HLVM_ENUM_TO_TCHAR(DisplayMode),
+				HLVM_E2TCHAR(DisplayMode),
 				Resizable,
 				StartMinimized,
-				HLVM_ENUM_TO_TCHAR(VSync),
+				HLVM_E2TCHAR(VSync),
 				::ToString(Extent),
 				::ToString(XY));
 		}

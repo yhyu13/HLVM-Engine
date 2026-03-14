@@ -228,7 +228,7 @@ void FVMArena::Free(void* p)
 	/**
 	 * Try to pop from local pending free list to pending local free list
 	 */
-	if (!mLocalPendingFreeList.Empty())
+	if (!mLocalPendingFreeList.IsEmpty())
 	{
 		while (mPendingFreeLists.LocalFreeList.size() < mPendingFreeLists.LocalFreeList.max_size())
 		{

@@ -2,7 +2,7 @@
  * Copyright (c) 2025. MIT License. All rights reserved.
  */
 
-#include "Core/Parallel/Async/WorkStealFiberPool.h"
+#include "Core/Parallel/Async/_Deprecated/WorkStealFiberPool.h"
 
 #if HLVM_ENABLE_BOOST_FIBER_POOL
 	#include "Platform/GenericPlatformThreadUtil.h"

@@ -23,10 +23,10 @@ enum class EConcurrentQueueMode : TUINT8
 };
 
 /**
- * Actually use atomic pointer is significantly faster (2x) than using raw ptr,
- * Try turn this on/off and compare TestParallel benchmark
+ * Actually use atomic pointer is significantly faster (2x) than using raw ptr in TestParallel.cpp benchmark,
+ * Try turn this on/off and compare TestParallel.cpp benchmark
  */
-#define QUEUE_NODE_USE_ATOMIC_PTR 1
+#define QUEUE_NEXT_NODE_USE_ATOMIC_PTR 1
 
 /**
  * Structure for the internal linked list.
@@ -39,7 +39,7 @@ struct MS_ALIGN(HLVM_MALLOC_ALIGNMENT) TConcurrentQueueNode
 		: mItem(FwdTemp<T>(InItem))
 	{
 	}
-#if QUEUE_NODE_USE_ATOMIC_PTR
+#if QUEUE_NEXT_NODE_USE_ATOMIC_PTR
 	TAtomicPointer<TConcurrentQueueNode*> mNextNode;
 #else
 	TConcurrentQueueNode* mNextNode{ nullptr };
@@ -57,8 +57,8 @@ template <typename T,
 	CPMRMallocator<TConcurrentQueueNode<T>> AllocatorType = TPMRStd<TConcurrentQueueNode<T>>>
 class TConcurrentQueue
 {
-#define IS_MP (Mode == EConcurrentQueueMode::Mpsc || Mode == EConcurrentQueueMode::Mpmc)
-#define IS_SC (Mode == EConcurrentQueueMode::Mpsc || Mode == EConcurrentQueueMode::Spsc)
+#define QUEUE_IS_MP (Mode == EConcurrentQueueMode::Mpsc || Mode == EConcurrentQueueMode::Mpmc)
+#define QUEUE_IS_SC (Mode == EConcurrentQueueMode::Mpsc || Mode == EConcurrentQueueMode::Spsc)
 	/*
 	 *  Concurrent Queue : Emulation
 	 *  mHead = mTail
@@ -172,7 +172,7 @@ public:
 	template <bool bTryPop = true>
 	bool PopFront(T& ret) noexcept
 	{
-		while (Empty() && !bStopFlagByUser)
+		while (IsEmpty() && !bStopFlagByUser)
 		{
 			/**
 			 * If only try pop, we should immediate exit with false on empty queue
@@ -196,7 +196,7 @@ public:
 
 		if (QueueNodeType* PopedNode = mTail->mNextNode)
 		{
-			if constexpr (IS_SC)
+			if constexpr (QUEUE_IS_SC)
 			{
 				// Step1 swap tail pointer
 				QueueNodeType* old_tail = mTail;
@@ -266,13 +266,26 @@ public:
 		return false;
 	}
 
-	bool Empty() const noexcept
+	/**
+	 * This method is not for stopping criteria,
+	 * User should use while(!Queue.ShouldStopPop()) to check queue should pop or not.
+	 */
+	bool IsEmpty() const noexcept
 	{
 		return mTail->mNextNode == nullptr;
 	}
 
 	/**
-	 * This method is for debugging propose.
+	 * This method is not for stopping criteria,
+	 * User should use while(!Queue.ShouldStopPop()) to check queue should pop or not.
+	 */
+	bool NumGreaterThanOne() const noexcept
+	{
+		return mTail->mNextNode != nullptr && mTail->mNextNode->mNextNode != nullptr;
+	}
+
+	/**
+	 * This method is not for stopping criteria,
 	 * User should use while(!Queue.ShouldStopPop()) to check queue should pop or not.
 	 * @return size_t Number of elements in the queue
 	 */
@@ -283,7 +296,7 @@ public:
 	}
 
 	/**
-	 * Use should call singla stop after all push finished,
+	 * Call signal stop after all push finished,
 	 * so that poping will not be blocked until queue is popped to empty
 	 */
 	void SignalStop() noexcept
@@ -292,23 +305,23 @@ public:
 	}
 
 	/**
-	 * Use should stop poping instead of Empty in the poping whle loop condition
+	 * This method is for stopping criteria
 	 */
 	bool ShouldStopPop() const noexcept
 	{
-		return bStopFlagByUser && Empty();
+		return bStopFlagByUser && IsEmpty();
 	}
 
 private:
 	void PushInternal(QueueNodeType* NewNode) noexcept
 	{
 		QueueNodeType* old_head;
-		if constexpr (IS_MP)
+		if constexpr (QUEUE_IS_MP)
 		{
 			// Step1, swap pointer
 			old_head = FGenericPlatformAtomicPointer::AtomicExchange(&mHead, NewNode);
 			// Step2, chain pointer
-#if QUEUE_NODE_USE_ATOMIC_PTR
+#if QUEUE_NEXT_NODE_USE_ATOMIC_PTR
 			FGenericPlatformAtomicPointer::AtomicExchange(&old_head->mNextNode, NewNode);
 #else
 			HLVM_ATOMIC_THREAD_FENCE();
@@ -353,7 +366,7 @@ private:
 
 	AllocatorType Mallocator;
 
-#undef IS_MP
-#undef IS_SC
-#undef QUEUE_NODE_USE_ATOMIC_PTR
+#undef QUEUE_IS_MP
+#undef QUEUE_IS_SC
 };
+#undef QUEUE_NEXT_NODE_USE_ATOMIC_PTR

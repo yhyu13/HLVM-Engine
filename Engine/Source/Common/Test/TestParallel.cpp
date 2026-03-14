@@ -26,7 +26,7 @@ RECORD(lock_test, true)
 	constexpr int kNumLoops = 10000;
 	double		  time_no_lock, time_lock;
 	{
-		HLVM_LOG(LogTest, info, TXT("Atomic ops : Create 10 threads and adds to i"));
+		HLVM_LOG(LogTest, info, TXT("Atomic ops : Create 10 threads and sum to variable i"));
 		auto TestFunc = [&](double& Duration) -> bool {
 			std::atomic_int32_t		 i = 0;
 			FTimer					 Timer;
@@ -63,7 +63,7 @@ RECORD(lock_test, true)
 	}
 
 	{
-		HLVM_LOG(LogTest, info, TXT("With lock : Create 10 threads and adds to i"));
+		HLVM_LOG(LogTest, info, TXT("With lock : Create 10 threads and sum to variable i"));
 		auto TestFunc = [&](double& Duration) -> bool {
 			int	   i = 0;
 			FTimer Timer;
@@ -105,14 +105,14 @@ RECORD(lock_test, true)
 		HLVM_LOG(LogTest, info, TXT("With lock avg took {0:f}"), time_lock);
 	}
 	{
-		double ratio = time_lock / time_no_lock;
-		double efficient = kNumThreads / ratio * 100;
+		double ratio = (time_lock) / time_no_lock;
+		double efficient = 100 - ((time_lock - time_no_lock) / time_lock ) * 100;
 		HLVM_LOG(LogTest, info,
 			TXT("Atomic ops = {0:.2f}x With lock, lock is {1:.2f}% efficient, ideally, lock should be 95% to 99% efficient"),
 			ratio, efficient);
 	}
 	{
-		HLVM_LOG(LogTest, info, TXT("With boost lock : Create 10 threads and adds to i"));
+		HLVM_LOG(LogTest, info, TXT("With boost lock : Create 10 threads and sum to variable i"));
 		auto TestFunc = [&](double& Duration) -> bool {
 			int						 i = 0;
 			FTimer					 Timer;
@@ -151,8 +151,8 @@ RECORD(lock_test, true)
 		HLVM_LOG(LogTest, info, TXT("With boost spin lock avg took {0:f}"), time_lock);
 	}
 	{
-		double ratio = time_lock / time_no_lock;
-		double efficient = kNumThreads / ratio * 100;
+		double ratio = (time_lock) / time_no_lock;
+		double efficient = 100 - ((time_lock - time_no_lock) / time_lock ) * 100;
 		HLVM_LOG(LogTest, info,
 			TXT("Atomic ops = {0:.2f}x With boost lock, boost lock is {1:.2f}% efficient, ideally, lock should be 95% to 99% efficient"),
 			ratio, efficient);
@@ -463,7 +463,7 @@ RECORD(pool_test, true)
 			std::atomic_int_fast32_t	   Counter{ kNumThreads };
 			std::vector<std::future<void>> PushThreads;
 			std::vector<std::future<void>> PopThreads;
-			FWorkStealThreadPool		   Pool{ FThreadAffinityMode::Bg2PhysicalCores() };
+			FWorkStealThreadPool		   Pool{ FThreadAffinityMode::Bg4PhysicalCores() };
 
 			for (int i = 0; i < kNumThreads; ++i)
 			{

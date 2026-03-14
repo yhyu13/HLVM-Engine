@@ -51,7 +51,7 @@ public:
 		requires(std::is_copy_constructible_v<T>)
 	{
 		// Block on full
-		while (FullInternal() && !bStopFlagByUser)
+		while (IsFullInternal() && !bStopFlagByUser)
 		{
 			if constexpr (bTryPush)
 			{
@@ -89,7 +89,7 @@ public:
 		requires(std::is_move_constructible_v<T>)
 	{
 		// Block on full
-		while (FullInternal() && !bStopFlagByUser)
+		while (IsFullInternal() && !bStopFlagByUser)
 		{
 			if constexpr (bTryPush)
 			{
@@ -126,7 +126,7 @@ public:
 	T& PeekFront() noexcept
 	{
 		LOCK_GUARD_NC();
-		HLVM_ASSERT_F(!EmptyInternal(), TXT("Queue Tail is null"));
+		HLVM_ASSERT_F(!IsEmptyInternal(), TXT("Queue Tail is null"));
 		return QueueNodes[mTail].mItem;
 	}
 
@@ -136,7 +136,7 @@ public:
 	template <bool bTryPop = true>
 	bool PopFront(T& ret) noexcept
 	{
-		while (EmptyInternal() && !bStopFlagByUser)
+		while (IsEmptyInternal() && !bStopFlagByUser)
 		{
 			/**
 			 * If only try pop, we should immediate exit with false on empty queue
@@ -158,7 +158,7 @@ public:
 		}
 
 		LOCK_GUARD_NC();
-		if (!EmptyInternal())
+		if (!IsEmptyInternal())
 		{
 			QueueNode* PopedNode = &QueueNodes[mTail];
 			{
@@ -195,13 +195,27 @@ public:
 		return false;
 	}
 
-	bool Empty() const noexcept
+	/**
+	 * This method is not for stopping criteria,
+	 * User should use while(!Queue.ShouldStopPop()) to check queue should pop or not.
+	 */
+	bool IsEmpty() const noexcept
 	{
-		return EmptyInternal();
+		return IsEmptyInternal();
 	}
 
 	/**
-	 * Use should call singla stop after all push finished,
+	 * This method is not for stopping criteria,
+	 * User should use while(!Queue.ShouldStopPop()) to check queue should pop or not.
+	 * @return size_t Number of elements in the queue
+	 */
+	size_t Num() const noexcept
+	{
+		return mCount.load(std::memory_order_relaxed);
+	}
+
+	/**
+	 * Call signal stop after all push finished,
 	 * so that poping will not be blocked until queue is popped to empty
 	 */
 	void SignalStop() noexcept
@@ -211,26 +225,21 @@ public:
 	}
 
 	/**
-	 * Use should stop poping instead of Empty in the poping whle loop condition
+	 * Use should stop poping instead of IsEmpty in the poping for loop condition
 	 */
 	bool ShouldStopPop() const noexcept
 	{
 		LOCK_GUARD_NC();
-		return bStopFlagByUser && EmptyInternal();
-	}
-
-	size_t Num() const noexcept
-	{
-		return mCount.load(std::memory_order_relaxed);
+		return bStopFlagByUser && IsEmptyInternal();
 	}
 
 private:
-	bool EmptyInternal() const noexcept
+	bool IsEmptyInternal() const noexcept
 	{
 		return mCount.load(std::memory_order_relaxed) == 0;
 	}
 
-	bool FullInternal() const noexcept
+	bool IsFullInternal() const noexcept
 	{
 		return mCount.load(std::memory_order_relaxed) == N;
 	}

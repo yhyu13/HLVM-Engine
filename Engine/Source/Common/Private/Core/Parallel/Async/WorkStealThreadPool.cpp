@@ -70,7 +70,7 @@ FWorkStealThreadPool::FWorkStealThreadPool(const FThreadAffinityMode& AffinityMo
 				 */
 				if (!task)
 				{
-					if (Queue->PopFront<false>(task))
+					if (Queue->PopFront<false>(task, std::chrono::milliseconds(100)))
 					{
 						if constexpr (HLVM_DEBUG_THREAD_UTILITY)
 						{
@@ -79,17 +79,18 @@ FWorkStealThreadPool::FWorkStealThreadPool(const FThreadAffinityMode& AffinityMo
 					}
 					else
 					{
-						// If should stop, stop the thread
+						// If pop fails, it might indicate we should stop, if true, stop the thread
 						if (Queue->ShouldStopPop())
 						{
 							break;
 						}
-						// There might be chances that queue is not stopped by still pop failed due to competition
+						// There might be chances that queue is not stopped but still pop failed due to competition
 						// In this case we must continue the thread
 						continue;
 					}
 				}
-				HLVM_ASSERT_F(task, TXT("Task is null"));
+
+				HLVM_ASSERT_F(task, TXT("Task is null!"));
 
 				if constexpr (HLVM_DEBUG_THREAD_UTILITY)
 				{

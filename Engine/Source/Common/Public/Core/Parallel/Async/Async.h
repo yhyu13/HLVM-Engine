@@ -6,7 +6,7 @@
 
 #include "AsyncConfig.h"
 #include "WorkStealThreadPool.h"
-#include "WorkStealFiberPool.h"
+#include "Core/Parallel/Async/_Deprecated/WorkStealFiberPool.h"
 
 #include <future>
 
