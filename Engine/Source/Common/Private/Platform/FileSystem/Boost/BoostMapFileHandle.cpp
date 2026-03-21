@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2025. MIT License. All rights reserved.
+ * Copyright (c) 2026. MIT License. All rights reserved.
  */
 
 #include "Platform/FileSystem/Boost/BoostMapFileHandle.h"
@@ -112,7 +112,7 @@ IFileHandle::OpRetType FBoostMapFileHandle::Open(const FPath& FilePath, const FF
 
 		mOpened = true;
 		Status_InOut->eFileOpStatus = EFileOpStatus::Success;
-		BMFH_VERBOSE_LOG(TXT("Open success with mode {}"), HLVM_E2TCHAR(mFileOptions.eFileMode));
+		BMFH_VERBOSE_LOG(TXT("Open success with mode {}"), E2TCHAR(mFileOptions.eFileMode));
 	}
 	catch (std::exception& Exception)
 	{
@@ -184,11 +184,12 @@ IFileHandle::OpRetType FBoostMapFileHandle::Read(void* Buffer, size_t Size, cons
 	BMFH_HANDLE_ASSERT(mOpened, TXT("File operation continue w/o open"));
 	BMFH_HANDLE_ASSERT(mFileOptions.eFileMode & EFileMode::R, TXT("File operation cannot read"));
 	BMFH_HANDLE_ASSERT(Size > 0, TXT("Buffer size invalid {}"), Size);
+	BMFH_HANDLE_ASSERT(SeekCtx.IsValid(), TXT("SeekCtx is invalid"));
 	BMFH_RECRSIVE_LOCK();
 
 	// tell if necessary
 	int64_t Prev_Tell = { -1 };
-	if (SeekCtx.bResetPos)
+	if (SeekCtx.bResetSeekPos)
 	{
 		Tell(Prev_Tell);
 		BMFH_HANDLE_ASSERT(Prev_Tell > 0, TXT("Tell failed before reset pos"), Prev_Tell);
@@ -246,16 +247,16 @@ IFileHandle::OpRetType FBoostMapFileHandle::Read(void* Buffer, size_t Size, cons
 	}
 
 	// Reset if necessary
-	if (SeekCtx.bResetPos)
+	if (SeekCtx.bResetSeekPos)
 		HLVM_UNLIKELY
 		{
-			BMFH_VERBOSE_LOG(TXT("bResetPos after read"));
+			BMFH_VERBOSE_LOG(TXT("bResetSeekPos after read"));
 			Seek(Prev_Tell, EWhence::Begin);
 		}
 	// Erase if necessary
-	else if (SeekCtx.bEraseSeekPos)
+	else if (SeekCtx.bIgnoreRWSeek)
 	{
-		BMFH_VERBOSE_LOG(TXT("bEraseSeekPos after read"));
+		BMFH_VERBOSE_LOG(TXT("bIgnoreRWSeek after read"));
 		Seek(0 - static_cast<int64_t>(Size), EWhence::Current);
 	}
 
@@ -269,11 +270,12 @@ IFileHandle::OpRetType FBoostMapFileHandle::Write(const void* Buffer, size_t Siz
 	BMFH_HANDLE_ASSERT(mOpened, TXT("File operation continue w/o open"));
 	BMFH_HANDLE_ASSERT(mFileOptions.eFileMode & EFileMode::W, TXT("File operation cannot write"));
 	BMFH_HANDLE_ASSERT(Size > 0, TXT("Buffer size invalid {}"), Size);
+	BMFH_HANDLE_ASSERT(SeekCtx.IsValid(), TXT("SeekCtx is invalid"));
 	BMFH_RECRSIVE_LOCK();
 
 	// tell if necessary
 	int64_t Prev_Tell{ -1 };
-	if (SeekCtx.bResetPos)
+	if (SeekCtx.bResetSeekPos)
 	{
 		Tell(Prev_Tell);
 		BMFH_HANDLE_ASSERT(Prev_Tell > 0, TXT("Tell failed before reset pos"), Prev_Tell);
@@ -359,15 +361,15 @@ IFileHandle::OpRetType FBoostMapFileHandle::Write(const void* Buffer, size_t Siz
 	}
 
 	// Reset if necessary
-	if (SeekCtx.bResetPos)
+	if (SeekCtx.bResetSeekPos)
 	{
-		BMFH_VERBOSE_LOG(TXT("bResetPos after write"));
+		BMFH_VERBOSE_LOG(TXT("bResetSeekPos after write"));
 		Seek(Prev_Tell, EWhence::Begin);
 	}
 	// Erase if necessary
-	else if (SeekCtx.bEraseSeekPos)
+	else if (SeekCtx.bIgnoreRWSeek)
 	{
-		BMFH_VERBOSE_LOG(TXT("bEraseSeekPos after write"));
+		BMFH_VERBOSE_LOG(TXT("bIgnoreRWSeek after write"));
 		Seek(0 - static_cast<int64_t>(Size), EWhence::Current);
 	}
 
@@ -452,7 +454,7 @@ IFileHandle::OpRetType FBoostMapFileHandle::Seek(int64_t Offset, EWhence Whence)
 			{
 				Status_InOut->eFileOpStatus = EFileOpStatus::Success;
 			}
-		BMFH_VERBOSE_LOG(TXT("Seek success given offset {} with {}"), Offset, HLVM_E2TCHAR(Whence));
+		BMFH_VERBOSE_LOG(TXT("Seek success given offset {} with {}"), Offset, E2TCHAR(Whence));
 	}
 	catch (std::exception& Exception)
 	{

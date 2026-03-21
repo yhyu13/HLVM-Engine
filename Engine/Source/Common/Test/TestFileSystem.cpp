@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2025. MIT License. All rights reserved.
+ * Copyright (c) 2026. MIT License. All rights reserved.
  */
 
 #include "Test.h"
@@ -44,10 +44,10 @@ RECORD(boostfile_test, true, 1, 1)
 		FFileOptions		   Options{ .eFileMode = EFileMode::RW, .eFileMapped = EFileMapped::NoMapped, .eFileLock = EFileLock::FullLock };
 		TCharArray<4>		   Buffer;
 		fileHandle.Open(TXT("./test.txt"), Options)
-			.Write("test", 4, { .bEraseSeekPos = true })
-			.Read(Buffer.data(), Buffer.Capacity, { .bEraseSeekPos = true })
-			.Write("asdf", 4, { .Offset = 4, .Whence = EWhence::Begin, .bEraseSeekPos = true })
-			.Read(Buffer.data(), Buffer.Capacity, { .Offset = 4, .Whence = EWhence::Begin, .bEraseSeekPos = true })
+			.Write("test", 4, { .bIgnoreRWSeek = true })
+			.Read(Buffer.data(), Buffer.Capacity, { .bIgnoreRWSeek = true })
+			.Write("asdf", 4, { .Offset = 4, .Whence = EWhence::Begin, .bIgnoreRWSeek = true })
+			.Read(Buffer.data(), Buffer.Capacity, { .Offset = 4, .Whence = EWhence::Begin, .bIgnoreRWSeek = true })
 			.Close();
 		HLVM_LOG(LogTest, info, TXT("Test BoostFileHandle nomap result: {}"), Buffer.c_str());
 	}
@@ -56,10 +56,10 @@ RECORD(boostfile_test, true, 1, 1)
 		FFileOptions		Options{ .eFileMode = EFileMode::RW, .eFileMapped = EFileMapped::Mapped, .eFileLock = EFileLock::FullLock };
 		TCharArray<4>		Buffer;
 		fileHandle.Open(TXT("./test_mapped.txt"), Options)
-			.Write("test", 4, { .bEraseSeekPos = true })
-			.Read(Buffer.data(), Buffer.Capacity, { .bEraseSeekPos = true })
-			.Write("asdf", 4, { .Offset = 4, .Whence = EWhence::Begin, .bEraseSeekPos = true })
-			.Read(Buffer.data(), Buffer.Capacity, { .Offset = 4, .Whence = EWhence::Begin, .bEraseSeekPos = true })
+			.Write("test", 4, { .bIgnoreRWSeek = true })
+			.Read(Buffer.data(), Buffer.Capacity, { .bIgnoreRWSeek = true })
+			.Write("asdf", 4, { .Offset = 4, .Whence = EWhence::Begin, .bIgnoreRWSeek = true })
+			.Read(Buffer.data(), Buffer.Capacity, { .Offset = 4, .Whence = EWhence::Begin, .bIgnoreRWSeek = true })
 			.Close();
 		HLVM_LOG(LogTest, info, TXT("Test BoostFileHandle mapped result: {}"), Buffer.c_str());
 	}

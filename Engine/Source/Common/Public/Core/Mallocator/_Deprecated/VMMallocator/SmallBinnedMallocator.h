@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2025. MIT License. All rights reserved.
+ * Copyright (c) 2026. MIT License. All rights reserved.
  */
 
 #pragma once
@@ -15,7 +15,7 @@ class FSmallBinnedMallocator final : public ISmallBinnedMallocator
 	static_assert(Alignment > 0);
 
 public:
-	NOCOPYMOVE(FSmallBinnedMallocator)
+	NOCOPYMOVE(FSmallBinnedMallocator);
 	FSmallBinnedMallocator() = default;
 	virtual ~FSmallBinnedMallocator() noexcept final override
 	{

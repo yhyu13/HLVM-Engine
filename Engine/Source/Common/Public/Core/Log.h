@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2025. MIT License. All rights reserved.
+ * Copyright (c) 2026. MIT License. All rights reserved.
  */
 
 #pragma once
@@ -27,7 +27,7 @@
 
 struct FLogCatgegory
 {
-	NOCOPYMOVE(FLogCatgegory)
+	NOCOPYMOVE(FLogCatgegory);
 	FLogCatgegory() = delete;
 	constexpr explicit FLogCatgegory(const TCHAR* CategoryName,
 		const spdlog::level::level_enum			  MinimumLogLevel =
@@ -78,7 +78,7 @@ struct FLogContext
 class FLogDevice
 {
 public:
-	NOCOPYMOVE(FLogDevice)
+	NOCOPYMOVE(FLogDevice);
 	FLogDevice() = default;
 	// Virtual destructor
 	virtual ~FLogDevice() = default;
@@ -118,7 +118,7 @@ class FLogRedirector
 public:
 	using ContainerType = std::forward_list<std::shared_ptr<FLogDevice>>;
 
-	NOCOPYMOVE(FLogRedirector)
+	NOCOPYMOVE(FLogRedirector);
 	FLogRedirector() = default;
 
 	static FLogRedirector* Get()
@@ -245,8 +245,7 @@ private:
 class FSpdlogConsoleDevice final : public FLogDevice
 {
 public:
-	NOCOPYMOVE(FSpdlogConsoleDevice)
-
+	NOCOPYMOVE(FSpdlogConsoleDevice);
 	FSpdlogConsoleDevice();
 	~FSpdlogConsoleDevice() override;
 

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2025. MIT License. All rights reserved.
+ * Copyright (c) 2026. MIT License. All rights reserved.
  */
 
 #pragma once
@@ -15,5 +15,10 @@
 #define HLVM_UNLIKELY [[unlikely]]
 #define HLVM_LIKELY [[likely]]
 #define HLVM_NORETURN [[noreturn]]
+#define HLVM_NO_RETURN HLVM_NORETURN
 #define HLVM_NODISCARD [[nodiscard]]
+#define HLVM_NO_DISCARD HLVM_NODISCARD
 #define HLVM_MAYBEUNUSED [[maybe_unused]]
+#define HLVM_MAY_BE_UNUSED HLVM_MAYBEUNUSED
+
+#define HLVM_COMMON_API

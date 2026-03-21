@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2025. MIT License. All rights reserved.
+ * Copyright (c) 2026. MIT License. All rights reserved.
  */
 
 #pragma once
@@ -9,7 +9,7 @@
 class FPackedEntryStat final : public IFFileStat
 {
 public:
-	NOCOPYMOVE(FPackedEntryStat)
+	NOCOPYMOVE(FPackedEntryStat);
 	FPackedEntryStat() = delete;
 	explicit FPackedEntryStat(const FPath& Path);
 

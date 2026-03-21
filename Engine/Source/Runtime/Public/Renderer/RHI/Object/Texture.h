@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2025. MIT License. All rights reserved.
+ * Copyright (c) 2026. MIT License. All rights reserved.
  *
  *  Texture Objects
  *
@@ -34,8 +34,7 @@
 class FTexture
 {
 public:
-	NOCOPYMOVE(FTexture)
-
+	NOCOPYMOVE(FTexture);
 	FTexture();
 	virtual ~FTexture();
 
@@ -127,8 +126,7 @@ protected:
 class FSampler
 {
 public:
-	NOCOPYMOVE(FSampler)
-
+	NOCOPYMOVE(FSampler);
 	FSampler() = default;
 	~FSampler();
 

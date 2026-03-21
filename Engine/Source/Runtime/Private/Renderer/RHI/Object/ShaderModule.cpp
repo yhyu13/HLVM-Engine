@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2025. MIT License. All rights reserved.
+ * Copyright (c) 2026. MIT License. All rights reserved.
  *
  *  Shader Module Implementation
  */
@@ -13,7 +13,7 @@ static bool LoadFileToArray(TArray<TBYTE>& buffer, const FPath& filename)
 	auto PlatformFile = FGenericPlatformFile::Get(EPlatformFileType::Disk);
 	if (PlatformFile)
 	{
-		auto Buffer = PlatformFile->ReadContent(filename);
+		auto Buffer = PlatformFile->LoadAsByteArray(filename);
 		if (Buffer.Num())
 		{
 			buffer = MoveTemp(Buffer);

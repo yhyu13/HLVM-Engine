@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2025. MIT License. All rights reserved.
+ * Copyright (c) 2026. MIT License. All rights reserved.
  */
 
 #pragma once
@@ -17,7 +17,7 @@ private:
 	using ThreadsType = boost::thread_group;
 
 public:
-	NOCOPYMOVE(FWorkStealThreadPool)
+	NOCOPYMOVE(FWorkStealThreadPool);
 	explicit FWorkStealThreadPool(const FThreadAffinityMode& AffinityMode = FThreadAffinityMode::NormalAllPhysicalCores());
 	~FWorkStealThreadPool();
 

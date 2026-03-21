@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2025. MIT License. All rights reserved.
+ * Copyright (c) 2026. MIT License. All rights reserved.
  */
 
 #pragma once
@@ -10,7 +10,7 @@
 class FGenericPlatformCrashDump
 {
 public:
-	NOCOPYMOVE(FGenericPlatformCrashDump)
+	NOCOPYMOVE(FGenericPlatformCrashDump);
 	FGenericPlatformCrashDump() = default;
 	virtual ~FGenericPlatformCrashDump() = default;
 

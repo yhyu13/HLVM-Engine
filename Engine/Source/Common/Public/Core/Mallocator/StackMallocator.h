@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2025. MIT License. All rights reserved.
+ * Copyright (c) 2026. MIT License. All rights reserved.
  */
 
 #pragma once
@@ -29,7 +29,7 @@ class TStackMallocator final : public IMallocator
 public:
 	using SizeType = int32_t;
 
-	NOCOPYMOVE(TStackMallocator)
+	NOCOPYMOVE(TStackMallocator);
 	TStackMallocator() noexcept
 	{
 		Type = EMallocator::Stack;
@@ -135,7 +135,7 @@ public:
 private:
 	struct FBlock
 	{
-		NOCOPYMOVE(FBlock)
+		NOCOPYMOVE(FBlock);
 		FBlock() = default;
 		TOffsetPtr32<FBlock> prevFreeBlock{};
 		TOffsetPtr32<FBlock> nextFreeBlock{};

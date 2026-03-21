@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2025. MIT License. All rights reserved.
+ * Copyright (c) 2026. MIT License. All rights reserved.
  */
 
 #pragma once
@@ -18,7 +18,7 @@ struct FMiMallocatorContext
 class FMiMallocator final : public IMallocator
 {
 public:
-	NOCOPYMOVE(FMiMallocator)
+	NOCOPYMOVE(FMiMallocator);
 	FMiMallocator(const FMiMallocatorContext& _Ctx = FMiMallocatorContext()) noexcept
 		: mCtx(_Ctx)
 	{

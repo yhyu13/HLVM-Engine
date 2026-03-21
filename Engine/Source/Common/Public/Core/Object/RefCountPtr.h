@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2025. MIT License. All rights reserved.
+ * Copyright (c) 2026. MIT License. All rights reserved.
  */
 
 #pragma once
@@ -16,7 +16,7 @@
  *  TRefCountPtr* or TRefCountPtr& to threads, simply copy TRefCountPtr instance to another TRefCountPtr instance, which guarantee
  *  thread safety due to reference being incrementing and decrementing.
  */
-template <CRefCountable T, bool bAllowPolymorphic = true>
+template <CRefCountable T, bool bAllowPolymorphic = false>
 class TRefCountPtr
 {
 public:
@@ -66,7 +66,7 @@ public:
 	TRefCountPtr(TRefCountPtr&& other) noexcept
 		: m_ptr(other.m_ptr)
 	{
-		other.m_ptr = nullptr;
+		other.m_ptr = nullptr; // other Reset to null so to ignore decrement
 	}
 
 	TRefCountPtr& operator=(const TRefCountPtr& other)
@@ -89,7 +89,7 @@ public:
 		{
 			Reset(); // Destructor first
 			m_ptr = other.m_ptr; // Copy
-			other.m_ptr = nullptr; // Reset
+			other.m_ptr = nullptr; // other Reset to null so to ignore decrement
 		}
 		return *this;
 	}
@@ -217,12 +217,56 @@ public:
 	template <bool bValidate = !HLVM_BUILD_RELEASE>
 	HLVM_NODISCARD T* Get() noexcept
 	{
+		if constexpr (bValidate)
+		{
+			if (!Valid())
+			{
+				HLVM_SEGFAULT_INLINE();
+				return nullptr;
+			}
+		}
 		return m_ptr;
 	}
 
 	template <bool bValidate = !HLVM_BUILD_RELEASE>
 	HLVM_NODISCARD T* Get() const noexcept
 	{
+		if constexpr (bValidate)
+		{
+			if (!Valid())
+			{
+				HLVM_SEGFAULT_INLINE();
+				return nullptr;
+			}
+		}
+		return m_ptr;
+	}
+
+	template <bool bValidate = !HLVM_BUILD_RELEASE>
+	HLVM_NODISCARD T* get() noexcept
+	{
+		if constexpr (bValidate)
+		{
+			if (!Valid())
+			{
+				HLVM_SEGFAULT_INLINE();
+				return nullptr;
+			}
+		}
+		return m_ptr;
+	}
+
+	template <bool bValidate = !HLVM_BUILD_RELEASE>
+	HLVM_NODISCARD T* get() const noexcept
+	{
+		if constexpr (bValidate)
+		{
+			if (!Valid())
+			{
+				HLVM_SEGFAULT_INLINE();
+				return nullptr;
+			}
+		}
 		return m_ptr;
 	}
 

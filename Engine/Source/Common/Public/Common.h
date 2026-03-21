@@ -1,13 +1,14 @@
 /**
- * Copyright (c) 2025. MIT License. All rights reserved.
+ * Copyright (c) 2026. MIT License. All rights reserved.
  */
 
 #pragma once
 
 /**
- * Global Defintion
+ * Global
  */
 #include "GlobalDefinition.h"
+
 /**
  * Templates
  */
@@ -45,7 +46,7 @@
 #include <boost/stacktrace.hpp>
 #include <boost/filesystem.hpp>
 
-/*
- * Core
+/**
+ * Minimal
  */
-#include "Core/CoreMinimal.h"
+#include "CommonMinimal.h"

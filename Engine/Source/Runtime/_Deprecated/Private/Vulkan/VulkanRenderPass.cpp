@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2025. MIT License. All rights reserved.
+ * Copyright (c) 2026. MIT License. All rights reserved.
  */
 
 #include "VulkanRenderPass.h"
@@ -341,7 +341,7 @@ FVulkanFrameBufferRef FVulkanRenderPassManager::GetOrCreateFramebuffer(const FRH
 	}
 	RTLayoutHash.Update(MipsAndSlicesValues, sizeof(MipsAndSlicesValues));
 
-	auto FindFramebufferInList = [&](const TSharedPtr<FFramebufferList>& InFramebufferList) {
+	auto FindFramebufferInList = [&](const TSharePtr<FFramebufferList>& InFramebufferList) {
 		FVulkanFrameBufferRef OutFramebuffer = nullptr;
 
 		for (TUINT32 Index = 0; Index < InFramebufferList->Framebuffer.Num(); ++Index)
@@ -358,8 +358,8 @@ FVulkanFrameBufferRef FVulkanRenderPassManager::GetOrCreateFramebuffer(const FRH
 		return OutFramebuffer;
 	};
 
-	TSharedPtr<FFramebufferList>* FoundFramebufferList = nullptr;
-	TSharedPtr<FFramebufferList>  FramebufferList = nullptr;
+	TSharePtr<FFramebufferList>* FoundFramebufferList = nullptr;
+	TSharePtr<FFramebufferList>  FramebufferList = nullptr;
 
 	{
 		LOCK_GUARD_RW(FramebuffersLock, FRWLock::Group::Read);

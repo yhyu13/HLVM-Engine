@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2025. MIT License. All rights reserved.
+ * Copyright (c) 2026. MIT License. All rights reserved.
  */
 
 // TODO : Remove deprecated test code
@@ -1269,7 +1269,7 @@ RECORD_BOOL(test_GLFW3VulkanWindowRaw)
 //RECORD_BOOL(test_GLFW3VulkanWindow)
 //{
 //		// 1 . Create window
-//	TSharedPtr<FGLFW3VulkanWindow> gWindow;
+//	TSharePtr<FGLFW3VulkanWindow> gWindow;
 //	{
 //		IWindow::Properties Properties;
 //		Properties.Resizable = false;
@@ -1279,7 +1279,7 @@ RECORD_BOOL(test_GLFW3VulkanWindowRaw)
 //	HLVM_LOG(LogTest, debug, TXT("FGLFW3VulkanWindow created!"));
 //
 //	// 2 . Create RHI
-//	TSharedPtr<FVulkanRHI> gVulkanRHI;
+//	TSharePtr<FVulkanRHI> gVulkanRHI;
 //	{
 //		FVulkanRHIInitializer Initializer;
 //		Initializer.RequiredExtensions = { gWindow->GetRequiredExtensions() };
@@ -1334,7 +1334,7 @@ RECORD_BOOL(test_GLFW3VulkanWindowRaw)
 //			HLVM_ENSURE_F(bDataDirExist, TXT("Data directory not exist {}"), *DataDir);
 //
 //			{
-//				auto			  vertShaderCode = FGenericPlatformFile::Get()->ReadContent(FPath::Combine(DataDir, TXT("vert.spv")));
+//				auto			  vertShaderCode = FGenericPlatformFile::Get()->LoadAsByteArray(FPath::Combine(DataDir, TXT("vert.spv")));
 //				FShaderCreateInfo vertShaderCreateInfo;
 //				vertShaderCreateInfo.DebugName = TXT("vert.spv");
 //				vertShaderCreateInfo.Code = MoveTemp(vertShaderCode);
@@ -1344,7 +1344,7 @@ RECORD_BOOL(test_GLFW3VulkanWindowRaw)
 //			}
 //
 //			{
-//				auto			  fragShaderCode = FGenericPlatformFile::Get()->ReadContent(FPath::Combine(DataDir, TXT("frag.spv")));
+//				auto			  fragShaderCode = FGenericPlatformFile::Get()->LoadAsByteArray(FPath::Combine(DataDir, TXT("frag.spv")));
 //				FShaderCreateInfo fragShaderCreateInfo;
 //				fragShaderCreateInfo.DebugName = TXT("frag.spv");
 //				fragShaderCreateInfo.Code = MoveTemp(fragShaderCode);
@@ -1354,7 +1354,7 @@ RECORD_BOOL(test_GLFW3VulkanWindowRaw)
 //			}
 //
 //			{
-//				auto			  geomShaderCode = FGenericPlatformFile::Get()->ReadContent(FPath::Combine(DataDir, TXT("geom.spv")));
+//				auto			  geomShaderCode = FGenericPlatformFile::Get()->LoadAsByteArray(FPath::Combine(DataDir, TXT("geom.spv")));
 //				FShaderCreateInfo geomShaderCreateInfo;
 //				geomShaderCreateInfo.DebugName = TXT("geom.spv");
 //				geomShaderCreateInfo.Code = MoveTemp(geomShaderCode);

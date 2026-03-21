@@ -1,5 +1,5 @@
 /**
-* Copyright (c) 2025. MIT License. All rights reserved.
+* Copyright (c) 2026. MIT License. All rights reserved.
 */
 
 #pragma once
@@ -29,7 +29,7 @@ DECLARE_LOG_CATEGORY(LogGLFW3Window)
 class FGLFW3Window : public IWindow
 {
 public:
-	NOCOPYMOVE(FGLFW3Window)
+	NOCOPYMOVE(FGLFW3Window);
 	FGLFW3Window() = delete;
 	explicit FGLFW3Window(const Properties& InProperties);
 	virtual ~FGLFW3Window() override;

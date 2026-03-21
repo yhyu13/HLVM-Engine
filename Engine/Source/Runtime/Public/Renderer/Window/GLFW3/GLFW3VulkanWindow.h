@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2025. MIT License. All rights reserved.
+ * Copyright (c) 2026. MIT License. All rights reserved.
  */
 
 #pragma once
@@ -11,8 +11,7 @@
 class FGLFW3VulkanWindow final : public FGLFW3Window
 {
 public:
-	NOCOPYMOVE(FGLFW3VulkanWindow)
-
+	NOCOPYMOVE(FGLFW3VulkanWindow);
 	FGLFW3VulkanWindow() = delete;
 	explicit FGLFW3VulkanWindow(const Properties& InProperties);
 	virtual ~FGLFW3VulkanWindow() override;

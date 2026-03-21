@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2025. MIT License. All rights reserved.
+ * Copyright (c) 2026. MIT License. All rights reserved.
  */
 
 #include "VulkanRHI.h"
@@ -786,7 +786,7 @@ void FVulkanRHI::CreateVulkanQueues()
 
 void FVulkanRHI::CreateVulkanViewPort()
 {
-//	TSharedPtr<FGLFW3VulkanWindow> glfwWindow = SP_C(FGLFW3VulkanWindow, InitializerParam.NativeWindowHandle);
+//	TSharePtr<FGLFW3VulkanWindow> glfwWindow = SP_C(FGLFW3VulkanWindow, InitializerParam.NativeWindowHandle);
 //	const IWindow::Properties& Property = glfwWindow->GetProperties();
 //
 //	FRHIViewportCreateInfo ViewportDesc;

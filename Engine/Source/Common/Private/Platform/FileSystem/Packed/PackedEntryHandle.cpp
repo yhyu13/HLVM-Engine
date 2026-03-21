@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2025. MIT License. All rights reserved.
+ * Copyright (c) 2026. MIT License. All rights reserved.
  */
 
 #include "Platform/FileSystem/Packed/PackedEntryHandle.h"
@@ -51,10 +51,10 @@ IFileHandle::OpRetType FPackedEntryHandle::Open(const FPath& FilePath, const FFi
 	PEH_HANDLE_STATUS(Status_InOut);
 	PEH_HANDLE_ENSURE(*Status_InOut, TXT("File operation continue with failed status"));
 	PEH_HANDLE_ASSERT(!mOpened, TXT("File operation begin with another already open file"));
-	PEH_HANDLE_ASSERT(Options.eFileMode == sDefaultEntryOptions.eFileMode, TXT("File option eFileMode invalid {}"), HLVM_E2TCHAR(Options.eFileMode));
-	PEH_HANDLE_ASSERT(Options.eFileMapped == sDefaultEntryOptions.eFileMapped, TXT("File option eFileMapped invalid {}"), HLVM_E2TCHAR(Options.eFileMapped));
-	PEH_HANDLE_ASSERT(Options.eFileAsync == sDefaultEntryOptions.eFileAsync, TXT("File option eFileAsync invalid {}"), HLVM_E2TCHAR(Options.eFileAsync));
-	PEH_HANDLE_ASSERT(Options.eFileLock == sDefaultEntryOptions.eFileLock, TXT("File option eFileLock invalid {}"), HLVM_E2TCHAR(Options.eFileLock));
+	PEH_HANDLE_ASSERT(Options.eFileMode == sDefaultEntryOptions.eFileMode, TXT("File option eFileMode invalid {}"), E2TCHAR(Options.eFileMode));
+	PEH_HANDLE_ASSERT(Options.eFileMapped == sDefaultEntryOptions.eFileMapped, TXT("File option eFileMapped invalid {}"), E2TCHAR(Options.eFileMapped));
+	PEH_HANDLE_ASSERT(Options.eFileAsync == sDefaultEntryOptions.eFileAsync, TXT("File option eFileAsync invalid {}"), E2TCHAR(Options.eFileAsync));
+	PEH_HANDLE_ASSERT(Options.eFileLock == sDefaultEntryOptions.eFileLock, TXT("File option eFileLock invalid {}"), E2TCHAR(Options.eFileLock));
 
 	mFileOptions = Options;
 	mFilePath = FilePath;

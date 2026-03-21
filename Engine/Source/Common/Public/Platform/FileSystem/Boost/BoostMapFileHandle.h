@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2025. MIT License. All rights reserved.
+ * Copyright (c) 2026. MIT License. All rights reserved.
  */
 
 #pragma once
@@ -32,7 +32,7 @@ public:
 	virtual OpRetType Size(size_t& Size) final override;
 
 	virtual OpRetType								   Truncate(size_t Size) final override;
-	HLVM_NODISCARD virtual std::shared_ptr<IFFileStat> Stat(const FPath& FilePath) final override;
+	HLVM_NODISCARD virtual TSharedPtr<IFFileStat> Stat(const FPath& FilePath) final override;
 
 	/**
 	 * For read only mapped file, we can use this to get the buffer range

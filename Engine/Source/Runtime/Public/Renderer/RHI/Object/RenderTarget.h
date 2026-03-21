@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2025. MIT License. All rights reserved.
+ * Copyright (c) 2026. MIT License. All rights reserved.
  *
  *  Render Target Objects
  *
@@ -40,8 +40,7 @@
 class FRenderTarget
 {
 public:
-	NOCOPYMOVE(FRenderTarget)
-
+	NOCOPYMOVE(FRenderTarget);
 	FRenderTarget();
 	virtual ~FRenderTarget();
 
@@ -107,8 +106,7 @@ protected:
 class FDepthTarget
 {
 public:
-	NOCOPYMOVE(FDepthTarget)
-
+	NOCOPYMOVE(FDepthTarget);
 	FDepthTarget();
 	virtual ~FDepthTarget();
 

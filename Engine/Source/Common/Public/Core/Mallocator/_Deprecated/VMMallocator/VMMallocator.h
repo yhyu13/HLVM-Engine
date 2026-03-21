@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2025. MIT License. All rights reserved.
+ * Copyright (c) 2026. MIT License. All rights reserved.
  */
 
 #pragma once
@@ -9,7 +9,7 @@
 class FVMArenaMallocator final : public IMallocator
 {
 public:
-	NOCOPYMOVE(FVMArenaMallocator)
+	NOCOPYMOVE(FVMArenaMallocator);
 	FVMArenaMallocator() noexcept
 	{
 		Type = EMallocator::VMArena;

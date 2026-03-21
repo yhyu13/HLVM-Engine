@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2025. MIT License. All rights reserved.
+ * Copyright (c) 2026. MIT License. All rights reserved.
  */
 
 #pragma once
@@ -44,7 +44,7 @@ class FVMArena;
 class ISmallBinnedMallocator
 {
 public:
-	NOCOPYMOVE(ISmallBinnedMallocator)
+	NOCOPYMOVE(ISmallBinnedMallocator);
 	ISmallBinnedMallocator() = default;
 	virtual ~ISmallBinnedMallocator() noexcept = default;
 	virtual void  Init(FVMArena* _Mallocator) = 0;

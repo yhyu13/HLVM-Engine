@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2025. MIT License. All rights reserved.
+ * Copyright (c) 2026. MIT License. All rights reserved.
  */
 
 #pragma once
@@ -952,5 +952,5 @@ private:
 	{
 		TVector<FVulkanFrameBufferRef> Framebuffer;
 	};
-	TMap<FVulkanHash, TSharedPtr<FFramebufferList>> Framebuffers;
+	TMap<FVulkanHash, TSharePtr<FFramebufferList>> Framebuffers;
 };

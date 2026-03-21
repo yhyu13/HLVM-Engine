@@ -1,6 +1,6 @@
 
 /**
- * Copyright (c) 2025. MIT License. All rights reserved.
+ * Copyright (c) 2026. MIT License. All rights reserved.
  */
 
 #pragma once
@@ -93,7 +93,7 @@ public:
 	using ValueType = T;
 	using QueueNodeType = TConcurrentQueueNode<T>;
 
-	NOCOPYMOVE(TConcurrentQueue)
+	NOCOPYMOVE(TConcurrentQueue);
 	TConcurrentQueue()
 	{
 		mHead = mTail = std::construct_at(R_C(QueueNodeType*, Mallocator.allocate()));

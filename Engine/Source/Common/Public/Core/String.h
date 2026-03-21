@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2025. MIT License. All rights reserved.
+ * Copyright (c) 2026. MIT License. All rights reserved.
  */
 
 #pragma once
@@ -70,20 +70,47 @@ public:
 		return static_cast<const TCHAR*>(fs);
 	}
 
+	// Convert to const TCHAR*
+	const TCHAR* ToTCharCStr() const
+	{
+		return (*this);
+	}
+
 	// Convert to const char*
 	operator const char*() const
 	{
 		return reinterpret_cast<const char*>(this->c_str());
 	}
 
+	// Convert to const char*
 	const char* ToCharCStr() const
 	{
 		return static_cast<const char*>(*this);
 	}
 
+	TCHAR* GetData()
+	{
+		return this->data();
+	}
+
+	const TCHAR* GetData() const
+	{
+		return this->data();
+	}
+
 	bool IsEmpty() const
 	{
 		return this->size() == 0;
+	}
+
+	TSIZE Num() const
+	{
+		return this->size();
+	}
+
+	TSIZE NumBytes() const
+	{
+		return this->size() * sizeof(TCHAR);
 	}
 
 	FString ToLower() const
@@ -108,14 +135,32 @@ public:
 
 	bool EndsWith(const FString& str) const
 	{
-		return this->size() >= str.size() &&
-			std::equal(str.rbegin(), str.rend(), this->rbegin());
+		return this->size() >= str.size() && std::equal(str.rbegin(), str.rend(), this->rbegin());
+	}
+
+	bool RemoveFromEndsInplace(const FString& str)
+	{
+		if (this->EndsWith(str))
+		{
+			this->resize(this->size() - str.size());
+			return true;
+		}
+		return false;
 	}
 
 	bool StartsWith(const FString& str) const
 	{
-		return this->size() >= str.size() &&
-			std::equal(str.begin(), str.end(), this->begin());
+		return this->size() >= str.size() && std::equal(str.begin(), str.end(), this->begin());
+	}
+
+	bool RemoveFromStarts(const FString& str)
+	{
+		if (this->StartsWith(str))
+		{
+			this->erase(0, str.size());
+			return true;
+		}
+		return false;
 	}
 
 	template <typename... Args>
@@ -127,7 +172,7 @@ public:
 	template <typename VecType, typename PredType>
 	static FString Join(const VecType& Vec,
 		const PredType&				   func,
-		const TCHAR*				   splitter = TXT(",\n"))
+		const FString&				   splitter = TXT(",\n"))
 	{
 		FString result{ "[ " };
 		int32_t count = 0;
@@ -140,6 +185,62 @@ public:
 			result += static_cast<const TCHAR*>(func(elem));
 		}
 		result += TXT(" ]");
+		return result;
+	}
+
+	// Parse
+	template <typename VecType, typename PredType>
+	static bool Parse(VecType& Result,
+		const FString&		   Input,
+		const PredType&		   ParserFunc,
+		bool				   bEraseEmpty = true)
+	{
+		// Reserve a little bit
+		Result.Reserve(Input.Num() / 32);
+		TSIZE Index = 0;
+		for (TSIZE i = 0; i < Input.Num();)
+		{
+			if (auto Offset = ParserFunc(&Input[i]); Offset > 0)
+			{
+				// If not empty
+				if (i - Index >= 1)
+				{
+					TSIZE	len = i - Index + 1;
+					FString tmp = new TCHAR[len];
+					for (TSIZE j = 0; j < len - 1; ++j)
+					{
+						tmp[j] = Input[i + j];
+					}
+					tmp[len - 1] = TCHAR(0);
+					Result.Add(MoveTemp(tmp));
+				}
+				else if (!bEraseEmpty)
+				{
+					Result.Add(FString{});
+				}
+
+				i += Offset;
+				Index = i;
+			}
+			else
+			{
+				++i;
+			}
+		}
+		return Result.Num() > 0;
+	}
+
+	static bool Equals(const TCHAR* lhs, const TCHAR* rhs, TSIZE len)
+	{
+		bool result = true;
+		for (TSIZE i = 0; i < len; ++i)
+		{
+			if (lhs[i] != rhs[i])
+			{
+				result = false;
+				break;
+			}
+		}
 		return result;
 	}
 };
@@ -161,6 +262,8 @@ namespace std
 		os << str.ToCharCStr();
 		return std::move(os);
 	}
+
+	// template for istream, ostream
 	inline std::istream&& operator>>(std::istream& is, FString& str)
 	{
 		std::string temp;
@@ -295,6 +398,6 @@ public:
 
 private:
 	static_assert(sizeof(CHAR) / sizeof(char) == 1, "CHAR only support same size as char");
-	CHAR  Buffer[Capacity + 1] { 0 };
+	CHAR   Buffer[Capacity + 1]{ 0 };
 	size_t Size{ 0 };
 });

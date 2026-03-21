@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2025. MIT License. All rights reserved.
+ * Copyright (c) 2026. MIT License. All rights reserved.
  */
 
 #pragma once
@@ -14,7 +14,7 @@ class FVMHeap
 public:
 	using SizeType = TINT32;
 
-	NOCOPYMOVE(FVMHeap)
+	NOCOPYMOVE(FVMHeap);
 	FVMHeap() = default;
 	~FVMHeap()
 	{
@@ -72,7 +72,7 @@ private:
 	void SortFreeBlockList();
 
 	PACK(struct FBlock {
-		NOCOPYMOVE(FBlock)
+		NOCOPYMOVE(FBlock);
 		FBlock() = default;
 		TOffsetPtr32<FBlock> prevFreeBlock{};
 		TOffsetPtr32<FBlock> nextFreeBlock{};

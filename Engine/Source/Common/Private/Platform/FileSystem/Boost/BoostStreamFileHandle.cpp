@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2025. MIT License. All rights reserved.
+ * Copyright (c) 2026. MIT License. All rights reserved.
  */
 
 #include "Platform/FileSystem/Boost/BoostStreamFileHandle.h"
@@ -93,7 +93,7 @@ IFileHandle::OpRetType FBoostStreamFileHandle::Open(const FPath& FilePath, const
 
 		mOpened = true;
 		Status_InOut->eFileOpStatus = EFileOpStatus::Success;
-		BSFH_VERBOSE_LOG(TXT("Open success with mode {}"), HLVM_E2TCHAR(mFileOptions.eFileMode));
+		BSFH_VERBOSE_LOG(TXT("Open success with mode {}"), E2TCHAR(mFileOptions.eFileMode));
 	}
 	catch (std::exception& Exception)
 	{
@@ -167,7 +167,7 @@ IFileHandle::OpRetType FBoostStreamFileHandle::Read(void* Buffer, size_t Size, c
 
 	// tell if necessary
 	int64_t Prev_Tell = { -1 };
-	if (SeekCtx.bResetPos)
+	if (SeekCtx.bResetSeekPos)
 	{
 		Tell(Prev_Tell);
 		BSFH_HANDLE_ASSERT(Prev_Tell > 0, TXT("Tell failed before reset pos"), Prev_Tell);
@@ -210,16 +210,16 @@ IFileHandle::OpRetType FBoostStreamFileHandle::Read(void* Buffer, size_t Size, c
 	}
 
 	// Reset if necessary
-	if (SeekCtx.bResetPos)
+	if (SeekCtx.bResetSeekPos)
 		HLVM_UNLIKELY
 		{
-			BSFH_VERBOSE_LOG(TXT("bResetPos after read"));
+			BSFH_VERBOSE_LOG(TXT("bResetSeekPos after read"));
 			Seek(Prev_Tell, EWhence::Begin);
 		}
 	// Erase if necessary
-	else if (SeekCtx.bEraseSeekPos)
+	else if (SeekCtx.bIgnoreRWSeek)
 	{
-		BSFH_VERBOSE_LOG(TXT("bEraseSeekPos after read"));
+		BSFH_VERBOSE_LOG(TXT("bIgnoreRWSeek after read"));
 		Seek(0 - static_cast<int64_t>(Size), EWhence::Current);
 	}
 
@@ -237,7 +237,7 @@ IFileHandle::OpRetType FBoostStreamFileHandle::Write(const void* Buffer, size_t 
 
 	// tell if necessary
 	int64_t Prev_Tell{ -1 };
-	if (SeekCtx.bResetPos)
+	if (SeekCtx.bResetSeekPos)
 	{
 		Tell(Prev_Tell);
 		BSFH_HANDLE_ASSERT(Prev_Tell > 0, TXT("Tell failed before reset pos"), Prev_Tell);
@@ -280,15 +280,15 @@ IFileHandle::OpRetType FBoostStreamFileHandle::Write(const void* Buffer, size_t 
 	}
 
 	// Reset if necessary
-	if (SeekCtx.bResetPos)
+	if (SeekCtx.bResetSeekPos)
 	{
-		BSFH_VERBOSE_LOG(TXT("bResetPos after write"));
+		BSFH_VERBOSE_LOG(TXT("bResetSeekPos after write"));
 		Seek(Prev_Tell, EWhence::Begin);
 	}
 	// Erase if necessary
-	else if (SeekCtx.bEraseSeekPos)
+	else if (SeekCtx.bIgnoreRWSeek)
 	{
-		BSFH_VERBOSE_LOG(TXT("bEraseSeekPos after write"));
+		BSFH_VERBOSE_LOG(TXT("bIgnoreRWSeek after write"));
 		Seek(0 - static_cast<int64_t>(Size), EWhence::Current);
 	}
 
@@ -362,7 +362,7 @@ IFileHandle::OpRetType FBoostStreamFileHandle::Seek(int64_t Offset, EWhence When
 			{
 				Status_InOut->eFileOpStatus = EFileOpStatus::Success;
 			}
-		BSFH_VERBOSE_LOG(TXT("Seek success given offset {} with {}"), Offset, HLVM_E2TCHAR(Whence));
+		BSFH_VERBOSE_LOG(TXT("Seek success given offset {} with {}"), Offset, E2TCHAR(Whence));
 	}
 	catch (std::exception& Exception)
 	{

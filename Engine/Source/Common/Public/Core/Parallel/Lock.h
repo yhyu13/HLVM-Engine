@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2025. MIT License. All rights reserved.
+ * Copyright (c) 2026. MIT License. All rights reserved.
  */
 
 #pragma once
@@ -27,7 +27,7 @@
 class FAtomicLockGuard
 {
 public:
-	NOCOPYMOVE(FAtomicLockGuard)
+	NOCOPYMOVE(FAtomicLockGuard);
 	FAtomicLockGuard() = delete;
 	explicit FAtomicLockGuard(std::atomic_flag& flag) _HLVM_LOCK_NOEXCEPT;
 	~FAtomicLockGuard() noexcept;
@@ -62,7 +62,7 @@ template <CLockable T>
 class TAtomicLockGuard
 {
 public:
-	NOCOPYMOVE(TAtomicLockGuard)
+	NOCOPYMOVE(TAtomicLockGuard);
 	TAtomicLockGuard() = delete;
 	explicit TAtomicLockGuard(T& Flag) _HLVM_LOCK_NOEXCEPT : mLock(&Flag)
 	{
@@ -140,7 +140,7 @@ template <typename T>
 class FAtomicFlagNI
 {
 public:
-	NOINSTANT(FAtomicFlagNI)
+	NOINSTANTIATE(FAtomicFlagNI);
 
 	// @brief Lock/Unlock guard for class that inherit FAtomicFlagNI
 #define LOCK_GUARD_NI()                                          \
@@ -172,7 +172,7 @@ protected:
 class FAtomicFlagNC
 {
 public:
-	NOCOPYMOVE(FAtomicFlagNC)
+	NOCOPYMOVE(FAtomicFlagNC);
 
 	// @brief Lock/Unlock guard for class that inherit FAtomicFlagNC
 #define LOCK_GUARD_NC()                                          \
@@ -199,7 +199,7 @@ private:
 };
 
 /**
- * @class FAtomicFlagNC
+ * @class FAtomicFlag
  * @brief 一个通常的的原子标志类, can be used by macro ATOMIC_LOCK_GUARD
  */
 class FAtomicFlag
@@ -322,7 +322,7 @@ public:
 		NUM_GROUPS = 2
 	};
 
-	NOCOPYMOVE(FRWRivalLock)
+	NOCOPYMOVE(FRWRivalLock);
 	FRWRivalLock() = default;
 
 	void LockRV(FRWRivalLock::Group group) const _HLVM_LOCK_NOEXCEPT;
@@ -338,7 +338,7 @@ private:
 template <typename TRival>
 struct RivialLockGuardCond
 {
-	NOCOPYMOVE(RivialLockGuardCond)
+	NOCOPYMOVE(RivialLockGuardCond);
 	RivialLockGuardCond() = delete;
 
 	explicit RivialLockGuardCond(TRival& flag, TRival::Group group, bool enabled = true)
@@ -382,7 +382,7 @@ public:
 		NUM_GROUPS = 2
 	};
 
-	NOCOPYMOVE(FRWLock)
+	NOCOPYMOVE(FRWLock);
 	FRWLock() = default;
 
 	void LockRV(FRWLock::Group group) const _HLVM_LOCK_NOEXCEPT;

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2025. MIT License. All rights reserved.
+ * Copyright (c) 2026. MIT License. All rights reserved.
  */
 
 #pragma once
@@ -98,11 +98,19 @@ public:
 	{
 		return FString(ToCharCStr());
 	}
+
+	// Convert to const char*
+	operator const char*() const
+	{
+		return this->c_str();
+	}
+
 	// Convert to const TCHAR*
 	operator const TCHAR*() const
 	{
 		return reinterpret_cast<const TCHAR*>(this->c_str());
 	}
+
 	// Convert to const TCHAR* by left * operator (e.g. const TCHAR* path = *mypath)
 	friend const TCHAR* operator*(const FPath& fs)
 	{
@@ -110,14 +118,15 @@ public:
 	}
 
 	// Convert to const char*
-	operator const char*() const
-	{
-		return this->c_str();
-	}
-	// Convert to const char*
 	const char* ToCharCStr() const
 	{
 		return static_cast<const char*>(*this);
+	}
+
+	// Convert to const TCHAR*
+	const TCHAR* ToTCharCStr() const
+	{
+		return static_cast<const TCHAR*>(*this);
 	}
 
 	EPlatformFileType Type() const
@@ -137,7 +146,9 @@ public:
 	FPath  ChangeExtension(const FString& new_ext) const;
 	FPath& ChangeExtensionInplace(const FString& new_ext);
 	FPath  AppendExtension(const FString& new_ext) const;
+	FPath& AppendExtensionInplace(const FString& new_ext);
 
+public:
 	/**
 	 * Static methods, internally calling generic platform api
 	 */
@@ -147,7 +158,7 @@ public:
 
 	static FPath GetParentPath(const FPath& path)
 	{
-		return FPath(path.parent_path());
+		return MoveTemp(FPath(path.parent_path()));
 	}
 
 	// variadic template of combining N paths
@@ -166,6 +177,14 @@ public:
 		}
 	}
 
+	static FPath   Absolute(const FPath& path);
+	static FString GetExtension(const FPath& path);
+	static FString GetBaseFileName(const FPath& path);
+	static FString GetCleanFileName(const FPath& path);
+
+public:
+	HLVM_STATIC_VAR const FPath Empty;
+
 private:
 	/**
 	 * Resolve path ${XXX} pattern with registered values
@@ -178,13 +197,15 @@ private:
 	 */
 	FPathHash CalculateHash() const noexcept;
 
-	mutable FPathHash mHash{ 0 };
-	EPlatformFileType mFileType{ EPlatformFileType::Unspecified };
-
+private:
 	// Path replace pattern, inspired by linux bash variable: ${...}, e.g. ${PROJECT_DIR}
 	HLVM_STATIC_VAR const std::regex PathReplacePattern;
 	// Path replace map: replace pattern with value, e.g. ${PROJECT_DIR} -> /Users/xxx/project
-	HLVM_STATIC_VAR TMap<std::string, std::string> PathReplaceMap;
+	HLVM_STATIC_VAR TMapSmall<std::string, std::string> PathReplaceProtocol;
+
+private:
+	mutable FPathHash mHash{ 0 };
+	EPlatformFileType mFileType{ EPlatformFileType::Unspecified };
 };
 
 /*

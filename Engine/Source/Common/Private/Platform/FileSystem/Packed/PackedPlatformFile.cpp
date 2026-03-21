@@ -1,22 +1,21 @@
 /**
- * Copyright (c) 2025. MIT License. All rights reserved.
+ * Copyright (c) 2026. MIT License. All rights reserved.
  */
 
 #include "Platform/FileSystem/Packed/PackedPlatformFile.h"
 
 DECLARE_LOG_CATEGORY(LogPackedPlatformFile)
 
-static FPackedPlatformFile SPackedPlatformFile{};
-
-void FPackedPlatformFile::_Init()
+void FPackedPlatformFile::InternalInit()
 {
-	HLVM_ASSERT_F(!sPlatformFileRedirector[HLVM_E2VALUE(EPlatformFileType::Packed)], TXT("Packed Platform file is already registered"));
-	sPlatformFileRedirector[HLVM_E2VALUE(EPlatformFileType::Packed)] = FPackedPlatformFile::Get();
+	HLVM_ASSERT_F(!sPlatformFileRedirector[E2VALUE(EPlatformFileType::Packed)], TXT("Packed Platform file is already registered"));
+	sPlatformFileRedirector[E2VALUE(EPlatformFileType::Packed)] = FPackedPlatformFile::Get();
 	HLVM_LOG(LogPackedPlatformFile, debug, TXT("Init FPackedPlatformFile"));
 }
 
 TNoNullablePtr<FPackedPlatformFile> FPackedPlatformFile::Get()
 {
+	static FPackedPlatformFile SPackedPlatformFile{};
 	return &SPackedPlatformFile;
 }
 
@@ -151,14 +150,51 @@ FPackedEntryQuickFind FPackedPlatformFile::QuickFindPackedEntry(const FPath& pat
 	return {};
 }
 
-FString FPackedPlatformFile::ReadFile(const FPath& /*path*/)
+bool FPackedPlatformFile::SaveAsString(const FPath& /*path*/, const FString& /*content*/)
 {
 	// TODO
+	HLVM_NOT_IMPLEMENTED();
+	return false;
+}
+
+bool FPackedPlatformFile::SaveAsStringArray(const FPath& /*path*/, const TVector<FString>& /*Result*/, const FString& /*linechanger*/)
+{
+	// TODO
+	HLVM_NOT_IMPLEMENTED();
+	return false;
+}
+
+bool FPackedPlatformFile::SaveAsByteArray(const FPath& /*path*/, const TVector<TBYTE>& /*content*/)
+{
+	// TODO
+	HLVM_NOT_IMPLEMENTED();
+	return false;
+}
+
+FString FPackedPlatformFile::LoadAsString(const FPath& /*path*/)
+{
+	// TODO
+	HLVM_NOT_IMPLEMENTED();
 	return FString();
 }
 
-TVector<TBYTE> FPackedPlatformFile::ReadContent(const FPath& /*path*/)
+TVector<FString> FPackedPlatformFile::LoadAsStringArray(const FPath& /*path*/, const TVector<FString>& /*delimiters*/)
 {
 	// TODO
+	HLVM_NOT_IMPLEMENTED();
+	return TVector<FString>();
+}
+
+TVector<TBYTE> FPackedPlatformFile::LoadAsByteArray(const FPath& /*path*/)
+{
+	// TODO
+	HLVM_NOT_IMPLEMENTED();
 	return TVector<TBYTE>();
+}
+
+bool FPackedPlatformFile::DeleteFile(const FPath& /*path*/)
+{
+	// Pack file should not call delete
+	HLVM_ASSERT(false);
+	return false;
 }

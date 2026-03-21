@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2025. MIT License. All rights reserved.
+ * Copyright (c) 2026. MIT License. All rights reserved.
  */
 
 #pragma once
@@ -17,13 +17,13 @@
  */
 class FOSPageMallocator
 {
+private:
 	HLVM_INLINE_VAR HLVM_STATIC_VAR constexpr bool bValidate = HLVM_MALLOC_VALIDATION;
 
 public:
 	HLVM_INLINE_VAR HLVM_STATIC_VAR constexpr size_t sLargeHeapPageSize = HLVM_VMA_OSPAGE_LARGE_HEAP_SIZE;
 
-	NOCOPYMOVE(FOSPageMallocator)
-
+	NOCOPYMOVE(FOSPageMallocator);
 	FOSPageMallocator() noexcept
 	{
 		mSmallHeapChainHead = std::construct_at(R_C(FSmallHeapChain*, HLVM_LOW_GMALLOC_TLS.MallocAligned(sizeof(FSmallHeapChain), sizeof(FSmallHeapChain))));

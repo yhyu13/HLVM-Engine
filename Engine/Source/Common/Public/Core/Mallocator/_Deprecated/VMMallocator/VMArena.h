@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2025. MIT License. All rights reserved.
+ * Copyright (c) 2026. MIT License. All rights reserved.
  */
 
 #pragma once
@@ -22,7 +22,7 @@ class FVMArena : public FAtomicFlagS<FVMArena>
 	HLVM_INLINE_VAR HLVM_STATIC_VAR constexpr bool bValidate = HLVM_MALLOC_VALIDATION;
 
 public:
-	NOCOPYMOVE(FVMArena)
+	NOCOPYMOVE(FVMArena);
 	FVMArena();
 	~FVMArena();
 

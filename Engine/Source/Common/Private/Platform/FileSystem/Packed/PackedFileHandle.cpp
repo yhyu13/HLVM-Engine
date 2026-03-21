@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2025. MIT License. All rights reserved.
+ * Copyright (c) 2026. MIT License. All rights reserved.
  */
 
 #include "Platform/FileSystem/Packed/PackedFileHandle.h"
@@ -52,10 +52,10 @@ IFileHandle::OpRetType FPackedFileHandle::Open(const FPath& FilePath, const FFil
 	PFH_HANDLE_STATUS(Status_InOut);
 	PFH_HANDLE_ENSURE(*Status_InOut, TXT("File operation continue with failed status"));
 	PFH_HANDLE_ASSERT(!mOpened, TXT("File operation begin with another already open file"));
-	PFH_HANDLE_ASSERT(Options.eFileMode == sDefaultFileOptions.eFileMode, TXT("File option eFileMode invalid {}"), HLVM_E2TCHAR(Options.eFileMode));
-	PFH_HANDLE_ASSERT(Options.eFileMapped == sDefaultFileOptions.eFileMapped, TXT("File option eFileMapped invalid {}"), HLVM_E2TCHAR(Options.eFileMapped));
-	PFH_HANDLE_ASSERT(Options.eFileAsync == sDefaultFileOptions.eFileAsync, TXT("File option eFileAsync invalid {}"), HLVM_E2TCHAR(Options.eFileAsync));
-	PFH_HANDLE_ASSERT(Options.eFileLock == sDefaultFileOptions.eFileLock, TXT("File option eFileLock invalid {}"), HLVM_E2TCHAR(Options.eFileLock));
+	PFH_HANDLE_ASSERT(Options.eFileMode == sDefaultFileOptions.eFileMode, TXT("File option eFileMode invalid {}"), E2TCHAR(Options.eFileMode));
+	PFH_HANDLE_ASSERT(Options.eFileMapped == sDefaultFileOptions.eFileMapped, TXT("File option eFileMapped invalid {}"), E2TCHAR(Options.eFileMapped));
+	PFH_HANDLE_ASSERT(Options.eFileAsync == sDefaultFileOptions.eFileAsync, TXT("File option eFileAsync invalid {}"), E2TCHAR(Options.eFileAsync));
+	PFH_HANDLE_ASSERT(Options.eFileLock == sDefaultFileOptions.eFileLock, TXT("File option eFileLock invalid {}"), E2TCHAR(Options.eFileLock));
 
 	mFileOptions = Options;
 	mFilePath = FilePath;
@@ -222,7 +222,7 @@ IFileHandle::OpRetType FPackedFileHandle::Open(const FPath& FilePath, const FFil
 
 		mOpened = true;
 		Status_InOut->eFileOpStatus = EFileOpStatus::Success;
-		PFH_VERBOSE_LOG(TXT("Open success with mode {}"), HLVM_E2TCHAR(mFileOptions.eFileMode));
+		PFH_VERBOSE_LOG(TXT("Open success with mode {}"), E2TCHAR(mFileOptions.eFileMode));
 	}
 	catch (std::exception& Exception)
 	{

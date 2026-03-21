@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2025. MIT License. All rights reserved.
+ * Copyright (c) 2026. MIT License. All rights reserved.
  */
 
 #pragma once
@@ -46,17 +46,17 @@ public:
 			return FString::Format(
 				TXT("Title: {0}, DisplayMode: {1}, Resizable: {2}, StartMinimized: {3}, VSync: {4}, Extent: {5}, XY: {6}"),
 				Title,
-				HLVM_E2TCHAR(DisplayMode),
+				E2TCHAR(DisplayMode),
 				Resizable,
 				StartMinimized,
-				HLVM_E2TCHAR(VSync),
+				E2TCHAR(VSync),
 				::ToString(Extent),
 				::ToString(XY));
 		}
 	};
 
 public:
-	NOCOPYMOVE(IWindow)
+	NOCOPYMOVE(IWindow);
 	IWindow() = default;
 	virtual ~IWindow() = default;
 

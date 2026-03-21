@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2025. MIT License. All rights reserved.
+ * Copyright (c) 2026. MIT License. All rights reserved.
  */
 
 #include "Core/Assert.h"
@@ -10,17 +10,16 @@
 
 DECLARE_LOG_CATEGORY(LogBoostPlatformFile)
 
-static FBoostPlatformFile SBoostPlatformFile{};
-
-void FBoostPlatformFile::_Init()
+void FBoostPlatformFile::InternalInit()
 {
-	HLVM_ASSERT_F(!sPlatformFileRedirector[HLVM_E2VALUE(EPlatformFileType::Disk)], TXT("Local Platform file is already registered"));
-	sPlatformFileRedirector[HLVM_E2VALUE(EPlatformFileType::Disk)] = FBoostPlatformFile::Get();
+	HLVM_ASSERT_F(!sPlatformFileRedirector[E2VALUE(EPlatformFileType::Disk)], TXT("Local Platform file is already registered"));
+	sPlatformFileRedirector[E2VALUE(EPlatformFileType::Disk)] = FBoostPlatformFile::Get();
 	HLVM_LOG(LogBoostPlatformFile, debug, TXT("Init FBoostPlatformFile"));
 }
 
 TNoNullablePtr<FBoostPlatformFile> FBoostPlatformFile::Get()
 {
+	static FBoostPlatformFile SBoostPlatformFile{};
 	return &SBoostPlatformFile;
 }
 
@@ -74,7 +73,83 @@ TSmallVector32<FPath> FBoostPlatformFile::Glob(const FPath& root_dir, const FStr
 	return Result;
 }
 
-FString FBoostPlatformFile::ReadFile(const FPath& path)
+bool FBoostPlatformFile::SaveAsString(const FPath& path, const FString& content)
+{
+	FBoostMapFileHandle mFileHandle;
+	if (mFileHandle.Open(path, GWriteOnlyFileOptions).IsOpen())
+	{
+		mFileHandle.Seek(0, EWhence::Begin);
+		if (content.NumBytes() > 0)
+		{
+			mFileHandle.Write(content.GetData(), content.NumBytes());
+
+			TINT64 size;
+			mFileHandle.Seek(0, EWhence::End)
+				.Tell(size);
+
+			if (SC1<TSIZE>(size) != content.NumBytes())
+			{
+				HLVM_LOG(LogBoostPlatformFile, err,
+					TXT("FBoostPlatformFile::SaveAsString : Failed to write file {}, size mismatch {} != {}"),
+					*path, size, content.NumBytes());
+				return false;
+			}
+			return true;
+		}
+		else
+		{
+			HLVM_LOG(LogBoostPlatformFile, warn, TXT("FBoostPlatformFile::SaveAsString : {} is empty"), *path);
+		}
+	}
+	else
+	{
+		HLVM_LOG(LogBoostPlatformFile, err, TXT("FBoostPlatformFile::SaveAsString : Failed to open file {}"), *path);
+	}
+	return false;
+}
+
+bool FBoostPlatformFile::SaveAsStringArray(const FPath& path, const TVector<FString>& Result, const FString& linechanger)
+{
+	FString Concat = FString::Join(Result, [](const FString& core) { return core.ToTCharCStr(); }, linechanger);
+	return SaveAsString(path, Concat);
+}
+
+bool FBoostPlatformFile::SaveAsByteArray(const FPath& path, const TVector<TBYTE>& content)
+{
+	FBoostMapFileHandle mFileHandle;
+	if (mFileHandle.Open(path, GWriteOnlyFileOptions).IsOpen())
+	{
+		mFileHandle.Seek(0, EWhence::Begin);
+		if (content.NumBytes() > 0)
+		{
+			mFileHandle.Write(content.GetData(), content.NumBytes());
+
+			TINT64 size;
+			mFileHandle.Seek(0, EWhence::End)
+				.Tell(size);
+
+			if (SC1<TSIZE>(size) != content.NumBytes())
+			{
+				HLVM_LOG(LogBoostPlatformFile, err,
+					TXT("FBoostPlatformFile::SaveAsByteArray : Failed to write file {}, size mismatch {} != {}"),
+					*path, size, content.NumBytes());
+				return false;
+			}
+			return true;
+		}
+		else
+		{
+			HLVM_LOG(LogBoostPlatformFile, warn, TXT("FBoostPlatformFile::SaveAsByteArray : {} content is empty"), *path);
+		}
+	}
+	else
+	{
+		HLVM_LOG(LogBoostPlatformFile, err, TXT("FBoostPlatformFile::SaveAsByteArray : Failed to open file {}"), *path);
+	}
+	return false;
+}
+
+FString FBoostPlatformFile::LoadAsString(const FPath& path)
 {
 	FBoostMapFileHandle mFileHandle;
 	if (mFileHandle.Open(path).IsOpen())
@@ -98,17 +173,34 @@ FString FBoostPlatformFile::ReadFile(const FPath& path)
 		}
 		else
 		{
-			HLVM_LOG(LogBoostPlatformFile, err, TXT("FBoostPlatformFile::ReadFile : {} is empty"), *path);
+			HLVM_LOG(LogBoostPlatformFile, err, TXT("FBoostPlatformFile::LoadAsString : {} is empty"), *path);
 		}
 	}
 	else
 	{
-		HLVM_LOG(LogBoostPlatformFile, err, TXT("FBoostPlatformFile::ReadFile : Failed to open file {}"), *path);
+		HLVM_LOG(LogBoostPlatformFile, err, TXT("FBoostPlatformFile::LoadAsString : Failed to open file {}"), *path);
 	}
 	return FString();
 }
 
-TVector<TBYTE> FBoostPlatformFile::ReadContent(const FPath& path)
+TVector<FString> FBoostPlatformFile::LoadAsStringArray(const FPath& path, const TVector<FString>& delimiters)
+{
+	FString			 Content = LoadAsString(path);
+	TVector<FString> Result;
+	Result.Reserve(Result.Num() / 16);
+	FString::Parse(Result, Content, [&delimiters](const TCHAR* str) -> TSIZE {
+			for (const FString& delimiter : delimiters)
+			{
+				if (FString::Equals(str, delimiter, 1))
+				{
+					return delimiter.Num();
+				}
+			}
+			return 0ul; }, true);
+	return Result;
+}
+
+TVector<TBYTE> FBoostPlatformFile::LoadAsByteArray(const FPath& path)
 {
 	FBoostMapFileHandle mFileHandle;
 	if (mFileHandle.Open(path).IsOpen())
@@ -127,12 +219,25 @@ TVector<TBYTE> FBoostPlatformFile::ReadContent(const FPath& path)
 		}
 		else
 		{
-			HLVM_LOG(LogBoostPlatformFile, err, TXT("FBoostPlatformFile::ReadContent : {} is empty"), *path);
+			HLVM_LOG(LogBoostPlatformFile, err, TXT("FBoostPlatformFile::LoadAsByteArray : {} is empty"), *path);
 		}
 	}
 	else
 	{
-		HLVM_LOG(LogBoostPlatformFile, err, TXT("FBoostPlatformFile::ReadContent : Failed to open file {}"), *path);
+		HLVM_LOG(LogBoostPlatformFile, err, TXT("FBoostPlatformFile::LoadAsByteArray : Failed to open file {}"), *path);
 	}
 	return TVector<TBYTE>();
+}
+
+bool FBoostPlatformFile::DeleteFile(const FPath& path)
+{
+	boost::system::error_code ec;
+	if (!boost::filesystem::remove(path, ec))
+	{
+		// Log
+		HLVM_LOG(LogBoostPlatformFile, err, TXT("FBoostPlatformFile::DeleteFile : Failed to delete file {} with error {}"),
+			*path, TCHARSTR(ec.message().c_str()));
+		return false;
+	}
+	return true;
 }

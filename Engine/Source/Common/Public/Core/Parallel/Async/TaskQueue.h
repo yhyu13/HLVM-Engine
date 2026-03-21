@@ -1,6 +1,6 @@
 
 /**
- * Copyright (c) 2025. MIT License. All rights reserved.
+ * Copyright (c) 2026. MIT License. All rights reserved.
  */
 
 #pragma once
@@ -15,7 +15,7 @@ template <typename TaskType>
 class TTaskQueue
 {
 public:
-	NOCOPYMOVE(TTaskQueue)
+	NOCOPYMOVE(TTaskQueue);
 	TTaskQueue() = default;
 	~TTaskQueue() = default;
 
@@ -36,7 +36,7 @@ public:
 	bool Push(ETaskPriority Priority, TaskType&& Task) noexcept
 		requires(std::is_move_constructible_v<TaskType>)
 	{
-		auto& Queue = mTaskQueues[HLVM_E2VALUE(Priority)];
+		auto& Queue = mTaskQueues[E2VALUE(Priority)];
 		const bool bPushed = Queue.template Push<bTryPush>(MoveTemp(Task));
 		if (bPushed)
 		{
@@ -62,7 +62,7 @@ public:
 	bool PushIfEmpty(ETaskPriority Priority, TaskType&& Task) noexcept
 		requires(std::is_move_constructible_v<TaskType>)
 	{
-		auto& Queue = mTaskQueues[HLVM_E2VALUE(Priority)];
+		auto& Queue = mTaskQueues[E2VALUE(Priority)];
 		if (Queue.IsEmpty())
 		{
 			const bool bPushed = Queue.template Push<bTryPush>(MoveTemp(Task));
@@ -89,7 +89,7 @@ public:
 	template <bool bTryPop = true>
 	bool PopFront(ETaskPriority Priority, TaskType& Task, std::chrono::milliseconds Timeout = std::chrono::milliseconds::zero()) noexcept
 	{
-		auto& Queue = mTaskQueues[HLVM_E2VALUE(Priority)];
+		auto& Queue = mTaskQueues[E2VALUE(Priority)];
 		if (Queue.template PopFront<bTryPop>(Task, Timeout))
 		{
 			return true;
@@ -173,7 +173,7 @@ public:
 
 	bool IsEmpty(ETaskPriority Priority) const noexcept
 	{
-		auto& Queue = mTaskQueues[HLVM_E2VALUE(Priority)];
+		auto& Queue = mTaskQueues[E2VALUE(Priority)];
 		return Queue.IsEmpty();
 	}
 

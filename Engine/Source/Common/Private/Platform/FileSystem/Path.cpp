@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2025. MIT License. All rights reserved.
+ * Copyright (c) 2026. MIT License. All rights reserved.
  */
 
 #include "Platform/FileSystem/Path.h"
@@ -8,9 +8,11 @@
 DECLARE_LOG_CATEGORY(LogFPath)
 
 // Static
+const FPath Empty;
+// Static
 const std::regex FPath::PathReplacePattern{ R"(\$\{([^}]+)\})" };
 // Static
-TMap<std::string, std::string> FPath::PathReplaceMap;
+TMapSmall<std::string, std::string> FPath::PathReplaceProtocol;
 
 bool FPath::IsDirectory(const FPath& path)
 {
@@ -32,9 +34,9 @@ void FPath::ResolvePath()
 	if (std::regex_match(this->ToCharCStr(), PathReplacePattern))
 		HLVM_UNLIKELY
 		{
-			HLVM_ASSERT_F(PathReplaceMap.size() > 0, TXT("PathReplaceMap is empty"));
+			HLVM_ASSERT_F(PathReplaceProtocol.size() > 0, TXT("PathReplaceProtocol is empty"));
 			std::string result = this->ToCharCStr();
-			for (auto const& replacement : PathReplaceMap)
+			for (auto const& replacement : PathReplaceProtocol)
 			{
 				result = std::regex_replace(result, PathReplacePattern, replacement.second);
 			}
@@ -58,7 +60,7 @@ FPathHash FPath::CalculateHash() const noexcept
 	{
 		hash = (hash * 31) ^ S_C(size_t, this->c_str()[i]);
 	}
-	HLVM_LOG(LogFPath, trace, TXT("Path {} hash value {}"), *(*this), hash);
+	HLVM_LOG(LogFPath, trace, TXT("Path hash {},{}"), *(*this), hash);
 	return hash;
 }
 
@@ -83,4 +85,45 @@ FPath FPath::AppendExtension(const FString& new_ext) const
 	std::string new_path = this->string();
 	new_path += new_ext;
 	return FPath{ boost::filesystem::path{ new_path }, this->mFileType };
+}
+
+FPath& FPath::AppendExtensionInplace(const FString& new_ext)
+{
+	HLVM_ASSERT_F(new_ext[0] == TXT('.'), TXT("{} must start with '.'"), new_ext);
+	this->append(new_ext);
+	return *this;
+}
+
+FPath FPath::Absolute(const FPath& path)
+{
+	if (path.is_absolute())
+	{
+		return path;
+	}
+	else
+	{
+		return FPath{ boost::filesystem::absolute(path), path.mFileType };
+	}
+}
+
+FString FPath::GetExtension(const FPath& path)
+{
+	return path.extension().c_str();
+}
+
+FString FPath::GetBaseFileName(const FPath& path)
+{
+	FString CleanFileName = GetCleanFileName(path);
+	FString Extension = GetExtension(path);
+	// Remove extension from  path
+	if (Extension.size() > 0)
+	{
+		CleanFileName.RemoveFromEndsInplace(Extension);
+	}
+	return CleanFileName;
+}
+
+FString FPath::GetCleanFileName(const FPath& path)
+{
+	return path.filename().c_str();
 }

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2025. MIT License. All rights reserved.
+ * Copyright (c) 2026. MIT License. All rights reserved.
  */
 
 #pragma once
@@ -10,12 +10,14 @@ static_assert(sizeof(TCHAR) == sizeof(char), "TCHAR is not char in size");
 
 //  Use utf8 for all string literal
 //  U8_STRING("Hello World!")
-#define U8_STRING(str) u8##str
-#define TXT(str) U8_STRING(str)
+#define _U8_STRING(str) u8##str
+#define TXT(str) _U8_STRING(str)
 #define STRTIFY(x) TXT(#x)
 
 /**
  * Here we refer "cstr" as const pointer of some char type (char, char16_t, char32_t, wchar_t)
  */
 #define TO_TCHAR_CSTR(x) reinterpret_cast<const TCHAR*>((x))
+#define TCHARSTR(x) TO_TCHAR_CSTR(x)
 #define TO_CHAR_CSTR(x) reinterpret_cast<const char*>((x))
+#define CHARSTR(x) TO_CHAR_CSTR(x)

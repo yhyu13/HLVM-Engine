@@ -1,6 +1,6 @@
 
 /**
- * Copyright (c) 2025. MIT License. All rights reserved.
+ * Copyright (c) 2026. MIT License. All rights reserved.
  */
 
 #pragma once
@@ -33,15 +33,9 @@ private:
 public:
 	using ValueType = T;
 
-	NOCOPYMOVE(TFixedSizeQueue)
-
-	TFixedSizeQueue()
-	{
-	}
-
-	~TFixedSizeQueue() noexcept
-	{
-	}
+	NOCOPYMOVE(TFixedSizeQueue);
+	TFixedSizeQueue() = default;
+	~TFixedSizeQueue() noexcept = default;
 
 	/**
 	 *  Copy item to queue, block on full

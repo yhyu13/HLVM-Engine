@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2025. MIT License. All rights reserved.
+ * Copyright (c) 2026. MIT License. All rights reserved.
  */
 
 #pragma once
@@ -31,7 +31,7 @@ struct FPackedContainerFragment
 	size_t									 FragmentStartPos{ 0 };
 	size_t									 FragmentSize{ 0 };
 
-	NOCOPY(FPackedContainerFragment)
+	NOCOPY(FPackedContainerFragment);
 	FPackedContainerFragment() = default;
 	FPackedContainerFragment(FPackedContainerFragment&& Other)
 	{

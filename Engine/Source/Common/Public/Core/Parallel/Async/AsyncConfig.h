@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2025. MIT License. All rights reserved.
+ * Copyright (c) 2026. MIT License. All rights reserved.
  */
 
 #pragma once
@@ -51,8 +51,8 @@ struct FCoreDescription
 	{
 		return FString::Format(TXT("Core {}, Type: {}, Capability: {}"),
 			ID,
-			HLVM_E2TCHAR(Type),
-			HLVM_E2TCHAR(Capability));
+			E2TCHAR(Type),
+			E2TCHAR(Capability));
 	}
 	HLVM_STATIC_FUNC TVector<FCoreDescription> NLogicalCores(TUINT32 N, ECoreCapability Capability = ECoreCapability::P1)
 	{
@@ -96,7 +96,7 @@ struct FThreadAffinityMode1
 	FString ToString() const
 	{
 		return FString::Format(TXT("Thread affinity mask1, {} Priority {} threads, affinity masks\n{}"),
-			HLVM_E2TCHAR(Priority),
+			E2TCHAR(Priority),
 			NumThreads,
 			FString::Join(TargetedCores, [](const FCoreDescription& core) { return core.ToString(); }));
 	}
@@ -120,7 +120,7 @@ struct FThreadAffinityMode2
 	FString ToString() const
 	{
 		return FString::Format(TXT("Thread affinity mask2, {} Priority {} threads, affinity masks\n{}"),
-			HLVM_E2TCHAR(Priority),
+			E2TCHAR(Priority),
 			NumThreads,
 			FString::Join(TargetedCores, [](const FCoreDescription& core) { return core.ToString(); }));
 	}
@@ -151,7 +151,7 @@ struct FThreadAffinityMode3
 	FString ToString() const
 	{
 		return FString::Format(TXT("Thread affinity mask2, {} Priority {} threads, affinity masks\n{}"),
-			HLVM_E2TCHAR(Priority),
+			E2TCHAR(Priority),
 			NumThreads,
 			FString::Join(TargetedCores, [](const std::pair<TVector<TUINT32>, TVector<FCoreDescription>>& pair) {
 				return FString::Format(TXT("threads {}, affinity {}"),

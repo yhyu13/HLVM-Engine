@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2025. MIT License. All rights reserved.
+ * Copyright (c) 2026. MIT License. All rights reserved.
  */
 
 #pragma once
@@ -16,13 +16,13 @@
 
 // magic enum don't enum class underlying type
 #define HLVM_ENUM_TO_UNDERLYING(enum_class) std::underlying_type_t<enum_class>
-#define HLVM_E2UNDERLYING(enum_class) HLVM_ENUM_TO_UNDERLYING(enum_class)
+#define E2UNDERLYING(enum_class) HLVM_ENUM_TO_UNDERLYING(enum_class)
 
 #define HLVM_ENUM_TO_VALUE(enum_value) magic_enum::enum_underlying(enum_value)
-#define HLVM_E2VALUE(enum_value) HLVM_ENUM_TO_VALUE(enum_value)
+#define E2VALUE(enum_value) HLVM_ENUM_TO_VALUE(enum_value)
 
 #define HLVM_ENUM_TO_TCHAR(enum_value) TO_TCHAR_CSTR(magic_enum::enum_name((enum_value)).data())
-#define HLVM_E2TCHAR(enum_value) HLVM_ENUM_TO_TCHAR(enum_value)
+#define E2TCHAR(enum_value) HLVM_ENUM_TO_TCHAR(enum_value)
 
 // Reference https://www.reddit.com/r/cpp/comments/13psi6f/comment/jleje26/?utm_source=share&utm_medium=web3x&utm_name=web3xcss&utm_term=1&utm_content=share_button
 #define _HLVM_DECLARE_FLAGS_OPERATOR(enum_class, Flags, op)          \

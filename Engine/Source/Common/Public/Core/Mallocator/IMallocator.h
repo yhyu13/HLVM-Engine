@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2025. MIT License. All rights reserved.
+ * Copyright (c) 2026. MIT License. All rights reserved.
  */
 
 #pragma once
@@ -28,7 +28,7 @@ HLVM_ENUM(EFreeRetType, TUINT8,
 class IMallocator
 {
 public:
-	NOCOPYMOVE(IMallocator)
+	NOCOPYMOVE(IMallocator);
 	IMallocator() noexcept = default;
 	virtual ~IMallocator() noexcept = default;
 	HLVM_NODISCARD virtual bool			Owned(void* ptr) noexcept = 0;

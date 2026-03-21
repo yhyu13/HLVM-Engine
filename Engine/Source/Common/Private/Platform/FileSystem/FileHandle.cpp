@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2025. MIT License. All rights reserved.
+ * Copyright (c) 2026. MIT License. All rights reserved.
  */
 
 #pragma once
@@ -17,8 +17,8 @@ void IFileHandle::HandleException(const OpStatusType& Status_InOut, const TCHAR*
 	FString Msg = FString::Format(TXT("File {}: calling '{}' return {} with errorNo {} and exception {}"),
 		*mFilePath,
 		Function,
-		HLVM_E2TCHAR(Status_InOut->eFileOpStatus),
-		HLVM_E2TCHAR(Status_InOut->eFileOpErrorNo),
+		E2TCHAR(Status_InOut->eFileOpStatus),
+		E2TCHAR(Status_InOut->eFileOpErrorNo),
 		TO_TCHAR_CSTR(Exception.what()));
 	if (!Status_InOut->bCancelByUser)
 	{
@@ -39,8 +39,8 @@ void IFileHandle::HandleException2(const OpStatusType& Status_InOut, const TCHAR
 	FString Msg = FString::Format(TXT("File {}: calling '{}' return {} with errorNo {}"),
 		*mFilePath,
 		Function,
-		HLVM_E2TCHAR(Status_InOut->eFileOpStatus),
-		HLVM_E2TCHAR(Status_InOut->eFileOpErrorNo));
+		E2TCHAR(Status_InOut->eFileOpStatus),
+		E2TCHAR(Status_InOut->eFileOpErrorNo));
 	if (!Status_InOut->bCancelByUser)
 	{
 		HLVM_LOG(LogIFileHandle, err, MoveTemp(Msg));

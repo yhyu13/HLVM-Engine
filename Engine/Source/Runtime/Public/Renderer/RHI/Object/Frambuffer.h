@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2025. MIT License. All rights reserved.
+ * Copyright (c) 2026. MIT License. All rights reserved.
  *
  *  Framebuffer Objects
  *
@@ -80,8 +80,7 @@ struct FFramebufferAttachment
 class FFramebuffer
 {
 public:
-	NOCOPYMOVE(FFramebuffer)
-
+	NOCOPYMOVE(FFramebuffer);
 	FFramebuffer();
 	virtual ~FFramebuffer();
 
@@ -158,8 +157,7 @@ protected:
 class FFramebufferManager
 {
 public:
-	NOCOPYMOVE(FFramebufferManager)
-
+	NOCOPYMOVE(FFramebufferManager);
 	FFramebufferManager() = default;
 	~FFramebufferManager();
 

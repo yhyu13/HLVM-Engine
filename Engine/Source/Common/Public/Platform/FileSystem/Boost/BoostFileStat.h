@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2025. MIT License. All rights reserved.
+ * Copyright (c) 2026. MIT License. All rights reserved.
  */
 
 #pragma once
@@ -12,7 +12,7 @@
 class FBoostFileStat final : public IFFileStat
 {
 public:
-	NOCOPYMOVE(FBoostFileStat)
+	NOCOPYMOVE(FBoostFileStat);
 	FBoostFileStat() = delete;
 	explicit FBoostFileStat(const FPath& Path);
 

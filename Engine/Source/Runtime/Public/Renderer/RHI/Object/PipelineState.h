@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2025. MIT License. All rights reserved.
+ * Copyright (c) 2026. MIT License. All rights reserved.
  *
  *  Pipeline State Objects - Fixed for NVRHI API
  *
@@ -187,8 +187,7 @@ struct FBlendState
 class IPipelineState
 {
 public:
-	NOCOPYMOVE(IPipelineState)
-
+	NOCOPYMOVE(IPipelineState);
 	IPipelineState();
 	virtual ~IPipelineState() = default;
 
@@ -209,8 +208,7 @@ class FGraphicsPipelineBuilder;
 class FGraphicsPipelineState : public IPipelineState
 {
 public:
-	NOCOPYMOVE(FGraphicsPipelineState)
-
+	NOCOPYMOVE(FGraphicsPipelineState);
 	FGraphicsPipelineState();
 	virtual ~FGraphicsPipelineState() override;
 
@@ -239,8 +237,7 @@ class FComputePipelineBuilder;
 class FComputePipelineState : public IPipelineState
 {
 public:
-	NOCOPYMOVE(FComputePipelineState)
-
+	NOCOPYMOVE(FComputePipelineState);
 	FComputePipelineState();
 	virtual ~FComputePipelineState() override;
 

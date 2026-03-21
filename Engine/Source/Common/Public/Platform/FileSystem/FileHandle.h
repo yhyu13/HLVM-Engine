@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2025. MIT License. All rights reserved.
+ * Copyright (c) 2026. MIT License. All rights reserved.
  */
 
 #pragma once
@@ -86,8 +86,15 @@ struct FFileOptions
 	EFileAsync	eFileAsync{ EFileAsync::Default };
 	EFileLock	eFileLock{ EFileLock::NoLock };
 };
-HLVM_INLINE_VAR const FFileOptions GReadOnlyFileOptions{
+HLVM_INLINE_VAR constexpr FFileOptions GReadOnlyFileOptions{
 	.eFileMode = EFileMode::R,
+	.eFileMapped = EFileMapped::Default,
+	.eFileAsync = EFileAsync::Default,
+	.eFileLock = EFileLock::NoLock,
+};
+
+HLVM_INLINE_VAR constexpr FFileOptions GWriteOnlyFileOptions{
+	.eFileMode = EFileMode::W,
 	.eFileMapped = EFileMapped::Default,
 	.eFileAsync = EFileAsync::Default,
 	.eFileLock = EFileLock::NoLock,
@@ -173,8 +180,11 @@ struct FFileSeekCtx
 {
 	int64_t Offset{ 0 };
 	EWhence Whence{ EWhence::Current };
-	BIT_FLAG(bResetPos){ false };	  // Reset seek pos to previous location after reading and writing, so to ignore the effect of this file seeking
-	BIT_FLAG(bEraseSeekPos){ false }; // Erase the effect of advancing seek pos when reading and writing, so to keep our seek pos unchanged
+	// Reset seek pos to previous location after reading and writing,
+	// so to ignore the effect of manul file seeking, and auto advancing seek pos when reading and writing
+	BIT_FLAG(bResetSeekPos){ false };
+	// Erase the effect of auto advancing seek pos when reading and writing, but keep the effect of manul file seeking
+	BIT_FLAG(bIgnoreRWSeek){ false };
 
 	/**
 	 * see if non trivial seek, which requires extra calling seek
@@ -182,6 +192,11 @@ struct FFileSeekCtx
 	bool NonTrivialSeek() const
 	{
 		return !(Offset == 0 && Whence == EWhence::Current);
+	}
+
+	bool IsValid() const
+	{
+		return !(bResetSeekPos && bIgnoreRWSeek);
 	}
 };
 HLVM_INLINE_VAR const FFileSeekCtx GFileSeekBegCtx{ 0, EWhence::Begin, false, false };
@@ -191,7 +206,7 @@ HLVM_INLINE_VAR const FFileSeekCtx GFileSeekCurCtx{ 0, EWhence::Current, false, 
 class IFFileStat
 {
 public:
-	NOCOPYMOVE(IFFileStat)
+	NOCOPYMOVE(IFFileStat);
 	IFFileStat() = default;
 	virtual ~IFFileStat() = default;
 
@@ -207,8 +222,9 @@ public:
 	using OpRetType = IFileHandle&;
 	using OpStatusType = FFileOpStatus*;
 
-	NOCOPYMOVE(IFileHandle)
+	NOCOPYMOVE(IFileHandle);
 	IFileHandle() = default;
+	// Derived class should override destructor to Close the file
 	virtual ~IFileHandle() = default;
 
 	virtual OpRetType Open(const FPath& FilePath, const FFileOptions& Options = GReadOnlyFileOptions) = 0;

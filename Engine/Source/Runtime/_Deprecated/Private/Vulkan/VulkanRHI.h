@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2025. MIT License. All rights reserved.
+ * Copyright (c) 2026. MIT License. All rights reserved.
  */
 
 #pragma once
@@ -11,7 +11,7 @@ struct FVulkanRHIInitializer
 {
 	TVector<TVector<FString>>				RequiredExtensions;
 	std::function<VkSurfaceKHR(VkInstance)> CreateSurfaceFunc;
-	TSharedPtr<IWindow>						NativeWindowHandle;
+	TSharePtr<IWindow>						NativeWindowHandle;
 };
 
 class FVulkanRHI final : public IVulkanDynamicRHI
@@ -194,7 +194,7 @@ private:
 	FVulkanLogicalDeviceRef	 LogicalDevice;
 	FVulkanViewportRef		 VulkanViewport;
 
-	TSharedPtr<FVulkanRenderPassManager> RenderPassManager;
+	TSharePtr<FVulkanRenderPassManager> RenderPassManager;
 	FVulkanRenderPassRef	 CurrentRenderPass;
 	FVulkanFrameBufferRef	 CurrentFrameBuffer;
 };

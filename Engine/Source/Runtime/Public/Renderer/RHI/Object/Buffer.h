@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2025. MIT License. All rights reserved.
+ * Copyright (c) 2026. MIT License. All rights reserved.
  *
  *  Buffer Objects
  *
@@ -30,8 +30,7 @@ HLVM_ENUM(EBufferType, TUINT8,
 class IBuffer
 {
 public:
-	NOCOPYMOVE(IBuffer)
-
+	NOCOPYMOVE(IBuffer);
 	virtual ~IBuffer();
 
 	// Access
@@ -66,7 +65,7 @@ protected:
 class FVertexBuffer : public IBuffer
 {
 public:
-	NOCOPYMOVE(FVertexBuffer)
+	NOCOPYMOVE(FVertexBuffer);
 protected:
 	FVertexBuffer();
 };
@@ -92,8 +91,7 @@ protected:
 class FStaticVertexBuffer : public FVertexBuffer
 {
 public:
-	NOCOPYMOVE(FStaticVertexBuffer)
-
+	NOCOPYMOVE(FStaticVertexBuffer);
 	FStaticVertexBuffer();
 	virtual ~FStaticVertexBuffer() override;
 
@@ -126,8 +124,7 @@ public:
 class FDynamicVertexBuffer : public FVertexBuffer
 {
 public:
-	NOCOPYMOVE(FDynamicVertexBuffer)
-
+	NOCOPYMOVE(FDynamicVertexBuffer);
 	FDynamicVertexBuffer();
 	virtual ~FDynamicVertexBuffer() override;
 
@@ -160,8 +157,7 @@ protected:
 class FIndexBuffer : public IBuffer
 {
 public:
-	NOCOPYMOVE(FIndexBuffer)
-
+	NOCOPYMOVE(FIndexBuffer);
 protected:
 	FIndexBuffer();
 
@@ -189,8 +185,7 @@ protected:
 class FStaticIndexBuffer : public FIndexBuffer
 {
 public:
-	NOCOPYMOVE(FStaticIndexBuffer)
-
+	NOCOPYMOVE(FStaticIndexBuffer);
 	FStaticIndexBuffer();
 	virtual ~FStaticIndexBuffer() override;
 
@@ -224,8 +219,7 @@ public:
 class FDynamicIndexBuffer : public FIndexBuffer
 {
 public:
-	NOCOPYMOVE(FDynamicIndexBuffer)
-
+	NOCOPYMOVE(FDynamicIndexBuffer);
 	FDynamicIndexBuffer();
 	virtual ~FDynamicIndexBuffer() override;
 
