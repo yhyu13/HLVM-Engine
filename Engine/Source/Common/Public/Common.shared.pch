@@ -44,6 +44,8 @@
 #include <math.h>
 #include <filesystem>
 
+#define HLVM_COMMON_API
+
 /**
  * Common lib
  */

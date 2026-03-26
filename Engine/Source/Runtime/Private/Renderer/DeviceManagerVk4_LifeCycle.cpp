@@ -94,6 +94,11 @@ void FDeviceManagerVk::DestroyDeviceAndSwapChain()
 	{
 		device->waitIdle();
 	}
+	else
+	{
+		// Already destroyed
+		return;
+	}
 
 	// Clean up frame sync resources
 	while (!m_FramesInFlight.empty())

@@ -124,9 +124,10 @@ public:
 
 	virtual nvrhi::ITexture* GetCurrentBackBuffer() = 0;
 	virtual nvrhi::ITexture* GetBackBuffer(TUINT32 Index) = 0;
-	virtual TUINT32			 GetCurrentBackBufferIndex() = 0;
-	virtual TUINT32			 GetBackBufferCount() = 0;
-
+	virtual TUINT32				 GetCurrentBackBufferIndex() = 0;
+	virtual TUINT32				 GetBackBufferCount() = 0;
+	// Depth texture access
+	virtual nvrhi::ITexture* GetDepthTexture(TUINT32 Index) = 0;
 	// Framebuffer management
 	nvrhi::IFramebuffer* GetCurrentFramebuffer();
 	virtual nvrhi::IFramebuffer* GetFramebuffer(TUINT32 Index) = 0;

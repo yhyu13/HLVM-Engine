@@ -32,7 +32,7 @@ public:
 	static TNoNullablePtr<FGenericPlatformFile> Get(EPlatformFileType PlatformFileType = EPlatformFileType::Unspecified);
 
 protected:
-	static FGenericPlatformFile* sPlatformFileRedirector[EPlatformFileType_NUM];
+	static TNoNullablePtr<FGenericPlatformFile> sPlatformFileRedirector[EPlatformFileType_NUM];
 
 private:
 	static void InternalInit();

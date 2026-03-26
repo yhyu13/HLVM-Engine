@@ -177,7 +177,7 @@ public:
 	void RemoveAllFramebuffers();
 
 	// Access device
-	[[nodiscard]] nvrhi::IDevice* GetDevice() const { return Device; }
+	[[nodiscard]] TNNPtr<nvrhi::IDevice> GetDevice() const { return Device; }
 
 protected:
 	TNNPtr<nvrhi::IDevice>					Device;

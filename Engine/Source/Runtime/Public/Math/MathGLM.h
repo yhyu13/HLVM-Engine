@@ -14,6 +14,9 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/packing.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtx/matrix_decompose.hpp>
+#include <glm/gtx/euler_angles.hpp>
+#include <glm/gtc/quaternion.hpp>
 
 #define PI_F 3.141592653589f
 #define PI2_F 6.28318530718f

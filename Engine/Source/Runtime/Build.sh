@@ -243,7 +243,7 @@ for config in "${buildConfigs[@]}"; do
         echo_color 32 "Run test #${test_index} out of ${TestRepeatNum} repeats"
         # Maually run test in each bg job parallely
         pids=()
-        max_jobs=8
+        max_jobs=4
         # Function to kill all background jobs
         kill_jobs() {
             for pid in "${pids[@]}"; do

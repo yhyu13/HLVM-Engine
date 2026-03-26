@@ -55,15 +55,15 @@ struct QueueFamilyIndices
  */
 struct SwapChainSupportDetails
 {
-	vk::SurfaceCapabilitiesKHR		  capabilities;
-	std::vector<vk::SurfaceFormatKHR> formats;
-	std::vector<vk::PresentModeKHR>	  presentModes;
+	vk::SurfaceCapabilitiesKHR	  capabilities;
+	TVector<vk::SurfaceFormatKHR> formats;
+	TVector<vk::PresentModeKHR>	  presentModes;
 };
 
 class FDeviceManagerVk final : public FDeviceManager
 {
 public:
-	virtual ~FDeviceManagerVk() override = default;
+	virtual ~FDeviceManagerVk() override;
 	// Window and device lifecycle
 	virtual bool CreateWindowDeviceAndSwapChain(const IWindow::Properties& Params) override;
 	virtual void Shutdown() override;
@@ -88,6 +88,7 @@ public:
 	virtual nvrhi::ITexture*	 GetBackBuffer(TUINT32 Index) override;
 	virtual TUINT32				 GetCurrentBackBufferIndex() override;
 	virtual TUINT32				 GetBackBufferCount() override;
+	virtual nvrhi::ITexture* GetDepthTexture(TUINT32 Index) override;
 
 	virtual void SetVSyncMode(TINT32 VSyncMode) override;
 
@@ -129,8 +130,8 @@ private:
 		vk::Image			 image;
 		nvrhi::TextureHandle rhiHandle;
 	};
-	std::vector<SwapChainImage> m_SwapChainImages;
-	uint32_t					m_SwapChainIndex = INVALID_INDEX_UINT32;
+	TVector<SwapChainImage> m_SwapChainImages;
+	uint32_t				m_SwapChainIndex = INVALID_INDEX_UINT32;
 
 	nvrhi::vulkan::DeviceHandle m_NvrhiDevice;
 	nvrhi::DeviceHandle			m_ValidationLayer;
@@ -144,14 +145,16 @@ private:
 	TUINT32 m_TransferQueueFamily = INVALID_INDEX_UINT32;
 
 	// Synchronization - following Donuts pattern
-	bool								 bCanPresent = false;
-	std::vector<vk::Semaphore>			 m_PresentSemaphores;
-	std::vector<vk::Semaphore>			 m_AcquireSemaphores;
-	uint32_t							 m_AcquireSemaphoreIndex = 0;
-	std::deque<nvrhi::EventQueryHandle>	 m_FramesInFlight;
-	std::vector<nvrhi::EventQueryHandle> m_QueryPool;
+	bool								bCanPresent = false;
+	TVector<vk::Semaphore>				m_PresentSemaphores;
+	TVector<vk::Semaphore>				m_AcquireSemaphores;
+	uint32_t							m_AcquireSemaphoreIndex = 0;
+	std::deque<nvrhi::EventQueryHandle> m_FramesInFlight;
+	TVector<nvrhi::EventQueryHandle>	m_QueryPool;
 	// Framebuffers (one per swapchain image)
-	std::vector<nvrhi::FramebufferHandle> m_Framebuffers;
+	TVector<nvrhi::FramebufferHandle> m_Framebuffers;
+	// Depth textures (one per swapchain image)
+	TVector<nvrhi::TextureHandle> m_DepthTextures;
 
 	// Surface present mode support
 	bool enablePModeMailbox = false;
@@ -216,9 +219,9 @@ private:
 	// HELPER METHODS
 	// =============================================================================
 
-	static std::vector<const char*> StringSetToVector(const std::unordered_set<std::string>& set)
+	static TVector<const char*> StringSetToVector(const std::unordered_set<std::string>& set)
 	{
-		std::vector<const char*> ret;
+		TVector<const char*> ret;
 		for (const auto& s : set)
 		{
 			ret.push_back(s.c_str());
@@ -245,15 +248,15 @@ private:
 	// =============================================================================
 
 	SwapChainSupportDetails QuerySwapChainSupport(vk::PhysicalDevice device);
-	vk::SurfaceFormatKHR	ChooseSwapSurfaceFormat(const std::vector<vk::SurfaceFormatKHR>& availableFormats);
-	vk::PresentModeKHR		ChooseSwapPresentMode(const std::vector<vk::PresentModeKHR>& availablePresentModes);
+	vk::SurfaceFormatKHR	ChooseSwapSurfaceFormat(const TVector<vk::SurfaceFormatKHR>& availableFormats);
+	vk::PresentModeKHR		ChooseSwapPresentMode(const TVector<vk::PresentModeKHR>& availablePresentModes);
 	vk::Extent2D			ChooseSwapExtent(const vk::SurfaceCapabilitiesKHR& capabilities);
 
 	bool CheckDeviceExtensionSupport(vk::PhysicalDevice device);
 	bool IsDeviceSuitable(vk::PhysicalDevice device);
 
-	std::vector<const char*> GetRequiredExtensions();
-	void					 PopulateDebugMessengerCreateInfo(vk::DebugUtilsMessengerCreateInfoEXT& createInfo);
+	TVector<const char*> GetRequiredExtensions();
+	void				 PopulateDebugMessengerCreateInfo(vk::DebugUtilsMessengerCreateInfoEXT& createInfo);
 
 	static VKAPI_ATTR vk::Bool32 VKAPI_CALL DebugCallback(
 		vk::DebugUtilsMessageSeverityFlagBitsEXT	  messageSeverity,

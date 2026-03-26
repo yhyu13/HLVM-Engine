@@ -6,6 +6,12 @@
 
 #if HLVM_VULKAN_RENDERER
 
+// Destructor
+FDeviceManagerVk::~FDeviceManagerVk()
+{
+	Shutdown();
+}
+
 bool FDeviceManagerVk::IsVulkanInstanceExtensionEnabled(const char* ExtensionName) const
 {
 	return enabledExtensions.instance.find(ExtensionName) != enabledExtensions.instance.end();

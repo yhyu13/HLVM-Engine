@@ -9,7 +9,7 @@
 
 DECLARE_LOG_CATEGORY(LogGenericPlatformFile)
 
-FGenericPlatformFile* FGenericPlatformFile::sPlatformFileRedirector[EPlatformFileType_NUM];
+TNoNullablePtr<FGenericPlatformFile> FGenericPlatformFile::sPlatformFileRedirector[EPlatformFileType_NUM];
 
 static FGenericPlatformFile SGenericPlatformFile{};
 
@@ -40,11 +40,11 @@ bool FGenericPlatformFile::IsDirectory(const FPath& path)
 {
 	if (path.Type() == EPlatformFileType::Disk)
 	{
-		return S_C(FBoostPlatformFile*, sPlatformFileRedirector[E2VALUE(EPlatformFileType::Disk)])->IsDirectory(path);
+		return S_C(FBoostPlatformFile*, sPlatformFileRedirector[E2VALUE(EPlatformFileType::Disk)].Get())->IsDirectory(path);
 	}
 	else if (path.Type() == EPlatformFileType::Packed)
 	{
-		return S_C(FPackedPlatformFile*, sPlatformFileRedirector[E2VALUE(EPlatformFileType::Packed)])->IsDirectory(path);
+		return S_C(FPackedPlatformFile*, sPlatformFileRedirector[E2VALUE(EPlatformFileType::Packed)].Get())->IsDirectory(path);
 	}
 	else HLVM_LIKELY
 	{
@@ -65,11 +65,11 @@ bool FGenericPlatformFile::Exists(const FPath& path)
 {
 	if (path.Type() == EPlatformFileType::Disk)
 	{
-		return S_C(FBoostPlatformFile*, sPlatformFileRedirector[E2VALUE(EPlatformFileType::Disk)])->Exists(path);
+		return S_C(FBoostPlatformFile*, sPlatformFileRedirector[E2VALUE(EPlatformFileType::Disk)].Get())->Exists(path);
 	}
 	else if (path.Type() == EPlatformFileType::Packed)
 	{
-		return S_C(FPackedPlatformFile*, sPlatformFileRedirector[E2VALUE(EPlatformFileType::Packed)])->Exists(path);
+		return S_C(FPackedPlatformFile*, sPlatformFileRedirector[E2VALUE(EPlatformFileType::Packed)].Get())->Exists(path);
 	}
 	else HLVM_LIKELY
 	{
@@ -92,11 +92,11 @@ TSmallVector32<FPath> FGenericPlatformFile::Glob(const FPath& path, const FStrin
 {
 	if (path.Type() == EPlatformFileType::Disk)
 	{
-		return S_C(FBoostPlatformFile*, sPlatformFileRedirector[E2VALUE(EPlatformFileType::Disk)])->Glob(path, regex, recursive);
+		return S_C(FBoostPlatformFile*, sPlatformFileRedirector[E2VALUE(EPlatformFileType::Disk)].Get())->Glob(path, regex, recursive);
 	}
 	else if (path.Type() == EPlatformFileType::Packed)
 	{
-		return S_C(FPackedPlatformFile*, sPlatformFileRedirector[E2VALUE(EPlatformFileType::Packed)])->Glob(path, regex, recursive);
+		return S_C(FPackedPlatformFile*, sPlatformFileRedirector[E2VALUE(EPlatformFileType::Packed)].Get())->Glob(path, regex, recursive);
 	}
 	else HLVM_LIKELY
 	{
@@ -114,15 +114,15 @@ bool FGenericPlatformFile::SaveAsString(const FPath& path, const FString& conten
 {
 	if (path.Type() == EPlatformFileType::Disk)
 	{
-		return S_C(FBoostPlatformFile*, sPlatformFileRedirector[E2VALUE(EPlatformFileType::Disk)])->SaveAsString(path, content);
+		return S_C(FBoostPlatformFile*, sPlatformFileRedirector[E2VALUE(EPlatformFileType::Disk)].Get())->SaveAsString(path, content);
 	}
 	else if (path.Type() == EPlatformFileType::Packed)
 	{
-		return S_C(FPackedPlatformFile*, sPlatformFileRedirector[E2VALUE(EPlatformFileType::Packed)])->SaveAsString(path, content);
+		return S_C(FPackedPlatformFile*, sPlatformFileRedirector[E2VALUE(EPlatformFileType::Packed)].Get())->SaveAsString(path, content);
 	}
 	else HLVM_LIKELY
 	{
-		return S_C(FBoostPlatformFile*, sPlatformFileRedirector[E2VALUE(EPlatformFileType::Disk)])->SaveAsString(path, content);
+		return S_C(FBoostPlatformFile*, sPlatformFileRedirector[E2VALUE(EPlatformFileType::Disk)].Get())->SaveAsString(path, content);
 	}
 }
 
@@ -130,15 +130,15 @@ bool FGenericPlatformFile::SaveAsStringArray(const FPath& path, const TVector<FS
 {
 	if (path.Type() == EPlatformFileType::Disk)
 	{
-		return S_C(FBoostPlatformFile*, sPlatformFileRedirector[E2VALUE(EPlatformFileType::Disk)])->SaveAsStringArray(path, Result, linechanger);
+		return S_C(FBoostPlatformFile*, sPlatformFileRedirector[E2VALUE(EPlatformFileType::Disk)].Get())->SaveAsStringArray(path, Result, linechanger);
 	}
 	else if (path.Type() == EPlatformFileType::Packed)
 	{
-		return S_C(FPackedPlatformFile*, sPlatformFileRedirector[E2VALUE(EPlatformFileType::Packed)])->SaveAsStringArray(path, Result, linechanger);
+		return S_C(FPackedPlatformFile*, sPlatformFileRedirector[E2VALUE(EPlatformFileType::Packed)].Get())->SaveAsStringArray(path, Result, linechanger);
 	}
 	else HLVM_LIKELY
 	{
-		return S_C(FBoostPlatformFile*, sPlatformFileRedirector[E2VALUE(EPlatformFileType::Disk)])->SaveAsStringArray(path, Result, linechanger);
+		return S_C(FBoostPlatformFile*, sPlatformFileRedirector[E2VALUE(EPlatformFileType::Disk)].Get())->SaveAsStringArray(path, Result, linechanger);
 	}
 }
 
@@ -146,15 +146,15 @@ bool FGenericPlatformFile::SaveAsByteArray(const FPath& path, const TVector<TBYT
 {
 	if (path.Type() == EPlatformFileType::Disk)
 	{
-		return S_C(FBoostPlatformFile*, sPlatformFileRedirector[E2VALUE(EPlatformFileType::Disk)])->SaveAsByteArray(path, content);
+		return S_C(FBoostPlatformFile*, sPlatformFileRedirector[E2VALUE(EPlatformFileType::Disk)].Get())->SaveAsByteArray(path, content);
 	}
 	else if (path.Type() == EPlatformFileType::Packed)
 	{
-		return S_C(FPackedPlatformFile*, sPlatformFileRedirector[E2VALUE(EPlatformFileType::Packed)])->SaveAsByteArray(path, content);
+		return S_C(FPackedPlatformFile*, sPlatformFileRedirector[E2VALUE(EPlatformFileType::Packed)].Get())->SaveAsByteArray(path, content);
 	}
 	else HLVM_LIKELY
 	{
-		return S_C(FBoostPlatformFile*, sPlatformFileRedirector[E2VALUE(EPlatformFileType::Disk)])->SaveAsByteArray(path, content);
+		return S_C(FBoostPlatformFile*, sPlatformFileRedirector[E2VALUE(EPlatformFileType::Disk)].Get())->SaveAsByteArray(path, content);
 	}
 }
 
@@ -162,15 +162,15 @@ FString FGenericPlatformFile::LoadAsString(const FPath& path)
 {
 	if (path.Type() == EPlatformFileType::Disk)
 	{
-		return S_C(FBoostPlatformFile*, sPlatformFileRedirector[E2VALUE(EPlatformFileType::Disk)])->LoadAsString(path);
+		return S_C(FBoostPlatformFile*, sPlatformFileRedirector[E2VALUE(EPlatformFileType::Disk)].Get())->LoadAsString(path);
 	}
 	else if (path.Type() == EPlatformFileType::Packed)
 	{
-		return S_C(FPackedPlatformFile*, sPlatformFileRedirector[E2VALUE(EPlatformFileType::Packed)])->LoadAsString(path);
+		return S_C(FPackedPlatformFile*, sPlatformFileRedirector[E2VALUE(EPlatformFileType::Packed)].Get())->LoadAsString(path);
 	}
 	else HLVM_LIKELY
 	{
-		return S_C(FBoostPlatformFile*, sPlatformFileRedirector[E2VALUE(EPlatformFileType::Disk)])->LoadAsString(path);
+		return S_C(FBoostPlatformFile*, sPlatformFileRedirector[E2VALUE(EPlatformFileType::Disk)].Get())->LoadAsString(path);
 	}
 }
 
@@ -178,15 +178,15 @@ TVector<FString> FGenericPlatformFile::LoadAsStringArray(const FPath& path, cons
 {
 	if (path.Type() == EPlatformFileType::Disk)
 	{
-		return S_C(FBoostPlatformFile*, sPlatformFileRedirector[E2VALUE(EPlatformFileType::Disk)])->LoadAsStringArray(path, delimiters);
+		return S_C(FBoostPlatformFile*, sPlatformFileRedirector[E2VALUE(EPlatformFileType::Disk)].Get())->LoadAsStringArray(path, delimiters);
 	}
 	else if (path.Type() == EPlatformFileType::Packed)
 	{
-		return S_C(FPackedPlatformFile*, sPlatformFileRedirector[E2VALUE(EPlatformFileType::Packed)])->LoadAsStringArray(path, delimiters);
+		return S_C(FPackedPlatformFile*, sPlatformFileRedirector[E2VALUE(EPlatformFileType::Packed)].Get())->LoadAsStringArray(path, delimiters);
 	}
 	else HLVM_LIKELY
 	{
-		return S_C(FBoostPlatformFile*, sPlatformFileRedirector[E2VALUE(EPlatformFileType::Disk)])->LoadAsStringArray(path, delimiters);
+		return S_C(FBoostPlatformFile*, sPlatformFileRedirector[E2VALUE(EPlatformFileType::Disk)].Get())->LoadAsStringArray(path, delimiters);
 	}
 }
 
@@ -194,15 +194,15 @@ TVector<TBYTE> FGenericPlatformFile::LoadAsByteArray(const FPath& path)
 {
 	if (path.Type() == EPlatformFileType::Disk)
 	{
-		return S_C(FBoostPlatformFile*, sPlatformFileRedirector[E2VALUE(EPlatformFileType::Disk)])->LoadAsByteArray(path);
+		return S_C(FBoostPlatformFile*, sPlatformFileRedirector[E2VALUE(EPlatformFileType::Disk)].Get())->LoadAsByteArray(path);
 	}
 	else if (path.Type() == EPlatformFileType::Packed)
 	{
-		return S_C(FPackedPlatformFile*, sPlatformFileRedirector[E2VALUE(EPlatformFileType::Packed)])->LoadAsByteArray(path);
+		return S_C(FPackedPlatformFile*, sPlatformFileRedirector[E2VALUE(EPlatformFileType::Packed)].Get())->LoadAsByteArray(path);
 	}
 	else HLVM_LIKELY
 	{
-		return S_C(FBoostPlatformFile*, sPlatformFileRedirector[E2VALUE(EPlatformFileType::Disk)])->LoadAsByteArray(path);
+		return S_C(FBoostPlatformFile*, sPlatformFileRedirector[E2VALUE(EPlatformFileType::Disk)].Get())->LoadAsByteArray(path);
 	}
 }
 
@@ -210,14 +210,14 @@ bool FGenericPlatformFile::DeleteFile(const FPath& path)
 {
 	if (path.Type() == EPlatformFileType::Disk)
 	{
-		return S_C(FBoostPlatformFile*, sPlatformFileRedirector[E2VALUE(EPlatformFileType::Disk)])->DeleteFile(path);
+		return S_C(FBoostPlatformFile*, sPlatformFileRedirector[E2VALUE(EPlatformFileType::Disk)].Get())->DeleteFile(path);
 	}
 	else if (path.Type() == EPlatformFileType::Packed)
 	{
-		return S_C(FPackedPlatformFile*, sPlatformFileRedirector[E2VALUE(EPlatformFileType::Packed)])->DeleteFile(path);
+		return S_C(FPackedPlatformFile*, sPlatformFileRedirector[E2VALUE(EPlatformFileType::Packed)].Get())->DeleteFile(path);
 	}
 	else HLVM_LIKELY
 	{
-		return S_C(FBoostPlatformFile*, sPlatformFileRedirector[E2VALUE(EPlatformFileType::Disk)])->DeleteFile(path);
+		return S_C(FBoostPlatformFile*, sPlatformFileRedirector[E2VALUE(EPlatformFileType::Disk)].Get())->DeleteFile(path);
 	}
 }

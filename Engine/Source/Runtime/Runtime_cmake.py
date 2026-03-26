@@ -12,6 +12,7 @@ vcpkg_ctx_runtime = VcpkgContenxt(vcpkg_root_path='../Dependency/vcpkg',
                                                                     "glslang",
                                                                     "assimp",
                                                                     "bullet3",
+                                                                    "ktx"
                                                                 ]))
 
 # 导入 Common_cmake.py 中的 vcpkg_ctx_common 变量
@@ -113,6 +114,8 @@ Global Config :
 bThreadSanitizer = False  # Supers low performance, not even debuggable lol
 bBuildShared = False  # Not working on ubuntu/linux, shared lib is PITA
 bLinkByGold = True  # Using llvm GOLD linker for link time optimization
+bSSE41 = True # Enable SSE41 for GLM matrix decomposition
+
 bVulkanNoPrototype = True  # True : Dynamic loading vk api on startup from shared lib
 # True : Use Vulkan SDK include path instead of system include path
 # False : Use system include path, but we may use wrong vulkan sdk version due to Ubuntu apt package management lag behind
@@ -140,12 +143,16 @@ class RuntimeModule(BaseModule):
                                         bullet3
                                         ]
                          )
-        self.target_interface.add_compile_options(domain=DomainEnum.PUBLIC, values=[
+        compile_options = [
             '$<$<COMPILE_LANGUAGE:C>: -Wall -Wextra -pedantic -Werror>',
             '$<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra -pedantic -Werror -Wunused-variable -Wconversion -Weverything>',
-            '$<$<COMPILE_LANGUAGE:CXX>:-Wno-padded -Wno-gnu-zero-variadic-macro-arguments -Wno-reserved-identifier -Wno-exit-time-destructors -Wno-global-constructors -Wno-c++98-compat-pedantic -Wno-float-equal -Wno-covered-switch-default -Wno-c++20-compat>',
-            '$<$<COMPILE_LANGUAGE:CXX>:-Wno-error=global-constructors -Wno-error=exit-time-destructors -Wno-error=unsafe-buffer-usage -Wno-error=unused-function -Wno-error=unused-but-set-variable -Wno-error=unused-variable -Wno-error=unused-member-function>'
-        ])
+            '$<$<COMPILE_LANGUAGE:CXX>:-Wno-unsafe-buffer-usage -Wno-padded -Wno-gnu-zero-variadic-macro-arguments -Wno-reserved-identifier -Wno-exit-time-destructors -Wno-global-constructors -Wno-c++98-compat-pedantic -Wno-float-equal -Wno-covered-switch-default -Wno-c++20-compat>',
+            '$<$<COMPILE_LANGUAGE:CXX>:-Wno-error=global-constructors -Wno-error=exit-time-destructors -Wno-error=unused-function -Wno-error=unused-but-set-variable -Wno-error=unused-variable -Wno-error=unused-member-function>',
+        ]
+        if bSSE41:
+            compile_options.append('$<$<COMPILE_LANGUAGE:CXX>:-msse4.1>')
+
+        self.target_interface.add_compile_options(domain=DomainEnum.PUBLIC, values=compile_options)
 
         # Do we have to include subdirectory's include paths? probably not
         self.target_interface.add_include_dirs(domain=DomainEnum.PUBLIC,

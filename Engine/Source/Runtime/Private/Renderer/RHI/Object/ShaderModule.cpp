@@ -7,24 +7,6 @@
 #include "Renderer/RHI/Object/ShaderModule.h"
 #include "Platform/GenericPlatformFile.h"
 
-// TODO : temp method to load file for shader
-static bool LoadFileToArray(TArray<TBYTE>& buffer, const FPath& filename)
-{
-	auto PlatformFile = FGenericPlatformFile::Get(EPlatformFileType::Disk);
-	if (PlatformFile)
-	{
-		auto Buffer = PlatformFile->LoadAsByteArray(filename);
-		if (Buffer.Num())
-		{
-			buffer = MoveTemp(Buffer);
-			// Log
-			HLVM_LOG(LogRHI, info, TXT("Loaded shader file: {0}"), *FString(filename));
-			return true;
-		}
-	}
-	return false;
-}
-
 bool FShaderModule::InitializeFromFile(
 	const FPath&	  InFilePath,
 	nvrhi::ShaderType InShaderType,
@@ -39,9 +21,9 @@ bool FShaderModule::InitializeFromFile(
 
 	// Read shader bytecode
 	TArray<TBYTE> FileContent;
-	if (!::LoadFileToArray(FileContent, *InFilePath))
+	if (!FFileSystem::LoadFileToArray(FileContent, InFilePath))
 	{
-		HLVM_LOG(LogRHI, err, TXT("Failed to load shader file: {0}"), *FString(InFilePath));
+		HLVM_LOG(LogRHI, err, TXT("Failed to load shader file: {0}"), *(InFilePath));
 		return false;
 	}
 
@@ -49,7 +31,7 @@ bool FShaderModule::InitializeFromFile(
 	nvrhi::ShaderDesc Desc;
 	Desc.setShaderType(ShaderType);
 	Desc.entryName = EntryPointName;
-	ShaderHandle = Device->createShader(Desc, FileContent.GetData(), FileContent.Num() * sizeof(TCHAR));
+	ShaderHandle = Device->createShader(Desc, FileContent.GetData(), FileContent.NumBytes());
 	HLVM_ENSURE_F(ShaderHandle, TXT("Failed to create shader"));
 
 	return true;

@@ -35,8 +35,8 @@ bool FDeviceManagerVk::PickPhysicalDevice()
 	std::stringstream errorStream;
 	errorStream << "Cannot find suitable Vulkan device:";
 
-	std::vector<vk::PhysicalDevice> discreteGPUs;
-	std::vector<vk::PhysicalDevice> otherGPUs;
+	TVector<vk::PhysicalDevice> discreteGPUs;
+	TVector<vk::PhysicalDevice> otherGPUs;
 
 	for (const auto& dev : devices)
 	{
@@ -182,8 +182,10 @@ SwapChainSupportDetails FDeviceManagerVk::QuerySwapChainSupport(vk::PhysicalDevi
 {
 	SwapChainSupportDetails details;
 	details.capabilities = InDevice.getSurfaceCapabilitiesKHR(*surface);
-	details.formats = InDevice.getSurfaceFormatsKHR(*surface);
-	details.presentModes = InDevice.getSurfacePresentModesKHR(*surface);
+	auto formats = InDevice.getSurfaceFormatsKHR(*surface);
+	details.formats = TVector<vk::SurfaceFormatKHR>(formats.begin(), formats.end());
+	auto presentModes = InDevice.getSurfacePresentModesKHR(*surface);
+	details.presentModes = TVector<vk::PresentModeKHR>(presentModes.begin(), presentModes.end());
 	return details;
 }
 
@@ -231,7 +233,7 @@ bool FDeviceManagerVk::CreateLogicalDevice()
 	}
 
 	float								   queuePriority = 1.0f;
-	std::vector<vk::DeviceQueueCreateInfo> queueCreateInfos;
+	TVector<vk::DeviceQueueCreateInfo> queueCreateInfos;
 	for (uint32_t queueFamily : uniqueQueueFamilies)
 	{
 		queueCreateInfos.push_back(

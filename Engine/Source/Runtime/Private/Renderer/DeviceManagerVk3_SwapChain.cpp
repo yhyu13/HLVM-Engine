@@ -34,8 +34,17 @@ nvrhi::IFramebuffer* FDeviceManagerVk::GetFramebuffer(TUINT32 Index)
 {
 	// ensure
 	HLVM_ENSURE(Index < m_Framebuffers.size());
-	return m_Framebuffers[Index];
-}
+		return m_Framebuffers[Index];
+	}
+
+	nvrhi::ITexture* FDeviceManagerVk::GetDepthTexture(TUINT32 Index)
+	{
+		if (Index < m_DepthTextures.size())
+		{
+			return m_DepthTextures[Index].Get();
+		}
+		return nullptr;
+	}
 
 void FDeviceManagerVk::ResizeSwapChain()
 {
@@ -159,12 +168,36 @@ bool FDeviceManagerVk::CreateSwapChain()
 		m_SwapChainImages.push_back(sci);
 	}
 
+	// Create depth textures for each swapchain image
+	m_DepthTextures.reserve(m_SwapChainImages.size());
+	for (size_t i = 0; i < m_SwapChainImages.size(); i++)
+	{
+		nvrhi::TextureDesc depthDesc;
+		depthDesc.width = extent.width;
+		depthDesc.height = extent.height;
+			depthDesc.format = nvrhi::Format::D32;
+		depthDesc.debugName = "Depth texture";
+		depthDesc.initialState = nvrhi::ResourceStates::DepthWrite;
+		depthDesc.keepInitialState = true;
+		depthDesc.isRenderTarget = true;
+		depthDesc.setDimension(nvrhi::TextureDimension::Texture2D);
+
+		nvrhi::TextureHandle depthTexture = m_NvrhiDevice->createTexture(depthDesc);
+		if (!depthTexture)
+		{
+			HLVM_LOG(LogRHI, critical, TXT("Failed to create depth texture %zu"), static_cast<TUINT32>(i));
+			return false;
+		}
+		m_DepthTextures.push_back(depthTexture);
+	}
+
 	// Create framebuffers for each swapchain image
 	m_Framebuffers.reserve(m_SwapChainImages.size());
 	for (size_t i = 0; i < m_SwapChainImages.size(); i++)
 	{
 		nvrhi::FramebufferDesc fbDesc = nvrhi::FramebufferDesc()
-											.addColorAttachment(m_SwapChainImages[i].rhiHandle);
+												.addColorAttachment(m_SwapChainImages[i].rhiHandle)
+												.setDepthAttachment(m_DepthTextures[i]);
 
 		nvrhi::FramebufferHandle fb = m_NvrhiDevice->createFramebuffer(fbDesc);
 		if (!fb)
@@ -193,17 +226,21 @@ void FDeviceManagerVk::DestroySwapChain()
 	// Destroy framebuffers
 	m_Framebuffers.clear();
 
-	while (!m_SwapChainImages.empty())
+	// Destroy depth textures
+	m_DepthTextures.clear();
+
+	// Destroy swapchain
+	swapChain.reset();
+
+	// Destroy swapchain images
+	for (auto& sci : m_SwapChainImages)
 	{
-		auto sci = m_SwapChainImages.back();
-		m_SwapChainImages.pop_back();
 		sci.rhiHandle = nullptr;
 	}
-
-	swapChain.reset();
+	m_SwapChainImages.clear();
 }
 
-vk::SurfaceFormatKHR FDeviceManagerVk::ChooseSwapSurfaceFormat(const std::vector<vk::SurfaceFormatKHR>& availableFormats)
+vk::SurfaceFormatKHR FDeviceManagerVk::ChooseSwapSurfaceFormat(const TVector<vk::SurfaceFormatKHR>& availableFormats)
 {
 	auto perferredFormat = vk::Format(nvrhi::vulkan::convertFormat(DeviceParams.SwapChainFormat));
 	for (const auto& availableFormat : availableFormats)
@@ -218,7 +255,7 @@ vk::SurfaceFormatKHR FDeviceManagerVk::ChooseSwapSurfaceFormat(const std::vector
 	return availableFormats[0];
 }
 
-vk::PresentModeKHR FDeviceManagerVk::ChooseSwapPresentMode(const std::vector<vk::PresentModeKHR>& availablePresentModes)
+vk::PresentModeKHR FDeviceManagerVk::ChooseSwapPresentMode(const TVector<vk::PresentModeKHR>& availablePresentModes)
 {
 	vk::PresentModeKHR presentMode;
 	switch (DeviceParams.VSyncMode)

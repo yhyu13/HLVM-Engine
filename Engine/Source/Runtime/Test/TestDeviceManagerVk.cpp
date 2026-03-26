@@ -43,6 +43,8 @@ using namespace std;
 // CONFIGURATION
 // =============================================================================
 
+	#define USING_INDEX 0
+
 const uint32_t	   WIDTH = 800;
 const uint32_t	   HEIGHT = 600;
 static const char* WINDOW_TITLE = "DeviceManagerVk Integration Test";
@@ -115,7 +117,6 @@ static void CreateDeviceManager(FDeviceManagerVkTestContext& Context)
 	DeviceParams.bEnableNVRHIValidationLayer = HLVM_BUILD_DEBUG;
 	DeviceParams.bEnableRayTracingExtensions = true;
 
-
 	// Create window, device, and swapchain
 	if (!Context.DeviceManager->CreateWindowDeviceAndSwapChain(WindowProps))
 	{
@@ -175,8 +176,16 @@ static void CreateNVRHIResources(FDeviceManagerVkTestContext& Context)
 		->Update(Context.NvrhiCommandList, Vertices, sizeof(Vertices));
 	Context.VertexBuffer->SetDebugName(TXT("DynamicTriangleVertexBuffer"));
 
-	// We don't need index buffer for simple triangle
-	// Context.IndexBuffer = ...;
+	#if USING_INDEX
+	// Create Index buffer
+	uint32_t Indices[] = { 0, 1, 2 };
+	Context.IndexBuffer = TUniquePtr<FDynamicIndexBuffer>(new FDynamicIndexBuffer());
+	static_cast<FDynamicIndexBuffer*>(Context.IndexBuffer.get())
+		->Initialize(Context.NvrhiDevice, sizeof(Indices), nvrhi::Format::R32_UINT);
+	static_cast<FDynamicIndexBuffer*>(Context.IndexBuffer.get())
+		->Update(Context.NvrhiCommandList, Indices, sizeof(Indices));
+	Context.IndexBuffer->SetDebugName(TXT("DynamicTriangleIndexBuffer"));
+	#endif
 
 	Context.NvrhiCommandList->close();
 	Context.NvrhiDevice->executeCommandList(Context.NvrhiCommandList);
@@ -295,6 +304,7 @@ static void CreateRenderPipeline(FDeviceManagerVkTestContext& Context)
 		.setVertexShader(Context.VertexShader)
 		.setPixelShader(Context.FragmentShader)
 		.addBindingLayout(Context.BindingLayout);
+	PipelineDesc.renderState.rasterState.setCullBack();
 	// Caveat : YuHang must explicitly disable depth test/write if fb does not have such attacment
 	// Disable depth stencil since framebuffer does not have depth stencil as well
 	// Otherwise vk will complain 'The depth-stencil state indicates that depth or stencil operations are used, but the framebuffer info has no depth format.'
@@ -408,16 +418,31 @@ RECORD_BOOL(test_DeviceManagerVk_Integration)
 					.setOffset(0);
 				State.addVertexBuffer(VBBinding);
 
+	#if USING_INDEX
+				// Set index buffer binding
+				nvrhi::IndexBufferBinding IBBinding;
+				IBBinding.setBuffer(Ctx.IndexBuffer->GetBufferHandle().Get())
+					.setFormat(nvrhi::Format::R32_UINT)
+					.setOffset(0);
+				State.setIndexBuffer(IBBinding);
+	#endif
 				// Set viewport and scissor
 				nvrhi::Viewport Viewport(0, float(WIDTH), 0, float(HEIGHT), 0.0f, 1.0f);
 				State.viewport.addViewportAndScissorRect(Viewport);
 
 				Ctx.NvrhiCommandList->setGraphicsState(State);
 
+	#if USING_INDEX == 0
 				// Draw (using vertices directly)
 				nvrhi::DrawArguments DrawArgs;
 				DrawArgs.setVertexCount(3);
 				Ctx.NvrhiCommandList->draw(DrawArgs);
+	#else
+				// Draw (using indices)
+				nvrhi::DrawArguments DrawArgs;
+				DrawArgs.setVertexCount(3);
+				Ctx.NvrhiCommandList->drawIndexed(DrawArgs);
+	#endif
 
 				// Execute command list and wait for completion
 				// This ensures rendering completes before DeviceManager presents

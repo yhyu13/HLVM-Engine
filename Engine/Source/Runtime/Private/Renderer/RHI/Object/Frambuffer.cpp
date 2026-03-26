@@ -137,7 +137,7 @@ FFramebuffer* FFramebufferManager::CreateFramebuffer(const TCHAR* Name)
 
 	// Create new framebuffer
 	auto Framebuffer = TUniquePtr<FFramebuffer>(new FFramebuffer());
-	Framebuffer->Initialize(Device);
+	Framebuffer->Initialize(Device.Get());
 	Framebuffer->SetDebugName(Name);
 
 	// Add to pool

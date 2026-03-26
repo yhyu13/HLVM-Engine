@@ -35,13 +35,65 @@
 
 // TODO : set all container growth factor to 1
 template <typename T, size_t N, typename Allocator = boost::container::new_allocator<T>>
-using TSmallVector = boost::container::small_vector<T, N, Allocator>;
+class TSmallVector : public boost::container::small_vector<T, N, Allocator>
+{
+public:
+	// Inheriting constructors
+	// https://stackoverflow.com/a/434784
+	using boost::container::small_vector<T, N, Allocator>::small_vector;
+
+	TUINT32 Num32() const
+	{
+		HLVM_ASSERT(this->size() <= S_C(size_t, TUINT32_MAX));
+		return S_C(TUINT32, this->size());
+	}
+
+	TUINT64 Num() const
+	{
+		return this->size();
+	}
+
+	T* GetData() const
+	{
+		return this->data();
+	}
+
+	const T* GetDataConst() const
+	{
+		return this->data();
+	}
+
+	T* LastData() const
+	{
+		if (this->size() > 0)
+		{
+			return C_C(T*, &(this->back()));
+		}
+		else
+		{
+			return nullptr;
+		}
+	}
+
+	void Add(const T& Value)
+	{
+		this->push_back(Value);
+	}
+
+	void Add(T&& Value)
+	{
+		this->push_back(Value);
+	}
+};
 
 template <typename T, typename Allocator = boost::container::new_allocator<T>>
-using TSmallVector32 = boost::container::small_vector<T, 32, Allocator>;
+using TSmallVector8 = TSmallVector<T, 8, Allocator>;
 
 template <typename T, typename Allocator = boost::container::new_allocator<T>>
-using TSmallVector64 = boost::container::small_vector<T, 64, Allocator>;
+using TSmallVector32 = TSmallVector<T, 32, Allocator>;
+
+template <typename T, typename Allocator = boost::container::new_allocator<T>>
+using TSmallVector64 = TSmallVector<T, 64, Allocator>;
 
 template <typename T>
 class TVectorView : public std::span<T>
@@ -548,6 +600,28 @@ public:
 		this->clear();
 		this->reserve(NewCapacity);
 		HLVM_ASSERT(this->capacity() >= NewCapacity);
+	}
+
+	TVector<Key> Keys() const
+	{
+		TVector<Key> Keys;
+		Keys.Reserve(this->size());
+		for (auto& Pair : *this)
+		{
+			Keys.Add(Pair.first);
+		}
+		return Keys;
+	}
+
+	TVector<Value> Values() const
+	{
+		TVector<Value> Values;
+		Values.Reserve(this->size());
+		for (auto& Pair : *this)
+		{
+			Values.Add(Pair.second);
+		}
+		return Values;
 	}
 };
 
