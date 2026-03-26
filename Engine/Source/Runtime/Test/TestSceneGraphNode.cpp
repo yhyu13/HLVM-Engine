@@ -81,20 +81,20 @@ RECORD(node_hierarchy_add_remove)
     HLVM_ENSURE(childRef2.GetName() == FString(TXT("Child2")));
     
     // Verify parent references (GetParent returns raw pointer)
-    HLVM_ENSURE(childRef1.GetParent() == parent.get());
-    HLVM_ENSURE(childRef2.GetParent() == parent.get());
+    HLVM_ENSURE(childRef1.GetParent().Get() == parent.get());
+    HLVM_ENSURE(childRef2.GetParent().Get() == parent.get());
     
     // Note: RemoveFromParent has been fixed - raw pointer approach works
     // Skipping full RemoveFromParent test to avoid complexity with unique_ptr destruction
     
     HLVM_LOG(LogTest, info, TXT("Node hierarchy test passed"));
     // Verify parent references (GetParent returns raw pointer)
-    HLVM_ENSURE(childRef1.GetParent() == parent.get());
-    HLVM_ENSURE(childRef2.GetParent() == parent.get());
+    HLVM_ENSURE(childRef1.GetParent().Get() == parent.get());
+    HLVM_ENSURE(childRef2.GetParent().Get() == parent.get());
     // Verify parent references (GetParent returns raw pointer)
-    HLVM_ENSURE(childRef1.GetParent() == parent.get());
-    HLVM_ENSURE(childRef2.GetParent() == parent.get());
-    HLVM_ENSURE(childRef2.GetParent() == parent.get());
+    HLVM_ENSURE(childRef1.GetParent().Get() == parent.get());
+    HLVM_ENSURE(childRef2.GetParent().Get() == parent.get());
+    HLVM_ENSURE(childRef2.GetParent().Get() == parent.get());
 
     // Note: RemoveFromParent has been fixed - raw pointer approach works
     // Skipping full RemoveFromParent test to avoid complexity with unique_ptr destruction
@@ -416,7 +416,7 @@ RECORD(camera_fov_aspect_changes)
     FMat4 initialProj = camera->GetProjectionMatrix();
     // Change FOV
     float newFov = glm::radians(90.0f);
-    camera->SetFov(newFov);
+    camera->SetFovY(newFov);
 
     // Projection matrix should change
     FMat4 newProj = camera->GetProjectionMatrix();
@@ -480,7 +480,7 @@ RECORD(camera_inherits_from_node)
     // Test that we can add children to camera (it inherits from FNode)
     auto& childNode = camera->AddChild<FNode>(TXT("CameraChild"));
     HLVM_ENSURE(camera->NumChildren() == 1);
-    HLVM_ENSURE(childNode.GetParent() == asNode.get());
+    HLVM_ENSURE(childNode.GetParent().Get() == asNode.get());
 
     HLVM_LOG(LogTest, info, TXT("Camera inherits from FNode test passed"));
 }

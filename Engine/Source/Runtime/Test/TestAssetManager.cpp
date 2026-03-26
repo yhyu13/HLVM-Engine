@@ -322,7 +322,7 @@ RECORD(resmanager_sync_load)
 		return MS1<TArray<TBYTE>>(buffer.begin(), buffer.end());
 	};
 
-	FResMan<Resource>* manager = FResMan<Resource>::GetInstance();
+	TNoNullablePtr<FResMan<Resource>> manager = FResMan<Resource>::GetInstance();
 	manager->SetLoadFromFileFunc(loadFunc);
 
 	const FString resName = TXT("test_resource");
@@ -361,7 +361,7 @@ RECORD(resmanager_async_loading)
 		return MS1<TArray<TBYTE>>(buffer.begin(), buffer.end());
 	};
 
-	FResMan<Resource>* manager = FResMan<Resource>::GetInstance();
+	TNoNullablePtr<FResMan<Resource>> manager = FResMan<Resource>::GetInstance();
 	manager->SetLoadFromFileFunc(loadFunc);
 
 	const FString resName = TXT("async_res");
@@ -403,7 +403,7 @@ RECORD(resmanager_duplicate_prevention)
 		return MS1<TArray<TBYTE>>(buffer.begin(), buffer.end());
 	};
 
-	FResMan<Resource>* manager = FResMan<Resource>::GetInstance();
+	TNoNullablePtr<FResMan<Resource>> manager = FResMan<Resource>::GetInstance();
 	manager->SetLoadFromFileFunc(loadFunc);
 
 	const FString name1 = TXT("res_one");
@@ -434,7 +434,7 @@ RECORD(resmanager_promise_fulfillment)
 
 	using Resource = TArray<TBYTE>;
 
-	FResMan<Resource>* manager = FResMan<Resource>::GetInstance();
+	TNoNullablePtr<FResMan<Resource>> manager = FResMan<Resource>::GetInstance();
 
 	// Ask for resource before setting up load function
 	FResMan<Resource>::Handle handle = manager->TryGet(TXT("deferred_res"));
@@ -484,7 +484,7 @@ RECORD(resmanager_thread_safety)
 		return MS1<TArray<TBYTE>>(buffer.begin(), buffer.end());
 	};
 
-	FResMan<Resource>* manager = FResMan<Resource>::GetInstance();
+	TNoNullablePtr<FResMan<Resource>> manager = FResMan<Resource>::GetInstance();
 	manager->SetLoadFromFileFunc(loadFunc);
 
 	const FPath tempFile = TXT("./ts.bin");
@@ -540,7 +540,7 @@ RECORD(resmanager_handle_semantics)
 		return MS1<TArray<TBYTE>>(buffer.begin(), buffer.end());
 	};
 
-	FResMan<Resource>* manager = FResMan<Resource>::GetInstance();
+	TNoNullablePtr<FResMan<Resource>> manager = FResMan<Resource>::GetInstance();
 	manager->SetLoadFromFileFunc(loadFunc);
 
 	const FPath tempFile = TXT("./hs.bin");
@@ -598,7 +598,7 @@ RECORD(integration_both_modules)
 				ResPtr)
 			{
 				// Callback would typically signal UI update
-				FResMan<Resource>* rscMgr = FResMan<Resource>::GetInstance();
+				TNoNullablePtr<FResMan<Resource>> rscMgr = FResMan<Resource>::GetInstance();
 				rscHandle = rscMgr->AddResource(
 					TXT("transferred"),
 					FilePath, ResPtr);
@@ -609,7 +609,7 @@ RECORD(integration_both_modules)
 		FAssetLoader::Options{ true, false });
 
 	// Use res manager to load from file as well
-	FResMan<Resource>* rscMgr = FResMan<Resource>::GetInstance();
+	TNoNullablePtr<FResMan<Resource>> rscMgr = FResMan<Resource>::GetInstance();
 	rscMgr->SetLoadFromFileFunc(resourceLoadFunc);
 
 	FResMan<Resource>::Handle rscHandle = rscMgr->LoadFromFile(

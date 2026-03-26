@@ -64,7 +64,7 @@
 		#define MI_UNLIKELY(x) (x)
 	#endif
 
-	#define MI_DEBUG 1
+	#define MI_DEBUG 0
 	#if MI_DEBUG
 		#include "Template/PrintTemplate.tpp"
 	#endif
@@ -380,7 +380,8 @@ namespace mi
 		uint8_t padding1[5] = {};
 
 		uintptr_t cookie = 0;
-		uint8_t	  padding2[8] = {};
+		uint8_t	  padding2[4] = {};
+		size_t reserved_size = 0;  // Actual reserved size for Huge segments
 
 		Page pages[mi_config::SMALL_PAGES_PER_SEGMENT];
 
@@ -1107,40 +1108,59 @@ namespace mi
 		size = detail::align_up(size, os::page_size());
 		size = detail::align_up(size, mi_config::SEGMENT_ALIGN);
 
-		Segment* seg = allocate_segment(PageKind::Huge, size);
-		if (!seg)
+		constexpr int MAX_RETRIES = 3;
+
+		for (int retry = 0; retry < MAX_RETRIES; ++retry)
 		{
+			Segment* seg = allocate_segment(PageKind::Huge, size);
+			if (!seg)
+			{
+			#if MI_DEBUG
+				StreamPrintf(&std::cout, "mi_warn %s:%s retry %d for size %zu\n",
+							mi_private::EErrorCode::allocate_huge_fail_alloc, retry, size,
+							thread_id, ++mi_private::terro);
+			#endif
+				// Collect delayed frees and retry
+				collect_delayed_free();
+				continue;
+			}
+
+			{
+				std::lock_guard<std::mutex> lock(segments_mutex_);
+				segments_.push_back(seg);
+			}
+
+			Page* page = &seg->pages[0];
+			page->kind = PageKind::Huge;
+			page->state = PageState::Active;
+			page->thread_id = thread_id;
+			page->block_size = static_cast<uint16_t>(size & 0xFFFF);
+
+			if (!os::commit(seg->data_start(), size))
+			{
+			#if MI_DEBUG
+				StreamPrintf(&std::cout, "mi_warn %s:%s retry %d for size %zu\n",
+							mi_private::EErrorCode::allocate_huge_fail_commit, retry, size,
+							thread_id, ++mi_private::terro);
+			#endif
+				// Release the segment and retry
+				free_segment(seg);
+				collect_delayed_free();
+				continue;
+			}
+
+			stats.alloc_count.fetch_add(1, std::memory_order_relaxed);
+			stats.bytes_allocated.fetch_add(size, std::memory_order_relaxed);
+
+			return seg->data_start();
+		}
+
+		// All retries exhausted
 	#if MI_DEBUG
-			StreamPrintf(&std::cout, "mi_err %s:%s (%s,%s)\n", mi_private::EErrorCode::allocate_huge_fail_alloc, size,
+		StreamPrintf(&std::cout, "mi_err %s:%s (%s,%s)\n", mi_private::EErrorCode::allocate_huge_fail_alloc, size,
 				thread_id, ++mi_private::terro);
 	#endif
-			return nullptr;
-		}
-
-		{
-			std::lock_guard<std::mutex> lock(segments_mutex_);
-			segments_.push_back(seg);
-		}
-
-		Page* page = &seg->pages[0];
-		page->kind = PageKind::Huge;
-		page->state = PageState::Active;
-		page->thread_id = thread_id;
-		page->block_size = static_cast<uint16_t>(size & 0xFFFF);
-
-		if (!os::commit(seg->data_start(), size))
-		{
-	#if MI_DEBUG
-			StreamPrintf(&std::cout, "mi_err %s:%s (%s,%s)\n", mi_private::EErrorCode::allocate_huge_fail_commit, size,
-				thread_id, ++mi_private::terro);
-	#endif
-			return nullptr;
-		}
-
-		stats.alloc_count.fetch_add(1, std::memory_order_relaxed);
-		stats.bytes_allocated.fetch_add(size, std::memory_order_relaxed);
-
-		return seg->data_start();
+		return nullptr;
 	}
 
 	[[nodiscard]] inline Segment* Heap::allocate_segment(PageKind kind, size_t huge_size) noexcept
@@ -1190,6 +1210,7 @@ namespace mi
 		seg->kind = kind;
 		seg->segment_id = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(seg) >> 22);
 		seg->cookie = enable_security ? security::generate_cookie() : 0;
+		seg->reserved_size = (kind == PageKind::Huge) ? size : mi_config::SEGMENT_SIZE;
 
 		if (kind == PageKind::Small)
 		{
@@ -1275,7 +1296,7 @@ namespace mi
 		}
 
 		std::destroy_at(seg);
-		os::release(seg, mi_config::SEGMENT_SIZE);
+		os::release(seg, seg->reserved_size);
 	}
 
 	inline void Heap::cleanup() noexcept

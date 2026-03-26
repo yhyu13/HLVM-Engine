@@ -135,6 +135,13 @@ void test_concurrent() {
     for (auto& t : threads) t.join();
     assert(success_count == THREADS);
     
+    // Report fragmentation state after concurrent stress
+    auto info = Mallocator::instance().get_debug_info();
+    std::cout << "  Memory state after concurrent: "
+              << info.pages_active << " pages active, "
+              << info.segments_active << " segments, "
+              << info.bytes_committed << " bytes committed" << std::endl;
+    
     std::cout << "  PASSED (" << alloc_count.load() << " allocations)" << std::endl;
 }
 
@@ -221,6 +228,13 @@ void test_large_huge() {
     std::cout << "Running test_large_huge..." << std::endl;
     
     Mallocator& alloc = Mallocator::instance();
+    
+    // Report fragmentation state before large allocations
+    auto info = alloc.get_debug_info();
+    std::cout << "  Memory state: "
+              << info.pages_active << " pages active, "
+              << info.segments_active << " segments, "
+              << info.bytes_committed << " bytes committed" << std::endl;
     
     void* large = alloc.allocate(100000);
     assert(large != nullptr);
@@ -310,12 +324,12 @@ int main() {
     
     try {
         test_basic_allocation();
+        test_large_huge();  // Run early, before concurrent fragments memory
         test_size_classes();
         test_temporal_cadence();
         test_concurrent();
         test_cpp_allocator();
         test_realloc();
-        test_large_huge();
         test_alignment();
         test_bulk_free();
         test_statistics();

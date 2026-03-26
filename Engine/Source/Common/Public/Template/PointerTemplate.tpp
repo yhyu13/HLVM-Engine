@@ -115,6 +115,7 @@ struct TNoNullablePtr
 	using Type = T;
 	using ValueType = T*;
 
+	~TNoNullablePtr() = default;
 	TNoNullablePtr() = default;
 	explicit TNoNullablePtr(std::nullptr_t)
 	{
@@ -127,7 +128,6 @@ struct TNoNullablePtr
 			HLVM_SEGFAULT_INLINE();
 		}
 	}
-	~TNoNullablePtr() = default;
 	TNoNullablePtr(const TNoNullablePtr& other)
 		: m_ptr(other.m_ptr)
 	{
@@ -163,6 +163,16 @@ struct TNoNullablePtr
 			HLVM_SEGFAULT_INLINE();
 		}
 		return *(handle.m_ptr);
+	}
+
+	TNoNullablePtr& operator=(T* other)
+	{
+		m_ptr = other;
+		if (m_ptr == nullptr)
+		{
+			HLVM_SEGFAULT_INLINE();
+		}
+		return *this;
 	}
 
 	TNoNullablePtr& operator=(const TNoNullablePtr& other)
@@ -234,12 +244,12 @@ struct TNullablePtr
 	using Type = T;
 	using ValueType = T*;
 
+	~TNullablePtr() = default;
 	TNullablePtr() = default;
-	TNullablePtr(T* handle)
+	explicit TNullablePtr(T* handle)
 		: m_ptr(handle)
 	{
 	}
-	~TNullablePtr() = default;
 	TNullablePtr(const TNullablePtr& other)
 		: m_ptr(other.m_ptr)
 	{
@@ -270,16 +280,6 @@ struct TNullablePtr
 		return m_ptr != nullptr;
 	}
 
-	operator bool() const
-	{
-		return m_ptr != nullptr;
-	}
-
-	explicit operator T*() const
-	{
-		return m_ptr;
-	}
-
 	friend T& operator*(const TNullablePtr& handle)
 	{
 		if (handle.m_ptr == nullptr)
@@ -292,6 +292,12 @@ struct TNullablePtr
 	TNullablePtr& operator=(std::nullptr_t)
 	{
 		m_ptr = nullptr;
+		return *this;
+	}
+
+	TNullablePtr& operator=(T* other)
+	{
+		m_ptr = other;
 		return *this;
 	}
 
@@ -331,6 +337,16 @@ struct TNullablePtr
 			m_ptr = SC1<TNoNullablePtr<U>::ValueType>(other.Get());
 		}
 		return *this;
+	}
+
+	operator bool() const
+	{
+		return m_ptr != nullptr;
+	}
+
+	explicit operator T*() const
+	{
+		return m_ptr;
 	}
 
 	T* Get() const
