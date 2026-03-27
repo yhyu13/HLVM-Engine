@@ -5,33 +5,27 @@
 #pragma once
 
 #include "MallocatorDefinition.h"
-#include "MiMallocator.h"
-#include "MiMallocator2.h"
-#include "StdMallocator.h"
+#include "IMallocator.h"
 
 #include "Core/Assert.h"
 #include "Template/PointerTemplate.tpp"
 
-#ifndef HLVM_STACK_MALLOCATOR_DEFAULT_SIZE
-	#define HLVM_STACK_MALLOCATOR_DEFAULT_SIZE 64 * 1024
-#endif
-
 /**
  * General purpose Stack allocator
  */
-template <int32_t N = HLVM_STACK_MALLOCATOR_DEFAULT_SIZE, // max size is N
+template <int32_t N = 64 * 1024, // max size is N
 	bool		  bMonolithic = false,					  // whether the allocator is monolithic growing or reuse blocks
 	bool		  bDefragment = true,					  // whether to defragment neighbor free blocks bubbles of the stack
-	bool		  bAllowOverflowToHeap = true,			  // whether to compensate allocation from the heap when stack cannot allocate
-	bool		  bUseHeapForAlignedAlloc = false,		  // whether to use aligned alloc from heap
+//	bool		  bAllowOverflowToHeap = true,			  // whether to compensate allocation from the heap when stack cannot allocate
+//	bool		  bUseHeapForAlignedAlloc = false,		  // whether to use aligned alloc from heap
 	bool		  bValidate = HLVM_MALLOC_VALIDATION>
-class TStackMallocator final : public IMallocator
+class TStackMallocator2 final : public IMallocator
 {
 public:
 	using SizeType = int32_t;
 
-	NOCOPYMOVE(TStackMallocator);
-	TStackMallocator() noexcept
+	NOCOPYMOVE(TStackMallocator2);
+	TStackMallocator2() noexcept
 	{
 		Type = EMallocator::Stack;
 		Reset();
@@ -80,11 +74,11 @@ public:
 	}
 	HLVM_NODISCARD HLVM_INLINE_FUNC virtual void* MallocAligned(size_t size, size_t align) noexcept(false) final override
 	{
-		if constexpr (bUseHeapForAlignedAlloc)
-		{
-			return HLVM_LOW_GMALLOC_TLS.MallocAligned(size, align);
-		}
-		else
+//		if constexpr (bUseHeapForAlignedAlloc)
+//		{
+//			return HLVM_LOW_GMALLOC_TLS.MallocAligned(size, align);
+//		}
+//		else
 		{
 			size = AlignUp(size, align);
 			return InternalMalloc(size);
@@ -92,11 +86,11 @@ public:
 	}
 	HLVM_NODISCARD HLVM_INLINE_FUNC virtual void* MallocAligned2(size_t size, size_t align) noexcept final override
 	{
-		if constexpr (bUseHeapForAlignedAlloc)
-		{
-			return HLVM_LOW_GMALLOC_TLS.MallocAligned2(size, align);
-		}
-		else
+//		if constexpr (bUseHeapForAlignedAlloc)
+//		{
+//			return HLVM_LOW_GMALLOC_TLS.MallocAligned2(size, align);
+//		}
+//		else
 		{
 			size = AlignUp(size, align);
 			return InternalMalloc(size);
@@ -110,24 +104,24 @@ public:
 	{
 		return InternalFree(ptr);
 	}
-	HLVM_NODISCARD HLVM_INLINE_FUNC virtual EFreeRetType FreeAligned(void* ptr, size_t align) noexcept final override
+	HLVM_NODISCARD HLVM_INLINE_FUNC virtual EFreeRetType FreeAligned(void* ptr, size_t /*align*/) noexcept final override
 	{
-		if constexpr (bUseHeapForAlignedAlloc)
-		{
-			return HLVM_LOW_GMALLOC_TLS.FreeAligned(ptr, align);
-		}
-		else
+//		if constexpr (bUseHeapForAlignedAlloc)
+//		{
+//			return HLVM_LOW_GMALLOC_TLS.FreeAligned(ptr, align);
+//		}
+//		else
 		{
 			return InternalFree(ptr);
 		}
 	}
-	HLVM_NODISCARD HLVM_INLINE_FUNC virtual EFreeRetType FreeSizeAligned(void* ptr, size_t size, size_t align) noexcept final override
+	HLVM_NODISCARD HLVM_INLINE_FUNC virtual EFreeRetType FreeSizeAligned(void* ptr, size_t /*size*/, size_t /*align*/) noexcept final override
 	{
-		if constexpr (bUseHeapForAlignedAlloc)
-		{
-			return HLVM_LOW_GMALLOC_TLS.FreeSizeAligned(ptr, size, align);
-		}
-		else
+//		if constexpr (bUseHeapForAlignedAlloc)
+//		{
+//			return HLVM_LOW_GMALLOC_TLS.FreeSizeAligned(ptr, size, align);
+//		}
+//		else
 		{
 			return InternalFree(ptr);
 		}
@@ -249,11 +243,11 @@ private:
 			HLVM_CONSTEXPR_ASSERT(bValidate, mFreeSizeUpperBound >= 0);
 		}
 		// Running out of free blocks in stack, try heap
-		if constexpr (bAllowOverflowToHeap)
-		{
-			return HLVM_LOW_GMALLOC_TLS.Malloc(_size);
-		}
-		else
+//		if constexpr (bAllowOverflowToHeap)
+//		{
+//			return HLVM_LOW_GMALLOC_TLS.Malloc(_size);
+//		}
+//		else
 		{
 			return nullptr;
 		}
@@ -419,10 +413,10 @@ private:
 		}
 		else
 		{
-			if constexpr (bAllowOverflowToHeap)
-			{
-				return HLVM_LOW_GMALLOC_TLS.Free(ptr);
-			}
+//			if constexpr (bAllowOverflowToHeap)
+//			{
+//				return HLVM_LOW_GMALLOC_TLS.Free(ptr);
+//			}
 		}
 		return EFreeRetType::NotOwned;
 	}
@@ -437,9 +431,3 @@ private:
 	FBlock*	 mTail;
 	SizeType mFreeSizeUpperBound;
 };
-
-/**
- * We create a monolithic specialization of stack allocator
- */
-template <int32_t N = HLVM_STACK_MALLOCATOR_DEFAULT_SIZE>
-using TStackMonolithicAllocator = TStackMallocator<N, true>;

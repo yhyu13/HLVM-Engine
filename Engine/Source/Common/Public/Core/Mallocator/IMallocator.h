@@ -12,6 +12,7 @@
 HLVM_ENUM(EMallocator, TUINT8,
 	Std,
 	Mimalloc,
+	MiMalloc2,
 	Stack,
 	VMArena,
 	Unknow);

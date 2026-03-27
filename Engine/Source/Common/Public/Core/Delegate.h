@@ -55,4 +55,6 @@ public:
 	 * @brief OnMallocatorShutdown
 	 */
 	HLVM_INLINE_VAR HLVM_STATIC_VAR FDelegate<void*> OnMallocatorShutdown;
+
+	// Extend 
 };

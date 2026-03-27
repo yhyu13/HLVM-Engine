@@ -3,6 +3,7 @@
  */
 
 #include "Core/Mallocator/MiMallocator.h"
+#include "Core/Mallocator/MiMallocator2.h"
 #include "Core/Mallocator/StdMallocator.h"
 #include "Core/Mallocator/StackMallocator.h"
 #include "Core/Log.h"
@@ -38,8 +39,6 @@
 #else
 	#define CALLOC(p, n) ((void)0)
 #endif
-
-DECLARE_LOG_CATEGORY(LogMiMallocator)
 
 /**
  * Mallocator time cost statistics
@@ -80,7 +79,7 @@ void FinlMallocator() // Extern
 	FMallocatorShutdownCtx Ctx;
 	CoreDelegates::OnMallocatorShutdown.Invoke(&Ctx);
 
-	HLVM_LOG(LogMiMallocator, info, TXT("Mallocator summary:\nNumber of malloc: {}\nPer malloc time {} micro sec\nTotal time on malloc {} micro sec\nNumber of free: {}\nPer free time {} micro sec\nTotal time on free {} micro sec\nRemain to be free: {}"),
+	HLVM_LOG(LogTemp, info, TXT("Mallocator summary:\nNumber of malloc: {}\nPer malloc time {} micro sec\nTotal time on malloc {} micro sec\nNumber of free: {}\nPer free time {} micro sec\nTotal time on free {} micro sec\nRemain to be free: {}"),
 		GMallocCounter.load(),
 		GMallocDurationCounter.load() / static_cast<double>(GMallocCounter.load()),
 		GMallocDurationCounter.load(),
@@ -90,6 +89,7 @@ void FinlMallocator() // Extern
 		GMallocCounter.load() - GFreeCounter.load());
 }
 
+// Move definition to cpp file instead of header
 bool FMiMallocator::Owned(void* ptr) noexcept
 {
 	try

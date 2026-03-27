@@ -5,6 +5,7 @@
 #pragma once
 
 #include "MiMallocator.h"
+#include "MiMallocator2.h"
 #include "StdMallocator.h"
 
 #ifndef HVLM_MALLOCATOR_DEATIL_TRACE

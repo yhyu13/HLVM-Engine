@@ -69,6 +69,8 @@
 		#include "Template/PrintTemplate.tpp"
 	#endif
 
+	#include "Core/Mallocator/StackMallocator2.h"
+
 namespace mi_private
 {
 	// extern
@@ -98,7 +100,9 @@ namespace mi_private
 		using propagate_on_container_move_assignment = std::true_type;
 		using is_always_equal = std::false_type;
 
-		StackAllocator() noexcept = default;
+		StackAllocator() noexcept
+		{
+		}
 
 		template <typename U>
 		StackAllocator(const StackAllocator<U>&) noexcept {}
@@ -200,8 +204,8 @@ namespace mi
 		[[nodiscard]] inline uint32_t get_thread_id() noexcept
 		{
 			static std::atomic<uint32_t> counter{ 1 };
-			thread_local uint32_t tid = []() {
-				return counter.fetch_add(1, std::memory_order_relaxed);
+			thread_local uint32_t		 tid = []() {
+				   return counter.fetch_add(1, std::memory_order_relaxed);
 			}();
 			return tid;
 		}
@@ -381,7 +385,7 @@ namespace mi
 
 		uintptr_t cookie = 0;
 		uint8_t	  padding2[4] = {};
-		size_t reserved_size = 0;  // Actual reserved size for Huge segments
+		size_t	  reserved_size = 0; // Actual reserved size for Huge segments
 
 		Page pages[mi_config::SMALL_PAGES_PER_SEGMENT];
 
@@ -1115,11 +1119,11 @@ namespace mi
 			Segment* seg = allocate_segment(PageKind::Huge, size);
 			if (!seg)
 			{
-			#if MI_DEBUG
+	#if MI_DEBUG
 				StreamPrintf(&std::cout, "mi_warn %s:%s retry %d for size %zu\n",
-							mi_private::EErrorCode::allocate_huge_fail_alloc, retry, size,
-							thread_id, ++mi_private::terro);
-			#endif
+					mi_private::EErrorCode::allocate_huge_fail_alloc, retry, size,
+					thread_id, ++mi_private::terro);
+	#endif
 				// Collect delayed frees and retry
 				collect_delayed_free();
 				continue;
@@ -1138,11 +1142,11 @@ namespace mi
 
 			if (!os::commit(seg->data_start(), size))
 			{
-			#if MI_DEBUG
+	#if MI_DEBUG
 				StreamPrintf(&std::cout, "mi_warn %s:%s retry %d for size %zu\n",
-							mi_private::EErrorCode::allocate_huge_fail_commit, retry, size,
-							thread_id, ++mi_private::terro);
-			#endif
+					mi_private::EErrorCode::allocate_huge_fail_commit, retry, size,
+					thread_id, ++mi_private::terro);
+	#endif
 				// Release the segment and retry
 				free_segment(seg);
 				collect_delayed_free();
@@ -1158,7 +1162,7 @@ namespace mi
 		// All retries exhausted
 	#if MI_DEBUG
 		StreamPrintf(&std::cout, "mi_err %s:%s (%s,%s)\n", mi_private::EErrorCode::allocate_huge_fail_alloc, size,
-				thread_id, ++mi_private::terro);
+			thread_id, ++mi_private::terro);
 	#endif
 		return nullptr;
 	}
@@ -1517,6 +1521,7 @@ namespace mi
 			if (heap)
 			{
 				heap->cleanup();
+				tl_heap_ = nullptr;
 			}
 		}
 
@@ -1658,7 +1663,6 @@ namespace mi
 				mi_private::StackAllocator<Heap> alloc;
 				alloc.destroy(h);
 				alloc.deallocate(h, 1);
-				// delete h; //TODO
 			}
 		}
 
