@@ -66,14 +66,14 @@ public:
 	virtual bool ShouldClose() = 0;
 
 	/**
+	 * @brief Requests to close the window
+	 */
+	virtual void SetShouldClose() = 0;
+
+	/**
 	 * @brief Handles the processing of all underlying window events
 	 */
 	virtual void ProcessEvents() = 0;
-
-	/**
-	 * @brief Requests to close the window
-	 */
-	virtual void Close() = 0;
 
 	/**
 	 * @return The dot-per-inch scale factor

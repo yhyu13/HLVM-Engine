@@ -133,6 +133,31 @@ public:
 	void SetPosition(const FVec3& NewPosition);
 	void SetRotation(const FVec3& NewRotation);
 	void SetScale(const FVec3& NewScale);
+	/**
+	 * @brief Set world position - computes local via inverse parent transform
+	 * @param NewWorldPosition New world space position
+	 */
+	void SetWorldPosition(const FVec3& NewWorldPosition);
+	/**
+	 * @brief Set world rotation - computes local via inverse parent transform
+	 * @param NewWorldRotation New world space rotation (Euler angles in radians)
+	 */
+	void SetWorldRotation(const FVec3& NewWorldRotation);
+	/**
+	 * @brief Set world scale - computes local via parent inverse
+	 * @param NewWorldScale New world space scale
+	 */
+	void SetWorldScale(const FVec3& NewWorldScale);
+	/**
+	 * @brief Set world transform matrix - decomposes to local TRS
+	 * @param NewWorldTransform New world transform matrix
+	 */
+	void SetWorldTransform(const FMat4& NewWorldTransform);
+	/**
+	 * @brief Set local transform matrix - decomposes to Position/Rotation/Scale
+	 * @param NewLocalTransform New local transform matrix
+	 */
+	void SetLocalTransform(const FMat4& NewLocalTransform);
 	void SetSceneData(std::shared_ptr<FScene3DNode> NewSceneData) { SceneData = std::move(NewSceneData); }
 
 	/**

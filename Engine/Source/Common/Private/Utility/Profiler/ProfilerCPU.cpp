@@ -12,7 +12,7 @@
 
 #include "Utility/Profiler/ProfilerCPU.h"
 
-#if HLVM_COMPILE_WITH_PROFILER
+#if HLVM_PROFILER_COMPILE
 
 /**
  * TLS Wrapper for FTrackedThread, used later as tls object to hold FTrackedThread

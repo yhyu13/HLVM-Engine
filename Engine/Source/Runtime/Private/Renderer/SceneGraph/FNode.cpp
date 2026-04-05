@@ -200,6 +200,134 @@ void FNode::SetScale(const FVec3& NewScale)
 	HLVM_LOG(LogSceneGraph, debug, TXT("Set scale of '{}' to {}"), Name, ::ToString(NewScale));
 }
 
+void FNode::SetWorldPosition(const FVec3& NewWorldPosition)
+{
+	if (Parent)
+	{
+		FMat4 parentInverse = glm::inverse(Parent->GetWorldTransform());
+		FVec4 localPos = parentInverse * FVec4(NewWorldPosition, 1.0f);
+		SetPosition(FVec3(localPos.x, localPos.y, localPos.z));
+	}
+	else
+	{
+		SetPosition(NewWorldPosition);
+	}
+	HLVM_LOG(LogSceneGraph, debug, TXT("Set world position of '{}' to {}"), Name, ::ToString(NewWorldPosition));
+}
+
+void FNode::SetWorldRotation(const FVec3& NewWorldRotation)
+{
+	if (Parent)
+	{
+		Parent->UpdateWorldTransform();
+		FQuat worldRotQuat = glm::quat(NewWorldRotation);
+		FQuat parentWorldRot = glm::quat(Parent->GetWorldTransform());
+		FQuat parentInverseRot = glm::inverse(parentWorldRot);
+		FQuat localRotQuat = parentInverseRot * worldRotQuat;
+		FVec3 localRot = glm::eulerAngles(localRotQuat);
+		SetRotation(localRot);
+	}
+	else
+	{
+		SetRotation(NewWorldRotation);
+	}
+	HLVM_LOG(LogSceneGraph, debug, TXT("Set world rotation of '{}' to {}"), Name, ::ToString(NewWorldRotation));
+}
+
+void FNode::SetWorldScale(const FVec3& NewWorldScale)
+{
+	if (Parent)
+	{
+		Parent->UpdateWorldTransform();
+		auto parentDecomp = Parent->GetDecomposedTransform();
+		FVec3 parentScale = parentDecomp.Scale;
+		FVec3 localScale;
+		localScale.x = parentScale.x != 0.0f ? NewWorldScale.x / parentScale.x : NewWorldScale.x;
+		localScale.y = parentScale.y != 0.0f ? NewWorldScale.y / parentScale.y : NewWorldScale.y;
+		localScale.z = parentScale.z != 0.0f ? NewWorldScale.z / parentScale.z : NewWorldScale.z;
+		SetScale(localScale);
+	}
+	else
+	{
+		SetScale(NewWorldScale);
+	}
+	HLVM_LOG(LogSceneGraph, debug, TXT("Set world scale of '{}' to {}"), Name, ::ToString(NewWorldScale));
+}
+
+void FNode::SetWorldTransform(const FMat4& NewWorldTransform)
+{
+	FVec3 scale;
+	FQuat rotation;
+	FVec3 translation;
+	FVec3 skew;
+	FVec4 perspective;
+
+	if (glm::decompose(NewWorldTransform, scale, rotation, translation, skew, perspective))
+	{
+		FVec3 worldRotEuler = glm::eulerAngles(rotation);
+
+		if (Parent)
+		{
+			Parent->UpdateWorldTransform();
+			FMat4 parentInverse = glm::inverse(Parent->GetWorldTransform());
+
+			FVec4 localPos = parentInverse * FVec4(translation, 1.0f);
+
+			FQuat parentWorldRot = glm::quat(Parent->GetWorldTransform());
+			FQuat parentInverseRot = glm::inverse(parentWorldRot);
+			FQuat localRotQuat = parentInverseRot * rotation;
+			FVec3 localRotEuler = glm::eulerAngles(localRotQuat);
+
+			auto parentDecomp = Parent->GetDecomposedTransform();
+			FVec3 parentScale = parentDecomp.Scale;
+			FVec3 localScale;
+			localScale.x = parentScale.x != 0.0f ? scale.x / parentScale.x : scale.x;
+			localScale.y = parentScale.y != 0.0f ? scale.y / parentScale.y : scale.y;
+			localScale.z = parentScale.z != 0.0f ? scale.z / parentScale.z : scale.z;
+
+			Position = FVec3(localPos.x, localPos.y, localPos.z);
+			Rotation = localRotEuler;
+			Scale = localScale;
+		}
+		else
+		{
+			Position = translation;
+			Rotation = worldRotEuler;
+			Scale = scale;
+		}
+
+		MarkDirty();
+	}
+	else
+	{
+		HLVM_LOG(LogSceneGraph, warn, TXT("Failed to decompose world transform for node '{}'"), Name);
+	}
+	HLVM_LOG(LogSceneGraph, debug, TXT("Set world transform of '{}'"), Name);
+}
+
+void FNode::SetLocalTransform(const FMat4& NewLocalTransform)
+{
+	FVec3 scale;
+	FQuat rotation;
+	FVec3 translation;
+	FVec3 skew;
+	FVec4 perspective;
+
+	if (glm::decompose(NewLocalTransform, scale, rotation, translation, skew, perspective))
+	{
+		Position = translation;
+		Rotation = glm::eulerAngles(rotation);
+		Scale = scale;
+		MarkDirty();
+	}
+	else
+	{
+		HLVM_LOG(LogSceneGraph, warn, TXT("Failed to decompose local transform for node '{}'"), Name);
+	}
+	HLVM_LOG(LogSceneGraph, debug, TXT("Set local transform of '{}'"), Name);
+}
+
+
 FNode::FDecomposedTransform FNode::GetDecomposedTransform() const
 {
 	FDecomposedTransform result;

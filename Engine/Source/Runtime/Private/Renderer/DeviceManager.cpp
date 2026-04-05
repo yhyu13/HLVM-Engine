@@ -60,3 +60,83 @@ void FNVRHIMessageCallback::message(nvrhi::MessageSeverity severity, const char*
 			break;
 	}
 }
+
+// =============================================================================
+// RENDER PASS MANAGEMENT
+// =============================================================================
+
+void FDeviceManager::AddRenderPassToFront(TSharedPtr<IRenderPass> pass)
+{
+	HLVM_ASSERT(pass != nullptr);
+	HLVM_ASSERT(!m_bIsRendering && "Cannot modify render pass list during Render()");
+
+	m_vRenderPasses.insert(m_vRenderPasses.begin(), pass);
+}
+
+void FDeviceManager::AddRenderPassToBack(TSharedPtr<IRenderPass> pass)
+{
+	HLVM_ASSERT(pass != nullptr);
+	HLVM_ASSERT(!m_bIsRendering && "Cannot modify render pass list during Render()");
+
+	m_vRenderPasses.push_back(pass);
+}
+
+void FDeviceManager::RemoveRenderPass(TSharedPtr<IRenderPass> pass)
+{
+	HLVM_ASSERT(pass != nullptr);
+	HLVM_ASSERT(!m_bIsRendering && "Cannot modify render pass list during Render()");
+
+	for (auto it = m_vRenderPasses.begin(); it != m_vRenderPasses.end(); ++it)
+	{
+		if (*it == pass)
+		{
+			m_vRenderPasses.erase(it);
+			return;
+		}
+	}
+}
+
+void FDeviceManager::RunMessageLoop()
+{
+	FGLFW3Window* glfwWindow = static_cast<FGLFW3Window*>(WindowHandle.get());
+
+	float previousTime = static_cast<float>(glfwGetTime());
+
+	while (!glfwWindow->ShouldClose())
+	{
+		// Calculate delta time
+		float currentTime = static_cast<float>(glfwGetTime());
+		float deltaTime = currentTime - previousTime;
+		previousTime = currentTime;
+
+		// Poll GLFW events (keyboard, mouse, etc.)
+		glfwWindow->ProcessEvents();
+
+		// Call Animate on all render passes
+		for (auto& pass : m_vRenderPasses)
+		{
+			pass->Animate(deltaTime);
+		}
+
+		// Render each pass
+		m_bIsRendering = true;
+		HLVM_ENSURE(BeginFrame());
+		{
+			nvrhi::IFramebuffer* framebuffer = GetCurrentFramebuffer();
+			for (auto& pass : m_vRenderPasses)
+			{
+				pass->Render(framebuffer);
+			}
+		}
+		HLVM_ENSURE(EndFrame());
+		HLVM_ENSURE(Present());
+		GetDevice()->waitForIdle();
+		m_bIsRendering = false;
+	}
+}
+
+void FDeviceManager::StopMessageLoop()
+{
+	FGLFW3Window* glfwWindow = static_cast<FGLFW3Window*>(WindowHandle.get());
+	glfwWindow->SetShouldClose();
+}

@@ -121,25 +121,6 @@ taskflow = FindPackage(name='Taskflow',
 
 ##########################################################
 
-# Fetch the Yalantinglibs package from GitHub with the specified options
-yalantinlibs = FetchContent(name='yalantinglibs',
-                            git_repo_url='https://github.com/yhyu13/yalantinglibs.git',
-                            git_tag='abf6016a8f7841d29303ef68f118ea85b69a1051',
-                            # target_compile_options=[TargetDomainValueModel(target='yalantinglibs',
-                            #                                                domain=DomainEnum.INTERFACE,
-                            #                                                values=[#'-DYLT_ENABLE_PMR=ON',
-                            #                                                        #'-DIGUANA_ENABLE_PMR=ON',
-                            #                                                        '-DENABLE_PMR=ON',
-                            #                                                        '-DENABLE_STRUCT_PACK_OPTIMIZE=ON'])],
-                            option_overrides=[
-                                OptionOverrideModel(option='YLT_ENABLE_PMR', value='ON'),
-                                OptionOverrideModel(option='IGUANA_ENABLE_PMR', value='ON'),
-                                OptionOverrideModel(option='YLT_ENABLE_STRUCT_PACK_OPTIMIZE', value='ON')
-                            ],
-                            dependant_target_link_libs=[
-                                DomainValueModel(domain=DomainEnum.PUBLIC, values=['yalantinglibs::yalantinglibs'])]
-                            )
-
 # Fetch the parallel-hashmap package from GitHub with the specified options
 parallel_hashmap = FetchContent(name='parallel-hashmap',
                                 git_repo_url='https://github.com/yhyu13/parallel-hashmap.git',
@@ -157,22 +138,10 @@ ctre = FetchContent(name='ctre',
                                                                  values=['ctre::ctre'])]
                     )
 
-# TODO : TracyClient should be added as ThirdParty cpp like Effil.cpp
 # Fetch the Tracy package from GitHub with the specified options
 tracy = FetchContent(name='Tracy',
                      git_repo_url='https://github.com/yhyu13/tracy.git',
                      git_tag='58d112e89245ae1d6221aa2a4842e24f56df213d',
-                     # target_compile_options=[TargetDomainValueModel(target='TracyClient', domain=DomainEnum.INTERFACE,
-                     #                                                values=[
-                     #                                                    # '-DTRACY_ON_DEMAND=ON', On demand not work on Linux
-                     #                                                    '-DTRACY_ONLY_LOCALHOST=ON',
-                     #                                                    '-DTRACY_NO_FRAME_IMAGE=ON',
-                     #                                                    '-DTRACY_ONLY_IPV4=ON',
-                     #                                                    '-DTRACY_USE_RPMALLOC=ON',
-                     #                                                    # No exit will make client program wait unitl profiler finish, which prolong exit time especially for client release build
-                     #                                                    '-DTRACY_NO_EXIT=OFF',
-                     #                                                    '-DTRACY_LIBBACKTRACE_ELF_DYNLOAD_SUPPORT=ON',
-                     #                                                ])],
                      option_overrides=[
                          OptionOverrideModel(option='TRACY_ONLY_LOCALHOST', value='ON'),
                          OptionOverrideModel(option='TRACY_NO_FRAME_IMAGE', value='ON'),
@@ -204,8 +173,7 @@ class CommonModule(BaseModule):
                                                                              recursive=True)
                                                        ]),
                                                   unity_build=True),
-                         fetch_packages=[yalantinlibs,
-                                         parallel_hashmap,
+                         fetch_packages=[parallel_hashmap,
                                          ctre,
                                          tracy,
                                          ],
@@ -275,6 +243,9 @@ class CommonProject(BaseProject):
         self.global_interface.add_global_set('ENV{HTTPS_PROXY}', ["http://127.0.0.1:8889"])
         self.global_interface.add_global_set('ENV{http_proxy}', ["http://127.0.0.1:8889"])
         self.global_interface.add_global_set('ENV{https_proxy}', ["http://127.0.0.1:8889"])
+
+        # CMP0077 set to new in order for Cmake to respect our setted value for CMAKE >=3.14
+        self.global_interface.add_global_set('CMAKE_POLICY_DEFAULT_CMP0077', ['NEW'])
 
         # Linker
         if bBuildShared:

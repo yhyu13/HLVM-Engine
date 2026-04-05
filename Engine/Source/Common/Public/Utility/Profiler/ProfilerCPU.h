@@ -12,7 +12,7 @@
 
 #include "ProfilerDefinition.h"
 
-#if HLVM_COMPILE_WITH_PROFILER
+#if HLVM_PROFILER_COMPILE
 
 	#include "Core/Container/ContainerDefinition.h"
 	#include "Core/Mallocator/PMR.h"
@@ -224,7 +224,7 @@ struct FScopeEventCPU
 /**
  * Override these in each profiler backend
  */
-#if HLVM_COMPILE_WITH_PROFILER
+#if HLVM_PROFILER_COMPILE
 	/**
 	 * By default, cpu profiler will trigger event on every call,
 	 * which has potential of recursive calling that evatually run out of stack.
@@ -250,7 +250,7 @@ struct FScopeEventCPU
  * Memory Allocation macro for tracking memory allocation
  * Usually no need to override
  */
-#if HLVM_COMPILE_WITH_PROFILER
+#if HLVM_PROFILER_COMPILE
 	#define HLVM_PROFILER_CPU_ON_MALLOC(ptr, size) FProfilerCPU::OnMemMalloc(ptr, size)
 	#define HLVM_PROFILER_CPU_ON_FREE(ptr) FProfilerCPU::OnMemFree(ptr)
 #else
@@ -258,7 +258,7 @@ struct FScopeEventCPU
 	#define HLVM_PROFILER_CPU_ON_FREE(ptr) ((void)0)
 #endif
 
-#if HLVM_COMPILE_WITH_PROFILER
+#if HLVM_PROFILER_COMPILE
 	#define HLVM_PROFILER_CPU_ONOFF(cond)                    \
 		HLVM_SCOPED_VARIABLE(                                \
 			ScopedProfilerCPU,                               \

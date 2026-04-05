@@ -38,6 +38,9 @@ HLVM_EXTERN_VAR FPath	GExecutablePath;
  * Gperf enabled
  */
 HLVM_EXTERN_VAR bool GGperfEnabled;
+#define HLVM_ALLOW_GPERF_EXEC(...) __VA_ARGS__
+#else
+#define HLVM_ALLOW_GPERF_EXEC(...) void(0)
 #endif
 
 /**

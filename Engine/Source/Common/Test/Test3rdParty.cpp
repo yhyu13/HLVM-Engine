@@ -4,10 +4,6 @@
 
 #include "Test.h"
 
-#include <ylt/struct_pack.hpp>
-#include <ylt/struct_json/json_reader.h>
-#include <ylt/struct_json/json_writer.h>
-#include <ylt/thirdparty/async_simple/coro/Lazy.h>
 #include <spdlog/spdlog.h>
 #include <spdlog/async.h>
 #include <magic_enum_all.hpp>
@@ -47,86 +43,6 @@ RECORD(spdlog_test)
 	// remove (depending on SPDLOG_ACTIVE_LEVEL) the call on the release code.
 	SPDLOG_TRACE("Some trace message with param {}", 42);
 	SPDLOG_DEBUG("Some debug message");
-};
-
-struct json_person
-{
-	std::string name;
-	int			age;
-
-	bool operator==(const json_person& other) const
-	{
-		return name == other.name && age == other.age;
-	}
-};
-REFLECTION(json_person, name, age);
-
-RECORD(yalantinlibs_test)
-{
-	HLVM_PROFILE_CPU_NAMED("Yalantin_test");
-
-	HLVM_LOG(LogTest, info, TXT("Yalantin test"));
-	{
-		// Yalantin example
-		struct person
-		{
-			int64_t		id;
-			std::string name;
-			int			age;
-			double		salary;
-
-			bool operator==(const person& other) const
-			{
-				return id == other.id && name == other.name && age == other.age && salary == other.salary;
-			}
-		};
-
-		person person1{ .id = 1, .name = "hello struct pack", .age = 20, .salary = 1024.42 };
-
-		// one line code serialize
-		auto buffer = struct_pack::serialize(person1);
-
-		// one line code deserialization
-		person person2;
-		auto   ec = struct_pack::deserialize_to(person2, buffer.data(), buffer.size());
-		assert(!ec);
-		assert(person1 == person2);
-	}
-
-	{
-		json_person p{ .name = "tom", .age = 20 };
-		std::string str;
-		struct_json::to_json(p, str); // {"name":"tom","age":20}
-
-		json_person p1;
-		struct_json::from_json(p1, str);
-
-		assert(p == p1);
-	}
-	{
-		auto task1 = [](int x) -> async_simple::coro::Lazy<int> {
-			co_return x;
-		};
-		auto task2 = [&task1]() -> async_simple::coro::Lazy<> {
-			auto t = task1(10);
-			auto x = co_await t;
-			HLVM_ENSURE_F(x == 10, TXT("task2 failed."));
-			HLVM_LOG(LogTest, info, TXT("task2 completed successfully."));
-		};
-		auto func = [&task2]() -> async_simple::coro::Lazy<> {
-			co_await task2();
-		};
-		func().start([](async_simple::Try<void> Result) {
-			if (Result.hasError())
-			{
-				Result.value();
-			}
-			else
-			{
-				HLVM_LOG(LogTest, info, TXT("func completed successfully."));
-			}
-		});
-	}
 };
 
 RECORD(magic_enum_test)

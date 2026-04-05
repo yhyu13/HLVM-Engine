@@ -14,6 +14,7 @@
 #endif
 
 #include "Renderer/RHI/RHICommon.h"
+#include "Renderer/IRenderPass.h"
 
 /*-----------------------------------------------------------------------------
    Device Creation Parameters
@@ -35,15 +36,15 @@ struct FDeviceCreationParameters
 	TUINT32		  BackBufferSampleCount = 1; // optional HDR Framebuffer MSAA
 	TUINT32		  RefreshRate = 0;
 	TUINT32		  SwapChainBufferCount = hlvm_rhi::MAX_FRAMES_IN_FLIGHT; // SRS - default matches GPU frames, can be overridden by renderer
-	nvrhi::Format SwapChainFormat = nvrhi::Format::RGBA8_UNORM;		// RB: don't do the sRGB gamma ramp with the swapchain
+	nvrhi::Format SwapChainFormat = nvrhi::Format::RGBA8_UNORM;			 // RB: don't do the sRGB gamma ramp with the swapchain
 	TUINT32		  SwapChainSampleCount = 1;
 	TUINT32		  SwapChainSampleQuality = 0;
 	TINT32		  VSyncMode = 0;
 
 	// Feature flags
-	bool		  bEnableRayTracingExtensions = false; // for vulkan
-	bool		  bEnableComputeQueue = false;
-	bool		  bEnableCopyQueue = false;
+	bool bEnableRayTracingExtensions = false; // for vulkan
+	bool bEnableComputeQueue = false;
+	bool bEnableCopyQueue = false;
 
 	// Debug and validation
 	bool bEnableDebugRuntime = false;
@@ -108,9 +109,10 @@ public:
 	virtual void Shutdown() = 0;
 
 	// Window management
-	void		 GetWindowDimensions(TUINT32& OutWidth, TUINT32& OutHeight) const;
-	virtual void GetDPIScaleInfo(float& OutScaleX, float& OutScaleY) const = 0;
-	virtual void UpdateWindowSize(const FUInt2& Params) = 0;
+	void		  GetWindowDimensions(TUINT32& OutWidth, TUINT32& OutHeight) const;
+	virtual void  GetDPIScaleInfo(float& OutScaleX, float& OutScaleY) const = 0;
+	virtual void  UpdateWindowSize(const FUInt2& Params) = 0;
+	virtual void* GetGLFWWindow() const { return nullptr; }
 
 	// Rendering interface
 	virtual bool BeginFrame() = 0;
@@ -124,12 +126,12 @@ public:
 
 	virtual nvrhi::ITexture* GetCurrentBackBuffer() = 0;
 	virtual nvrhi::ITexture* GetBackBuffer(TUINT32 Index) = 0;
-	virtual TUINT32				 GetCurrentBackBufferIndex() = 0;
-	virtual TUINT32				 GetBackBufferCount() = 0;
+	virtual TUINT32			 GetCurrentBackBufferIndex() = 0;
+	virtual TUINT32			 GetBackBufferCount() = 0;
 	// Depth texture access
 	virtual nvrhi::ITexture* GetDepthTexture(TUINT32 Index) = 0;
 	// Framebuffer management
-	nvrhi::IFramebuffer* GetCurrentFramebuffer();
+	nvrhi::IFramebuffer*		 GetCurrentFramebuffer();
 	virtual nvrhi::IFramebuffer* GetFramebuffer(TUINT32 Index) = 0;
 
 	// Configuration
@@ -148,12 +150,28 @@ public:
 	virtual void GetEnabledVulkanInstanceExtensions(TVector<std::string>& /*OutExtensions*/) const {}
 	virtual void GetEnabledVulkanDeviceExtensions(TVector<std::string>& /*OutExtensions*/) const {}
 	virtual void GetEnabledVulkanLayers(TVector<std::string>& /*OutLayers*/) const {}
+
+	// ImGui integration - Vulkan handles
+	virtual void*  GetVkInstance() const { return nullptr; }
+	virtual void*  GetVkPhysicalDevice() const { return nullptr; }
+	virtual void*  GetVkDevice() const { return nullptr; }
+	virtual void*  GetGraphicsQueue() const { return nullptr; }
+	virtual void*  GetRenderPass() const { return nullptr; }
+	virtual void*  GetImGuiDescriptorPool() const { return nullptr; }
+	virtual TINT32 GetImGuiQueueFamilyIndex() const { return -1; }
 #endif
 
 	// OpenVR integration
 	virtual TINT32 GetGraphicsFamilyIndex() const { return -1; }
 
 	virtual ~FDeviceManager() = default;
+
+	// Render pass management
+	void AddRenderPassToFront(TSharedPtr<IRenderPass> pass);
+	void AddRenderPassToBack(TSharedPtr<IRenderPass> pass);
+	void RemoveRenderPass(TSharedPtr<IRenderPass> pass);
+	void RunMessageLoop();
+	void StopMessageLoop();
 
 protected:
 	// Construction
@@ -175,12 +193,15 @@ protected:
 	TINT32	RequestedVSync = 0;
 	TUINT32 FrameIndex = 0;
 
+	TVector<TSharedPtr<IRenderPass>> m_vRenderPasses;
+	bool							 m_bIsRendering = false;
+
 	// Framebuffer lifecycle management (called by derived classes)
-	virtual void OnBeforeSwapchainRecreate() {}
-	virtual void OnAfterSwapchainRecreate() {}
+	virtual void   OnBeforeSwapchainRecreate() {}
+	virtual void   OnAfterSwapchainRecreate() {}
 	::EGpuVendorID GetGPUVendor(TUINT32 VendorID) const;
-	void			  BackBufferResizing();
-	void			  BackBufferResized();
+	void		   BackBufferResizing();
+	void		   BackBufferResized();
 
 	// Pure virtual methods for derived classes
 	virtual bool CreateDeviceAndSwapChain() = 0;

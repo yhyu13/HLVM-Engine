@@ -337,6 +337,31 @@ bool FDeviceManagerVk::CreateLogicalDevice()
 
 	HLVM_LOG(LogRHI, info, TXT("Created Vulkan device: {}, API version: {}.{}.{}"), TO_TCHAR_CSTR(m_RendererString.c_str()), VK_VERSION_MAJOR(m_DeviceApiVersion), VK_VERSION_MINOR(m_DeviceApiVersion), VK_VERSION_PATCH(m_DeviceApiVersion));
 
+	// Create ImGui descriptor pool
+	// ImGui_ImplVulkan requires: 1x CombinedImageSampler, 1x Sampler, 1x UniformBuffer
+	TVector<vk::DescriptorPoolSize> poolSizes =
+	{
+		vk::DescriptorPoolSize(vk::DescriptorType::eCombinedImageSampler, 1),
+		vk::DescriptorPoolSize(vk::DescriptorType::eSampler, 1),
+		vk::DescriptorPoolSize(vk::DescriptorType::eUniformBuffer, 1)
+	};
+
+	vk::DescriptorPoolCreateInfo poolInfo;
+	poolInfo
+		.setPoolSizes(poolSizes)
+		.setMaxSets(1);
+
+	try
+	{
+		auto pool = device->createDescriptorPoolUnique(poolInfo);
+		m_ImGuiDescriptorPool = std::move(pool);
+		HLVM_LOG(LogRHI, info, TXT("Created ImGui descriptor pool"));
+	}
+	catch (std::system_error& e)
+	{
+		HLVM_LOG(LogRHI, err, TXT("Failed to create ImGui descriptor pool: {}"), TO_TCHAR_CSTR(e.what()));
+	}
+
 	return true;
 }
 

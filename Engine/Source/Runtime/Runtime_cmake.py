@@ -12,7 +12,9 @@ vcpkg_ctx_runtime = VcpkgContenxt(vcpkg_root_path='../Dependency/vcpkg',
                                                                     "glslang",
                                                                     "assimp",
                                                                     "bullet3",
-                                                                    "ktx"
+                                                                    "ktx",
+                                                                    VcpkgPackage(name="imgui", features=["glfw-binding"],
+                                                                                 default_features=True),
                                                                 ]))
 
 # 导入 Common_cmake.py 中的 vcpkg_ctx_common 变量
@@ -97,6 +99,13 @@ bullet3 = FindPackage(name='Bullet',
                                                                              ])
                       ])
 
+imgui = FindPackage(name='imgui',
+                   config=True,
+                   required=True,
+                   dependant_target_link_libs=[
+                       DomainValueModel(domain=DomainEnum.PUBLIC, values=['imgui::imgui'])
+                   ])
+
 ##########################################################
 
 # Fetch the parallel-hashmap package from GitHub with the specified options
@@ -131,7 +140,7 @@ class RuntimeModule(BaseModule):
                                                                              recursive=True)
                                                        ]),
                                                   unity_build=True, unity_build_exclusion_patterns=['*VulkanLoader*']),
-                         fetch_packages=[nvrhi
+                         fetch_packages=[nvrhi,
                                          ],
                          find_packages=[vulkan,
                                         glfw3,
@@ -140,7 +149,8 @@ class RuntimeModule(BaseModule):
                                         vulkan_memory_allocator,
                                         glslang,
                                         assimp,
-                                        bullet3
+                                        bullet3,
+                                        imgui,
                                         ]
                          )
         compile_options = [
@@ -211,6 +221,9 @@ class RuntimeProject(BaseProject):
         self.global_interface.add_global_set('ENV{HTTPS_PROXY}', ["http://127.0.0.1:8889"])
         self.global_interface.add_global_set('ENV{http_proxy}', ["http://127.0.0.1:8889"])
         self.global_interface.add_global_set('ENV{https_proxy}', ["http://127.0.0.1:8889"])
+
+        # CMP0077 set to new in order for Cmake to respect our setted value for CMAKE >=3.14
+        self.global_interface.add_global_set('CMAKE_POLICY_DEFAULT_CMP0077', ['NEW'])
 
         # Linker
         if bBuildShared:

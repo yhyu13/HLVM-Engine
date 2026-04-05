@@ -248,30 +248,29 @@ int main(int ac, char* av[])
 			cout << "options: verbosity override is " << GLogVerbosity
 				 << "\n";
 		}
+
+#if HLVM_ALLOW_GPERF
 		/**
 		 * Enable gperf
 		 */
-		if constexpr (HLVM_ALLOW_GPERF)
+		if (GVariableMap.count("gperf") && GVariableMap["gperf"].as<int>() == 1)
 		{
-			if (GVariableMap.count("gperf") && GVariableMap["gperf"].as<int>() == 1)
-			{
-				GGperfEnabled = true;
-				cout << "options: gperf 1"
-					 << "\n";
-			}
+			GGperfEnabled = true;
+			cout << "options: gperf 1"
+				 << "\n";
 		}
+#endif
+#if HLVM_PROFILER_COMPILE
 		/**
 		 * Enable cpu profiler by default
 		 */
-		if constexpr (HLVM_COMPILE_WITH_PROFILER)
+		if (GVariableMap.count("no-cpu-profile") && GVariableMap["no-cpu-profile"].as<int>() == 1)
 		{
-			if (GVariableMap.count("no-cpu-profile") && GVariableMap["no-cpu-profile"].as<int>() == 1)
-			{
-				FProfilerCPU::bEnabled = false;
-				cout << "options: no-cpu-profile 1"
-					 << "\n";
-			}
+			FProfilerCPU::bEnabled = false;
+			cout << "options: no-cpu-profile 1"
+				 << "\n";
 		}
+#endif
 	}
 	catch (std::exception& e)
 	{
@@ -293,25 +292,19 @@ int main(int ac, char* av[])
 		HLVM_SCOPED_VARIABLE(
 			Scoped,
 			[&] {
-				FProfilerCPU::OnFrameBegin();
-				if constexpr (HLVM_ALLOW_GPERF)
-				{
-					if (GGperfEnabled)
-					{
+				HLVM_PROFILER_EXEC(FProfilerCPU::OnFrameBegin());
+				HLVM_ALLOW_GPERF_EXEC(
+					if (GGperfEnabled) {
 						ProfilerStart(FString::Format(TXT("{}_{}"), GExecutableName, TXT("gperf.prof")));
-					}
-				}
+					});
 			},
 			[&] {
-				if constexpr (HLVM_ALLOW_GPERF)
-				{
-					if (GGperfEnabled)
-					{
+				HLVM_ALLOW_GPERF_EXEC(
+					if (GGperfEnabled) {
 						ProfilerStop();
-					}
-				}
-				FProfilerCPU::OnFrameEnd();
-				FProfilerCPU::Dispose();
+					});
+				HLVM_PROFILER_EXEC(FProfilerCPU::OnFrameEnd());
+				HLVM_PROFILER_EXEC(FProfilerCPU::Dispose());
 			});
 
 		// Run all registered test functions

@@ -132,6 +132,8 @@ void FDeviceManagerVk::DestroyDeviceAndSwapChain()
 
 	DestroySwapChain();
 
+	m_ImGuiDescriptorPool.reset();
+
 	m_NvrhiDevice = nullptr;
 	m_ValidationLayer = nullptr;
 	m_RendererString.clear();

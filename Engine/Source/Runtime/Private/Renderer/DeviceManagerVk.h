@@ -60,7 +60,7 @@ struct SwapChainSupportDetails
 	TVector<vk::PresentModeKHR>	  presentModes;
 };
 
-class FDeviceManagerVk final : public FDeviceManager
+class FDeviceManagerVk final : public FDeviceManager, public IGLFWInputCallbacks
 {
 public:
 	virtual ~FDeviceManagerVk() override;
@@ -71,6 +71,14 @@ public:
 	// Window management
 	virtual void GetDPIScaleInfo(float& OutScaleX, float& OutScaleY) const override;
 	virtual void UpdateWindowSize(const FUInt2& Params) override;
+
+	// IGLFWInputCallbacks - input routing to render passes
+	virtual bool OnKey(int key, int scancode, int action, int mods);
+	virtual bool OnChar(unsigned int unicode, int mods);
+	virtual bool OnMousePos(double xpos, double ypos);
+	virtual bool OnScroll(double xoffset, double yoffset);
+	virtual bool OnMouseButton(int button, int action, int mods);
+	virtual void SetInputCallbacks(GLFWwindow* window) override;
 
 	// Rendering interface
 	virtual bool BeginFrame() override;
@@ -88,16 +96,27 @@ public:
 	virtual nvrhi::ITexture*	 GetBackBuffer(TUINT32 Index) override;
 	virtual TUINT32				 GetCurrentBackBufferIndex() override;
 	virtual TUINT32				 GetBackBufferCount() override;
-	virtual nvrhi::ITexture* GetDepthTexture(TUINT32 Index) override;
+	virtual nvrhi::ITexture*	 GetDepthTexture(TUINT32 Index) override;
 
 	virtual void SetVSyncMode(TINT32 VSyncMode) override;
 
-	virtual bool IsVulkanInstanceExtensionEnabled(const char* ExtensionName) const override;
-	virtual bool IsVulkanDeviceExtensionEnabled(const char* ExtensionName) const override;
-	virtual bool IsVulkanLayerEnabled(const char* LayerName) const override;
-	virtual void GetEnabledVulkanInstanceExtensions(TVector<std::string>& OutExtensions) const override;
-	virtual void GetEnabledVulkanDeviceExtensions(TVector<std::string>& OutExtensions) const override;
-	virtual void GetEnabledVulkanLayers(TVector<std::string>& OutLayers) const override;
+	virtual bool   IsVulkanInstanceExtensionEnabled(const char* ExtensionName) const override;
+	virtual bool   IsVulkanDeviceExtensionEnabled(const char* ExtensionName) const override;
+	virtual bool   IsVulkanLayerEnabled(const char* LayerName) const override;
+	virtual void   GetEnabledVulkanInstanceExtensions(TVector<std::string>& OutExtensions) const override;
+	virtual void   GetEnabledVulkanDeviceExtensions(TVector<std::string>& OutExtensions) const override;
+	virtual void   GetEnabledVulkanLayers(TVector<std::string>& /*OutLayers*/) const override;
+	virtual TINT32 GetGraphicsFamilyIndex() const override;
+
+	// ImGui integration
+	virtual void*  GetGLFWWindow() const override;
+	virtual void*  GetVkInstance() const override;
+	virtual void*  GetVkPhysicalDevice() const override;
+	virtual void*  GetVkDevice() const override;
+	virtual void*  GetGraphicsQueue() const override;
+	virtual void*  GetRenderPass() const override;
+	virtual void*  GetImGuiDescriptorPool() const override;
+	virtual TINT32 GetImGuiQueueFamilyIndex() const override;
 
 	// Pure virtual methods for derived classes
 	virtual bool CreateDeviceAndSwapChain() override;
@@ -120,6 +139,9 @@ private:
 	vk::Queue presentQueue;
 	vk::Queue computeQueue;
 	vk::Queue transferQueue;
+
+	// ImGui descriptor pool
+	vk::UniqueDescriptorPool m_ImGuiDescriptorPool;
 
 	vk::UniqueSwapchainKHR swapChain;
 	vk::Format			   swapChainImageFormat;

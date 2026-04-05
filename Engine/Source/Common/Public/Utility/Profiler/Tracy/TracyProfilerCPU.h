@@ -12,7 +12,7 @@
 
 #include "TracyDefinition.h"
 
-#if HLVM_COMPILE_WITH_PROFILER
+#if HLVM_PROFILER_COMPILE
 	#if HLVM_PROFILER_USE_TRACY
 
 		#include "Utility/Profiler/ProfilerSrcLoc.h"
