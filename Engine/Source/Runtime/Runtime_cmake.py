@@ -13,7 +13,8 @@ vcpkg_ctx_runtime = VcpkgContenxt(vcpkg_root_path='../Dependency/vcpkg',
                                                                     "assimp",
                                                                     "bullet3",
                                                                     "ktx",
-                                                                    VcpkgPackage(name="imgui", features=["glfw-binding"],
+                                                                    VcpkgPackage(name="imgui",
+                                                                                 features=["glfw-binding"],
                                                                                  default_features=True),
                                                                 ]))
 
@@ -24,6 +25,7 @@ import os
 # 添加 Common_cmake.py 到 sys.path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from Common import Common_cmake
+import ShaderMakeBuild
 
 # 合并 vcpkg_ctx_common
 vcpkg_ctx_runtime.merge_vckpkg_context(Common_cmake.vcpkg_cxt_common)
@@ -100,18 +102,25 @@ bullet3 = FindPackage(name='Bullet',
                       ])
 
 imgui = FindPackage(name='imgui',
-                   config=True,
-                   required=True,
-                   dependant_target_link_libs=[
-                       DomainValueModel(domain=DomainEnum.PUBLIC, values=['imgui::imgui'])
-                   ])
+                    config=True,
+                    required=True,
+                    dependant_target_link_libs=[
+                        DomainValueModel(domain=DomainEnum.PUBLIC, values=['imgui::imgui'])
+                    ])
+
+ktx = FindPackage(name='Ktx',
+                  config=True,
+                  required=True,
+                  dependant_target_link_libs=[
+                      DomainValueModel(domain=DomainEnum.PUBLIC, values=['KTX::ktx'])
+                  ])
 
 ##########################################################
 
 # Fetch the parallel-hashmap package from GitHub with the specified options
 nvrhi = FetchContent(name='nvrhi',
                      git_repo_url='https://github.com/yhyu13/NVRHI.git',
-                     git_tag='2ac4b58c355f53827c2e1d0740849ce4d09d5dd6',
+                     git_tag='472f99ac68251970dc9e75afa1648c9bc4db7e83',
                      dependant_target_link_libs=[
                          # link nvrhi_vk before nvrhi otherwise link error
                          DomainValueModel(domain=DomainEnum.PUBLIC, values=['nvrhi_vk', 'nvrhi'])]
@@ -122,13 +131,14 @@ Global Config :
 """
 bThreadSanitizer = False  # Supers low performance, not even debuggable lol
 bBuildShared = False  # Not working on ubuntu/linux, shared lib is PITA
-bLinkByGold = True  # Using llvm GOLD linker for link time optimization
-bSSE41 = True # Enable SSE41 for GLM matrix decomposition
+bLinkByGold = False  # Using llvm GOLD linker for link time optimization
+bSSE41 = True  # Enable SSE41 for GLM matrix decomposition
 
 bVulkanNoPrototype = True  # True : Dynamic loading vk api on startup from shared lib
 # True : Use Vulkan SDK include path instead of system include path
 # False : Use system include path, but we may use wrong vulkan sdk version due to Ubuntu apt package management lag behind
 bVulkanSDKOVerridePath = True
+
 
 # Create a RuntimeModule object with the specified options
 class RuntimeModule(BaseModule):
@@ -139,7 +149,7 @@ class RuntimeModule(BaseModule):
                                                       [PyCMakeUtil.GlobModel(path='./Private/**/*.cpp',
                                                                              recursive=True)
                                                        ]),
-                                                  unity_build=True, unity_build_exclusion_patterns=['*VulkanLoader*']),
+                                                  unity_build=False, unity_build_exclusion_patterns=['*VulkanLoader*']),
                          fetch_packages=[nvrhi,
                                          ],
                          find_packages=[vulkan,
@@ -151,6 +161,7 @@ class RuntimeModule(BaseModule):
                                         assimp,
                                         bullet3,
                                         imgui,
+                                        ktx,
                                         ]
                          )
         compile_options = [
@@ -172,6 +183,9 @@ class RuntimeModule(BaseModule):
                                                    './../Common/Test'])  # for testing, we just need Common/Test/Test.h
         self.target_interface.add_include_dirs(domain=DomainEnum.PUBLIC,
                                                values=['./Public'])
+        # Local stb (before vcpkg to avoid vcpkg's modified stb_image.h)
+        self.target_interface.add_include_dirs(domain=DomainEnum.PUBLIC,
+                                               values=['./ThirdParty/stb'])
         self.target_interface.add_pch_files(domain=DomainEnum.PUBLIC,
                                             values=['./Public/Runtime.shared.pch'])
         self.target_interface.add_link_libs(domain=DomainEnum.PUBLIC, values=['Common'])
@@ -183,11 +197,28 @@ class RuntimeModule(BaseModule):
         if bVulkanNoPrototype:
             self.target_interface.add_compile_options(domain=DomainEnum.PUBLIC, values=['-DVK_NO_PROTOTYPES'])
 
+    def dump(self, fp):
+        # First dump the base module
+        super().dump(fp)
+        # Disable LTO for STBTextureLoader.cpp to prevent JPEG decoder stripping
+        # Use -fno-lto to compile without ThinLTO
+        # Use -Wl,-allow-multiple-definition to handle duplicate stb symbols with assimp
+        fp.write('\n')
+        fp.write('# Disable LTO for STBTextureLoader.cpp to preserve JPEG decoder\n')
+        fp.write('set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/Private/Renderer/Texture/STBTextureLoader.cpp\n')
+        fp.write('    PROPERTIES COMPILE_FLAGS "-fno-lto")\n')
+        fp.write('\n')
+        fp.write('# Allow multiple definitions of stb symbols (from assimp and local stb)\n')
+        fp.write('if(CMAKE_INTERPROCEDURAL_OPTIMIZATION)\n')
+        fp.write('    target_link_options(Runtime PRIVATE -Wl,-allow-multiple-definition)\n')
+        fp.write('endif()\n')
+
 
 # Create a RuntimeTestModule object with the specified options
 class RuntimeTestModule(BaseModule):
-    def __init__(self, cpp_path: str):
-        super().__init__(module=ModuleTargetModel(target=os.path.basename(cpp_path).split('.')[0],
+    def __init__(self, cpp_path: str, shader_data_dir: str = None):
+        test_name = os.path.basename(cpp_path).split('.')[0]
+        super().__init__(module=ModuleTargetModel(target=test_name,
                                                   type=ModuleEnum.EXECUTABLE_AND_TEST,
                                                   source_files=[cpp_path],
                                                   unity_build=False),
@@ -197,11 +228,52 @@ class RuntimeTestModule(BaseModule):
         self.target_interface.add_pch_files(domain=DomainEnum.REUSE_FROM,
                                             values=['Runtime'])
         self.target_interface.add_link_libs(domain=DomainEnum.PRIVATE, values=['Runtime'])
+        self.target_name = test_name  # Store for shader integration
+        self.shader_data_dir = shader_data_dir  # Store for shader integration
 
         if bBuildShared:
             # TODO : windows platform compatibility check!
             # https://gitlab.kitware.com/cmake/cmake/-/issues/20289
             self.target_interface.add_compile_options(domain=DomainEnum.PRIVATE, values=['-fPIC'])
+
+    def dump(self, fp):
+        # First dump the base module info (test executable)
+        super().dump(fp)
+        # Add linker flag to allow multiple definitions (for stb symbols from assimp and local stb)
+        if not bBuildShared:
+            fp.write('\n')
+            fp.write('# Allow multiple definitions when linking test with LTO\n')
+            fp.write('if(CMAKE_INTERPROCEDURAL_OPTIMIZATION)\n')
+            fp.write(f'    target_link_options({self.target_name} PRIVATE -Wl,-allow-multiple-definition)\n')
+            fp.write('endif()\n')
+
+        # Then dump shader build CMake code if this test has shader data
+        if self.shader_data_dir:
+            # Choose the right ShaderMake function based on target name
+            if "FullDeferredShading2" in self.target_name:
+                shader_cmake = ShaderMakeBuild.create_full_deferred_shading2_shadermake(self.target_name)
+            elif "RTShadowsGBuffer" in self.target_name:
+                shader_cmake = ShaderMakeBuild.create_rt_shadows_gbuffer_shadermake(self.target_name)
+            elif "SponzaDeferred" in self.target_name:
+                shader_cmake = ShaderMakeBuild.create_sponza_deferred_shadermake(self.target_name)
+            elif "RenderSponza" in self.target_name:
+                shader_cmake = ShaderMakeBuild.create_render_sponza_shadermake(self.target_name)
+            else:
+                shader_cmake = ShaderMakeBuild.create_deferred_shading_shadermake(self.target_name)
+            shader_cmake.dump(fp)
+            fp.write(f"add_dependencies({self.target_name} {self.target_name}_ShaderMake)\n")
+
+            # Create symlink for shader data directory in binary output directory
+            # This is needed because tests load shader data relative to executable path
+            shader_data_name = self.target_name + "_Data"
+            fp.write(f"\n")
+            fp.write(f"# Create symlink for shader data directory\n")
+            fp.write(f"add_custom_command(TARGET {self.target_name} POST_BUILD\n")
+            fp.write(f"    COMMAND ${{CMAKE_COMMAND}} -E create_symlink\n")
+            fp.write(f"        ${{CMAKE_SOURCE_DIR}}/Test/{shader_data_name}\n")
+            fp.write(f"        \"${{CMAKE_RUNTIME_OUTPUT_DIRECTORY}}/{shader_data_name}\"\n")
+            fp.write(f"    COMMENT \"Creating symlink for {shader_data_name}\"\n")
+            fp.write(f")\n")
 
 
 # Create a RuntimeProject object with the specified options
@@ -253,7 +325,8 @@ class RuntimeProject(BaseProject):
                                                               "$<$<CONFIG:RelWithDebInfo>:HLVM_BUILD_DEVELOPMENT=1>",
                                                               "$<$<CONFIG:Release>:HLVM_BUILD_RELEASE=1>",
                                                               "$<$<CONFIG:MinSizeRel>:HLVM_BUILD_RELEASE=1>",
-                                                              f"HLVM_COMMON_DYNAMIC_LINKED={bBuildShared * 1}"])
+                                                              f"HLVM_COMMON_DYNAMIC_LINKED={bBuildShared * 1}",
+                                                              f"HLVM_ROOT=$ENV{{HLVM_ROOT}}"])
 
         if bVulkanSDKOVerridePath:
             # env get $Vulkan_SDK
@@ -264,8 +337,24 @@ class RuntimeProject(BaseProject):
                 raise RuntimeError("Vulkan SDK 1.4.328.1 not found")
             self.global_interface.add_global_set('ENV{VULKAN_SDK}', [vulkan_sdk_path])
 
+        hlvm_root = os.getenv('HLVM_ROOT')
+        self.global_interface.add_global_set('ENV{HLVM_ROOT}', [hlvm_root])
+
         self.modules.append(RuntimeModule())
-        self.modules.extend([RuntimeTestModule(path) for path in glob.glob("./Test/*.cpp")])
+
+        # Add common shader compilation for shared Blit shaders
+        common_shaders = ShaderMakeBuild.create_common_shadermake()
+        self.modules.append(common_shaders)
+
+        # Create test modules - detect tests with shader data directories
+        for test_cpp in glob.glob("./Test/*.cpp"):
+            test_name = os.path.basename(test_cpp).split('.')[0]
+            # Check if this test has a shader data directory with ShaderMake.cfg
+            shader_data_dir = None
+            possible_data_dir = f"./Test/{test_name}_Data"
+            if os.path.isdir(possible_data_dir) and os.path.exists(os.path.join(possible_data_dir, "ShaderMake.cfg")):
+                shader_data_dir = possible_data_dir
+            self.modules.append(RuntimeTestModule(test_cpp, shader_data_dir))
 
 
 # Main function

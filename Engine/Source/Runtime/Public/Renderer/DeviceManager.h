@@ -112,6 +112,7 @@ public:
 	void		  GetWindowDimensions(TUINT32& OutWidth, TUINT32& OutHeight) const;
 	virtual void  GetDPIScaleInfo(float& OutScaleX, float& OutScaleY) const = 0;
 	virtual void  UpdateWindowSize(const FUInt2& Params) = 0;
+	virtual void  SetWindowTitle(const FString& InTitle) { WindowHandle->SetTitle(InTitle); }
 	virtual void* GetGLFWWindow() const { return nullptr; }
 
 	// Rendering interface

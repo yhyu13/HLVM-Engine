@@ -14,6 +14,9 @@ static_assert(sizeof(TCHAR) == sizeof(char), "TCHAR is not char in size");
 #define TXT(str) _U8_STRING(str)
 #define STRTIFY(x) TXT(#x)
 
+#define _LITERAL(x) #x
+#define LITERAL(x) _LITERAL(x)
+
 /**
  * Here we refer "cstr" as const pointer of some char type (char, char16_t, char32_t, wchar_t)
  */

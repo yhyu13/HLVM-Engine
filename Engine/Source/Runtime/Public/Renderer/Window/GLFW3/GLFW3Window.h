@@ -103,6 +103,7 @@ public:
 
 	virtual bool ShouldClose() override;
 	virtual void SetShouldClose() override;
+	virtual void SetTitle(const FString& InTitle) override;
 	virtual void ProcessEvents() override;
 
 	virtual TFP32 GetDPIScaleFactor() const override;

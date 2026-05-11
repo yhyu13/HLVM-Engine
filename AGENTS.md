@@ -2,292 +2,261 @@
 
 ## Build & Test Commands
 
-### Primary Build Script
 ```bash
-./GenerateCMakeProjects.sh    # Generate CMakeLists.txt files
-./Build.sh [OPTIONS]          # Build/test project
+./GenerateCMakeProjects.sh    # Generate CMakeLists.txt from PyCMake
+./Build.sh --Test              # Run ALL tests
+./Build.sh --Config=Debug --Target=TestSceneGraphNode --Test  # Single test
+./Build.sh --Rebuild --Test --TestRepeatNum=2  # Rebuild + repeat
 ```
 
-### Running Tests
-```bash
-# Run ALL tests (all configurations)
-./Build.sh --Test
+**Options**: `--Config=<Debug|RelWithDebInfo|Release>`, `--Target=<name>`, `--Test`, `--TestRepeatNum=N`, `--Jobs=N`, `--Clean`, `--Rebuild`, `--Verbose`, `--GraphViz`, `--GPerf`
 
-# Run single test by name
-./Build.sh --Config=Debug --Target=TestParallel --Test
-
-# Rebuild + test with repetition
-./Build.sh --Rebuild --Test --TestRepeatNum=2
-
-# Performance profiling
-./Build.sh --Config=RelWithDebInfo --GPerf --Target=TestMemory
-```
-
-### Available Options
-| Option | Description | Example |
-|--------|-------------|---------|
-| `--Config=<type>` | Debug/RelWithDebInfo/Release | `--Config=Debug` |
-| `--Target=<name>` | Specific test executable | `--Target=TestLogger` |
-| `--Test` | Run CTest after build | standalone flag |
-| `--TestRepeatNum=<N>` | Number of repetitions | `--TestRepeatNum=3` |
-| `--Jobs=<N>` | Parallel compilation jobs | `--Jobs=8` |
-| `--Verbose` | Show CMake output | standalone flag |
-
-**Warning**: Don't use `ctest -j N` (parallel ctest) - causes mallocator errors.
+**WARNING**: Don't use `ctest -j N` - causes mallocator errors.
 
 ---
 
-## Code Style Guidelines
+## Project Structure
 
-### Project Structure
 ```
 HLVM-Engine/
-├── Engine/
-│   ├── Source/Common/Public/     # Header-only interfaces
-│   ├── Source/Common/Private/    # Implementation
-│   └── Source/Runtime/           # Engine subsystems
-├── Binary/<Config>/              # Build outputs
-┗── Samples/                      # Demo applications
+├── Engine/Source/
+│   ├── Common/              # Shared utilities
+│   │   ├── Public/         # Header-only interfaces
+│   │   ├── Private/        # Implementation
+│   │   └── Test/           # Common tests
+│   └── Runtime/            # Engine runtime
+│       ├── Public/         # RHI, Window, SceneGraph
+│       ├── Private/        # DeviceManagerVk, etc.
+│       └── Test/           # Runtime tests
+├── Binary/                 # Build outputs
+├── Build/                  # CMake build dirs
+└── Samples/               # Asset files
 ```
 
-**Key**: Public/Private separation for modules (inspired by Unreal Engine)
+**Public/Private separation** (Unreal Engine pattern).
+
+---
+
+## Code Style
 
 ### Include Order
 ```cpp
-// 1. Project's own headers (in defined order)
 #pragma once
-#include "Core/String.h"
+#include "Core/String.h"           // 1. Project headers
 #include "Platform/PlatformDefinition.h"
 
-// 2. Standard Library
-#include <atomic>
+#include <atomic>                   // 2. Standard library
 #include <memory>
-#include <string>
 
-// 3. Third-party (Boost, external libs)
-#include <boost/container/vector.hpp>
-#include <spdlog/spdlog.h>
+#include <boost/container/vector.hpp>  // 3. Third-party
 ```
 
 ### Naming Conventions
-- **Classes**: PascalCase (`FString`, `FVulkanDevice`)
-- **Functions**: camelCase (`GetCurrentThreadId`, `RenderFrame`)
-- **Member Variables**: camelCase prefixed with `g_` or no prefix (`GMallocator`, `Width`)
-- **Macros**: UPPER_CASE (`DECLARE_LOG_CATEGORY`, `HLVM_LOG`)
-- **Types/Templates**: PascalCase with T prefix (`TFString`, `TSmallVector<T,N>`)
-- **Templates**: PascalCase with F prefix on free functions (`FFmtString`)
+| Element | Convention | Example |
+|---------|------------|---------|
+| Classes | PascalCase | `FString`, `FVulkanDevice` |
+| Functions | camelCase | `GetCurrentThreadId` |
+| Member vars | camelCase | `GMallocator`, `Width` |
+| Macros | UPPER_CASE | `DECLARE_LOG_CATEGORY` |
+| Types/Templates | PascalCase + T prefix | `TFString`, `TSmallVector<T,N>` |
 
-### Types & Types Aliases
-Use engine-defined type aliases (from `TypeDefinition.h`):
+### Types (from `TypeDefinition.h`)
 ```cpp
-typedef std::byte TBYTE;
 typedef std::uint8_t TUINT8;
 typedef std::int32_t TINT32;
 typedef std::uint64_t TUINT64;
-typedef double TFLOAT;        // Note: double precision!
+typedef double TFLOAT;  // Note: double precision!
 typedef std::basic_string<char8_t> FString;
-
 using FByteBuffer = std::span<TBYTE>;
 ```
 
-### Memory Patterns
-- Use `std::shared_ptr`/`TSharedPtr` for reference-counted objects
-- Prefer stack allocation where possible
-- Override global `new/delete` with custom allocator
-- Use `TMiMallocator` (mimalloc wrapper) as thread-local default
-- Avoid heap allocation in hot paths - use `FStackAllocator` for temporary allocations
-
 ### Error Handling
-- **NO exceptions** - disabled for performance
-- Use assertion macros instead:
-  ```cpp
-  HLVM_ASSERT(condition);                    // Development only
-  HLVM_ASSERT_F(condition, TXT("msg {}"), x);
-  HLVM_ENSURE(condition);                    // Always evaluated
-  HLVM_LOG(category, error, TXT("Error"));   // Runtime logging
-  ```
-- Custom exception throws program, prints stack trace
+**NO exceptions** - disabled for performance.
 
-### Formatting (based on clang-format implicit rules)
-- Indentation: 4 spaces per level
-- Brace style: Allman/breaking braces
-- Line length: ~120 chars (soft limit)
-- Trailing commas in struct/class definitions
-- No trailing whitespace
+```cpp
+HLVM_ASSERT(condition);                    // Dev only
+HLVM_ASSERT_F(condition, TXT("msg {}"), x); // Dev only with format
+HLVM_ENSURE(condition);                    // Always evaluated
+HLVM_LOG(LogCat, error, TXT("Error: {}"), val);
+```
+
+### Formatting
+- 4 spaces indent, Allman braces (breaking), ~120 char line length
+- Trailing commas in struct/class definitions, no trailing whitespace
 
 ---
 
-## Core Systems Reference
+## Critical Gotchas (MUST REMEMBER)
 
-### Logging System (UE5-style)
+### NVRHI Rendering
+1. **`constantBufferOffset` defaults to 256** - Set explicitly to 0 for GLSL binding 0:
+   ```cpp
+   VulkanBindingOffsets offsets;
+   offsets.constantBufferOffset = 0;
+   ```
+2. Buffers require `isConstantBuffer=true` + `keepInitialState=true`
+3. Depth clear: `ClearDepthStencilAttachment(cmd, fb, 1.0f, 0u)` NOT `ClearDepthAttachment`
+
+### FNode Scene Graph
 ```cpp
-// Declare log category
-DECLARE_LOG_CATEGORY(LogMyModule)
+auto& child = parentNode.AddChild<FNode>(TXT("ChildName"));
+child.SetPosition(FVec3(1, 2, 3));
+child.UpdateWorldTransform();  // MUST call after Set*
+```
+**Use `IsUpdating` flag** to prevent infinite recursion in transform propagation.
 
-// Use in code
-HLVM_LOG(LogMyModule, info, TXT("Message value: {}", val));
-HLVM_CLOG(cond, LogMyModule, warning, TXT("Warn: {}"), msg);
+### Camera Coordinates
+- Camera looks in **-Z direction** by default
+- For camera to see scene at z=-39, camera must be at z > -39
+- Use `MoveToAndLookAt(cameraPos, targetPos)` for orientation
+
+### GExecutablePath
+```cpp
+// WRONG: Points to CWD, not executable
+boost::filesystem::current_path()  // This IS GExecutablePath
+
+// CORRECT shader path:
+FString::Format(TXT("{}/../../Test/{}_Data"), *GExecutablePath, *GExecutableName);
+```
+
+### MiMalloc2 Thread Cleanup
+```cpp
+mi::Mallocator::thread_done();  // MUST call on thread exit
+```
+
+### Logging Macros
+**Available**: `HLVM_LOG`, `HLVM_CLOG`, `HLVM_CLOG_ELSE_FATAL`
+**NOT available**: `HLVM_LOG_F`, `HLVM_LOGF`
+```cpp
+HLVM_LOG(LogMyModule, info, TXT("Value: {}"), val);
+spdlog::level::critical  // correct enum, NOT 'crit'
+```
+
+### Matrix Operations
+- **COPY** matrices before comparing (not reference)
+- `SetFov()` modifies matrix in-place
+
+### shared_from_this Trap
+```cpp
+// WRONG: Object not owned by shared_ptr
+auto n = std::make_unique<Node>();
+n->shared_from_this(); // CRASH!
+
+// CORRECT: Use shared_ptr ownership
+auto sp = std::make_shared<Node>();
+sp->shared_from_this(); // OK
+```
+
+---
+
+## Core Systems
+
+### Logging
+```cpp
+DECLARE_LOG_CATEGORY(LogMyModule)
+HLVM_LOG(LogMyModule, info, TXT("Message: {}"), val);
+HLVM_CLOG(condition, LogMyModule, warning, TXT("Warn: {}"), msg);
 ```
 
 ### Console Variables (CVar)
 ```cpp
-// Define CVar (auto-generated from macro)
 AUTO_CVAR_BOOL(r_VSync, true, "Enable VSync", Saved)
 AUTO_CVAR_INT(r_MaxAnisotropy, 8, "Max anisotropic filtering", Saved)
-
-// Access value
 if (CVar_r_VSync) { /* ... */ }
-int32_t maxAniso = CVar_r_MaxAnisotropy;
 CVar_r_VSync.SetValue(false);
 ```
-
-### Platform Layer
-- Linux: GCC/Clang with ptrace debugging
-- Windows: MSVC compatibility layer
-- Common interface via `GenericPlatform` + platform-specific implementations
+**Flags**: `Saved` (persist to INI), `ReadOnly`, `Cheat`, `Console`
 
 ---
 
-## Testing Guide
-
-### Test File Locations
-- `/Engine/Source/Common/Test/`     - Common module tests
-- `/Engine/Source/Runtime/Test/`    - Runtime module tests
-
-### Sample Test Pattern
+## Testing
 ```cpp
-// Top of test file
 DECLARE_LOG_CATEGORY(LogTest)
 RECORD(test_name, true) {
-    // Test setup and assertions
-    HLVM_LOG(LogTest, info, TXT("Test running..."));
-    
-    // Actual test
-    CheckCondition();
+    HLVM_LOG(LogTest, info, TXT("Running..."));
+    CheckCondition(value == expected);
 }
 ```
 
-### CTest Integration
-Tests auto-register via CMake function:
-```cmake
-add_test(NAME ${TEST_TARGET} COMMAND $<TARGET_FILE:${TEST_TARGET}> ${ARGN})
+Test locations: `Engine/Source/Common/Test/`, `Engine/Source/Runtime/Test/`
+
+---
+
+## ShaderMake (HLSL → SPIR-V)
+
+ShaderMake compiles HLSL shaders to SPIR-V blobs with NVSP header.
+
+**Key files**:
+- `Engine/Source/Runtime/ShaderMakeBuild.py` - PyCMake integration
+- `Test/TestName_Data/ShaderMake.cfg` - Shader compilation config
+- `Test/TestName_Data/*.hlsl` - HLSL shader sources
+
+**Config format**:
+```ini
+[options]
+entry = vsMain
+profile = vs_6_7
+
+[reflection]
+...
+
+[make]
+shader0 0 * vsMain vs vs_6_7
 ```
 
-**Run with logs**:
-```bash
-./Build.sh --Config=Debug --Target=TestParallel --Test
-# Logs saved to Testing/build_test_Debug_TestParallel.log
+**Usage**:
+```cpp
+#include "ShaderMake/ShaderMakeLoader.h"
+ShaderMake::FindPermutationInBlob(blob, "vsMain", &outEntry, &outSize);
 ```
 
 ---
 
-## Dependencies & Tooling
+## Key Files
 
-### Build Requirements
-- clang-16 or later
-- CMake 3.28+
-- vcpkg dependency manager (forked at `/Engine/Source/Dependency/vcpkg`)
-
-### Key Frameworks
-- **vcpkg.json** at root of each module - dependency declarations
-- **PyCMake** - Python-based cmake generator (custom build system)
-- **CTest** - Unit testing framework
-
-### External Libraries (selected)
-- Boost (containers, filesystem, fibers)
-- spdlog (logging)
-- mimalloc (memory allocator)
-- Vulkan Memory Allocator
-- glslang/glsl (shader compilation)
-- assimp (3D model import)
-- Botan3 (encryption)
-- Zstd (compression)
+| File | Purpose |
+|------|---------|
+| `Engine/Source/Runtime/Public/Renderer/SceneGraph/FNode.h` | Scene graph transform hierarchy |
+| `Engine/Source/Runtime/Private/Renderer/DeviceManagerVk*.cpp` | NVRHI Vulkan device |
+| `Engine/Source/Runtime/Test/TestSceneGraphNode.cpp` | 12 FNode/camera tests |
+| `Engine/Source/Runtime/Test/TestCubeOnPlane.cpp` | NVRHI rendering example |
+| `Engine/Source/Runtime/Test/TestFullDeferredShading2.cpp` | Deferred shading with GBuffer |
+| `Engine/Source/Common/Public/Core/CVar/CVarMacros.h` | CVar system |
+| `Engine/Source/Common/Public/Test/Test.h` | Testing framework |
 
 ---
 
-## Git Workflow
+## Build System
 
-### Commit Practices
-- Follow conventional commits: `feat()`, `fix()`, `refactor()`, `docs()`
-- Keep commits focused and atomic
-- Write clear messages describing WHY not WHAT
-
-### Pre-push Checklist
-1. Run `./Build.sh --Rebuild --Test` (all configs)
-2. Ensure clean compiler warnings (`-Werror` enabled)
-3. Verify all tests pass
+- **PyCMake** (`Runtime_cmake.py`) generates CMakeLists.txt
+- **vcpkg** fork at `Engine/Source/Dependency/vcpkg` for dependencies
+- **NVRHI**: Forked at `https://github.com/yhyu13/NVRHI.git`
 
 ---
 
-## Additional Resources
-
-- `/DOC_Coding_Style.md`         - Full coding standards document
-- `/README.md`                    - Project overview and features
-- `/Engine/Scripts/pycmake/`      - PyCMake source code
-- `/Engine/Source/Dependency/README.md` - vcpkg upgrade guide
+## Pre-Flight Checklist
+1. Read `AGENTS.md` and relevant skills in `.opencode/skills/`
+2. Build single test: `./Build.sh --Config=Debug --Target=<Test> --Test`
+3. Verify compilation before proceeding
 
 ---
 
-# HLVM-Engine Documentation for Vibe Coding
+## Quick Reference
 
-## Project Overview
-A UE5-inspired game engine framework focused on infrastructure development with enhanced pak file handling, memory management, and tooling. Prioritizes Linux development workflow, C++20 features, and performance optimizations.
+### Thread Safety
+```cpp
+mi::Mallocator::thread_done();  // On thread exit
+LOCK_GUARD(flag);               // RAII lock
+```
 
-## Core Architecture
-- **Engine/**: Contains core engine systems and subsystems
-- **Source/**: Main source code repository
-  - **Common/**: Shared utilities and cross-platform components
-  - **Platform/**: OS-specific implementations
-  - **Core/**: Fundamental engine systems
-- **Build/**: Build system and configuration files
-- **ThirdParty/**: External dependencies and libraries
+### Parallelism
+```cpp
+FWorkStealThreadPool pool(8);
+auto future = pool.Submit([]() { return result; });
+```
 
-## Build & Setup
-- **Prerequisites**: 
-  - Anaconda3
-  - git
-  - clang-17
-  - cmake 3.29
-- **Key Scripts**:
-  - `Setup.sh`: Environment setup and dependency installation
-  - `GenerateCMakeProjects.sh`: CMake project generation
-
-## Key Features
-- **Custom Build System**: PyCMake Python package generating CMake projects
-- **Memory Management**: 
-  - Global mallocator interface with TLS mimallocator
-  - Stack allocator (2/3 cost of mimalloc)
-  - Virtual memory arena with binned allocators
-- **String Handling**: 
-  - `chat8_t` char type with UE5-style string handling
-  - `FString` and `FPath` implementations
-  - String pooling system
-- **Compression**: Zstd wrapper with custom interface
-- **Encryption**: Botan3-based RSA with PKCS8 obfuscation
-- **Logging**: UE5-style macros with compile-time level elimination
-- **Parallelism**: 
-  - Spin/Rival locks
-  - Work-steal thread pool
-  - MPMC queues with 1.5x Boost performance
-
-## Dependencies
-- **Core Libraries**:
-  - Boost (filesystem, hashing)
-  - Botan3 (encryption)
-  - Zstd (compression)
-  - RapidJSON (JSON parsing)
-  - Protobuf (serialization)
-- **Development Tools**:
-  - Backward.cpp (stack traces)
-  - Ctre (compile-time regex)
-  - Magic Enum (enumeration handling)
-  - Mimalloc (memory allocator)
-
-## Technical Highlights
-- **Obfuscation**: AdvoObfuscator integration for sensitive strings
-- **File System**: Packed token/containers with hash-based indexing
-- **Debugging**: PTrace (Linux) and WinAPI (Windows) debugger detection
-- **Concurrency**: Lock-free queues with rival lock optimization
-- **Memory**: Custom VM allocator with sharded free lists (WIP)
-
-This additional vibe coding info focuses on infrastructure components critical for vibe coding: core engine architecture, build system, memory management patterns, and key library integrations. Omitted: test files, temporary configurations, and rendering-related components.
+### File Paths
+```cpp
+FString dataDir = FString::Format(
+    TXT("{}/../../Test/{}_Data"), *GExecutablePath, *GExecutableName);
+```

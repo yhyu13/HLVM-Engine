@@ -68,12 +68,17 @@ public:
 	/**
 	 * @brief Requests to close the window
 	 */
-	virtual void SetShouldClose() = 0;
+	 virtual void SetShouldClose() = 0;
+
+	/**
+	 * @brief Sets the window title
+	 */
+	 virtual void SetTitle(const FString& InTitle) = 0;
 
 	/**
 	 * @brief Handles the processing of all underlying window events
 	 */
-	virtual void ProcessEvents() = 0;
+	 virtual void ProcessEvents() = 0;
 
 	/**
 	 * @return The dot-per-inch scale factor

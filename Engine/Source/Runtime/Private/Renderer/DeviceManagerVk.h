@@ -19,10 +19,10 @@
 HLVM_INLINE_VAR bool g_VulkanFastSync = true;
 AUTO_CVAR_REF_BOOL(VulkanFastSync, g_VulkanFastSync, "Use vulkan fast vsync eMailbox", EConsoleVariableFlag::RequiresRestart)
 
-HLVM_INLINE_VAR bool g_UseValidationLayers = !HLVM_BUILD_RELEASE;
+HLVM_INLINE_VAR bool g_UseValidationLayers = true;
 AUTO_CVAR_REF_BOOL(UseValidationLayers, g_UseValidationLayers, "Use vulkan validation layers", EConsoleVariableFlag::RequiresRestart)
 
-HLVM_INLINE_VAR bool g_UseDebugRuntime = HLVM_BUILD_DEBUG;
+HLVM_INLINE_VAR bool g_UseDebugRuntime = true;
 AUTO_CVAR_REF_BOOL(UseDebugRuntime, g_UseDebugRuntime, "Use vulkan debug runtime", EConsoleVariableFlag::RequiresRestart)
 
 HLVM_INLINE_VAR bool g_vkUsePushConstants = true;
@@ -226,15 +226,23 @@ private:
 			VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME,
 			VK_NV_MESH_SHADER_EXTENSION_NAME,
 			VK_KHR_FRAGMENT_SHADING_RATE_EXTENSION_NAME,
-			VK_EXT_MEMORY_BUDGET_EXTENSION_NAME }
+			VK_EXT_MEMORY_BUDGET_EXTENSION_NAME,
+			VK_KHR_MAINTENANCE_4_EXTENSION_NAME,
+			VK_KHR_SWAPCHAIN_MUTABLE_FORMAT_EXTENSION_NAME,
+			VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME,
+			VK_EXT_MESH_SHADER_EXTENSION_NAME,
+			VK_EXT_MUTABLE_DESCRIPTOR_TYPE_EXTENSION_NAME,
+		}
 	};
 
-	std::unordered_set<std::string> m_RayTracingExtensions = {
+std::unordered_set<std::string> m_RayTracingExtensions = {
 		VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
 		VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME,
 		VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME,
 		VK_KHR_RAY_QUERY_EXTENSION_NAME,
-		VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME
+		VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME,
+		VK_NV_CLUSTER_ACCELERATION_STRUCTURE_EXTENSION_NAME,
+		VK_NV_RAY_TRACING_LINEAR_SWEPT_SPHERES_EXTENSION_NAME
 	};
 
 	// =============================================================================

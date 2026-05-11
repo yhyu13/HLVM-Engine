@@ -12,8 +12,8 @@
 
 bool FDeviceManagerVk::CreateDeviceAndSwapChain()
 {
-	DeviceParams.bEnableNVRHIValidationLayer = g_UseValidationLayers;
-	DeviceParams.bEnableDebugRuntime = g_UseDebugRuntime;
+	DeviceParams.bEnableNVRHIValidationLayer |= g_UseValidationLayers;
+	DeviceParams.bEnableDebugRuntime |= g_UseDebugRuntime;
 
 	HLVM_ENSURE(CreateInstance());
 
@@ -90,14 +90,21 @@ bool FDeviceManagerVk::CreateDeviceAndSwapChain()
 
 void FDeviceManagerVk::DestroyDeviceAndSwapChain()
 {
-	if (device)
-	{
-		device->waitIdle();
-	}
-	else
+	if (!device)
 	{
 		// Already destroyed
 		return;
+	}
+
+	// waitIdle can throw if device is in invalid state (e.g., resources not properly released)
+	// Catch and log to prevent std::terminate()
+	try
+	{
+		device->waitIdle();
+	}
+	catch (const std::exception& e)
+	{
+		HLVM_LOG(LogRHI, warn, TXT("device->waitIdle() threw: {}"), TO_TCHAR_CSTR(e.what()));
 	}
 
 	// Clean up frame sync resources

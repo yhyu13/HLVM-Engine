@@ -117,3 +117,37 @@ nvrhi::ShaderHandle FShaderFactoryImpl::CreateAutoShader(
 	// Fall back to file-based loading
 	return CreateShader(fileName, entryName, defines, desc);
 }
+
+nvrhi::ShaderLibraryHandle FShaderFactoryImpl::CreateShaderLibrary(
+    const std::filesystem::path&  fileName,
+    const std::vector<FShaderMacro>* defines)
+{
+    (void)defines;
+    if (!Device)
+    {
+        HLVM_LOG(LogShaderFactory, err, TXT("FShaderFactory::CreateShaderLibrary: Device not initialized"));
+        return nullptr;
+    }
+
+    FPath shaderPath(fileName.string().c_str(), EPlatformFileType::Disk);
+    if (!FGenericPlatformFile::Get(EPlatformFileType::Disk)->Exists(shaderPath))
+    {
+        HLVM_LOG(LogShaderFactory, err, TXT("FShaderFactory::CreateShaderLibrary: Shader library file not found: {}"), FString(fileName.string().c_str()));
+        return nullptr;
+    }
+
+    TArray<TBYTE> fileContent;
+    if (!FFileSystem::LoadFileToArray(fileContent, shaderPath))
+    {
+        HLVM_LOG(LogShaderFactory, err, TXT("FShaderFactory::CreateShaderLibrary: Failed to load shader library: {}"), FString(fileName.string().c_str()));
+        return nullptr;
+    }
+    nvrhi::ShaderLibraryHandle library = Device->createShaderLibrary(fileContent.GetData(), fileContent.NumBytes());
+    if (!library)
+    {
+        HLVM_LOG(LogShaderFactory, err, TXT("FShaderFactory::CreateShaderLibrary: Failed to create shader library"));
+        return nullptr;
+    }
+
+    return library;
+}

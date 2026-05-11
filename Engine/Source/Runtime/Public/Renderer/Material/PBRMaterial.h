@@ -7,6 +7,7 @@
 #include "Math/MathGLM.h"
 #include "Platform/FileSystem/Path.h"
 #include "Renderer/Material/IMaterial.h"
+#include "Renderer/RHI/Object/Texture.h"
 #include <memory>
 
 /**
@@ -176,6 +177,54 @@ public:
 		return !AOTexture.empty();
 	}
 
+	//! Check if material has GPU texture of specified type
+	bool HasGPUTexture(ETextureType Type) const
+	{
+		switch (Type)
+		{
+			case ETextureType::Albedo:
+				return AlbedoGPUTexture.GetTextureHandle() != nullptr;
+			case ETextureType::Normal:
+				return NormalGPUTexture.GetTextureHandle() != nullptr;
+			case ETextureType::Metallic:
+				return MetallicGPUTexture.GetTextureHandle() != nullptr;
+			case ETextureType::Roughness:
+				return RoughnessGPUTexture.GetTextureHandle() != nullptr;
+			case ETextureType::AmbientOcclusion:
+				return AOGPUTexture.GetTextureHandle() != nullptr;
+			default:
+				return false;
+			case ETextureType::Count:
+				return false;
+		}
+	}
+
+	//! Get GPU texture for specified type
+	FTexture& GetGPUTexture(ETextureType Type)
+	{
+		switch (Type)
+		{
+			case ETextureType::Albedo:
+				return AlbedoGPUTexture;
+			case ETextureType::Normal:
+				return NormalGPUTexture;
+			case ETextureType::Metallic:
+				return MetallicGPUTexture;
+			case ETextureType::Roughness:
+				return RoughnessGPUTexture;
+			case ETextureType::AmbientOcclusion:
+				return AOGPUTexture;
+			case ETextureType::Count:
+				break;
+		}
+		static FTexture NullTexture;
+		return NullTexture;
+	}
+
+	//! Load GPU texture from path using KTX loader
+	//! Returns true on success
+	bool LoadTexture(ETextureType Type, nvrhi::IDevice* Device, nvrhi::ICommandList* CommandList);
+
 public:
 	//! Albedo/Diffuse color (RGB)
 	FVec3 AlbedoColor = FVec3(1.0f);
@@ -199,4 +248,11 @@ public:
 	FString MetallicTextureName;
 	FString RoughnessTextureName;
 	FString AOTextureName;
+
+	//! GPU textures (loaded from texture paths)
+	FTexture AlbedoGPUTexture;
+	FTexture NormalGPUTexture;
+	FTexture MetallicGPUTexture;
+	FTexture RoughnessGPUTexture;
+	FTexture AOGPUTexture;
 };

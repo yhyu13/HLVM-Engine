@@ -104,10 +104,9 @@ bool FDeviceManagerVk::CreateInstance()
 		return false;
 	}
 
-	HLVM_LOG(LogRHI, info, TO_TCHAR_CSTR("Enabled Vulkan instance extensions:"));
-	for (const auto& ext : enabledExtensions.instance)
 	{
-		HLVM_LOG(LogRHI, info, TXT("    {}"), TO_TCHAR_CSTR(ext.c_str()));
+		FString enabledExtensionsLog = FString::Join(enabledExtensions.instance, [](const auto& ext){return TCHARSTR(ext.c_str());}, TXT("\n"));
+		HLVM_LOG(LogRHI, info, TO_TCHAR_CSTR("Enabled Vulkan instance extensions:\n{}"), *enabledExtensionsLog);
 	}
 
 	// Check layers
@@ -134,13 +133,12 @@ bool FDeviceManagerVk::CreateInstance()
 		HLVM_LOG(LogRHI, critical, TO_TCHAR_CSTR(ss.str().c_str()));
 		return false;
 	}
-	HLVM_LOG(LogRHI, info, TO_TCHAR_CSTR("Enabled Vulkan layers:"));
-	for (const auto& layer : enabledExtensions.layers)
 	{
-		HLVM_LOG(LogRHI, info, TXT("    {}"), TO_TCHAR_CSTR(layer.c_str()));
+		FString enabledLayersLog = FString::Join(enabledExtensions.layers, [](const auto& layer){return TCHARSTR(layer.c_str());}, TXT("\n"));
+		HLVM_LOG(LogRHI, info, TO_TCHAR_CSTR("Enabled Vulkan layers:\n{}"), *enabledLayersLog);
 	}
 
-	// Create instance
+	// Query the Vulkan API version supported on the system to make sure we use at least 1.3 when that's present.
 	vk::ApplicationInfo appInfo(
 		"HLVM VK",
 		VK_MAKE_VERSION(1, 0, 0),
@@ -151,6 +149,34 @@ bool FDeviceManagerVk::CreateInstance()
 	auto extensionsVec = StringSetToVector(enabledExtensions.instance);
 	auto layersVec = StringSetToVector(enabledExtensions.layers);
 
+
+	vk::Result res = vk::enumerateInstanceVersion(&appInfo.apiVersion);
+
+	if (res != vk::Result::eSuccess)
+	{
+		HLVM_LOG(LogRHI, critical, TXT("Call to vkEnumerateInstanceVersion failed, error code = %s"), TO_TCHAR_CSTR(nvrhi::vulkan::resultToString(VkResult(res))));
+		return false;
+	}
+
+	const uint32_t minimumVulkanVersion = VK_MAKE_API_VERSION(0, 1, 3, 0);
+
+	// Check if the Vulkan API version is sufficient.
+	if (appInfo.apiVersion < minimumVulkanVersion)
+	{
+		HLVM_LOG(LogRHI, critical, TXT("The Vulkan API version supported on the system ({}.{}.{}) is too low, at least {}.{}.{} is required."),
+			VK_API_VERSION_MAJOR(appInfo.apiVersion), VK_API_VERSION_MINOR(appInfo.apiVersion), VK_API_VERSION_PATCH(appInfo.apiVersion),
+			VK_API_VERSION_MAJOR(minimumVulkanVersion), VK_API_VERSION_MINOR(minimumVulkanVersion), VK_API_VERSION_PATCH(minimumVulkanVersion));
+		return false;
+	}
+
+	// Spec says: A non-zero variant indicates the API is a variant of the Vulkan API.
+	if (VK_API_VERSION_VARIANT(appInfo.apiVersion) != 0)
+	{
+		HLVM_LOG(LogRHI, critical, TXT("The Vulkan API supported on the system uses an unexpected variant: {}."), VK_API_VERSION_VARIANT(appInfo.apiVersion));
+		return false;
+	}
+
+	// Create instance
 	vk::InstanceCreateInfo createInfo;
 	createInfo.setPApplicationInfo(&appInfo)
 		.setEnabledExtensionCount(static_cast<uint32_t>(extensionsVec.size()))
@@ -238,5 +264,4 @@ bool FDeviceManagerVk::CreateWindowSurface()
 
 	return true;
 }
-
 #endif

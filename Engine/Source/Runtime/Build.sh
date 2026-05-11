@@ -30,6 +30,8 @@ BuildGraphViz=0
 RunGPerf=0
 Jobs=$(nproc)
 TestRepeatNum=2
+DumpFrames=0
+DumpDir=
 
 # Step 2: Loop through each argument
 for arg in "$@"; do
@@ -82,6 +84,16 @@ for arg in "$@"; do
     if [[ $arg == --TestRepeatNum ]]; then
         TestRepeatNum=${arg#*=}
     fi
+
+    # Step 13: Check for --DumpFrames=value
+    if [[ $arg == --DumpFrames=* ]]; then
+        DumpFrames=${arg#*=}
+    fi
+
+    # Step 14: Check for --DumpDir=value
+    if [[ $arg == --DumpDir=* ]]; then
+        DumpDir=${arg#*=}
+    fi
 done
 
 # echo all arguments
@@ -95,6 +107,8 @@ echo_color 32 "Receive BuildGraphViz: ${BuildGraphViz}"
 echo_color 32 "Receive RunGPerf: ${RunGPerf}"
 echo_color 32 "Receive Jobs: ${Jobs}"
 echo_color 32 "Receive TestRepeatNum: ${TestRepeatNum}"
+echo_color 32 "Receive DumpFrames: ${DumpFrames}"
+echo_color 32 "Receive DumpDir: ${DumpDir}"
 #------------------------------------------------------------------
 time {
 
@@ -179,10 +193,10 @@ for config in "${buildConfigs[@]}"; do
     # 构建参数s
     cbuild_param="-j ${Jobs}"
     if [ ${Verbose} -eq 1 ]; then
-        cbuild_param+="--verbose"
+        cbuild_param+=" --verbose"
     fi
     if [ -n "${BuildTarget}" ]; then
-        cbuild_param+="--target ${BuildTarget} ${cbuild_param}"
+        cbuild_param="--target ${BuildTarget} ${cbuild_param}"
     fi
     if [ ${RunRebuild} -eq 1 ]; then
         cbuild_param1="--clean-first ${cbuild_param}"
@@ -260,7 +274,21 @@ for config in "${buildConfigs[@]}"; do
         test_logs=()
 
         # scan test dir and parallel execute ctest in each subprocess
+        # Build env var prefix for frame dump
+        dump_env_prefix=""
+        if [ ${DumpFrames} -gt 0 ]; then
+          dump_env_prefix="HLVM_DUMP_RT=1 HLVM_DUMP_FRAMES=${DumpFrames}"
+          if [ -n "${DumpDir}" ]; then
+            dump_env_prefix="${dump_env_prefix} HLVM_DUMP_DIR=${DumpDir}"
+          fi
+          echo_color 33 "Frame dump enabled: ${dump_env_prefix}"
+        fi
+
         for binary in ${CMAKE_BIN_DIR}/Test*; do
+          # Check if file is a binary executable (skip directories and non-executable files)
+          if [ ! -f "${binary}" ] || [ ! -x "${binary}" ]; then
+            continue
+          fi
           test_target=${binary#${CMAKE_BIN_DIR}/}
           ctest_param="--output-on-failure"
           ctest_param+=" --repeat-until-fail 1" # manually repeat test instead of let cmake repeat it
@@ -274,7 +302,7 @@ for config in "${buildConfigs[@]}"; do
           ctest_param="-R ${test_target} ${ctest_param}"
 
           # 测试项目
-          test_cmd="${CTEST_BIN} . ${ctest_param}"
+          test_cmd="${dump_env_prefix} ${CTEST_BIN} . ${ctest_param}"
           echo_color 34 "Test cmd: ${test_cmd}"
           output_log="${CWD_DIR}/Testing/build_test_${config}_${test_target}.log"
           cmd="(${test_cmd} || exit 1) | tee "${output_log}" 2>&1"
@@ -330,6 +358,11 @@ for config in "${buildConfigs[@]}"; do
         TEST_LOG="${CWD_DIR}/Testing/perf_test_${config}.log"
         echo_color 32 "Start testing " | tee "${TEST_LOG}"
         for binary in ./Test*; do
+            # Check if file is a binary executable (skip directories and non-executable files)
+            if [ ! -f "${binary}" ] || [ ! -x "${binary}" ]; then
+              continue
+            fi
+
             if [ -n "${BuildTarget}" ]; then
                 if [[ ${binary} != "./${BuildTarget}" ]]; then
                   continue

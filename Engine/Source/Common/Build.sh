@@ -261,6 +261,10 @@ for config in "${buildConfigs[@]}"; do
 
         # scan test dir and parallel execute ctest in each subprocess
         for binary in ${CMAKE_BIN_DIR}/Test*; do
+          # Check if file is a binary executable (skip directories and non-executable files)
+          if [ ! -f "${binary}" ] || [ ! -x "${binary}" ]; then
+            continue
+          fi
           test_target=${binary#${CMAKE_BIN_DIR}/}
           ctest_param="--output-on-failure"
           ctest_param+=" --repeat-until-fail 1" # manually repeat test instead of let cmake repeat it
@@ -330,6 +334,11 @@ for config in "${buildConfigs[@]}"; do
         TEST_LOG="${CWD_DIR}/Testing/perf_test_${config}.log"
         echo_color 32 "Start testing " | tee "${TEST_LOG}"
         for binary in ./Test*; do
+            # Check if file is a binary executable (skip directories and non-executable files)
+            if [ ! -f "${binary}" ] || [ ! -x "${binary}" ]; then
+              continue
+            fi
+
             if [ -n "${BuildTarget}" ]; then
                 if [[ ${binary} != "./${BuildTarget}" ]]; then
                   continue

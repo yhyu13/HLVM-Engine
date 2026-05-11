@@ -213,6 +213,23 @@ int main(int ac, char* av[])
 	{
 		GExecutableName = boost::filesystem::path(TO_CHAR_CSTR(av[0])).filename().c_str();
 		GExecutablePath = boost::filesystem::current_path();
+#ifdef HLVM_ROOT
+		GProjectRoot = TCHARSTR(LITERAL(HLVM_ROOT));
+#else
+		const char* hlvmRootEnv = std::getenv("HLVM_ROOT");
+		if (hlvmRootEnv != nullptr)
+		{
+			GProjectRoot = boost::filesystem::canonical(hlvmRootEnv);
+		}
+#endif
+		if (!boost::filesystem::exists(GProjectRoot))
+		{
+			std::cout << "HLVM_ROOT environment variable is not set or invalid" << std::endl;
+		}
+		else
+		{
+			std::cout << "Project root: " << GProjectRoot << std::endl;
+		}
 	}
 	{
 		FGenericPlatformCrashDump::Init();

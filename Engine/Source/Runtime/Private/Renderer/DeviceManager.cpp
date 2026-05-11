@@ -130,9 +130,10 @@ void FDeviceManager::RunMessageLoop()
 		}
 		HLVM_ENSURE(EndFrame());
 		HLVM_ENSURE(Present());
-		GetDevice()->waitForIdle();
+		GetDevice()->waitForIdle(); // TODO : Or frame controller wait for limited amount of time
 		m_bIsRendering = false;
 	}
+	GetDevice()->waitForIdle();
 }
 
 void FDeviceManager::StopMessageLoop()

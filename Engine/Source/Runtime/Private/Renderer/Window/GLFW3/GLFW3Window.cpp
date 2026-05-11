@@ -22,6 +22,12 @@ void FGLFW3Window::SetShouldClose()
 	glfwSetWindowShouldClose(Window, GLFW_TRUE);
 }
 
+void FGLFW3Window::SetTitle(const FString& InTitle)
+{
+	Property.Title = InTitle;
+	glfwSetWindowTitle(Window, reinterpret_cast<const char*>(InTitle.c_str()));
+}
+
 bool FGLFW3Window::ShouldClose()
 {
 	return glfwWindowShouldClose(Window);

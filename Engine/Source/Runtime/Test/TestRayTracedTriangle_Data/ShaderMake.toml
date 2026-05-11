@@ -1,0 +1,24 @@
+#NK|# ShaderMake Configuration for HLSL to SPIR-V Compilation
+#XM|# This file defines shader compilation rules for use with ShaderMake + DXC
+#HW|
+#VT|# Ray tracing uber shader (single library with all entry points)
+#JS|[[shaders]]
+#SV|file = "RayTracedTriangle.hlsl"
+#QB|entry_point = "main"
+#HJ|profile = "lib_6_5"
+#SY|output_file = "RayTracingLib.spv"
+#SS|type = "library"
+#TJ|
+#JS|[[shaders]]
+#SS|file = "BlitShader.hlsl"
+#PN|entry_point = "BlitVS"
+#KM|profile = "vs_6_5"
+#YY|output_file = "Blit.vert.spv"
+#YS|type = "vertex"
+#KS|
+#JS|[[shaders]]
+#SS|file = "BlitShader.hlsl"
+#XH|entry_point = "BlitPS"
+#MR|profile = "ps_6_5"
+#KJ|output_file = "Blit.frag.spv"
+#NQ|type = "pixel"

@@ -160,7 +160,7 @@ Global Config :
 bThreadSanitizer = False  # Supers low performance, not even debuggable lol
 bBuildShared = False  # Not working on ubuntu/linux, shared lib is PITA
 bLinkByGold = True  # Using llvm GOLD linker for link time optimization
-bSSE41 = True # Enable SSE41 for GLM matrix decomposition
+bSSE41 = True  # Enable SSE41 for GLM matrix decomposition
 
 
 # Create a CommonModule object with the specified options
@@ -275,7 +275,11 @@ class CommonProject(BaseProject):
                                                               "$<$<CONFIG:RelWithDebInfo>:HLVM_BUILD_DEVELOPMENT=1>",
                                                               "$<$<CONFIG:Release>:HLVM_BUILD_RELEASE=1>",
                                                               "$<$<CONFIG:MinSizeRel>:HLVM_BUILD_RELEASE=1>",
-                                                              f"HLVM_COMMON_DYNAMIC_LINKED={bBuildShared * 1}"])
+                                                              f"HLVM_COMMON_DYNAMIC_LINKED={bBuildShared * 1}",
+                                                              f"HLVM_ROOT=$ENV{{HLVM_ROOT}}"])
+
+        hlvm_root = os.getenv('HLVM_ROOT')
+        self.global_interface.add_global_set('ENV{HLVM_ROOT}', [hlvm_root])
 
         # Create a CommonModule object for the main project
         self.modules.append(CommonModule())

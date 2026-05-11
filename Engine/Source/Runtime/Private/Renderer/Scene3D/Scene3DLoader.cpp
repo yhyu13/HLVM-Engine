@@ -56,13 +56,13 @@ void FScene3DLoader::RecurseLoad(
 		{
 			LoadingContext.MaterialMaterialMap.Add(AIMaterial, PBRMaterial);
 			aiString TexPath;
-			// Albedo texture or color
-			if (AI_SUCCESS == AIMaterial->GetTexture(aiTextureType_DIFFUSE, 0, &TexPath))
+			// Albedo texture or color (glTF uses aiTextureType_BASE_COLOR, not aiTextureType_DIFFUSE)
+			if (AI_SUCCESS == AIMaterial->GetTexture(aiTextureType_BASE_COLOR, 0, &TexPath))
 			{
 				const FString Filename = FString(TexPath.C_Str());
 				PBRMaterial->SetTexture(Filename, SceneDir / Filename, IMaterial::ETextureType::Albedo);
 			}
-			else if (aiColor4D BaseColorFactor; AI_SUCCESS == AIMaterial->Get(AI_MATKEY_COLOR_DIFFUSE, BaseColorFactor))
+			else if (aiColor4D BaseColorFactor; AI_SUCCESS == AIMaterial->Get(AI_MATKEY_BASE_COLOR, BaseColorFactor))
 			{
 				PBRMaterial->AlbedoColor = FVec3(BaseColorFactor.r, BaseColorFactor.g, BaseColorFactor.b);
 			}

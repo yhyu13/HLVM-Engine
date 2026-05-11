@@ -77,6 +77,10 @@ public:
         const FStaticShader& spirv,
         const std::vector<FShaderMacro>* defines,
         const nvrhi::ShaderDesc& desc) = 0;
+
+    virtual nvrhi::ShaderLibraryHandle CreateShaderLibrary(
+        const std::filesystem::path& fileName,
+        const std::vector<FShaderMacro>* defines) = 0;
 };
 
 class FShaderFactoryImpl : public FShaderFactory
@@ -103,6 +107,10 @@ public:
         const FStaticShader& spirv,
         const std::vector<FShaderMacro>* defines,
         const nvrhi::ShaderDesc& desc) override;
+
+    nvrhi::ShaderLibraryHandle CreateShaderLibrary(
+        const std::filesystem::path& fileName,
+        const std::vector<FShaderMacro>* defines) override;
 
 private:
     nvrhi::DeviceHandle Device;

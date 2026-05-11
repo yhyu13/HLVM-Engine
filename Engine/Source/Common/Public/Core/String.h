@@ -174,7 +174,7 @@ public:
 		const PredType&				   func,
 		const FString&				   splitter = TXT(",\n"))
 	{
-		FString result{ "[ " };
+		FString result;
 		int32_t count = 0;
 		for (const auto& elem : Vec)
 		{
@@ -184,7 +184,6 @@ public:
 			}
 			result += static_cast<const TCHAR*>(func(elem));
 		}
-		result += TXT(" ]");
 		return result;
 	}
 

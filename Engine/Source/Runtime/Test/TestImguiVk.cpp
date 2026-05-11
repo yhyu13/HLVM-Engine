@@ -477,7 +477,6 @@ RECORD_BOOL(test_ImguiVk)
 			throw runtime_error("Failed to initialize ShaderFactory");
 		}
 
-
 		// 5. Create and initialize render passes
 		HLVM_LOG(LogTest, info, TXT("Creating render passes..."));
 

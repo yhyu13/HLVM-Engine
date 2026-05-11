@@ -211,10 +211,20 @@ bool FDeviceManagerVk::CreateLogicalDevice()
 	}
 
 	// Log enabled extensions
-	HLVM_LOG(LogRHI, info, TXT("Enabled Vulkan device extensions:"));
+	{
+		FString enabledExtensionsLog = FString::Join(enabledExtensions.device, [](const auto& ext){return TCHARSTR(ext.c_str());}, TXT("\n"));
+		HLVM_LOG(LogRHI, info, TXT("Enabled Vulkan device extensions:\n{}"), *enabledExtensionsLog);
+	}
+
+	// Track extension support flags for feature chaining
+	bool synchronization2Supported = false;
+	bool maintenance4Supported = false;
 	for (const auto& ext : enabledExtensions.device)
 	{
-		HLVM_LOG(LogRHI, info, TXT("    {}"), TO_TCHAR_CSTR(ext.c_str()));
+		if (ext == VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME)
+			synchronization2Supported = true;
+		else if (ext == VK_KHR_MAINTENANCE_4_EXTENSION_NAME)
+			maintenance4Supported = true;
 	}
 
 	// Collect unique queue families
@@ -232,7 +242,7 @@ bool FDeviceManagerVk::CreateLogicalDevice()
 		uniqueQueueFamilies.insert(m_TransferQueueFamily);
 	}
 
-	float								   queuePriority = 1.0f;
+	float							   queuePriority = 1.0f;
 	TVector<vk::DeviceQueueCreateInfo> queueCreateInfos;
 	for (uint32_t queueFamily : uniqueQueueFamilies)
 	{
@@ -243,7 +253,7 @@ bool FDeviceManagerVk::CreateLogicalDevice()
 				.setPQueuePriorities(&queuePriority));
 	}
 
-	// Core Device features
+	// Core Device features - matching Donut's enabled features
 	vk::PhysicalDeviceFeatures deviceFeatures;
 	deviceFeatures
 		.setShaderImageGatherExtended(true)
@@ -253,26 +263,56 @@ bool FDeviceManagerVk::CreateLogicalDevice()
 		.setGeometryShader(true)
 		.setFillModeNonSolid(true)
 		.setImageCubeArray(true)
-		.setDualSrcBlend(true);
+		.setDualSrcBlend(true)
+		.setShaderInt16(true)
+		.setFragmentStoresAndAtomics(true)
+		.setVertexPipelineStoresAndAtomics(true)
+		.setShaderInt64(true)
+		.setShaderStorageImageWriteWithoutFormat(true)
+		.setShaderStorageImageReadWithoutFormat(true);
+	// Vulkan 1.1 features
+	auto vulkan11Features = vk::PhysicalDeviceVulkan11Features()
+		.setShaderDrawParameters(true)
+		.setPNext(nullptr);
 
 	// Vulkan 1.2 features nvrhi required
-	vk::PhysicalDeviceVulkan12Features vulkan12Features;
-	vulkan12Features
+	auto vulkan12Features = vk::PhysicalDeviceVulkan12Features()
 		.setDescriptorIndexing(true)
 		.setRuntimeDescriptorArray(true)
 		.setDescriptorBindingPartiallyBound(true)
 		.setDescriptorBindingVariableDescriptorCount(true)
 		.setTimelineSemaphore(true)
 		.setShaderSampledImageArrayNonUniformIndexing(true)
-		.setBufferDeviceAddress(IsVulkanDeviceExtensionEnabled(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME));
+		.setBufferDeviceAddress(IsVulkanDeviceExtensionEnabled(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME))
+		.setPNext(&vulkan11Features);
+	// Chain ray tracing features only when enabled
+	// Declare ray tracing features outside if block to ensure proper lifetime
+	vk::PhysicalDeviceRayQueryFeaturesKHR rayQueryFeatures;
+	vk::PhysicalDeviceAccelerationStructureFeaturesKHR accelerationStructureFeatures;
+	vk::PhysicalDeviceRayTracingPipelineFeaturesKHR rayTracingPipelineFeatures;
+
+	if (DeviceParams.bEnableRayTracingExtensions)
+	{
+		// Initialize ray tracing features with constructor chain
+		// Chain: ... -> rayTracingPipeline -> accelerationStructure -> rayQuery -> vulkan11Features -> nullptr
+		rayQueryFeatures.setRayQuery(true).setPNext(&vulkan11Features);
+		accelerationStructureFeatures.setAccelerationStructure(true).setPNext(&rayQueryFeatures);
+		rayTracingPipelineFeatures.setRayTracingPipeline(true).setPNext(&accelerationStructureFeatures);
+
+		// Update vulkan12Features to chain to ray tracing features
+		vulkan12Features.setPNext(&rayTracingPipelineFeatures);
+	}
+	else
+	{
+		vulkan12Features.setPNext(&vulkan11Features);
+	}
 
 	/*
 	 * Vulkan 1.3 features nvrhi required
 	 */
-	vk::PhysicalDeviceVulkan13Features vulkan13Features;
-	vulkan13Features
+	auto vulkan13Features = vk::PhysicalDeviceVulkan13Features()
 		.setDynamicRendering(true) // Caveat : YuHang NVRHI requires dynamic rendering
-		.setSynchronization2(true) // Caveat : YuHang NVRHI requires synchronization2
+		.setSynchronization2(synchronization2Supported) // Caveat : YuHang NVRHI requires synchronization2
 		.setPNext(&vulkan12Features);
 
 	auto extensionsVec = StringSetToVector(enabledExtensions.device);
@@ -339,8 +379,7 @@ bool FDeviceManagerVk::CreateLogicalDevice()
 
 	// Create ImGui descriptor pool
 	// ImGui_ImplVulkan requires: 1x CombinedImageSampler, 1x Sampler, 1x UniformBuffer
-	TVector<vk::DescriptorPoolSize> poolSizes =
-	{
+	TVector<vk::DescriptorPoolSize> poolSizes = {
 		vk::DescriptorPoolSize(vk::DescriptorType::eCombinedImageSampler, 1),
 		vk::DescriptorPoolSize(vk::DescriptorType::eSampler, 1),
 		vk::DescriptorPoolSize(vk::DescriptorType::eUniformBuffer, 1)

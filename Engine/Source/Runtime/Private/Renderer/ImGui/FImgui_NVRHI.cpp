@@ -461,12 +461,7 @@ void FImgui_NVRHI::Shutdown()
 	VertexShader = nullptr;
 	PixelShader = nullptr;
 	ShaderAttribLayout = nullptr;
-
-	if (CommandList)
-	{
-		CommandList->close();
-		CommandList = nullptr;
-	}
+	CommandList = nullptr;
 
 	// Reset device last to ensure all operations complete before device is potentially destroyed
 	Device = nullptr;

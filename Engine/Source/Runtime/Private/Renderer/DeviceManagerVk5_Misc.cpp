@@ -3,6 +3,7 @@
  */
 
 #include "DeviceManagerVk.h"
+#include "Renderer/Common/FCommonRenderPasses.h"
 
 #if HLVM_VULKAN_RENDERER
 
@@ -147,7 +148,29 @@ bool FDeviceManagerVk::CreateWindowDeviceAndSwapChain(const IWindow::Properties&
 
 void FDeviceManagerVk::Shutdown()
 {
-	DestroyDeviceAndSwapChain();
+	// Wrap entire shutdown in try-catch to prevent std::terminate
+	// if any step throws
+	try
+	{
+		// 1 . Destroy render passes
+		{
+			m_vRenderPasses.clear();
+		}
+
+		// 2 . Shutdown common render passes (must happen before device destruction)
+		FCommonRenderPasses::Shutdown();
+
+		// 3 . Destroy device and swapchain
+		DestroyDeviceAndSwapChain();
+	}
+	catch (const std::exception& e)
+	{
+		HLVM_LOG(LogRHI, err, TXT("Shutdown exception: {}"), TO_TCHAR_CSTR(e.what()));
+	}
+	catch (...)
+	{
+		HLVM_LOG(LogRHI, err, TXT("Shutdown unknown exception"));
+	}
 }
 
 void* FDeviceManagerVk::GetGLFWWindow() const

@@ -20,6 +20,11 @@ HLVM_EXTERN_VAR FTimer GlobalTimerFromStart;
 HLVM_EXTERN_VAR FString GExecutableName;
 HLVM_EXTERN_VAR FPath	GExecutablePath;
 
+/**
+ * Project root directory (git root)
+ */
+HLVM_EXTERN_VAR FPath	GProjectRoot;
+
 #ifdef PLATFORM_LINUXGNU
 	#ifndef HLVM_ALLOW_GPERF
 		#define HLVM_ALLOW_GPERF 1
