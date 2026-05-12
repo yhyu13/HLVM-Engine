@@ -295,6 +295,32 @@ def create_render_sponza_shadermake(test_target_name: str) -> ShaderMakeModule:
     )
 
 
+def create_pbr_lighting_shadermake(test_target_name: str) -> ShaderMakeModule:
+    """Factory function to create ShaderMake module for TestPBRLighting shaders."""
+    shader_target_name = test_target_name + "_ShaderMake"
+
+    test_data_dir = "${CMAKE_SOURCE_DIR}/Test/TestPBRLighting_Data"
+    config_file = "${CMAKE_SOURCE_DIR}/Test/TestPBRLighting_Data/ShaderMake.cfg"
+
+    shader_sources = [
+        test_data_dir + "/PBRLighting_cs.hlsl",
+    ]
+
+    include_dirs = [
+        test_data_dir,
+    ]
+
+    return ShaderMakeModule(
+        target_name=shader_target_name,
+        config_file_cmake=config_file,
+        shader_sources_cmake=shader_sources,
+        output_dir_cmake=test_data_dir,
+        include_dirs_cmake=include_dirs,
+        project_name="HLVM_PBRLighting",
+        slang_options=""
+    )
+
+
 def create_common_shadermake() -> ShaderMakeModule:
     """Factory function to create ShaderMake module for common shaders (BlitVS, BlitPS).
 

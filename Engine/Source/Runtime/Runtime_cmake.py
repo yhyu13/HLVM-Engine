@@ -258,6 +258,8 @@ class RuntimeTestModule(BaseModule):
                 shader_cmake = ShaderMakeBuild.create_sponza_deferred_shadermake(self.target_name)
             elif "RenderSponza" in self.target_name:
                 shader_cmake = ShaderMakeBuild.create_render_sponza_shadermake(self.target_name)
+            elif "PBRLighting" in self.target_name:
+                shader_cmake = ShaderMakeBuild.create_pbr_lighting_shadermake(self.target_name)
             else:
                 shader_cmake = ShaderMakeBuild.create_deferred_shading_shadermake(self.target_name)
             shader_cmake.dump(fp)
