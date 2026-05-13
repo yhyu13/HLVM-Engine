@@ -156,6 +156,29 @@ public:
 		HLVM_LOG(LogTest, info, TXT("Lighting shader loaded successfully"));
 
 		// =====================================================================
+		// Load tone mapping compute shader
+		// =====================================================================
+		HLVM_LOG(LogTest, info, TXT("Loading tone mapping shader..."));
+
+		auto ToneMapCSBlob = ReadBinaryFile(
+			FPath::Combine(ShaderDataDir, TXT("TonemapSponza_cs.sblob")).string());
+		const void* ToneMapCSBinary = nullptr;
+		size_t		ToneMapCSBinarySize = 0;
+		if (!ShaderMake::FindPermutationInBlob(ToneMapCSBlob.data(), ToneMapCSBlob.size(), nullptr, 0, &ToneMapCSBinary, &ToneMapCSBinarySize))
+		{
+			HLVM_LOG(LogTest, err, TXT("Failed to extract ToneMapCS from blob"));
+			return false;
+		}
+
+		ToneMapCS = NvrhiDevice->createShader(CSDesc, ToneMapCSBinary, ToneMapCSBinarySize);
+		if (!ToneMapCS)
+		{
+			HLVM_LOG(LogTest, err, TXT("Failed to create tone mapping shader"));
+			return false;
+		}
+		HLVM_LOG(LogTest, info, TXT("Tone mapping shader loaded successfully"));
+
+		// =====================================================================
 		// Create command list for initialization
 		// =====================================================================
 		nvrhi::CommandListHandle InitCmdList = NvrhiDevice->createCommandList();
@@ -482,18 +505,19 @@ public:
 			LayoutDesc.setBindingOffsets(offsets);
 
 			// b0 -> 256 (LightingConstants)
-			// t0 -> 0 (GBufferDiffuse - Diffuse RGB, Specular from alpha packed here)
-			// t1 -> 1 (GBufferDiffuse - Specular from alpha, same texture as t0)
+			// t0 -> 0 (GBufferDiffuse - Diffuse RGB)
+			// t1 -> 1 (GBufferMaterial - Metallic(R) + Roughness(G))
 			// t2 -> 2 (GBufferNormals - Normal XYZ)
 			// t3 -> 3 (GBufferEmissive - Emissive RGB)
+			// t4 -> 4 (GBufferDepthCopy - Depth value for world pos reconstruction)
 			// u0 -> 384 (HDR output)
-			// Note: GBufferSpecularTexture (MRT1) is created but not used - Specular comes from Diffuse alpha
 			LayoutDesc.bindings = {
 				nvrhi::BindingLayoutItem::ConstantBuffer(256),
 				nvrhi::BindingLayoutItem::Texture_SRV(0),  // t0: Diffuse RGB
-				nvrhi::BindingLayoutItem::Texture_SRV(1),  // t1: Specular (Diffuse alpha)
+				nvrhi::BindingLayoutItem::Texture_SRV(1),  // t1: Metallic/Roughness
 				nvrhi::BindingLayoutItem::Texture_SRV(2),  // t2: Normals
 				nvrhi::BindingLayoutItem::Texture_SRV(3),  // t3: Emissive
+				nvrhi::BindingLayoutItem::Texture_SRV(4),  // t4: Depth copy
 				nvrhi::BindingLayoutItem::Texture_UAV(384) // u0: HDR output
 			};
 
@@ -516,6 +540,46 @@ public:
 			}
 		}
 		HLVM_LOG(LogTest, info, TXT("Lighting pipeline created"));
+
+		// =====================================================================
+		// Create Tone Map binding layout
+		// =====================================================================
+		{
+			nvrhi::BindingLayoutDesc LayoutDesc;
+			LayoutDesc.visibility = nvrhi::ShaderType::Compute;
+
+			nvrhi::VulkanBindingOffsets offsets;
+			offsets.setConstantBufferOffset(0).setShaderResourceOffset(0).setSamplerOffset(0).setUnorderedAccessViewOffset(0);
+			LayoutDesc.setBindingOffsets(offsets);
+
+			// b0 -> 256 (TonemapConstants)
+			// t0 -> 0 (HDR input)
+			// u0 -> 384 (SDR output)
+			LayoutDesc.bindings = {
+				nvrhi::BindingLayoutItem::ConstantBuffer(256),
+				nvrhi::BindingLayoutItem::Texture_SRV(0),  // t0: HDR input
+				nvrhi::BindingLayoutItem::Texture_UAV(384) // u0: SDR output
+			};
+
+			ToneMapBindingLayout = NvrhiDevice->createBindingLayout(LayoutDesc);
+		}
+
+		// =====================================================================
+		// Create Tone Map pipeline
+		// =====================================================================
+		{
+			nvrhi::ComputePipelineDesc PipelineDesc;
+			PipelineDesc.setComputeShader(ToneMapCS);
+			PipelineDesc.addBindingLayout(ToneMapBindingLayout);
+
+			ToneMapPipeline = NvrhiDevice->createComputePipeline(PipelineDesc);
+			if (!ToneMapPipeline)
+			{
+				HLVM_LOG(LogTest, err, TXT("Failed to create tone mapping pipeline"));
+				return false;
+			}
+		}
+		HLVM_LOG(LogTest, info, TXT("Tone mapping pipeline created"));
 
 		// =====================================================================
 		// Create Sponza geometry buffers (per-mesh)
@@ -608,17 +672,67 @@ public:
 		}
 
 		// =====================================================================
+		// Create SDR output texture (for tone mapping)
+		// =====================================================================
+		{
+			nvrhi::TextureDesc Desc;
+			Desc.dimension = nvrhi::TextureDimension::Texture2D;
+			Desc.width = GBufferWidth;
+			Desc.height = GBufferHeight;
+			Desc.format = nvrhi::Format::RGBA8_UNORM;
+			Desc.isRenderTarget = false;
+			Desc.isUAV = true;
+			Desc.isTypeless = false;
+			Desc.initialState = nvrhi::ResourceStates::UnorderedAccess;
+			Desc.keepInitialState = true;
+			Desc.debugName = "SDROutput";
+			SDRTexture = NvrhiDevice->createTexture(Desc);
+		}
+
+		// =====================================================================
+		// Create depth copy texture (R32_FLOAT for SRV in compute)
+		// =====================================================================
+		{
+			nvrhi::TextureDesc Desc;
+			Desc.dimension = nvrhi::TextureDimension::Texture2D;
+			Desc.width = GBufferWidth;
+			Desc.height = GBufferHeight;
+			Desc.format = nvrhi::Format::R32_FLOAT;
+			Desc.isRenderTarget = false;
+			Desc.isUAV = false;
+			Desc.isTypeless = false;
+			Desc.initialState = nvrhi::ResourceStates::ShaderResource;
+			Desc.keepInitialState = true;
+			Desc.debugName = "GBufferDepthCopy";
+			GBufferDepthCopyTexture = NvrhiDevice->createTexture(Desc);
+		}
+
+		// =====================================================================
 		// Create lighting constant buffer
 		// =====================================================================
 		{
 			nvrhi::BufferDesc BufferDesc;
-			BufferDesc.byteSize = sizeof(float) * 32; // 8 float4s
+			BufferDesc.byteSize = sizeof(float) * 32; // 8 float4s = 128 bytes
 			BufferDesc.isConstantBuffer = true;
 			BufferDesc.isVolatile = false;
 			BufferDesc.keepInitialState = true;
 			BufferDesc.initialState = nvrhi::ResourceStates::ConstantBuffer;
 			BufferDesc.debugName = "LightingConstants";
 			LightingConstantBuffer = NvrhiDevice->createBuffer(BufferDesc);
+		}
+
+		// =====================================================================
+		// Create tone mapping constant buffer
+		// =====================================================================
+		{
+			nvrhi::BufferDesc BufferDesc;
+			BufferDesc.byteSize = sizeof(float) * 8; // 2 float4s = 32 bytes
+			BufferDesc.isConstantBuffer = true;
+			BufferDesc.isVolatile = false;
+			BufferDesc.keepInitialState = true;
+			BufferDesc.initialState = nvrhi::ResourceStates::ConstantBuffer;
+			BufferDesc.debugName = "TonemapConstants";
+			ToneMapConstantBuffer = NvrhiDevice->createBuffer(BufferDesc);
 		}
 
 		// =====================================================================
@@ -647,9 +761,9 @@ public:
 			NvrhiDevice->executeCommandList(TexCmdList);
 		}
 
-		// Initialize frame dumper - use RGBA16_FLOAT to match HDRTexture format
+		// Initialize frame dumper - use RGBA8_UNORM to match SDRTexture format
 		HLVM_LOG(LogTest, info, TXT("Initializing FrameDumper..."));
-		FrameDumper.Initialize(NvrhiDevice, nvrhi::Format::RGBA32_FLOAT);
+		FrameDumper.Initialize(NvrhiDevice, nvrhi::Format::RGBA8_UNORM);
 		HLVM_LOG(LogTest, info, TXT("FrameDumper initialized."));
 		FrameDumper.SetTestName(TXT("TestSponzaDeferred"));
 
@@ -671,6 +785,12 @@ public:
 		PlaceholderTexture = nullptr;
 		LoadedDiffuseTexture = nullptr;
 
+		ToneMapPipeline = nullptr;
+		ToneMapBindingLayout = nullptr;
+		ToneMapCS = nullptr;
+		SDRTexture = nullptr;
+		ToneMapConstantBuffer = nullptr;
+
 		GBufferVS = nullptr;
 		GBufferPS = nullptr;
 		GBufferDiffuseTexture = nullptr;
@@ -678,6 +798,7 @@ public:
 		GBufferNormalsTexture = nullptr;
 		GBufferEmissiveTexture = nullptr;
 		GBufferDepthTexture = nullptr;
+		GBufferDepthCopyTexture = nullptr;
 		GBufferFramebuffer = nullptr;
 		GBufferInputLayout = nullptr;
 		GBufferBindingLayout = nullptr;
@@ -789,6 +910,18 @@ public:
 			Desc.initialState = nvrhi::ResourceStates::UnorderedAccess;
 			Desc.debugName = "HDROutput";
 			HDRTexture = NvrhiDevice->createTexture(Desc);
+
+			// Recreate SDR texture
+			Desc.format = nvrhi::Format::RGBA8_UNORM;
+			Desc.debugName = "SDROutput";
+			SDRTexture = NvrhiDevice->createTexture(Desc);
+
+			// Recreate depth copy texture
+			Desc.format = nvrhi::Format::R32_FLOAT;
+			Desc.isUAV = false;
+			Desc.initialState = nvrhi::ResourceStates::ShaderResource;
+			Desc.debugName = "GBufferDepthCopy";
+			GBufferDepthCopyTexture = NvrhiDevice->createTexture(Desc);
 
 			BindingCache.Clear();
 		}
@@ -953,33 +1086,51 @@ public:
 			}
 		}
 
-		// Transition textures
+		// Transition GBuffer color textures to ShaderResource
 		CmdList->setTextureState(GBufferDiffuseTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
 		CmdList->setTextureState(GBufferSpecularTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
 		CmdList->setTextureState(GBufferNormalsTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
 		CmdList->setTextureState(GBufferEmissiveTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
-		CmdList->setTextureState(GBufferDepthTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+
+		// Copy depth to R32_FLOAT texture for compute SRV
+		CmdList->setTextureState(GBufferDepthTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::CopySource);
+		CmdList->setTextureState(GBufferDepthCopyTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::CopyDest);
+		nvrhi::TextureSlice slice = {};
+		slice.width = CurrentFBInfo.width;
+		slice.height = CurrentFBInfo.height;
+		slice.depth = 1;
+		CmdList->copyTexture(GBufferDepthCopyTexture.Get(), slice, GBufferDepthTexture.Get(), slice);
+		CmdList->setTextureState(GBufferDepthCopyTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
 
 		// =====================================================================
 		// Lighting Pass (same command list)
 		// =====================================================================
 
-		// Write lighting constants
-		float LightingData[32] = {
-			// LightDir - Sunlight from upper-right-front
-			0.577f, 0.577f, 0.577f, 0.8f,
-			// CameraPos
-			camX, camY, camZ, 0.f,
-			// AmbientColor
-			0.03f, 0.03f, 0.03f, 0.f,
-			// ShadowHardness
-			16.0f, 0.f, 0.f, 0.f,
-			// Padding
-			0.f, 0.f, 0.f, 0.f,
-			0.f, 0.f, 0.f, 0.f,
-			0.f, 0.f, 0.f, 0.f,
-			0.f, 0.f, 0.f, 0.f
-		};
+		// Write lighting constants: InvViewProj (4 registers) + light data (4 registers)
+		float LightingData[32];
+		glm::mat4 invViewProj = glm::inverse(proj * view);
+		// Register 0-3: InvViewProj (column-major)
+		memcpy(&LightingData[0], glm::value_ptr(invViewProj), 64);
+		// Register 4: LightDir + LightIntensity
+		LightingData[16] = 0.577f;
+		LightingData[17] = 0.577f;
+		LightingData[18] = 0.577f;
+		LightingData[19] = 0.8f;
+		// Register 5: CameraPos + ShadowHardness
+		LightingData[20] = camX;
+		LightingData[21] = camY;
+		LightingData[22] = camZ;
+		LightingData[23] = 16.0f;
+		// Register 6: AmbientColor + Pad
+		LightingData[24] = 0.03f;
+		LightingData[25] = 0.03f;
+		LightingData[26] = 0.03f;
+		LightingData[27] = 0.0f;
+		// Register 7: ScreenSize + Pad2
+		LightingData[28] = float(CurrentFBInfo.width);
+		LightingData[29] = float(CurrentFBInfo.height);
+		LightingData[30] = 0.0f;
+		LightingData[31] = 0.0f;
 		CmdList->writeBuffer(LightingConstantBuffer, LightingData, sizeof(LightingData));
 
 		// Transition HDR texture to UAV for compute write
@@ -993,6 +1144,7 @@ public:
 			nvrhi::BindingSetItem::Texture_SRV(1, GBufferSpecularTexture),
 			nvrhi::BindingSetItem::Texture_SRV(2, GBufferNormalsTexture),
 			nvrhi::BindingSetItem::Texture_SRV(3, GBufferEmissiveTexture),
+			nvrhi::BindingSetItem::Texture_SRV(4, GBufferDepthCopyTexture),
 			nvrhi::BindingSetItem::Texture_UAV(384, HDRTexture)
 		};
 		nvrhi::BindingSetHandle LightingBindingSet = BindingCache.GetOrCreateBindingSet(LightingBindingSetDesc, LightingBindingLayout);
@@ -1012,14 +1164,42 @@ public:
 		CmdList->setTextureState(GBufferSpecularTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::RenderTarget);
 		CmdList->setTextureState(GBufferNormalsTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::RenderTarget);
 		CmdList->setTextureState(GBufferEmissiveTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::RenderTarget);
+		CmdList->setTextureState(GBufferDepthTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::DepthWrite);
+
+		// =====================================================================
+		// Tone Mapping Pass
+		// =====================================================================
+		float TonemapData[8] = {
+			1.0f, 2.2f, 0.0f, 0.0f,                           // Exposure, Gamma, Mode=ACES, Pad
+			float(CurrentFBInfo.width), float(CurrentFBInfo.height), 0.0f, 0.0f  // TextureSize
+		};
+		CmdList->writeBuffer(ToneMapConstantBuffer, TonemapData, sizeof(TonemapData));
+
+		CmdList->setTextureState(HDRTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+		CmdList->setTextureState(SDRTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
+
+		nvrhi::BindingSetDesc ToneMapBindingSetDesc;
+		ToneMapBindingSetDesc.bindings = {
+			nvrhi::BindingSetItem::ConstantBuffer(256, ToneMapConstantBuffer),
+			nvrhi::BindingSetItem::Texture_SRV(0, HDRTexture),
+			nvrhi::BindingSetItem::Texture_UAV(384, SDRTexture)
+		};
+		nvrhi::BindingSetHandle ToneMapBindingSet = BindingCache.GetOrCreateBindingSet(ToneMapBindingSetDesc, ToneMapBindingLayout);
+
+		nvrhi::ComputeState ToneMapComputeState;
+		ToneMapComputeState.setPipeline(ToneMapPipeline);
+		ToneMapComputeState.addBindingSet(ToneMapBindingSet);
+		CmdList->setComputeState(ToneMapComputeState);
+		CmdList->dispatch(DispatchX, DispatchY, 1);
 
 		// =====================================================================
 		// Frame dump Phase 1: Prepare copy on command list (BEFORE close)
 		// =====================================================================
 		if (FrameDumper.IsEnabled()) {
-			HLVM_LOG(LogTest, info, TXT("Frame dump: HDRTexture={}, width={}, height={}"),
-				static_cast<void*>(HDRTexture.Get()), CurrentFBInfo.width, CurrentFBInfo.height);
-			FrameDumper.BeginDump(NvrhiDevice, HDRTexture.Get(), CurrentFBInfo.width, CurrentFBInfo.height);
+			CmdList->setTextureState(SDRTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::CopySource);
+			HLVM_LOG(LogTest, info, TXT("Frame dump: SDRTexture={}, width={}, height={}"),
+				static_cast<void*>(SDRTexture.Get()), CurrentFBInfo.width, CurrentFBInfo.height);
+			FrameDumper.BeginDump(NvrhiDevice, SDRTexture.Get(), CurrentFBInfo.width, CurrentFBInfo.height);
 			FrameDumper.PrepareCopy(CmdList);
 		}
 
@@ -1042,15 +1222,15 @@ public:
 		else
 		{
 			// =====================================================================
-			// Blit to screen
+			// Blit SDR to screen
 			// =====================================================================
-			CmdList->setTextureState(HDRTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+			CmdList->setTextureState(SDRTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
 
 			FCommonRenderPasses::BlitParameters BlitParams;
 			FCommonRenderPasses::BlitTexture(
 				CmdList,
 				Framebuffer,
-				HDRTexture,
+				SDRTexture,
 				&BindingCache,
 				CurrentFBInfo.width,
 				CurrentFBInfo.height,
@@ -1079,12 +1259,14 @@ public:
 	virtual void BackBufferResizing() override
 	{
 		HDRTexture = nullptr;
+		SDRTexture = nullptr;
 		GBufferFramebuffer = nullptr;
 		GBufferDiffuseTexture = nullptr;
 		GBufferSpecularTexture = nullptr;
 		GBufferNormalsTexture = nullptr;
 		GBufferEmissiveTexture = nullptr;
 		GBufferDepthTexture = nullptr;
+		GBufferDepthCopyTexture = nullptr;
 		LoadedDiffuseTexture = nullptr;
 		BindingCache.Clear();
 	}
@@ -1099,12 +1281,14 @@ private:
 	nvrhi::ShaderHandle GBufferVS;
 	nvrhi::ShaderHandle GBufferPS;
 	nvrhi::ShaderHandle LightingCS;
+	nvrhi::ShaderHandle ToneMapCS;
 
 	nvrhi::TextureHandle	 GBufferDiffuseTexture;
 	nvrhi::TextureHandle	 GBufferSpecularTexture;
 	nvrhi::TextureHandle	 GBufferNormalsTexture;
 	nvrhi::TextureHandle	 GBufferEmissiveTexture;
 	nvrhi::TextureHandle	 GBufferDepthTexture;
+	nvrhi::TextureHandle	 GBufferDepthCopyTexture;
 	nvrhi::FramebufferHandle GBufferFramebuffer;
 	nvrhi::TextureHandle	 PlaceholderTexture;
 	nvrhi::TextureHandle	 LoadedDiffuseTexture;
@@ -1120,6 +1304,12 @@ private:
 	nvrhi::ComputePipelineHandle LightingPipeline;
 	nvrhi::BufferHandle			 LightingConstantBuffer;
 	nvrhi::TextureHandle		 HDRTexture;
+
+	nvrhi::BindingLayoutHandle	 ToneMapBindingLayout;
+	nvrhi::ComputePipelineHandle ToneMapPipeline;
+	nvrhi::BufferHandle			 ToneMapConstantBuffer;
+	nvrhi::TextureHandle		 SDRTexture;
+
 	FRenderPassDumper			 FrameDumper;
 
 	// Sponza geometry buffers (cached)

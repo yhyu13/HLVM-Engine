@@ -250,6 +250,7 @@ def create_sponza_deferred_shadermake(test_target_name: str) -> ShaderMakeModule
         test_data_dir + "/GBufferSponzaVS.hlsl",
         test_data_dir + "/GBufferSponzaPS.hlsl",
         test_data_dir + "/SponzaDeferredLighting_cs.hlsl",
+        test_data_dir + "/TonemapSponza_cs.hlsl",
     ]
 
     # Include directories
@@ -317,6 +318,32 @@ def create_pbr_lighting_shadermake(test_target_name: str) -> ShaderMakeModule:
         output_dir_cmake=test_data_dir,
         include_dirs_cmake=include_dirs,
         project_name="HLVM_PBRLighting",
+        slang_options=""
+    )
+
+
+def create_tone_mapping_shadermake(test_target_name: str) -> ShaderMakeModule:
+    """Factory function to create ShaderMake module for TestToneMapping shaders."""
+    shader_target_name = test_target_name + "_ShaderMake"
+
+    test_data_dir = "${CMAKE_SOURCE_DIR}/Test/TestToneMapping_Data"
+    config_file = "${CMAKE_SOURCE_DIR}/Test/TestToneMapping_Data/ShaderMake.cfg"
+
+    shader_sources = [
+        test_data_dir + "/Tonemap_cs.hlsl",
+    ]
+
+    include_dirs = [
+        test_data_dir,
+    ]
+
+    return ShaderMakeModule(
+        target_name=shader_target_name,
+        config_file_cmake=config_file,
+        shader_sources_cmake=shader_sources,
+        output_dir_cmake=test_data_dir,
+        include_dirs_cmake=include_dirs,
+        project_name="HLVM_ToneMapping",
         slang_options=""
     )
 
