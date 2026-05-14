@@ -2,6 +2,8 @@
 #include "Image/FImageDump.h"
 #include "Core/Log.h"
 #include <cstring>
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb_image_wrapper.h>
 
 DECLARE_LOG_CATEGORY(LogImageDump)
 
@@ -124,6 +126,7 @@ bool FRenderPassDumper::ReadbackAndSave() {
 
     size_t pixelSizeBytes = GetPixelSizeBytes(mFormat);
     bool is16Float = (mFormat == nvrhi::Format::RGBA16_FLOAT);
+    bool is8Unorm  = (mFormat == nvrhi::Format::RGBA8_UNORM);
 
     for (uint32_t y = 0; y < mHeight; y++) {
         uint8_t* srcRowBase;
@@ -144,8 +147,15 @@ bool FRenderPassDumper::ReadbackAndSave() {
                 dst[dstIdx + 1] = Float16ToFloat32(src16[1]);
                 dst[dstIdx + 2] = Float16ToFloat32(src16[2]);
                 dst[dstIdx + 3] = Float16ToFloat32(src16[3]);
+            } else if (is8Unorm) {
+                // RGBA8_UNORM - read as uint8_t and normalize to [0,1]
+                uint8_t* src = srcRowBase + srcIdx;
+                dst[dstIdx + 0] = static_cast<float>(src[0]) / 255.0f;
+                dst[dstIdx + 1] = static_cast<float>(src[1]) / 255.0f;
+                dst[dstIdx + 2] = static_cast<float>(src[2]) / 255.0f;
+                dst[dstIdx + 3] = static_cast<float>(src[3]) / 255.0f;
             } else {
-                // RGBA32_FLOAT or others - read directly as float
+                // RGBA32_FLOAT - read directly as float
                 float* src = reinterpret_cast<float*>(srcRowBase + srcIdx);
                 dst[dstIdx + 0] = src[0];
                 dst[dstIdx + 1] = src[1];
@@ -164,7 +174,7 @@ bool FRenderPassDumper::ReadbackAndSave() {
         outputDir = FString(dirEnv);
     } else {
         outputDir = FString::Format(
-            TXT("{}/Engine/Source/Runtime/Test/{}_Data"),
+            TXT("{}/../../Test/{}_Data"),
             *GExecutablePath, *mTestName);
     }
 
@@ -211,4 +221,50 @@ bool FRenderPassDumper::EndDump() {
 
     // Then readback
     return ReadbackAndSave();
+}
+
+bool FRenderPassDumper::CompareAgainstReference(const FString& referencePath, float thresholdMSE) {
+    if (mPixelBuffer.empty() || mWidth == 0 || mHeight == 0) {
+        HLVM_LOG(LogImageDump, warn, TXT("Regression: No pixel data to compare"));
+        return false;
+    }
+
+    // Load reference PNG via stb_image
+    int refW = 0, refH = 0, refChannels = 0;
+    std::string narrowPath(referencePath.begin(), referencePath.end());
+    unsigned char* refData = stbi_load(narrowPath.c_str(), &refW, &refH, &refChannels, 4);  // force RGBA
+
+    if (!refData) {
+        HLVM_LOG(LogImageDump, warn, TXT("Regression: Reference image not found: {}"), *referencePath);
+        return false;
+    }
+
+    if (refW != static_cast<int>(mWidth) || refH != static_cast<int>(mHeight)) {
+        HLVM_LOG(LogImageDump, warn,
+            TXT("Regression: Resolution mismatch: ref={}x{} vs dump={}x{}"),
+            refW, refH, mWidth, mHeight);
+        stbi_image_free(refData);
+        return false;
+    }
+
+    // Compute MSE over RGB channels (skip alpha)
+    double sse = 0.0;
+    size_t pixelCount = static_cast<size_t>(mWidth) * mHeight;
+    for (size_t i = 0; i < pixelCount; i++) {
+        for (size_t c = 0; c < 3; c++) {
+            float ref = refData[i * 4 + c] / 255.0f;
+            float dump = mPixelBuffer[i * 4 + c];
+            float diff = ref - dump;
+            sse += static_cast<double>(diff) * static_cast<double>(diff);
+        }
+    }
+    float mse = static_cast<float>(sse / static_cast<double>(pixelCount * 3));
+
+    bool pass = mse < thresholdMSE;
+    HLVM_LOG(LogImageDump, info,
+        TXT("Regression: MSE={:.6f}, threshold={:.6f}, result={}"),
+        mse, thresholdMSE, pass ? TXT("PASS") : TXT("FAIL"));
+
+    stbi_image_free(refData);
+    return pass;
 }

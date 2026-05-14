@@ -59,6 +59,12 @@ public:
     // Kept for backwards compatibility but will fail if called while another command list is open
     bool EndDump();
 
+    // Compare dumped frame against a reference PNG image.
+    // Loads reference via stb_image, computes per-pixel MSE against dumped pixels.
+    // Returns true if MSE < threshold (PASS), false if MSE >= threshold or error (FAIL).
+    // Does NOT throw or fail the test — just logs the result.
+    bool CompareAgainstReference(const FString& referencePath, float thresholdMSE = 0.01f);
+
 private:
     void Shutdown();
 

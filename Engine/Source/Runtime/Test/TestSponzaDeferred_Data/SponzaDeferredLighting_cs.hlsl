@@ -84,6 +84,7 @@ void main(uint2 dispatchThreadId : SV_DispatchThreadID)
     float4 diffuseData  = t_Diffuse[pixelCoord];
     float4 materialData = t_Material[pixelCoord];
     float4 normalData   = t_Normal[pixelCoord];
+    float4 emissiveData = t_Emissive[pixelCoord];
     float  depth        = t_Depth[pixelCoord];
 
     // Decode normal from [0,1] to [-1,1]
@@ -131,7 +132,7 @@ void main(uint2 dispatchThreadId : SV_DispatchThreadID)
     // Ambient
     float3 ambient = albedo * AmbientColor;
 
-    float3 finalColor = ambient + Lo;
+    float3 finalColor = ambient + Lo + emissiveData.rgb;
 
     u_HDROutput[pixelCoord] = float4(finalColor, 1.0);
 }

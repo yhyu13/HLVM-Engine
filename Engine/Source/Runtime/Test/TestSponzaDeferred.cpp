@@ -268,6 +268,30 @@ public:
 			}
 		}
 
+		// Load normal maps for materials that have them
+		for (auto& Mat : Materials)
+		{
+			if (Mat->HasTexture(IMaterial::ETextureType::Normal))
+			{
+				FPath TexPath = Mat->GetTexturePath(IMaterial::ETextureType::Normal);
+				HLVM_LOG(LogTest, info, TXT("Loading normal texture: {}"), *TexPath);
+				nvrhi::CommandListHandle TexCmdList = NvrhiDevice->createCommandList();
+				TexCmdList->open();
+				bool LoadSuccess = Mat->LoadTexture(IMaterial::ETextureType::Normal, NvrhiDevice, TexCmdList);
+				if (LoadSuccess)
+				{
+					FTexture& GPUTex = Mat->GetGPUTexture(IMaterial::ETextureType::Normal);
+					HLVM_LOG(LogTest, info, TXT("Successfully loaded normal texture: {}x{}"),
+						GPUTex.GetWidth(), GPUTex.GetHeight());
+				}
+				else
+				{
+					HLVM_LOG(LogTest, warn, TXT("Failed to load normal texture: {}"), *TexPath);
+				}
+			}
+		}
+
+
 		// If no texture loaded, use placeholder
 		if (!LoadedDiffuseTexture)
 		{
@@ -416,11 +440,15 @@ public:
 			LayoutDesc.setBindingOffsets(offsets);
 
 			// b0 -> 256 (ViewConstants)
+			// b1 -> 257 (MaterialConstants)
 			// t0 -> 0 (DiffuseTexture)
+			// t1 -> 1 (NormalTexture)
 			// s0 -> 128 (LinearSampler)
 			LayoutDesc.bindings = {
 				nvrhi::BindingLayoutItem::ConstantBuffer(256), // ViewConstants b0 -> 256
+				nvrhi::BindingLayoutItem::ConstantBuffer(257), // MaterialConstants b1 -> 257
 				nvrhi::BindingLayoutItem::Texture_SRV(0),	   // DiffuseTexture t0
+				nvrhi::BindingLayoutItem::Texture_SRV(1),	   // NormalTexture t1
 				nvrhi::BindingLayoutItem::Sampler(128)		   // LinearSampler s0 -> 128
 			};
 
@@ -445,7 +473,7 @@ public:
 		// =====================================================================
 		{
 			nvrhi::BufferDesc MatCBDesc;
-			MatCBDesc.byteSize = sizeof(float) * 4 + sizeof(float) * 3; // AlbedoColor(4) + Specular/Roughness/Pad(3)
+			MatCBDesc.byteSize = sizeof(float) * 8; // AlbedoColor(4) + Specular/Roughness/Pad(3)
 			MatCBDesc.isConstantBuffer = true;
 			MatCBDesc.isVolatile = false;
 			MatCBDesc.keepInitialState = true;
@@ -509,7 +537,7 @@ public:
 			// t1 -> 1 (GBufferMaterial - Metallic(R) + Roughness(G))
 			// t2 -> 2 (GBufferNormals - Normal XYZ)
 			// t3 -> 3 (GBufferEmissive - Emissive RGB)
-			// t4 -> 4 (GBufferDepthCopy - Depth value for world pos reconstruction)
+			// t4 -> 4 (GBufferDepth - Direct depth SRV for world pos reconstruction)
 			// u0 -> 384 (HDR output)
 			LayoutDesc.bindings = {
 				nvrhi::BindingLayoutItem::ConstantBuffer(256),
@@ -690,24 +718,6 @@ public:
 		}
 
 		// =====================================================================
-		// Create depth copy texture (R32_FLOAT for SRV in compute)
-		// =====================================================================
-		{
-			nvrhi::TextureDesc Desc;
-			Desc.dimension = nvrhi::TextureDimension::Texture2D;
-			Desc.width = GBufferWidth;
-			Desc.height = GBufferHeight;
-			Desc.format = nvrhi::Format::R32_FLOAT;
-			Desc.isRenderTarget = false;
-			Desc.isUAV = false;
-			Desc.isTypeless = false;
-			Desc.initialState = nvrhi::ResourceStates::ShaderResource;
-			Desc.keepInitialState = true;
-			Desc.debugName = "GBufferDepthCopy";
-			GBufferDepthCopyTexture = NvrhiDevice->createTexture(Desc);
-		}
-
-		// =====================================================================
 		// Create lighting constant buffer
 		// =====================================================================
 		{
@@ -798,7 +808,6 @@ public:
 		GBufferNormalsTexture = nullptr;
 		GBufferEmissiveTexture = nullptr;
 		GBufferDepthTexture = nullptr;
-		GBufferDepthCopyTexture = nullptr;
 		GBufferFramebuffer = nullptr;
 		GBufferInputLayout = nullptr;
 		GBufferBindingLayout = nullptr;
@@ -916,13 +925,6 @@ public:
 			Desc.debugName = "SDROutput";
 			SDRTexture = NvrhiDevice->createTexture(Desc);
 
-			// Recreate depth copy texture
-			Desc.format = nvrhi::Format::R32_FLOAT;
-			Desc.isUAV = false;
-			Desc.initialState = nvrhi::ResourceStates::ShaderResource;
-			Desc.debugName = "GBufferDepthCopy";
-			GBufferDepthCopyTexture = NvrhiDevice->createTexture(Desc);
-
 			BindingCache.Clear();
 		}
 
@@ -1012,8 +1014,13 @@ public:
 		{
 			const auto& DrawData = AllMeshDrawData[MeshIdx];
 
-			// Look up material texture for this mesh
+			// Look up material for this mesh
 			nvrhi::TextureHandle DiffuseTex = PlaceholderTexture;
+			nvrhi::TextureHandle NormalTex = PlaceholderTexture;
+			float MatData[8] = {
+				1.0f, 1.0f, 1.0f, 1.0f,   // AlbedoTint
+				0.0f, 1.0f, 0.0f, 0.0f    // Metallic, Roughness, EmissiveStrength, Pad
+			};
 			if (DrawData.Mesh && Scene)
 			{
 				auto it = Scene->MeshMultiMaterialMap.find(DrawData.Mesh);
@@ -1032,16 +1039,33 @@ public:
 									DiffuseTex = PlaceholderTexture;
 								}
 							}
+							if (PBRMat->HasGPUTexture(IMaterial::ETextureType::Normal))
+							{
+								NormalTex = PBRMat->GetGPUTexture(IMaterial::ETextureType::Normal).GetTextureSRV();
+								if (!NormalTex)
+								{
+									NormalTex = PlaceholderTexture;
+								}
+							}
+							FVec3 albedo = PBRMat->GetAlbedoColor();
+							MatData[0] = albedo.x;
+							MatData[1] = albedo.y;
+							MatData[2] = albedo.z;
+							MatData[4] = PBRMat->GetMetallic();
+							MatData[5] = PBRMat->GetRoughness();
 						}
 					}
 				}
 			}
+			CmdList->writeBuffer(MaterialConstantBuffer, MatData, sizeof(MatData));
 
-			// Create binding set for this mesh's texture
+			// Create binding set for this mesh's textures
 			nvrhi::BindingSetDesc GBufferBindingSetDesc;
 			GBufferBindingSetDesc.bindings = {
 				nvrhi::BindingSetItem::ConstantBuffer(256, ViewConstantsBuffer),
+				nvrhi::BindingSetItem::ConstantBuffer(257, MaterialConstantBuffer),
 				nvrhi::BindingSetItem::Texture_SRV(0, DiffuseTex),
+				nvrhi::BindingSetItem::Texture_SRV(1, NormalTex),
 				nvrhi::BindingSetItem::Sampler(128, GBufferLinearSampler)
 			};
 			nvrhi::BindingSetHandle GBufferBindingSet = BindingCache.GetOrCreateBindingSet(GBufferBindingSetDesc, GBufferBindingLayout);
@@ -1092,15 +1116,8 @@ public:
 		CmdList->setTextureState(GBufferNormalsTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
 		CmdList->setTextureState(GBufferEmissiveTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
 
-		// Copy depth to R32_FLOAT texture for compute SRV
-		CmdList->setTextureState(GBufferDepthTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::CopySource);
-		CmdList->setTextureState(GBufferDepthCopyTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::CopyDest);
-		nvrhi::TextureSlice slice = {};
-		slice.width = CurrentFBInfo.width;
-		slice.height = CurrentFBInfo.height;
-		slice.depth = 1;
-		CmdList->copyTexture(GBufferDepthCopyTexture.Get(), slice, GBufferDepthTexture.Get(), slice);
-		CmdList->setTextureState(GBufferDepthCopyTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+		// Transition depth to ShaderResource for compute SRV (D32 can be sampled directly)
+		CmdList->setTextureState(GBufferDepthTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
 
 		// =====================================================================
 		// Lighting Pass (same command list)
@@ -1144,7 +1161,7 @@ public:
 			nvrhi::BindingSetItem::Texture_SRV(1, GBufferSpecularTexture),
 			nvrhi::BindingSetItem::Texture_SRV(2, GBufferNormalsTexture),
 			nvrhi::BindingSetItem::Texture_SRV(3, GBufferEmissiveTexture),
-			nvrhi::BindingSetItem::Texture_SRV(4, GBufferDepthCopyTexture),
+			nvrhi::BindingSetItem::Texture_SRV(4, GBufferDepthTexture),
 			nvrhi::BindingSetItem::Texture_UAV(384, HDRTexture)
 		};
 		nvrhi::BindingSetHandle LightingBindingSet = BindingCache.GetOrCreateBindingSet(LightingBindingSetDesc, LightingBindingLayout);
@@ -1247,8 +1264,14 @@ public:
 		// Frame dump Phase 2: Readback and save (AFTER execute)
 		// =====================================================================
 		if (FrameDumper.IsEnabled()) {
+			int frameNum = FrameDumper.GetCurrentFrame();
 			if (FrameDumper.ReadbackAndSave()) {
-				HLVM_LOG(LogTest, info, TXT("Dumped frame {}"), FrameDumper.GetCurrentFrame());
+				HLVM_LOG(LogTest, info, TXT("Dumped frame {}"), frameNum);
+				// Compare against reference image if available
+				FString refPath = FString::Format(
+					TXT("{}/../../Test/TestSponzaDeferred_Data/Reference/frame_{:04d}.png"),
+					*GExecutablePath, frameNum);
+				FrameDumper.CompareAgainstReference(refPath, 0.01f);
 			}
 			if (FrameDumper.IsLastFrame()) {
 				return;  // Skip presentation on last frame
@@ -1266,7 +1289,6 @@ public:
 		GBufferNormalsTexture = nullptr;
 		GBufferEmissiveTexture = nullptr;
 		GBufferDepthTexture = nullptr;
-		GBufferDepthCopyTexture = nullptr;
 		LoadedDiffuseTexture = nullptr;
 		BindingCache.Clear();
 	}
@@ -1288,7 +1310,6 @@ private:
 	nvrhi::TextureHandle	 GBufferNormalsTexture;
 	nvrhi::TextureHandle	 GBufferEmissiveTexture;
 	nvrhi::TextureHandle	 GBufferDepthTexture;
-	nvrhi::TextureHandle	 GBufferDepthCopyTexture;
 	nvrhi::FramebufferHandle GBufferFramebuffer;
 	nvrhi::TextureHandle	 PlaceholderTexture;
 	nvrhi::TextureHandle	 LoadedDiffuseTexture;

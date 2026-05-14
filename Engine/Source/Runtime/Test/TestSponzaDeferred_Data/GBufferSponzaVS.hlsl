@@ -21,6 +21,7 @@ struct PSInput {
     float3 WorldPos : TEXCOORD0;
     float3 Normal : TEXCOORD1;
     float2 TexCoord : TEXCOORD2;
+    float3 Tangent : TEXCOORD3;
 };
 
 PSInput main(VSInput input) {
@@ -33,6 +34,7 @@ PSInput main(VSInput input) {
     output.Position = mul(ProjMatrix, viewPos);
 
     output.Normal = normalize(mul((float3x3)ModelMatrix, input.Normal));
+    output.Tangent = normalize(mul((float3x3)ModelMatrix, input.Tangent));
     output.TexCoord = input.TexCoord;
 
     return output;
