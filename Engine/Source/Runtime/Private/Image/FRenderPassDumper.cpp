@@ -2,6 +2,8 @@
 #include "Image/FImageDump.h"
 #include "Core/Log.h"
 #include <cstring>
+#include <unistd.h>
+#include <climits>
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image_wrapper.h>
 
@@ -173,9 +175,17 @@ bool FRenderPassDumper::ReadbackAndSave() {
     if (dirEnv && dirEnv[0] != '\0') {
         outputDir = FString(dirEnv);
     } else {
+        // Use executable path for robust resolution, fallback to CWD
+        FPath exeDir = GExecutablePath;
+        char exeBuf[PATH_MAX];
+        ssize_t exeLen = readlink("/proc/self/exe", exeBuf, sizeof(exeBuf) - 1);
+        if (exeLen != -1) {
+            exeBuf[exeLen] = '\0';
+            exeDir = FPath(boost::filesystem::path(exeBuf).parent_path());
+        }
         outputDir = FString::Format(
             TXT("{}/../../Test/{}_Data"),
-            *GExecutablePath, *mTestName);
+            *exeDir, *mTestName);
     }
 
     FString baseFilename = FImageDump::GenerateTimestampedFilename(outputDir);

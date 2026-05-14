@@ -28,6 +28,8 @@
 #include "Image/FImageDump.h"
 #include "Image/FRenderPassDumper.h"
 #include <nvrhi/utils.h>
+#include <unistd.h>
+#include <climits>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -762,11 +764,18 @@ public:
 			Desc.debugName = "PlaceholderTexture";
 			PlaceholderTexture = NvrhiDevice->createTexture(Desc);
 
-			// Initialize with white
+			// Initialize with white for albedo placeholder
 			nvrhi::CommandListHandle TexCmdList = NvrhiDevice->createCommandList();
 			TexCmdList->open();
 			uint32_t whitePixel = 0xFFFFFFFF;
 			TexCmdList->writeTexture(PlaceholderTexture, 0, 0, &whitePixel, 4);
+
+			// Create flat normal placeholder [0.5, 0.5, 1.0] = tangent-space "up"
+			Desc.debugName = "NormalPlaceholderTexture";
+			NormalPlaceholderTexture = NvrhiDevice->createTexture(Desc);
+			uint32_t flatNormalPixel = 0xFF8080FF; // ABGR: A=255, B=128, G=128, R=255
+			TexCmdList->writeTexture(NormalPlaceholderTexture, 0, 0, &flatNormalPixel, 4);
+
 			TexCmdList->close();
 			NvrhiDevice->executeCommandList(TexCmdList);
 		}
@@ -793,6 +802,7 @@ public:
 		HDRTexture = nullptr;
 		LightingConstantBuffer = nullptr;
 		PlaceholderTexture = nullptr;
+		NormalPlaceholderTexture = nullptr;
 		LoadedDiffuseTexture = nullptr;
 
 		ToneMapPipeline = nullptr;
@@ -1016,7 +1026,7 @@ public:
 
 			// Look up material for this mesh
 			nvrhi::TextureHandle DiffuseTex = PlaceholderTexture;
-			nvrhi::TextureHandle NormalTex = PlaceholderTexture;
+			nvrhi::TextureHandle NormalTex = NormalPlaceholderTexture;
 			float MatData[8] = {
 				1.0f, 1.0f, 1.0f, 1.0f,   // AlbedoTint
 				0.0f, 1.0f, 0.0f, 0.0f    // Metallic, Roughness, EmissiveStrength, Pad
@@ -1044,7 +1054,7 @@ public:
 								NormalTex = PBRMat->GetGPUTexture(IMaterial::ETextureType::Normal).GetTextureSRV();
 								if (!NormalTex)
 								{
-									NormalTex = PlaceholderTexture;
+									NormalTex = NormalPlaceholderTexture;
 								}
 							}
 							FVec3 albedo = PBRMat->GetAlbedoColor();
@@ -1312,6 +1322,7 @@ private:
 	nvrhi::TextureHandle	 GBufferDepthTexture;
 	nvrhi::FramebufferHandle GBufferFramebuffer;
 	nvrhi::TextureHandle	 PlaceholderTexture;
+	nvrhi::TextureHandle	 NormalPlaceholderTexture;
 	nvrhi::TextureHandle	 LoadedDiffuseTexture;
 
 	nvrhi::InputLayoutHandle	  GBufferInputLayout;
