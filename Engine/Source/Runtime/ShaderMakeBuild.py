@@ -366,6 +366,7 @@ def create_common_shadermake() -> ShaderMakeModule:
     shader_sources = [
         shader_dir + "/BlitVS.hlsl",
         shader_dir + "/BlitPS.hlsl",
+        shader_dir + "/JointBilateralUpsample_cs.hlsl",
     ]
 
     # Include directories

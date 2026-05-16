@@ -1267,6 +1267,11 @@ RECORD_BOOL(test_RTShadowsGBuffer)
         DeviceParams.bEnableDebugRuntime = false;
         DeviceParams.bEnableNVRHIValidationLayer = true;
         DeviceParams.bEnableRayTracingExtensions = true;
+        // Suppress known validation layer false positive: dynamic viewport/scissor state from prior
+        // graphics pipeline is incorrectly attributed to ray-tracing pipeline dispatch.
+        // See: https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/8038
+        DeviceParams.IgnoredVulkanValidationMessageLocations.push_back(0x29056f6a);
+
 
         if (!DeviceManager->CreateWindowDeviceAndSwapChain(WindowProps))
         {

@@ -27,6 +27,7 @@
 #include "Renderer/ShaderMake/ShaderBlob.h"
 #include "Image/FImageDump.h"
 #include "Image/FRenderPassDumper.h"
+#include "Renderer/PostProcess/FJointBilateralUpsamplePass.h"
 #include <nvrhi/utils.h>
 #include <unistd.h>
 #include <climits>
@@ -181,6 +182,58 @@ public:
 		HLVM_LOG(LogTest, info, TXT("Tone mapping shader loaded successfully"));
 
 		// =====================================================================
+		// Load shadow vertex shader
+		// =====================================================================
+		HLVM_LOG(LogTest, info, TXT("Loading shadow shader..."));
+
+		auto ShadowVSBlob = ReadBinaryFile(
+			FPath::Combine(ShaderDataDir, TXT("ShadowVS.sblob")).string());
+		const void* ShadowVSBinary = nullptr;
+		size_t		ShadowVSBinarySize = 0;
+		if (!ShaderMake::FindPermutationInBlob(ShadowVSBlob.data(), ShadowVSBlob.size(), nullptr, 0, &ShadowVSBinary, &ShadowVSBinarySize))
+		{
+			HLVM_LOG(LogTest, err, TXT("Failed to extract ShadowVS from blob"));
+			return false;
+		}
+
+		nvrhi::ShaderDesc ShadowVSDesc;
+		ShadowVSDesc.setShaderType(nvrhi::ShaderType::Vertex);
+		ShadowVS = NvrhiDevice->createShader(ShadowVSDesc, ShadowVSBinary, ShadowVSBinarySize);
+
+		if (!ShadowVS)
+		{
+			HLVM_LOG(LogTest, err, TXT("Failed to create shadow shader"));
+			return false;
+		}
+		HLVM_LOG(LogTest, info, TXT("Shadow shader loaded successfully"));
+
+		// =====================================================================
+		// Load SSAO compute shaders
+		// =====================================================================
+		HLVM_LOG(LogTest, info, TXT("Loading SSAO shaders..."));
+
+		auto SSAOCSBlob = ReadBinaryFile(
+			FPath::Combine(ShaderDataDir, TXT("SSAO_cs.sblob")).string());
+		const void* SSAOCSBinary = nullptr;
+		size_t SSAOCSBinarySize = 0;
+		if (!ShaderMake::FindPermutationInBlob(SSAOCSBlob.data(), SSAOCSBlob.size(), nullptr, 0, &SSAOCSBinary, &SSAOCSBinarySize))
+		{
+			HLVM_LOG(LogTest, err, TXT("Failed to extract SSAO CS from blob"));
+			return false;
+		}
+
+		nvrhi::ShaderDesc SSAOCSDesc;
+		SSAOCSDesc.setShaderType(nvrhi::ShaderType::Compute);
+		SSAOCS = NvrhiDevice->createShader(SSAOCSDesc, SSAOCSBinary, SSAOCSBinarySize);
+
+		if (!SSAOCS)
+		{
+			HLVM_LOG(LogTest, err, TXT("Failed to create SSAO shader"));
+			return false;
+		}
+		HLVM_LOG(LogTest, info, TXT("SSAO shaders loaded successfully"));
+
+		// =====================================================================
 		// Create command list for initialization
 		// =====================================================================
 		nvrhi::CommandListHandle InitCmdList = NvrhiDevice->createCommandList();
@@ -209,8 +262,8 @@ public:
 			StaticMeshes.size(), Materials.size());
 
 		// Calculate scene center from bounding box (like TestRTShadowsGBuffer)
-		glm::vec3 BBoxMin(FLT_MAX, FLT_MAX, FLT_MAX);
-		glm::vec3 BBoxMax(-FLT_MAX, -FLT_MAX, -FLT_MAX);
+		BBoxMin = glm::vec3(FLT_MAX, FLT_MAX, FLT_MAX);
+		BBoxMax = glm::vec3(-FLT_MAX, -FLT_MAX, -FLT_MAX);
 		for (const auto& Mesh : StaticMeshes)
 		{
 			for (auto& vert : Mesh->GetVertices())
@@ -540,6 +593,8 @@ public:
 			// t2 -> 2 (GBufferNormals - Normal XYZ)
 			// t3 -> 3 (GBufferEmissive - Emissive RGB)
 			// t4 -> 4 (GBufferDepth - Direct depth SRV for world pos reconstruction)
+			// t5 -> 5 (ShadowMap)
+			// t6 -> 6 (SSAO blur texture)
 			// u0 -> 384 (HDR output)
 			LayoutDesc.bindings = {
 				nvrhi::BindingLayoutItem::ConstantBuffer(256),
@@ -548,6 +603,9 @@ public:
 				nvrhi::BindingLayoutItem::Texture_SRV(2),  // t2: Normals
 				nvrhi::BindingLayoutItem::Texture_SRV(3),  // t3: Emissive
 				nvrhi::BindingLayoutItem::Texture_SRV(4),  // t4: Depth copy
+				nvrhi::BindingLayoutItem::Texture_SRV(5),  // t5: ShadowMap
+				nvrhi::BindingLayoutItem::Texture_SRV(6),  // t6: SSAO blur
+				nvrhi::BindingLayoutItem::Sampler(129),    // s1: ShadowSampler
 				nvrhi::BindingLayoutItem::Texture_UAV(384) // u0: HDR output
 			};
 
@@ -724,7 +782,7 @@ public:
 		// =====================================================================
 		{
 			nvrhi::BufferDesc BufferDesc;
-			BufferDesc.byteSize = sizeof(float) * 32; // 8 float4s = 128 bytes
+			BufferDesc.byteSize = sizeof(float) * 52; // 13 float4s = 208 bytes
 			BufferDesc.isConstantBuffer = true;
 			BufferDesc.isVolatile = false;
 			BufferDesc.keepInitialState = true;
@@ -780,6 +838,201 @@ public:
 			NvrhiDevice->executeCommandList(TexCmdList);
 		}
 
+		// =====================================================================
+		// Create shadow map texture and framebuffer
+		// =====================================================================
+		HLVM_LOG(LogTest, info, TXT("Creating shadow map resources..."));
+
+		// Shadow map (2048x2048, D32)
+		{
+			nvrhi::TextureDesc Desc;
+			Desc.dimension = nvrhi::TextureDimension::Texture2D;
+			Desc.width = 2048;
+			Desc.height = 2048;
+			Desc.format = nvrhi::Format::D32;
+			Desc.isRenderTarget = true;
+			Desc.isUAV = false;
+			Desc.isTypeless = true;
+			Desc.initialState = nvrhi::ResourceStates::DepthWrite;
+			Desc.keepInitialState = true;
+			Desc.debugName = "ShadowMap";
+			ShadowMapTexture = NvrhiDevice->createTexture(Desc);
+		}
+
+		// Shadow map framebuffer (depth-only)
+		{
+			nvrhi::FramebufferDesc FBDesc;
+			nvrhi::FramebufferAttachment DepthAttach;
+			DepthAttach.setTexture(ShadowMapTexture);
+			FBDesc.setDepthAttachment(DepthAttach);
+			ShadowMapFramebuffer = NvrhiDevice->createFramebuffer(FBDesc);
+		}
+
+		// Shadow constants buffer (128 bytes: ModelMatrix + LightViewProj)
+		{
+			nvrhi::BufferDesc CBDesc;
+			CBDesc.byteSize = sizeof(float) * 16 * 2; // 2 float4x4 matrices
+			CBDesc.isConstantBuffer = true;
+			CBDesc.isVolatile = false;
+			CBDesc.keepInitialState = true;
+			CBDesc.initialState = nvrhi::ResourceStates::ConstantBuffer;
+			CBDesc.debugName = "ShadowConstants";
+			ShadowConstantsBuffer = NvrhiDevice->createBuffer(CBDesc);
+		}
+
+		// Shadow sampler (clamp border white)
+		{
+			nvrhi::SamplerDesc SamplerDesc;
+			SamplerDesc.setAddressU(nvrhi::SamplerAddressMode::ClampToBorder)
+				.setAddressV(nvrhi::SamplerAddressMode::ClampToBorder)
+				.setAddressW(nvrhi::SamplerAddressMode::ClampToBorder)
+				.setBorderColor(nvrhi::Color(1.0f, 1.0f, 1.0f, 1.0f))
+				.setMinFilter(true)
+				.setMagFilter(true)
+				.setMipFilter(false);
+			ShadowSampler = NvrhiDevice->createSampler(SamplerDesc);
+		}
+
+		// Shadow binding layout
+		{
+			nvrhi::BindingLayoutDesc LayoutDesc;
+			LayoutDesc.visibility = nvrhi::ShaderType::Vertex;
+
+			nvrhi::VulkanBindingOffsets offsets;
+			offsets.setConstantBufferOffset(0).setShaderResourceOffset(0).setSamplerOffset(0).setUnorderedAccessViewOffset(0);
+			LayoutDesc.setBindingOffsets(offsets);
+
+			LayoutDesc.bindings = {
+				nvrhi::BindingLayoutItem::ConstantBuffer(256) // ShadowConstants b0 -> 256
+			};
+
+			ShadowBindingLayout = NvrhiDevice->createBindingLayout(LayoutDesc);
+		}
+
+		// Shadow pipeline (vertex-only, cull back, depth less)
+		{
+			nvrhi::GraphicsPipelineDesc PipelineDesc;
+			PipelineDesc.setVertexShader(ShadowVS);
+			PipelineDesc.setInputLayout(GBufferInputLayout);
+			PipelineDesc.addBindingLayout(ShadowBindingLayout);
+			PipelineDesc.setPrimType(nvrhi::PrimitiveType::TriangleList);
+			PipelineDesc.renderState.setRasterState(nvrhi::RasterState().setCullBack());
+			PipelineDesc.renderState.depthStencilState
+				.setDepthTestEnable(true)
+				.setDepthWriteEnable(true)
+				.setDepthFunc(nvrhi::ComparisonFunc::Less);
+
+			ShadowPipeline = NvrhiDevice->createGraphicsPipeline(PipelineDesc, ShadowMapFramebuffer->getFramebufferInfo());
+			if (!ShadowPipeline)
+			{
+				HLVM_LOG(LogTest, err, TXT("Failed to create shadow pipeline"));
+				return false;
+			}
+		}
+		HLVM_LOG(LogTest, info, TXT("Shadow map resources created"));
+
+		// =====================================================================
+		// Create SSAO textures
+		// =====================================================================
+		HLVM_LOG(LogTest, info, TXT("Creating SSAO textures..."));
+		{
+			nvrhi::TextureDesc Desc;
+			Desc.dimension = nvrhi::TextureDimension::Texture2D;
+			Desc.width = GBufferWidth;
+			Desc.height = GBufferHeight;
+			Desc.format = nvrhi::Format::R8_UNORM;
+			Desc.isRenderTarget = false;
+			Desc.isUAV = true;
+			Desc.isTypeless = false;
+			Desc.initialState = nvrhi::ResourceStates::UnorderedAccess;
+			Desc.keepInitialState = true;
+
+			Desc.debugName = "SSAOTexture";
+			SSAOTexture = NvrhiDevice->createTexture(Desc);
+
+			Desc.debugName = "SSAOBlurTexture";
+			SSAOBlurTexture = NvrhiDevice->createTexture(Desc);
+		}
+
+		// =====================================================================
+		// Create SSAO binding layout
+		// =====================================================================
+		{
+			nvrhi::BindingLayoutDesc LayoutDesc;
+			LayoutDesc.visibility = nvrhi::ShaderType::Compute;
+
+			nvrhi::VulkanBindingOffsets offsets;
+			offsets.setConstantBufferOffset(0).setShaderResourceOffset(0).setSamplerOffset(0).setUnorderedAccessViewOffset(0);
+			LayoutDesc.setBindingOffsets(offsets);
+
+			// b0 -> 256 (SSAOConstants)
+			// t0 -> 0 (GBufferDepth)
+			// t1 -> 1 (GBufferNormals)
+			// u0 -> 384 (SSAO output)
+			LayoutDesc.bindings = {
+				nvrhi::BindingLayoutItem::ConstantBuffer(256),
+				nvrhi::BindingLayoutItem::Texture_SRV(0),
+				nvrhi::BindingLayoutItem::Texture_SRV(1),
+				nvrhi::BindingLayoutItem::Texture_UAV(384)
+			};
+
+			SSAOBindingLayout = NvrhiDevice->createBindingLayout(LayoutDesc);
+		}
+
+		// =====================================================================
+		// Create SSAO compute pipeline
+		// =====================================================================
+		{
+			nvrhi::ComputePipelineDesc PipelineDesc;
+			PipelineDesc.setComputeShader(SSAOCS);
+			PipelineDesc.addBindingLayout(SSAOBindingLayout);
+
+			SSAOPipeline = NvrhiDevice->createComputePipeline(PipelineDesc);
+			if (!SSAOPipeline)
+			{
+				HLVM_LOG(LogTest, err, TXT("Failed to create SSAO pipeline"));
+				return false;
+			}
+		}
+
+		// =====================================================================
+		// Create SSAO constant buffer
+		// =====================================================================
+		{
+			nvrhi::BufferDesc BufferDesc;
+			BufferDesc.byteSize = 256; // Padded to 256 bytes
+			BufferDesc.isConstantBuffer = true;
+			BufferDesc.isVolatile = false;
+			BufferDesc.keepInitialState = true;
+			BufferDesc.initialState = nvrhi::ResourceStates::ConstantBuffer;
+			BufferDesc.debugName = "SSAOConstants";
+			SSAOConstantBuffer = NvrhiDevice->createBuffer(BufferDesc);
+		}
+
+		{
+			nvrhi::BufferDesc BufferDesc;
+			BufferDesc.byteSize = 16; // 2 float2s = 16 bytes
+			BufferDesc.isConstantBuffer = true;
+			BufferDesc.isVolatile = false;
+			BufferDesc.keepInitialState = true;
+			BufferDesc.initialState = nvrhi::ResourceStates::ConstantBuffer;
+		}
+		HLVM_LOG(LogTest, info, TXT("SSAO resources created"));
+
+		// =====================================================================
+		// Initialize joint bilateral upsample pass (for SSAO blur)
+		// =====================================================================
+		HLVM_LOG(LogTest, info, TXT("Initializing bilateral blur pass..."));
+		const FString CommonShaderDir = FString::Format(
+			TXT("{}/Engine/Source/Runtime/Shader"),
+			*GProjectRoot);
+		if (!BilateralBlurPass.Initialize(NvrhiDevice, CommonShaderDir))
+		{
+			HLVM_LOG(LogTest, err, TXT("Failed to initialize bilateral blur pass"));
+			return false;
+		}
+		HLVM_LOG(LogTest, info, TXT("Bilateral blur pass initialized"));
+
 		// Initialize frame dumper - use RGBA8_UNORM to match SDRTexture format
 		HLVM_LOG(LogTest, info, TXT("Initializing FrameDumper..."));
 		FrameDumper.Initialize(NvrhiDevice, nvrhi::Format::RGBA8_UNORM);
@@ -810,6 +1063,22 @@ public:
 		ToneMapCS = nullptr;
 		SDRTexture = nullptr;
 		ToneMapConstantBuffer = nullptr;
+
+		ShadowVS = nullptr;
+		ShadowPipeline = nullptr;
+		ShadowMapTexture = nullptr;
+		ShadowMapFramebuffer = nullptr;
+		ShadowConstantsBuffer = nullptr;
+		ShadowSampler = nullptr;
+		ShadowBindingLayout = nullptr;
+
+		SSAOCS = nullptr;
+		SSAOTexture = nullptr;
+		SSAOBlurTexture = nullptr;
+		SSAOBindingLayout = nullptr;
+		SSAOPipeline = nullptr;
+		SSAOConstantBuffer = nullptr;
+		BilateralBlurPass.Shutdown();
 
 		GBufferVS = nullptr;
 		GBufferPS = nullptr;
@@ -935,23 +1204,102 @@ public:
 			Desc.debugName = "SDROutput";
 			SDRTexture = NvrhiDevice->createTexture(Desc);
 
+			// Recreate SSAO textures
+			Desc.format = nvrhi::Format::R8_UNORM;
+			Desc.debugName = "SSAOTexture";
+			SSAOTexture = NvrhiDevice->createTexture(Desc);
+			Desc.debugName = "SSAOBlurTexture";
+			SSAOBlurTexture = NvrhiDevice->createTexture(Desc);
+
 			BindingCache.Clear();
 		}
 
 		// =====================================================================
-		// GBuffer Pass
+		// Compute Light View-Proj matrix (using scaled bounding box)
+		// =====================================================================
+		float localSceneRadius = glm::length(glm::vec3(BBoxMax.x - BBoxMin.x, BBoxMax.y - BBoxMin.y, BBoxMax.z - BBoxMin.z)) * 0.5f;
+		float worldSceneRadius = localSceneRadius * 2.0f;
+		glm::vec3 WorldSceneCenter = SceneCenter * 2.0f;
+		glm::vec3 LightDirVec(0.577f, 0.577f, 0.577f);
+		glm::vec3 LightPos = WorldSceneCenter + glm::normalize(LightDirVec) * worldSceneRadius * 2.0f;
+		glm::mat4 LightView = glm::lookAtLH(LightPos, WorldSceneCenter, glm::vec3(0, 1, 0));
+		float orthoSize = worldSceneRadius * 1.5f;
+		glm::mat4 LightProj = glm::orthoLH_ZO(-orthoSize, orthoSize, -orthoSize, orthoSize, 0.1f, worldSceneRadius * 4.0f);
+		LightViewProj = LightProj * LightView;
+
+		// =====================================================================
+		// Shadow Pass
 		// =====================================================================
 		nvrhi::CommandListParameters CmdListParams;
 		CmdListParams.enableImmediateExecution = false;
 		nvrhi::CommandListHandle CmdList = NvrhiDevice->createCommandList(CmdListParams);
 		CmdList->open();
 
+		// Clear shadow map
+		CmdList->clearDepthStencilTexture(ShadowMapTexture, nvrhi::AllSubresources, true, 1.0f, false, 0);
+
+		// Draw all meshes to shadow map
+		for (size_t MeshIdx = 0; MeshIdx < AllMeshDrawData.size(); ++MeshIdx)
+		{
+			const auto& DrawData = AllMeshDrawData[MeshIdx];
+
+			// Upload shadow constants: ModelMatrix (2x scale) + LightViewProj
+			float ShadowConstantsData[16 * 2];
+			memcpy(&ShadowConstantsData[0], glm::value_ptr(glm::scale(glm::mat4(1.0f), glm::vec3(2.0f))), 64);
+			memcpy(&ShadowConstantsData[16], glm::value_ptr(LightViewProj), 64);
+			CmdList->writeBuffer(ShadowConstantsBuffer, ShadowConstantsData, sizeof(ShadowConstantsData));
+
+			nvrhi::BindingSetDesc ShadowBindingSetDesc;
+			ShadowBindingSetDesc.bindings = {
+				nvrhi::BindingSetItem::ConstantBuffer(256, ShadowConstantsBuffer)
+			};
+			nvrhi::BindingSetHandle ShadowBindingSet = BindingCache.GetOrCreateBindingSet(ShadowBindingSetDesc, ShadowBindingLayout);
+
+			nvrhi::GraphicsState ShadowState;
+			ShadowState.setPipeline(ShadowPipeline);
+			ShadowState.setFramebuffer(ShadowMapFramebuffer);
+			ShadowState.addBindingSet(ShadowBindingSet);
+
+			nvrhi::VertexBufferBinding VBBinding;
+			VBBinding.setBuffer(DrawData.VertexBuffer);
+			VBBinding.setSlot(0);
+			VBBinding.setOffset(0);
+			ShadowState.addVertexBuffer(VBBinding);
+
+			nvrhi::IndexBufferBinding IBBinding;
+			IBBinding.setBuffer(DrawData.IndexBuffer);
+			IBBinding.setOffset(0);
+			IBBinding.setFormat(nvrhi::Format::R32_UINT);
+			ShadowState.setIndexBuffer(IBBinding);
+
+			nvrhi::Viewport shadowViewport(0.f, 2048.f, 0.f, 2048.f, 0.0f, 1.0f);
+			ShadowState.viewport.addViewportAndScissorRect(shadowViewport);
+
+			CmdList->setGraphicsState(ShadowState);
+
+			nvrhi::DrawArguments DrawArgs;
+			DrawArgs.vertexCount = DrawData.IndexCount;
+			CmdList->drawIndexed(DrawArgs);
+		}
+
+		// Transition shadow map to ShaderResource for lighting pass
+		CmdList->setTextureState(ShadowMapTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+
+		// =====================================================================
+		// GBuffer Pass
+		// =====================================================================
+
 		// Camera orbit around scene center
-		float angle = static_cast<float>(FrameCount) * 0.01f + glm::pi<float>();  // Start on opposite side
-		float radius = 20.0f;  // Outside the scene (scene radius ~18.5)
+		// NOTE: Position adjusted from original (radius=20, camY=8, angle=pi) to
+		// (radius=35, camY=20, angle=0) to show exterior surfaces. The original
+		// interior view showed only back-faces relative to the light, making all
+		// pixels shadowed and preventing shadow validation. This exterior view
+		// shows both lit and shadowed surfaces for meaningful shadow testing.
+		float angle = static_cast<float>(FrameCount) * 0.01f;  // Start on lit side
+		float radius = 35.0f;  // Further out to see exterior surfaces
 		float camX = SceneCenter.x + sinf(angle) * radius;
 		float camZ = SceneCenter.z + cosf(angle) * radius;
-		float camY = 8.0f;  // Fixed height above ground, matching RT shadows test
+		float camY = 20.0f;  // Higher to see roof and upper walls
 
 		// Log camera position for first few frames
 		if (FrameCount < 2)
@@ -1129,12 +1477,77 @@ public:
 		// Transition depth to ShaderResource for compute SRV (D32 can be sampled directly)
 		CmdList->setTextureState(GBufferDepthTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
 
+		// Precompute dispatch dimensions for compute passes
+		uint32_t DispatchX = (CurrentFBInfo.width + 7) / 8;
+		uint32_t DispatchY = (CurrentFBInfo.height + 7) / 8;
+
+		// =====================================================================
+		// SSAO Pass
+		// =====================================================================
+		// Upload SSAO constants
+		float SSAOData[64]; // 256 bytes
+		memset(SSAOData, 0, sizeof(SSAOData));
+		// ProjMatrix (column-major)
+		memcpy(&SSAOData[0], glm::value_ptr(proj), 64);
+		// InvProjMatrix (column-major)
+		glm::mat4 invProj = glm::inverse(proj);
+		memcpy(&SSAOData[16], glm::value_ptr(invProj), 64);
+		// ViewMatrix (column-major)
+		memcpy(&SSAOData[32], glm::value_ptr(view), 64);
+		// ScreenSize, SampleRadius, Bias, SampleCount, MinAO
+		SSAOData[48] = float(CurrentFBInfo.width);
+		SSAOData[49] = float(CurrentFBInfo.height);
+		SSAOData[50] = 0.5f;   // SampleRadius
+		SSAOData[51] = 0.025f; // Bias
+		int32_t sampleCount = 8;
+			memcpy(&SSAOData[52], &sampleCount, sizeof(int32_t)); // SampleCount
+		SSAOData[53] = 0.3f;   // MinAO
+		CmdList->writeBuffer(SSAOConstantBuffer, SSAOData, sizeof(SSAOData));
+
+		// Transition SSAO texture to UAV
+		CmdList->setTextureState(SSAOTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
+
+		// Create SSAO binding set
+		nvrhi::BindingSetDesc SSAOBindingSetDesc;
+		SSAOBindingSetDesc.bindings = {
+			nvrhi::BindingSetItem::ConstantBuffer(256, SSAOConstantBuffer),
+			nvrhi::BindingSetItem::Texture_SRV(0, GBufferDepthTexture),
+			nvrhi::BindingSetItem::Texture_SRV(1, GBufferNormalsTexture),
+			nvrhi::BindingSetItem::Texture_UAV(384, SSAOTexture)
+		};
+		nvrhi::BindingSetHandle SSAOBindingSet = BindingCache.GetOrCreateBindingSet(SSAOBindingSetDesc, SSAOBindingLayout);
+
+		// Dispatch SSAO compute
+		nvrhi::ComputeState SSAOComputeState;
+		SSAOComputeState.setPipeline(SSAOPipeline);
+		SSAOComputeState.addBindingSet(SSAOBindingSet);
+		CmdList->setComputeState(SSAOComputeState);
+		CmdList->dispatch(DispatchX, DispatchY, 1);
+
+		// Transition SSAO texture to SRV for blur
+		CmdList->setTextureState(SSAOTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+		// Transition SSAO blur texture to UAV
+		CmdList->setTextureState(SSAOBlurTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
+
+		// Dispatch bilateral blur pass
+		FJointBilateralUpsamplePass::FDesc BilateralDesc;
+		BilateralDesc.InputTexture = SSAOTexture;
+		BilateralDesc.DepthTexture = GBufferDepthTexture;
+		BilateralDesc.OutputTexture = SSAOBlurTexture;
+		BilateralDesc.OutputWidth = CurrentFBInfo.width;
+		BilateralDesc.OutputHeight = CurrentFBInfo.height;
+		BilateralDesc.DepthSigma = 0.01f;
+		BilateralBlurPass.Dispatch(CmdList, BilateralDesc);
+
+		// Transition SSAO blur texture to SRV for lighting
+		CmdList->setTextureState(SSAOBlurTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+
 		// =====================================================================
 		// Lighting Pass (same command list)
 		// =====================================================================
 
-		// Write lighting constants: InvViewProj (4 registers) + light data (4 registers)
-		float LightingData[32];
+		// Write lighting constants: InvViewProj (4 registers) + light data (4 registers) + shadow data (5 registers)
+		float LightingData[52];
 		glm::mat4 invViewProj = glm::inverse(proj * view);
 		// Register 0-3: InvViewProj (column-major)
 		memcpy(&LightingData[0], glm::value_ptr(invViewProj), 64);
@@ -1148,16 +1561,23 @@ public:
 		LightingData[21] = camY;
 		LightingData[22] = camZ;
 		LightingData[23] = 16.0f;
-		// Register 6: AmbientColor + Pad
+		// Register 6: AmbientColor + MinAO
 		LightingData[24] = 0.03f;
 		LightingData[25] = 0.03f;
 		LightingData[26] = 0.03f;
-		LightingData[27] = 0.0f;
-		// Register 7: ScreenSize + Pad2
+		LightingData[27] = 0.3f; // MinAO
+		// Register 7: ScreenSize + Pad1
 		LightingData[28] = float(CurrentFBInfo.width);
 		LightingData[29] = float(CurrentFBInfo.height);
 		LightingData[30] = 0.0f;
 		LightingData[31] = 0.0f;
+		// Register 8-11: LightViewProj (column-major)
+		memcpy(&LightingData[32], glm::value_ptr(LightViewProj), 64);
+		// Register 12: ShadowMapSize + ShadowBias + Pad2
+		LightingData[48] = 2048.0f;
+		LightingData[49] = 0.005f;
+		LightingData[50] = 0.0f;
+		LightingData[51] = 0.0f;
 		CmdList->writeBuffer(LightingConstantBuffer, LightingData, sizeof(LightingData));
 
 		// Transition HDR texture to UAV for compute write
@@ -1172,14 +1592,14 @@ public:
 			nvrhi::BindingSetItem::Texture_SRV(2, GBufferNormalsTexture),
 			nvrhi::BindingSetItem::Texture_SRV(3, GBufferEmissiveTexture),
 			nvrhi::BindingSetItem::Texture_SRV(4, GBufferDepthTexture),
+			nvrhi::BindingSetItem::Texture_SRV(5, ShadowMapTexture),
+			nvrhi::BindingSetItem::Texture_SRV(6, SSAOBlurTexture),
+			nvrhi::BindingSetItem::Sampler(129, ShadowSampler),
 			nvrhi::BindingSetItem::Texture_UAV(384, HDRTexture)
 		};
 		nvrhi::BindingSetHandle LightingBindingSet = BindingCache.GetOrCreateBindingSet(LightingBindingSetDesc, LightingBindingLayout);
 
 		// Dispatch
-		uint32_t DispatchX = (CurrentFBInfo.width + 7) / 8;
-		uint32_t DispatchY = (CurrentFBInfo.height + 7) / 8;
-
 		nvrhi::ComputeState ComputeState;
 		ComputeState.setPipeline(LightingPipeline);
 		ComputeState.addBindingSet(LightingBindingSet);
@@ -1231,38 +1651,19 @@ public:
 		}
 
 		// =====================================================================
-		// DEBUG: Blit GBuffer diffuse directly to verify GBuffer is written
+		// Blit SDR to screen
 		// =====================================================================
-		if (FrameCount < 2)
-		{
-			CmdList->setTextureState(GBufferDiffuseTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
-			FCommonRenderPasses::BlitParameters DebugBlitParams;
-			FCommonRenderPasses::BlitTexture(
-				CmdList,
-				Framebuffer,
-				GBufferDiffuseTexture,
-				&BindingCache,
-				CurrentFBInfo.width,
-				CurrentFBInfo.height,
-				DebugBlitParams);
-		}
-		else
-		{
-			// =====================================================================
-			// Blit SDR to screen
-			// =====================================================================
-			CmdList->setTextureState(SDRTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+		CmdList->setTextureState(SDRTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
 
-			FCommonRenderPasses::BlitParameters BlitParams;
-			FCommonRenderPasses::BlitTexture(
-				CmdList,
-				Framebuffer,
-				SDRTexture,
-				&BindingCache,
-				CurrentFBInfo.width,
-				CurrentFBInfo.height,
-				BlitParams);
-		}
+		FCommonRenderPasses::BlitParameters BlitParams;
+		FCommonRenderPasses::BlitTexture(
+			CmdList,
+			Framebuffer,
+			SDRTexture,
+			&BindingCache,
+			CurrentFBInfo.width,
+			CurrentFBInfo.height,
+			BlitParams);
 
 		CmdList->close();
 		NvrhiDevice->executeCommandList(CmdList);
@@ -1300,6 +1701,9 @@ public:
 		GBufferEmissiveTexture = nullptr;
 		GBufferDepthTexture = nullptr;
 		LoadedDiffuseTexture = nullptr;
+		ShadowMapFramebuffer = nullptr;
+		SSAOTexture = nullptr;
+		SSAOBlurTexture = nullptr;
 		BindingCache.Clear();
 	}
 
@@ -1342,6 +1746,24 @@ private:
 	nvrhi::BufferHandle			 ToneMapConstantBuffer;
 	nvrhi::TextureHandle		 SDRTexture;
 
+	nvrhi::ShaderHandle			 ShadowVS;
+	nvrhi::GraphicsPipelineHandle ShadowPipeline;
+	nvrhi::TextureHandle		 ShadowMapTexture;
+	nvrhi::FramebufferHandle	 ShadowMapFramebuffer;
+	nvrhi::BufferHandle			 ShadowConstantsBuffer;
+	nvrhi::SamplerHandle		 ShadowSampler;
+	nvrhi::BindingLayoutHandle	 ShadowBindingLayout;
+	glm::mat4					 LightViewProj = glm::mat4(1.0f);
+
+	// SSAO resources
+	nvrhi::ShaderHandle			 SSAOCS;
+	nvrhi::TextureHandle		 SSAOTexture;
+	nvrhi::TextureHandle		 SSAOBlurTexture;
+	nvrhi::BindingLayoutHandle	 SSAOBindingLayout;
+	nvrhi::ComputePipelineHandle SSAOPipeline;
+	nvrhi::BufferHandle			 SSAOConstantBuffer;
+	FJointBilateralUpsamplePass BilateralBlurPass;
+
 	FRenderPassDumper			 FrameDumper;
 
 	// Sponza geometry buffers (cached)
@@ -1362,6 +1784,8 @@ private:
 	FBindingCache BindingCache;
 
 	glm::vec3 SceneCenter = glm::vec3(0.f);  // Calculated from scene bounding box
+	glm::vec3 BBoxMin = glm::vec3(0.f);
+	glm::vec3 BBoxMax = glm::vec3(0.f);
 
 	uint32_t LastWidth = 0;
 	uint32_t LastHeight = 0;

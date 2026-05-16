@@ -105,7 +105,11 @@ VKAPI_ATTR vk::Bool32 VKAPI_CALL FDeviceManagerVk::DebugCallback(
 
 	if (manager)
 	{
-		// Note: location not available in DebugUtils, would need to parse message or use DebugReport
+		const auto& ignored = manager->DeviceParams.IgnoredVulkanValidationMessageLocations;
+		const int32_t messageId = pCallbackData->messageIdNumber;
+		const auto found = std::find(ignored.begin(), ignored.end(), static_cast<size_t>(messageId));
+		if (found != ignored.end())
+			return VK_FALSE;
 	}
 
 	if (messageSeverity == vk::DebugUtilsMessageSeverityFlagBitsEXT::eError)

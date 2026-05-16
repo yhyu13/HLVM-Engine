@@ -1,6 +1,7 @@
 /*
  * Sponza Deferred Lighting Compute Shader - TestSponzaDeferred
  * Cook-Torrance PBR (GGX + Schlick + Smith) with world position reconstruction from depth
+ * Shadow mapping: single directional light shadow map with hard shadows
  */
 
 cbuffer LightingConstants : register(b0)
@@ -11,9 +12,13 @@ cbuffer LightingConstants : register(b0)
     float3   CameraPos;        // 1 register
     float    ShadowHardness;
     float3   AmbientColor;     // 1 register
-    float    Pad0;
+    float    MinAO;
     float2   ScreenSize;       // 1 register
     float2   Pad1;
+    float4x4 LightViewProj;    // 4 registers — NEW
+    float    ShadowMapSize;    // NEW
+    float    ShadowBias;       // NEW
+    float2   Pad2;             // NEW
 };
 
 Texture2D<float4> t_Diffuse  : register(t0);
@@ -21,6 +26,10 @@ Texture2D<float4> t_Material : register(t1); // Metallic(R) + Roughness(G)
 Texture2D<float4> t_Normal   : register(t2);
 Texture2D<float4> t_Emissive : register(t3);
 Texture2D<float>  t_Depth    : register(t4);
+Texture2D<float>  t_ShadowMap : register(t5); // NEW
+Texture2D<float>  t_SSAO      : register(t6); // NEW
+
+SamplerState ShadowSampler : register(s1); // NEW
 
 RWTexture2D<float4> u_HDROutput : register(u0);
 
@@ -66,6 +75,66 @@ float3 ReconstructWorldPosition(uint2 pixelCoord, float depth)
     // Vulkan NDC: Y down, Z [0,1]. Flip Y for reconstruction.
     float4 worldPosH = mul(InvViewProj, float4(ndc.x, -ndc.y, depth, 1.0));
     return worldPosH.xyz / worldPosH.w;
+}
+
+// ---------------------------------------------------------------------------
+// Shadow Sampling
+// ---------------------------------------------------------------------------
+
+// Shared helper: compute shadow UV and light depth from world position
+void ComputeShadowCoords(float3 worldPos, out float2 shadowUV, out float lightDepth)
+{
+    float4 lightPos = mul(LightViewProj, float4(worldPos, 1.0));
+    lightPos.xyz /= lightPos.w;
+    shadowUV = lightPos.xy * 0.5 + 0.5;
+    shadowUV.y = 1.0 - shadowUV.y;  // Flip Y for NVRHI DX-style viewport
+    lightDepth = lightPos.z;
+}
+
+// Hard shadows (single sample, binary result)
+float SampleShadowHard(float3 worldPos)
+{
+    float2 shadowUV;
+    float lightDepth;
+    ComputeShadowCoords(worldPos, shadowUV, lightDepth);
+    
+    // Check if outside shadow map bounds
+    if (shadowUV.x < 0.0 || shadowUV.x > 1.0 || shadowUV.y < 0.0 || shadowUV.y > 1.0)
+        return 1.0; // Outside shadow map = fully lit
+    
+    // Sample shadow map depth and compare with bias
+    float shadowDepth = t_ShadowMap.SampleLevel(ShadowSampler, shadowUV, 0);
+    return (lightDepth < shadowDepth + ShadowBias) ? 1.0 : 0.0;
+}
+
+// PCF 2x2: manual 4-tap kernel filtering for soft shadow edges
+float SampleShadowPCF2x2(float3 worldPos)
+{
+    float2 shadowUV;
+    float lightDepth;
+    ComputeShadowCoords(worldPos, shadowUV, lightDepth);
+    
+    // Check if outside shadow map bounds
+    if (shadowUV.x < 0.0 || shadowUV.x > 1.0 || shadowUV.y < 0.0 || shadowUV.y > 1.0)
+        return 1.0; // Outside shadow map = fully lit
+    
+    float2 texelSize = 1.0 / ShadowMapSize;
+    float result = 0.0;
+    
+    // 2x2 kernel: sample at texel corners and average
+    [unroll]
+    for (int y = 0; y < 2; y++)
+    {
+        [unroll]
+        for (int x = 0; x < 2; x++)
+        {
+            float2 sampleUV = shadowUV + (float2(x, y) - 0.5) * texelSize;
+            float shadowDepth = t_ShadowMap.SampleLevel(ShadowSampler, sampleUV, 0);
+            result += (lightDepth < shadowDepth + ShadowBias) ? 1.0 : 0.0;
+        }
+    }
+    
+    return result * 0.25;
 }
 
 // ---------------------------------------------------------------------------
@@ -126,13 +195,22 @@ void main(uint2 dispatchThreadId : SV_DispatchThreadID)
     // Diffuse Lambertian
     float3 diffuse = (kD * albedo) / 3.14159265;
 
-    // Combined direct lighting
-    float3 Lo = (diffuse + specular) * NdotL * LightIntensity;
+    // Shadow factor: use PCF 2x2 for soft edges
+    float shadowFactor = SampleShadowPCF2x2(worldPos);
 
-    // Ambient
-    float3 ambient = albedo * AmbientColor;
+    // Combined direct lighting (attenuated by shadow)
+    float3 Lo = (diffuse + specular) * NdotL * LightIntensity * shadowFactor;
+
+    // Ambient: modulated by SSAO with minimum clamp
+    float ao = t_SSAO[pixelCoord];
+    float3 ambient = albedo * AmbientColor * max(ao, MinAO);
 
     float3 finalColor = ambient + Lo + emissiveData.rgb;
+
+    // DEBUG: Uncomment to visualize shadow factor directly as grayscale.
+    // This verifies PCF produces smooth values between 0 and 1.
+    // u_HDROutput[pixelCoord] = float4(shadowFactor, shadowFactor, shadowFactor, 1.0);
+    // return;
 
     u_HDROutput[pixelCoord] = float4(finalColor, 1.0);
 }
