@@ -367,6 +367,7 @@ def create_common_shadermake() -> ShaderMakeModule:
         shader_dir + "/BlitVS.hlsl",
         shader_dir + "/BlitPS.hlsl",
         shader_dir + "/JointBilateralUpsample_cs.hlsl",
+        shader_dir + "/HBAO_cs.hlsl",
     ]
 
     # Include directories

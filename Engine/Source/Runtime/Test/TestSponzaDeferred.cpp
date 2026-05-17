@@ -28,6 +28,7 @@
 #include "Image/FImageDump.h"
 #include "Image/FRenderPassDumper.h"
 #include "Renderer/PostProcess/FJointBilateralUpsamplePass.h"
+#include "Renderer/PostProcess/FSSAOPass.h"
 #include <nvrhi/utils.h>
 #include <unistd.h>
 #include <climits>
@@ -208,30 +209,18 @@ public:
 		HLVM_LOG(LogTest, info, TXT("Shadow shader loaded successfully"));
 
 		// =====================================================================
-		// Load SSAO compute shaders
+		// Initialize HBAO pass
 		// =====================================================================
-		HLVM_LOG(LogTest, info, TXT("Loading SSAO shaders..."));
-
-		auto SSAOCSBlob = ReadBinaryFile(
-			FPath::Combine(ShaderDataDir, TXT("SSAO_cs.sblob")).string());
-		const void* SSAOCSBinary = nullptr;
-		size_t SSAOCSBinarySize = 0;
-		if (!ShaderMake::FindPermutationInBlob(SSAOCSBlob.data(), SSAOCSBlob.size(), nullptr, 0, &SSAOCSBinary, &SSAOCSBinarySize))
+		HLVM_LOG(LogTest, info, TXT("Initializing HBAO pass..."));
+		const FString CommonShaderDir = FString::Format(
+			TXT("{}/Engine/Source/Runtime/Shader"),
+			*GProjectRoot);
+		if (!HBAOPass.Initialize(NvrhiDevice, CommonShaderDir))
 		{
-			HLVM_LOG(LogTest, err, TXT("Failed to extract SSAO CS from blob"));
+			HLVM_LOG(LogTest, err, TXT("Failed to initialize HBAO pass"));
 			return false;
 		}
-
-		nvrhi::ShaderDesc SSAOCSDesc;
-		SSAOCSDesc.setShaderType(nvrhi::ShaderType::Compute);
-		SSAOCS = NvrhiDevice->createShader(SSAOCSDesc, SSAOCSBinary, SSAOCSBinarySize);
-
-		if (!SSAOCS)
-		{
-			HLVM_LOG(LogTest, err, TXT("Failed to create SSAO shader"));
-			return false;
-		}
-		HLVM_LOG(LogTest, info, TXT("SSAO shaders loaded successfully"));
+		HLVM_LOG(LogTest, info, TXT("HBAO pass initialized successfully"));
 
 		// =====================================================================
 		// Create command list for initialization
@@ -954,78 +943,12 @@ public:
 			SSAOBlurTexture = NvrhiDevice->createTexture(Desc);
 		}
 
-		// =====================================================================
-		// Create SSAO binding layout
-		// =====================================================================
-		{
-			nvrhi::BindingLayoutDesc LayoutDesc;
-			LayoutDesc.visibility = nvrhi::ShaderType::Compute;
-
-			nvrhi::VulkanBindingOffsets offsets;
-			offsets.setConstantBufferOffset(0).setShaderResourceOffset(0).setSamplerOffset(0).setUnorderedAccessViewOffset(0);
-			LayoutDesc.setBindingOffsets(offsets);
-
-			// b0 -> 256 (SSAOConstants)
-			// t0 -> 0 (GBufferDepth)
-			// t1 -> 1 (GBufferNormals)
-			// u0 -> 384 (SSAO output)
-			LayoutDesc.bindings = {
-				nvrhi::BindingLayoutItem::ConstantBuffer(256),
-				nvrhi::BindingLayoutItem::Texture_SRV(0),
-				nvrhi::BindingLayoutItem::Texture_SRV(1),
-				nvrhi::BindingLayoutItem::Texture_UAV(384)
-			};
-
-			SSAOBindingLayout = NvrhiDevice->createBindingLayout(LayoutDesc);
-		}
-
-		// =====================================================================
-		// Create SSAO compute pipeline
-		// =====================================================================
-		{
-			nvrhi::ComputePipelineDesc PipelineDesc;
-			PipelineDesc.setComputeShader(SSAOCS);
-			PipelineDesc.addBindingLayout(SSAOBindingLayout);
-
-			SSAOPipeline = NvrhiDevice->createComputePipeline(PipelineDesc);
-			if (!SSAOPipeline)
-			{
-				HLVM_LOG(LogTest, err, TXT("Failed to create SSAO pipeline"));
-				return false;
-			}
-		}
-
-		// =====================================================================
-		// Create SSAO constant buffer
-		// =====================================================================
-		{
-			nvrhi::BufferDesc BufferDesc;
-			BufferDesc.byteSize = 256; // Padded to 256 bytes
-			BufferDesc.isConstantBuffer = true;
-			BufferDesc.isVolatile = false;
-			BufferDesc.keepInitialState = true;
-			BufferDesc.initialState = nvrhi::ResourceStates::ConstantBuffer;
-			BufferDesc.debugName = "SSAOConstants";
-			SSAOConstantBuffer = NvrhiDevice->createBuffer(BufferDesc);
-		}
-
-		{
-			nvrhi::BufferDesc BufferDesc;
-			BufferDesc.byteSize = 16; // 2 float2s = 16 bytes
-			BufferDesc.isConstantBuffer = true;
-			BufferDesc.isVolatile = false;
-			BufferDesc.keepInitialState = true;
-			BufferDesc.initialState = nvrhi::ResourceStates::ConstantBuffer;
-		}
-		HLVM_LOG(LogTest, info, TXT("SSAO resources created"));
+		HLVM_LOG(LogTest, info, TXT("SSAO textures created"));
 
 		// =====================================================================
 		// Initialize joint bilateral upsample pass (for SSAO blur)
 		// =====================================================================
 		HLVM_LOG(LogTest, info, TXT("Initializing bilateral blur pass..."));
-		const FString CommonShaderDir = FString::Format(
-			TXT("{}/Engine/Source/Runtime/Shader"),
-			*GProjectRoot);
 		if (!BilateralBlurPass.Initialize(NvrhiDevice, CommonShaderDir))
 		{
 			HLVM_LOG(LogTest, err, TXT("Failed to initialize bilateral blur pass"));
@@ -1072,12 +995,9 @@ public:
 		ShadowSampler = nullptr;
 		ShadowBindingLayout = nullptr;
 
-		SSAOCS = nullptr;
 		SSAOTexture = nullptr;
 		SSAOBlurTexture = nullptr;
-		SSAOBindingLayout = nullptr;
-		SSAOPipeline = nullptr;
-		SSAOConstantBuffer = nullptr;
+		HBAOPass.Shutdown();
 		BilateralBlurPass.Shutdown();
 
 		GBufferVS = nullptr;
@@ -1482,47 +1402,44 @@ public:
 		uint32_t DispatchY = (CurrentFBInfo.height + 7) / 8;
 
 		// =====================================================================
-		// SSAO Pass
+		// HBAO Pass
 		// =====================================================================
-		// Upload SSAO constants
-		float SSAOData[64]; // 256 bytes
-		memset(SSAOData, 0, sizeof(SSAOData));
-		// ProjMatrix (column-major)
-		memcpy(&SSAOData[0], glm::value_ptr(proj), 64);
-		// InvProjMatrix (column-major)
-		glm::mat4 invProj = glm::inverse(proj);
-		memcpy(&SSAOData[16], glm::value_ptr(invProj), 64);
-		// ViewMatrix (column-major)
-		memcpy(&SSAOData[32], glm::value_ptr(view), 64);
-		// ScreenSize, SampleRadius, Bias, SampleCount, MinAO
-		SSAOData[48] = float(CurrentFBInfo.width);
-		SSAOData[49] = float(CurrentFBInfo.height);
-		SSAOData[50] = 0.5f;   // SampleRadius
-		SSAOData[51] = 0.025f; // Bias
-		int32_t sampleCount = 8;
-			memcpy(&SSAOData[52], &sampleCount, sizeof(int32_t)); // SampleCount
-		SSAOData[53] = 0.3f;   // MinAO
-		CmdList->writeBuffer(SSAOConstantBuffer, SSAOData, sizeof(SSAOData));
+		{
+			SSao::FHBAOConstants HBAOConstants;
+			memset(&HBAOConstants, 0, sizeof(HBAOConstants));
 
-		// Transition SSAO texture to UAV
-		CmdList->setTextureState(SSAOTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
+			// Matrices (column-major)
+			glm::mat4 invProj = glm::inverse(proj);
+			memcpy(HBAOConstants.ProjMatrix,    glm::value_ptr(proj),      64);
+			memcpy(HBAOConstants.InvProjMatrix, glm::value_ptr(invProj),   64);
+			memcpy(HBAOConstants.ViewMatrix,    glm::value_ptr(view),      64);
 
-		// Create SSAO binding set
-		nvrhi::BindingSetDesc SSAOBindingSetDesc;
-		SSAOBindingSetDesc.bindings = {
-			nvrhi::BindingSetItem::ConstantBuffer(256, SSAOConstantBuffer),
-			nvrhi::BindingSetItem::Texture_SRV(0, GBufferDepthTexture),
-			nvrhi::BindingSetItem::Texture_SRV(1, GBufferNormalsTexture),
-			nvrhi::BindingSetItem::Texture_UAV(384, SSAOTexture)
-		};
-		nvrhi::BindingSetHandle SSAOBindingSet = BindingCache.GetOrCreateBindingSet(SSAOBindingSetDesc, SSAOBindingLayout);
+			HBAOConstants.ScreenSize[0]    = float(CurrentFBInfo.width);
+			HBAOConstants.ScreenSize[1]    = float(CurrentFBInfo.height);
+			HBAOConstants.InvScreenSize[0] = 1.0f / float(CurrentFBInfo.width);
+			HBAOConstants.InvScreenSize[1] = 1.0f / float(CurrentFBInfo.height);
 
-		// Dispatch SSAO compute
-		nvrhi::ComputeState SSAOComputeState;
-		SSAOComputeState.setPipeline(SSAOPipeline);
-		SSAOComputeState.addBindingSet(SSAOBindingSet);
-		CmdList->setComputeState(SSAOComputeState);
-		CmdList->dispatch(DispatchX, DispatchY, 1);
+			// Scene-scale radius for Sponza (~20 unit scene)
+			HBAOConstants.SampleRadius     = 2.0f;
+			HBAOConstants.AngleBias        = 0.2f;      // ~11 degrees
+			HBAOConstants.MaxRadiusPixels  = 50.0f;
+			HBAOConstants.AttenuationScale = 1.0f;
+			HBAOConstants.MinAO            = 0.3f;
+			HBAOConstants.DirectionCount   = 4;
+			HBAOConstants.StepCount        = 6;
+
+			SSao::FSSAOPass::FDesc HBAODesc;
+			HBAODesc.DepthTexture  = GBufferDepthTexture;
+			HBAODesc.NormalTexture = GBufferNormalsTexture;
+			HBAODesc.OutputTexture = SSAOTexture;
+			HBAODesc.OutputWidth   = CurrentFBInfo.width;
+			HBAODesc.OutputHeight  = CurrentFBInfo.height;
+
+			// Transition SSAO texture to UAV before dispatch
+			CmdList->setTextureState(SSAOTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
+
+			HBAOPass.Dispatch(CmdList, HBAODesc, HBAOConstants);
+		}
 
 		// Transition SSAO texture to SRV for blur
 		CmdList->setTextureState(SSAOTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
@@ -1756,12 +1673,9 @@ private:
 	glm::mat4					 LightViewProj = glm::mat4(1.0f);
 
 	// SSAO resources
-	nvrhi::ShaderHandle			 SSAOCS;
 	nvrhi::TextureHandle		 SSAOTexture;
 	nvrhi::TextureHandle		 SSAOBlurTexture;
-	nvrhi::BindingLayoutHandle	 SSAOBindingLayout;
-	nvrhi::ComputePipelineHandle SSAOPipeline;
-	nvrhi::BufferHandle			 SSAOConstantBuffer;
+	SSao::FSSAOPass				 HBAOPass;
 	FJointBilateralUpsamplePass BilateralBlurPass;
 
 	FRenderPassDumper			 FrameDumper;
