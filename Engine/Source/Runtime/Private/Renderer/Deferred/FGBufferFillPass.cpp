@@ -21,67 +21,30 @@
 // SOFTWARE.
 
 #include "Renderer/Deferred/FGBufferFillPass.h"
-#include "Renderer/Deferred/FCubeGeometry.h"
 #include "Renderer/ShaderMake/ShaderBlob.h"
 #include "Core/Log.h"
+#include "Renderer/Mesh/StaticMesh.h"
+#include <nvrhi/utils.h>
 #include <fstream>
 #include <vector>
 
 DECLARE_LOG_CATEGORY(LogRenderer)
 
-FGBufferFillPass::FGBufferFillPass() = default;
-
-FGBufferFillPass::~FGBufferFillPass()
-{
-    Cleanup();
-}
-
-void FGBufferFillPass::Cleanup()
-{
-    VertexShader = nullptr;
-    PixelShader = nullptr;
-    AnisotropicSampler = nullptr;
-    InputLayout = nullptr;
-    MaterialBindingLayout = nullptr;
-    ViewBindingLayout = nullptr;
-    Pipeline = nullptr;
-    PositionBuffer.reset();
-    TexCoordBuffer.reset();
-    NormalBuffer.reset();
-    TangentBuffer.reset();
-    IndexBuffer.reset();
-    MaterialBindingSet = nullptr;
-    ViewBindingSet = nullptr;
-    bIsInitialized = false;
-}
-
-bool FGBufferFillPass::Initialize(
-    nvrhi::IDevice* InDevice,
-    FGBufferTextures* InGBuffer,
-    const FViewConstants* InViewConstants)
+bool FGBufferFillPass::Initialize(nvrhi::IDevice* InDevice, const FString& InShaderDataDir, const FDesc& Desc)
 {
     if (bIsInitialized)
     {
-        Cleanup();
+        Shutdown();
     }
 
     Device = InDevice;
-    GBuffer = InGBuffer;
-    ViewConstants = InViewConstants;
 
-    nvrhi::CommandListHandle CmdList = Device->createCommandList();
-    CmdList->open();
-
-    const auto DataDir = FString::Format(
-        TXT("{}/../../Test/{}_Data"),
-        *GExecutablePath,
-        *GExecutableName);
-
-    auto VSPath = FPath::Combine(DataDir, TXT("gbuffer_vs.sblob"));
+    // Load GBuffer vertex shader
+    auto VSPath = FPath::Combine(InShaderDataDir, TXT("GBufferSponzaVS.sblob"));
     std::ifstream VSFile(VSPath.string(), std::ios::ate | std::ios::binary);
     if (!VSFile.is_open())
     {
-        HLVM_LOG(LogRenderer, err, TXT("Failed to open vertex shader"));
+        HLVM_LOG(LogRenderer, err, TXT("FGBufferFillPass: Failed to open vertex shader"));
         return false;
     }
     size_t VSBytes = static_cast<size_t>(VSFile.tellg());
@@ -90,20 +53,29 @@ bool FGBufferFillPass::Initialize(
     VSFile.read(reinterpret_cast<char*>(VSData.data()), static_cast<std::streamsize>(VSBytes));
     VSFile.close();
 
-    // No permutations for simple shader
     const void* VSBinary = nullptr;
     size_t VSBinarySize = 0;
     if (!ShaderMake::FindPermutationInBlob(VSData.data(), VSData.size(), nullptr, 0, &VSBinary, &VSBinarySize))
     {
-        HLVM_LOG(LogRenderer, err, TXT("Failed to extract vertex shader SPIR-V from blob"));
+        HLVM_LOG(LogRenderer, err, TXT("FGBufferFillPass: Failed to extract vertex shader SPIR-V from blob"));
         return false;
     }
 
-    auto PSPath = FPath::Combine(DataDir, TXT("gbuffer_ps.sblob"));
+    nvrhi::ShaderDesc VSDesc;
+    VSDesc.setShaderType(nvrhi::ShaderType::Vertex);
+    GBufferVS = Device->createShader(VSDesc, VSBinary, VSBinarySize);
+    if (!GBufferVS)
+    {
+        HLVM_LOG(LogRenderer, err, TXT("FGBufferFillPass: Failed to create vertex shader"));
+        return false;
+    }
+
+    // Load GBuffer pixel shader
+    auto PSPath = FPath::Combine(InShaderDataDir, TXT("GBufferSponzaPS.sblob"));
     std::ifstream PSFile(PSPath.string(), std::ios::ate | std::ios::binary);
     if (!PSFile.is_open())
     {
-        HLVM_LOG(LogRenderer, err, TXT("Failed to open pixel shader"));
+        HLVM_LOG(LogRenderer, err, TXT("FGBufferFillPass: Failed to open pixel shader"));
         return false;
     }
     size_t PSBytes = static_cast<size_t>(PSFile.tellg());
@@ -112,76 +84,170 @@ bool FGBufferFillPass::Initialize(
     PSFile.read(reinterpret_cast<char*>(PSData.data()), static_cast<std::streamsize>(PSBytes));
     PSFile.close();
 
-    // No permutations for simple shader
     const void* PSBinary = nullptr;
     size_t PSBinarySize = 0;
     if (!ShaderMake::FindPermutationInBlob(PSData.data(), PSData.size(), nullptr, 0, &PSBinary, &PSBinarySize))
     {
-        HLVM_LOG(LogRenderer, err, TXT("Failed to extract pixel shader SPIR-V from blob"));
-        return false;
-    }
-    nvrhi::ShaderDesc VSDsc;
-    VSDsc.setShaderType(nvrhi::ShaderType::Vertex);
-    VSDsc.entryName = "main";
-    VertexShader = Device->createShader(VSDsc, VSBinary, VSBinarySize);
-
-    nvrhi::ShaderDesc PSDsc;
-    PSDsc.setShaderType(nvrhi::ShaderType::Pixel);
-    PixelShader = Device->createShader(PSDsc, PSBinary, PSBinarySize);
-
-    if (!VertexShader || !PixelShader)
-    {
-        HLVM_LOG(LogRenderer, err, TXT("Failed to create GBuffer shaders"));
+        HLVM_LOG(LogRenderer, err, TXT("FGBufferFillPass: Failed to extract pixel shader SPIR-V from blob"));
         return false;
     }
 
-    // Create anisotropic sampler
-    nvrhi::SamplerDesc samplerDesc;
-    samplerDesc.setAllAddressModes(nvrhi::SamplerAddressMode::Wrap);
-    samplerDesc.setAllFilters(true);
-    AnisotropicSampler = Device->createSampler(samplerDesc);
-    if (!AnisotropicSampler)
+    nvrhi::ShaderDesc PSDesc;
+    PSDesc.setShaderType(nvrhi::ShaderType::Pixel);
+    GBufferPS = Device->createShader(PSDesc, PSBinary, PSBinarySize);
+    if (!GBufferPS)
     {
-        HLVM_LOG(LogRenderer, err, TXT("Failed to create anisotropic sampler"));
+        HLVM_LOG(LogRenderer, err, TXT("FGBufferFillPass: Failed to create pixel shader"));
         return false;
     }
 
-    if (!CreateMaterialBindingLayout())
+    // Create input layout
+    nvrhi::VertexAttributeDesc Attrs[4];
+    Attrs[0].setName("POSITION")
+        .setFormat(nvrhi::Format::RGB32_FLOAT)
+        .setOffset(offsetof(FVertex, Position))
+        .setElementStride(sizeof(FVertex));
+    Attrs[1].setName("NORMAL")
+        .setFormat(nvrhi::Format::RGB32_FLOAT)
+        .setOffset(offsetof(FVertex, Normal))
+        .setElementStride(sizeof(FVertex));
+    Attrs[2].setName("TEXCOORD0")
+        .setFormat(nvrhi::Format::RG32_FLOAT)
+        .setOffset(offsetof(FVertex, UV))
+        .setElementStride(sizeof(FVertex));
+    Attrs[3].setName("TANGENT")
+        .setFormat(nvrhi::Format::RGB32_FLOAT)
+        .setOffset(offsetof(FVertex, Tangent))
+        .setElementStride(sizeof(FVertex));
+
+    GBufferInputLayout = Device->createInputLayout(Attrs, 4, GBufferVS);
+    if (!GBufferInputLayout)
     {
-        HLVM_LOG(LogRenderer, err, TXT("Failed to create material binding layout"));
+        HLVM_LOG(LogRenderer, err, TXT("FGBufferFillPass: Failed to create input layout"));
         return false;
     }
 
-    if (!CreateViewBindingLayout())
+    // Create binding layout
+    nvrhi::BindingLayoutDesc LayoutDesc;
+    LayoutDesc.setVisibility(nvrhi::ShaderType::Vertex | nvrhi::ShaderType::Pixel);
+
+    nvrhi::VulkanBindingOffsets offsets;
+    offsets.setConstantBufferOffset(0)
+           .setShaderResourceOffset(0)
+           .setSamplerOffset(0)
+           .setUnorderedAccessViewOffset(0);
+    LayoutDesc.setBindingOffsets(offsets);
+
+    LayoutDesc.addItem(nvrhi::BindingLayoutItem::ConstantBuffer(256));
+    LayoutDesc.addItem(nvrhi::BindingLayoutItem::ConstantBuffer(257));
+    LayoutDesc.addItem(nvrhi::BindingLayoutItem::Texture_SRV(0));
+    LayoutDesc.addItem(nvrhi::BindingLayoutItem::Texture_SRV(1));
+    LayoutDesc.addItem(nvrhi::BindingLayoutItem::Sampler(128));
+
+    GBufferBindingLayout = Device->createBindingLayout(LayoutDesc);
+    if (!GBufferBindingLayout)
     {
-        HLVM_LOG(LogRenderer, err, TXT("Failed to create view binding layout"));
+        HLVM_LOG(LogRenderer, err, TXT("FGBufferFillPass: Failed to create binding layout"));
         return false;
     }
 
-    if (!CreateGeometryBuffers(CmdList.Get()))
+    // Create constant buffers
+    nvrhi::BufferDesc CBDesc;
+    CBDesc.setByteSize(sizeof(FViewConstants))
+        .setIsConstantBuffer(true)
+        .setInitialState(nvrhi::ResourceStates::ConstantBuffer)
+        .setKeepInitialState(true);
+    ViewConstantsBuffer = Device->createBuffer(CBDesc);
+    if (!ViewConstantsBuffer)
     {
-        HLVM_LOG(LogRenderer, err, TXT("Failed to create geometry buffers"));
+        HLVM_LOG(LogRenderer, err, TXT("FGBufferFillPass: Failed to create view constants buffer"));
         return false;
     }
 
-    CmdList->close();
-    Device->executeCommandList(CmdList);
-
-    if (!CreatePipelines())
+    nvrhi::BufferDesc MatCBDesc;
+    MatCBDesc.setByteSize(sizeof(FMaterialConstants))
+        .setIsConstantBuffer(true)
+        .setInitialState(nvrhi::ResourceStates::ConstantBuffer)
+        .setKeepInitialState(true);
+    MaterialConstantBuffer = Device->createBuffer(MatCBDesc);
+    if (!MaterialConstantBuffer)
     {
-        HLVM_LOG(LogRenderer, err, TXT("Failed to create pipelines"));
+        HLVM_LOG(LogRenderer, err, TXT("FGBufferFillPass: Failed to create material constants buffer"));
         return false;
     }
 
-    if (!UpdateMaterialBindingSet())
+    // Create sampler
+    nvrhi::SamplerDesc SamplerDesc;
+    SamplerDesc.setAddressU(nvrhi::SamplerAddressMode::Repeat)
+        .setAddressV(nvrhi::SamplerAddressMode::Repeat)
+        .setAddressW(nvrhi::SamplerAddressMode::Repeat)
+        .setMinFilter(true)
+        .setMagFilter(true)
+        .setMipFilter(true);
+    GBufferLinearSampler = Device->createSampler(SamplerDesc);
+    if (!GBufferLinearSampler)
     {
-        HLVM_LOG(LogRenderer, err, TXT("Failed to create material binding set"));
+        HLVM_LOG(LogRenderer, err, TXT("FGBufferFillPass: Failed to create sampler"));
         return false;
     }
 
-    if (!UpdateViewBindingSet())
+    // Create GBuffer textures
+    nvrhi::TextureDesc TexDesc;
+    TexDesc.dimension = nvrhi::TextureDimension::Texture2D;
+    TexDesc.width = Desc.Width;
+    TexDesc.height = Desc.Height;
+    TexDesc.isRenderTarget = true;
+    TexDesc.isUAV = false;
+    TexDesc.initialState = nvrhi::ResourceStates::RenderTarget;
+    TexDesc.keepInitialState = true;
+
+    TexDesc.format = nvrhi::Format::RGBA16_FLOAT;
+    TexDesc.debugName = "GBufferDiffuse";
+    GBufferDiffuseTexture = Device->createTexture(TexDesc);
+    TexDesc.debugName = "GBufferSpecular";
+    GBufferSpecularTexture = Device->createTexture(TexDesc);
+    TexDesc.debugName = "GBufferNormals";
+    GBufferNormalsTexture = Device->createTexture(TexDesc);
+    TexDesc.debugName = "GBufferEmissive";
+    GBufferEmissiveTexture = Device->createTexture(TexDesc);
+
+    TexDesc.format = nvrhi::Format::D32;
+    TexDesc.isTypeless = true;
+    TexDesc.initialState = nvrhi::ResourceStates::DepthWrite;
+    TexDesc.debugName = "GBufferDepth";
+    GBufferDepthTexture = Device->createTexture(TexDesc);
+
+    // Create framebuffer
+    nvrhi::FramebufferDesc FBDesc;
+    FBDesc.addColorAttachment(GBufferDiffuseTexture);
+    FBDesc.addColorAttachment(GBufferSpecularTexture);
+    FBDesc.addColorAttachment(GBufferNormalsTexture);
+    FBDesc.addColorAttachment(GBufferEmissiveTexture);
+    FBDesc.setDepthAttachment(GBufferDepthTexture);
+    GBufferFramebuffer = Device->createFramebuffer(FBDesc);
+    if (!GBufferFramebuffer)
     {
-        HLVM_LOG(LogRenderer, err, TXT("Failed to create view binding set"));
+        HLVM_LOG(LogRenderer, err, TXT("FGBufferFillPass: Failed to create framebuffer"));
+        return false;
+    }
+
+    // Create pipeline
+    nvrhi::GraphicsPipelineDesc PipelineDesc;
+    PipelineDesc.setVertexShader(GBufferVS)
+        .setPixelShader(GBufferPS)
+        .setInputLayout(GBufferInputLayout)
+        .addBindingLayout(GBufferBindingLayout)
+        .setPrimType(nvrhi::PrimitiveType::TriangleList);
+    PipelineDesc.renderState.setRasterState(nvrhi::RasterState().setCullNone());
+    PipelineDesc.renderState.depthStencilState
+        .setDepthTestEnable(true)
+        .setDepthWriteEnable(true)
+        .setDepthFunc(nvrhi::ComparisonFunc::Less);
+
+    GBufferPipeline = Device->createGraphicsPipeline(PipelineDesc, GBufferFramebuffer->getFramebufferInfo());
+    if (!GBufferPipeline)
+    {
+        HLVM_LOG(LogRenderer, err, TXT("FGBufferFillPass: Failed to create pipeline"));
         return false;
     }
 
@@ -190,286 +256,162 @@ bool FGBufferFillPass::Initialize(
     return true;
 }
 
-bool FGBufferFillPass::CreateMaterialBindingLayout()
+void FGBufferFillPass::Render(nvrhi::ICommandList* CmdList, const FRenderDesc& Desc)
 {
-    // GBUFFER_SPACE_MATERIAL = 0
-    nvrhi::BindingLayoutDesc LayoutDesc;
-    LayoutDesc.setVisibility(nvrhi::ShaderType::Pixel);
-    LayoutDesc.setRegisterSpaceAndDescriptorSet(0);
+    if (!bIsInitialized || !CmdList)
+    {
+        return;
+    }
 
-    // Use offsets=0 to match GLSL bindings directly
-    nvrhi::VulkanBindingOffsets Offsets;
-    Offsets.setConstantBufferOffset(0).setShaderResourceOffset(0).setSamplerOffset(0);
-    LayoutDesc.setBindingOffsets(Offsets);
+    // Upload view constants
+    CmdList->writeBuffer(ViewConstantsBuffer, &Desc.ViewConstants, sizeof(FViewConstants));
 
-    // b0: MaterialConstants - bRegShift 256 → SPIR-V binding 256
-    LayoutDesc.addItem(nvrhi::BindingLayoutItem::ConstantBuffer(256));
-    // s0: MaterialSampler - sRegShift 128 → SPIR-V binding 128
-    LayoutDesc.addItem(nvrhi::BindingLayoutItem::Sampler(128));
+    // Clear MRTs
+    nvrhi::Color clearBlack(0.f, 0.f, 0.f, 0.f);
+    nvrhi::Color clearBlue(0.f, 0.f, 1.f, 1.f);
+    nvrhi::Color clearNormalUp(0.5f, 1.0f, 0.5f, 1.f);
+    nvrhi::utils::ClearColorAttachment(CmdList, GBufferFramebuffer, 0, clearBlue);
+    nvrhi::utils::ClearColorAttachment(CmdList, GBufferFramebuffer, 1, clearBlack);
+    nvrhi::utils::ClearColorAttachment(CmdList, GBufferFramebuffer, 2, clearNormalUp);
+    nvrhi::utils::ClearColorAttachment(CmdList, GBufferFramebuffer, 3, clearBlack);
+    nvrhi::utils::ClearDepthStencilAttachment(CmdList, GBufferFramebuffer, 1.0f, 0u);
 
-    // t0-t7: Material textures at bindings 0-7
-    LayoutDesc.addItem(nvrhi::BindingLayoutItem::Texture_SRV(0));
-    LayoutDesc.addItem(nvrhi::BindingLayoutItem::Texture_SRV(1));
-    LayoutDesc.addItem(nvrhi::BindingLayoutItem::Texture_SRV(2));
-    LayoutDesc.addItem(nvrhi::BindingLayoutItem::Texture_SRV(3));
-    LayoutDesc.addItem(nvrhi::BindingLayoutItem::Texture_SRV(4));
-    LayoutDesc.addItem(nvrhi::BindingLayoutItem::Texture_SRV(5));
-    LayoutDesc.addItem(nvrhi::BindingLayoutItem::Texture_SRV(6));
+    // Draw all meshes with per-mesh material binding
+    for (uint32_t MeshIdx = 0; MeshIdx < Desc.MeshDrawItemCount; ++MeshIdx)
+    {
+        const auto& DrawData = Desc.MeshDrawItems[MeshIdx];
 
-    MaterialBindingLayout = Device->createBindingLayout(LayoutDesc);
-    return MaterialBindingLayout != nullptr;
+        // Upload material constants
+        CmdList->writeBuffer(MaterialConstantBuffer, &DrawData.Material.Constants, sizeof(FMaterialConstants));
+
+        // Create binding set for this mesh's textures
+        nvrhi::BindingSetDesc SetDesc;
+        SetDesc.addItem(nvrhi::BindingSetItem::ConstantBuffer(256, ViewConstantsBuffer));
+        SetDesc.addItem(nvrhi::BindingSetItem::ConstantBuffer(257, MaterialConstantBuffer));
+        SetDesc.addItem(nvrhi::BindingSetItem::Texture_SRV(0, DrawData.Material.DiffuseTexture));
+        SetDesc.addItem(nvrhi::BindingSetItem::Texture_SRV(1, DrawData.Material.NormalTexture));
+        SetDesc.addItem(nvrhi::BindingSetItem::Sampler(128, GBufferLinearSampler));
+        nvrhi::BindingSetHandle BindingSet = Device->createBindingSet(SetDesc, GBufferBindingLayout);
+
+        // Build graphics state
+        nvrhi::GraphicsState State;
+        State.setPipeline(GBufferPipeline)
+            .setFramebuffer(GBufferFramebuffer)
+            .addBindingSet(BindingSet);
+
+        nvrhi::VertexBufferBinding VBBinding;
+        VBBinding.setBuffer(DrawData.VertexBuffer)
+            .setSlot(0)
+            .setOffset(0);
+        State.addVertexBuffer(VBBinding);
+
+        nvrhi::IndexBufferBinding IBBinding;
+        IBBinding.setBuffer(DrawData.IndexBuffer)
+            .setOffset(0)
+            .setFormat(nvrhi::Format::R32_UINT);
+        State.setIndexBuffer(IBBinding);
+
+        nvrhi::Viewport viewport(0.f, float(GBufferDiffuseTexture->getDesc().width), 0.f, float(GBufferDiffuseTexture->getDesc().height), 0.0f, 1.0f);
+        State.viewport.addViewportAndScissorRect(viewport);
+
+        CmdList->setGraphicsState(State);
+
+        nvrhi::DrawArguments DrawArgs;
+        DrawArgs.vertexCount = DrawData.IndexCount;
+        CmdList->drawIndexed(DrawArgs);
+    }
+
+    // Transition GBuffer color textures to ShaderResource
+    CmdList->setTextureState(GBufferDiffuseTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+    CmdList->setTextureState(GBufferSpecularTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+    CmdList->setTextureState(GBufferNormalsTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+    CmdList->setTextureState(GBufferEmissiveTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+    CmdList->setTextureState(GBufferDepthTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
 }
 
-bool FGBufferFillPass::CreateViewBindingLayout()
+void FGBufferFillPass::Resize(uint32_t Width, uint32_t Height)
 {
-    // GBUFFER_SPACE_VIEW = 2
-    nvrhi::BindingLayoutDesc LayoutDesc;
-    LayoutDesc.setVisibility(nvrhi::ShaderType::Vertex | nvrhi::ShaderType::Pixel);
-    LayoutDesc.setRegisterSpaceAndDescriptorSet(2);
-
-    // Use offsets=0 to match GLSL bindings directly
-    nvrhi::VulkanBindingOffsets Offsets;
-    Offsets.setConstantBufferOffset(0).setShaderResourceOffset(0).setSamplerOffset(0);
-    LayoutDesc.setBindingOffsets(Offsets);
-
-    // b2: ViewConstants - bRegShift 256 → SPIR-V binding 258
-    LayoutDesc.addItem(nvrhi::BindingLayoutItem::ConstantBuffer(258));
-    // s0: Anisotropic sampler - sRegShift 128 → SPIR-V binding 128
-
-
-    ViewBindingLayout = Device->createBindingLayout(LayoutDesc);
-    return ViewBindingLayout != nullptr;
-}
-
-bool FGBufferFillPass::CreateGeometryBuffers(nvrhi::ICommandList* CmdList)
-{
-    PositionBuffer = std::make_unique<FStaticVertexBuffer>();
-    if (!PositionBuffer->Initialize(CmdList, Device, g_Positions, g_PositionsSize))
+    if (!bIsInitialized || !Device)
     {
-        return false;
+        return;
     }
 
-    TexCoordBuffer = std::make_unique<FStaticVertexBuffer>();
-    if (!TexCoordBuffer->Initialize(CmdList, Device, g_TexCoords, g_TexCoordsSize))
-    {
-        return false;
-    }
+    // Release old textures and framebuffer
+    GBufferDiffuseTexture = nullptr;
+    GBufferSpecularTexture = nullptr;
+    GBufferNormalsTexture = nullptr;
+    GBufferEmissiveTexture = nullptr;
+    GBufferDepthTexture = nullptr;
+    GBufferFramebuffer = nullptr;
+    GBufferPipeline = nullptr;
 
-    NormalBuffer = std::make_unique<FStaticVertexBuffer>();
-    if (!NormalBuffer->Initialize(CmdList, Device, g_Normals, g_NormalsSize))
-    {
-        return false;
-    }
-
-    TangentBuffer = std::make_unique<FStaticVertexBuffer>();
-    if (!TangentBuffer->Initialize(CmdList, Device, g_Tangents, g_TangentsSize))
-    {
-        return false;
-    }
-
-    IndexBuffer = std::make_unique<FStaticIndexBuffer>();
-    if (!IndexBuffer->Initialize(CmdList, Device, g_Indices, g_IndicesSize, nvrhi::Format::R32_UINT))
-    {
-        return false;
-    }
-
-    return true;
-}
-
-bool FGBufferFillPass::CreatePipelines()
-{
-    if (!GBuffer)
-    {
-        return false;
-    }
-
-    nvrhi::IFramebuffer* FB = GBuffer->GetFramebuffer();
-    if (!FB)
-    {
-        HLVM_LOG(LogRenderer, err, TXT("GBuffer framebuffer is null"));
-        return false;
-    }
-
-    nvrhi::VertexAttributeDesc Attrs[8];
-    Attrs[0].setBufferIndex(0).setName("POSITION").setFormat(nvrhi::Format::RGB32_FLOAT).setOffset(0).setElementStride(12);
-    Attrs[1].setBufferIndex(1).setName("TEXCOORD").setFormat(nvrhi::Format::RG32_FLOAT).setOffset(0).setElementStride(8);
-    Attrs[2].setBufferIndex(2).setName("NORMAL").setFormat(nvrhi::Format::RGBA8_SNORM).setOffset(0).setElementStride(4);
-    Attrs[3].setBufferIndex(3).setName("TANGENT").setFormat(nvrhi::Format::RGBA8_SNORM).setOffset(0).setElementStride(4);
-    Attrs[4].setBufferIndex(4).setName("UV1").setFormat(nvrhi::Format::RG32_FLOAT).setOffset(0).setElementStride(8);
-    Attrs[5].setBufferIndex(5).setName("COLOR").setFormat(nvrhi::Format::RGBA32_FLOAT).setOffset(0).setElementStride(16);
-    Attrs[6].setBufferIndex(6).setName("BLENDWEIGHTS").setFormat(nvrhi::Format::R32_FLOAT).setOffset(0).setElementStride(4);
-    Attrs[7].setBufferIndex(7).setName("BLENDINDICES").setFormat(nvrhi::Format::R32_SINT).setOffset(0).setElementStride(4);
-
-    InputLayout = Device->createInputLayout(Attrs, 8, VertexShader);
-    if (!InputLayout)
-    {
-        HLVM_LOG(LogRenderer, err, TXT("Failed to create input layout"));
-        return false;
-    }
-
-    nvrhi::GraphicsPipelineDesc PipelineDesc;
-    PipelineDesc.setInputLayout(InputLayout)
-                .setVertexShader(VertexShader)
-                .setPixelShader(PixelShader)
-                .addBindingLayout(MaterialBindingLayout)
-                .addBindingLayout(ViewBindingLayout);
-
-    PipelineDesc.renderState.depthStencilState.setDepthTestEnable(true)
-                          .setDepthWriteEnable(true)
-                          .setDepthFunc(nvrhi::ComparisonFunc::Less);
-
-    Pipeline = Device->createGraphicsPipeline(PipelineDesc, FB->getFramebufferInfo());
-    if (!Pipeline)
-    {
-        HLVM_LOG(LogRenderer, err, TXT("Failed to create graphics pipeline"));
-        return false;
-    }
-
-    return true;
-}
-
-bool FGBufferFillPass::UpdateMaterialBindingSet()
-{
-    nvrhi::BindingSetDesc SetDesc;
-
-    // b0: MaterialConstants buffer at slot 0 -> SPIR-V binding 256
-    nvrhi::BufferDesc MaterialBufferDesc;
-    MaterialBufferDesc.byteSize = 256;
-    MaterialBufferDesc.isConstantBuffer = true;
-    MaterialBufferDesc.initialState = nvrhi::ResourceStates::ConstantBuffer;
-    MaterialBufferDesc.keepInitialState = true;
-    nvrhi::BufferHandle MaterialBuffer = Device->createBuffer(MaterialBufferDesc);
-    if (!MaterialBuffer)
-    {
-        HLVM_LOG(LogRenderer, err, TXT("Failed to create MaterialConstants buffer"));
-        return false;
-    }
-
-    // Create placeholder 1x1 textures for all material texture slots
+    // Recreate GBuffer textures
     nvrhi::TextureDesc TexDesc;
-    TexDesc.format = nvrhi::Format::RGBA16_FLOAT;
-    TexDesc.width = 1;
-    TexDesc.height = 1;
-    TexDesc.depth = 1;
-    TexDesc.arraySize = 1;
-    TexDesc.mipLevels = 1;
-    TexDesc.initialState = nvrhi::ResourceStates::ShaderResource;
-    TexDesc.keepInitialState = true;
-    TexDesc.isRenderTarget = false;
+    TexDesc.dimension = nvrhi::TextureDimension::Texture2D;
+    TexDesc.width = Width;
+    TexDesc.height = Height;
+    TexDesc.isRenderTarget = true;
     TexDesc.isUAV = false;
-    TexDesc.isShaderResource = true;
-    nvrhi::TextureHandle PlaceholderTex = Device->createTexture(TexDesc);
-    if (!PlaceholderTex)
-    {
-        HLVM_LOG(LogRenderer, err, TXT("Failed to create placeholder texture"));
-        return false;
-    }
-    SetDesc.addItem(nvrhi::BindingSetItem::ConstantBuffer(256, MaterialBuffer));
-    // t0-t6: placeholder textures at slots 0-6
-    SetDesc.addItem(nvrhi::BindingSetItem::Texture_SRV(0, PlaceholderTex));
-    SetDesc.addItem(nvrhi::BindingSetItem::Texture_SRV(1, PlaceholderTex));
-    SetDesc.addItem(nvrhi::BindingSetItem::Texture_SRV(2, PlaceholderTex));
-    SetDesc.addItem(nvrhi::BindingSetItem::Texture_SRV(3, PlaceholderTex));
-    SetDesc.addItem(nvrhi::BindingSetItem::Texture_SRV(4, PlaceholderTex));
-    SetDesc.addItem(nvrhi::BindingSetItem::Texture_SRV(5, PlaceholderTex));
-    SetDesc.addItem(nvrhi::BindingSetItem::Texture_SRV(6, PlaceholderTex));
-    SetDesc.addItem(nvrhi::BindingSetItem::Texture_SRV(7, PlaceholderTex));
-    // s0: sampler - bRegShift 128 → SPIR-V binding 128
-    SetDesc.addItem(nvrhi::BindingSetItem::Sampler(128, AnisotropicSampler));
+    TexDesc.initialState = nvrhi::ResourceStates::RenderTarget;
+    TexDesc.keepInitialState = true;
 
-    MaterialBindingSet = Device->createBindingSet(SetDesc, MaterialBindingLayout);
-    return MaterialBindingSet != nullptr;
+    TexDesc.format = nvrhi::Format::RGBA16_FLOAT;
+    TexDesc.debugName = "GBufferDiffuse";
+    GBufferDiffuseTexture = Device->createTexture(TexDesc);
+    TexDesc.debugName = "GBufferSpecular";
+    GBufferSpecularTexture = Device->createTexture(TexDesc);
+    TexDesc.debugName = "GBufferNormals";
+    GBufferNormalsTexture = Device->createTexture(TexDesc);
+    TexDesc.debugName = "GBufferEmissive";
+    GBufferEmissiveTexture = Device->createTexture(TexDesc);
+
+    TexDesc.format = nvrhi::Format::D32;
+    TexDesc.isTypeless = true;
+    TexDesc.initialState = nvrhi::ResourceStates::DepthWrite;
+    TexDesc.debugName = "GBufferDepth";
+    GBufferDepthTexture = Device->createTexture(TexDesc);
+
+    // Recreate framebuffer
+    nvrhi::FramebufferDesc FBDesc;
+    FBDesc.addColorAttachment(GBufferDiffuseTexture);
+    FBDesc.addColorAttachment(GBufferSpecularTexture);
+    FBDesc.addColorAttachment(GBufferNormalsTexture);
+    FBDesc.addColorAttachment(GBufferEmissiveTexture);
+    FBDesc.setDepthAttachment(GBufferDepthTexture);
+    GBufferFramebuffer = Device->createFramebuffer(FBDesc);
+
+    // Recreate pipeline with new framebuffer info
+    nvrhi::GraphicsPipelineDesc PipelineDesc;
+    PipelineDesc.setVertexShader(GBufferVS)
+        .setPixelShader(GBufferPS)
+        .setInputLayout(GBufferInputLayout)
+        .addBindingLayout(GBufferBindingLayout)
+        .setPrimType(nvrhi::PrimitiveType::TriangleList);
+    PipelineDesc.renderState.setRasterState(nvrhi::RasterState().setCullNone());
+    PipelineDesc.renderState.depthStencilState
+        .setDepthTestEnable(true)
+        .setDepthWriteEnable(true)
+        .setDepthFunc(nvrhi::ComparisonFunc::Less);
+
+    GBufferPipeline = Device->createGraphicsPipeline(PipelineDesc, GBufferFramebuffer->getFramebufferInfo());
 }
 
-bool FGBufferFillPass::UpdateViewBindingSet()
+void FGBufferFillPass::Shutdown()
 {
-    nvrhi::BindingSetDesc SetDesc;
-
-    // b2: ViewConstants buffer (volatile) at slot 2 -> SPIR-V binding 258
-    nvrhi::BufferDesc ViewBufferDesc;
-    ViewBufferDesc.byteSize = sizeof(FViewConstants);
-    ViewBufferDesc.isConstantBuffer = true;
-    ViewBufferDesc.initialState = nvrhi::ResourceStates::ConstantBuffer;
-    ViewBufferDesc.keepInitialState = true;
-    nvrhi::BufferHandle ViewConstantsBuffer = Device->createBuffer(ViewBufferDesc);
-    if (!ViewConstantsBuffer)
-    {
-        HLVM_LOG(LogRenderer, err, TXT("Failed to create ViewConstants buffer"));
-        return false;
-    }
-
-    nvrhi::CommandListHandle UploadCmdList = Device->createCommandList();
-    UploadCmdList->open();
-    UploadCmdList->writeBuffer(ViewConstantsBuffer, ViewConstants, sizeof(FViewConstants), 0);
-    UploadCmdList->close();
-    Device->executeCommandList(UploadCmdList);
-
-    // b2: ViewConstants - bRegShift 256 → SPIR-V binding 258
-    SetDesc.addItem(nvrhi::BindingSetItem::ConstantBuffer(258, ViewConstantsBuffer));
-    // s0: sampler - sRegShift 128 → SPIR-V binding 128
-    SetDesc.addItem(nvrhi::BindingSetItem::Sampler(128, AnisotropicSampler));
-    // s0: sampler at slot 0 -> SPIR-V binding 128
-    SetDesc.addItem(nvrhi::BindingSetItem::Sampler(0, AnisotropicSampler));
-
-    ViewBindingSet = Device->createBindingSet(SetDesc, ViewBindingLayout);
-    return ViewBindingSet != nullptr;
-}
-
-void FGBufferFillPass::Render(nvrhi::ICommandList* CommandList)
-{
-    if (!bIsInitialized || !Pipeline || !MaterialBindingSet || !ViewBindingSet)
-    {
-        return;
-    }
-
-    nvrhi::IFramebuffer* FB = GBuffer->GetFramebuffer();
-    if (!FB)
-    {
-        return;
-    }
-
-    nvrhi::GraphicsState State;
-    State.pipeline = Pipeline;
-    State.framebuffer = FB;
-    State.bindings = {MaterialBindingSet, ViewBindingSet};
-
-    nvrhi::VertexBufferBinding PositionBinding;
-    PositionBinding.setBuffer(PositionBuffer->GetBufferHandle().Get());
-    PositionBinding.setSlot(0);
-    PositionBinding.setOffset(0);
-    State.addVertexBuffer(PositionBinding);
-
-    nvrhi::VertexBufferBinding TexCoordBinding;
-    TexCoordBinding.setBuffer(TexCoordBuffer->GetBufferHandle().Get());
-    TexCoordBinding.setSlot(1);
-    TexCoordBinding.setOffset(0);
-    State.addVertexBuffer(TexCoordBinding);
-
-    nvrhi::VertexBufferBinding NormalBinding;
-    NormalBinding.setBuffer(NormalBuffer->GetBufferHandle().Get());
-    NormalBinding.setSlot(2);
-    NormalBinding.setOffset(0);
-    State.addVertexBuffer(NormalBinding);
-
-    nvrhi::VertexBufferBinding TangentBinding;
-    TangentBinding.setBuffer(TangentBuffer->GetBufferHandle().Get());
-    TangentBinding.setSlot(3);
-    TangentBinding.setOffset(0);
-    State.addVertexBuffer(TangentBinding);
-
-    nvrhi::IndexBufferBinding IndexBinding;
-    IndexBinding.setBuffer(IndexBuffer->GetBufferHandle().Get());
-    IndexBinding.setOffset(0);
-    IndexBinding.setFormat(nvrhi::Format::R32_UINT);
-    State.setIndexBuffer(IndexBinding);
-
-    CommandList->setGraphicsState(State);
-
-    nvrhi::DrawArguments Args;
-    Args.vertexCount = g_NumIndices;
-    Args.instanceCount = 1;
-    Args.startVertexLocation = 0;
-    Args.startInstanceLocation = 0;
-
-    CommandList->drawIndexed(Args);
+    GBufferVS = nullptr;
+    GBufferPS = nullptr;
+    GBufferInputLayout = nullptr;
+    GBufferBindingLayout = nullptr;
+    GBufferPipeline = nullptr;
+    ViewConstantsBuffer = nullptr;
+    MaterialConstantBuffer = nullptr;
+    GBufferLinearSampler = nullptr;
+    GBufferDiffuseTexture = nullptr;
+    GBufferSpecularTexture = nullptr;
+    GBufferNormalsTexture = nullptr;
+    GBufferEmissiveTexture = nullptr;
+    GBufferDepthTexture = nullptr;
+    GBufferFramebuffer = nullptr;
+    Device = nullptr;
+    bIsInitialized = false;
 }

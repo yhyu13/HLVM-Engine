@@ -20,7 +20,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include "Renderer/Deferred/FDeferredLightingPass.h"
+#include "Renderer/PostProcess/FToneMappingPass.h"
 #include "Renderer/ShaderMake/ShaderBlob.h"
 #include "Core/Log.h"
 #include <fstream>
@@ -28,7 +28,7 @@
 
 DECLARE_LOG_CATEGORY(LogRenderer)
 
-bool FDeferredLightingPass::Initialize(nvrhi::IDevice* InDevice, const FString& InShaderDataDir)
+bool FToneMappingPass::Initialize(nvrhi::IDevice* InDevice, const FString& InShaderDataDir)
 {
     if (bIsInitialized)
     {
@@ -38,11 +38,11 @@ bool FDeferredLightingPass::Initialize(nvrhi::IDevice* InDevice, const FString& 
     Device = InDevice;
     ShaderDataDir = InShaderDataDir;
 
-    auto CSPath = FPath::Combine(ShaderDataDir, TXT("SponzaDeferredLighting_cs.sblob"));
+    auto CSPath = FPath::Combine(ShaderDataDir, TXT("TonemapSponza_cs.sblob"));
     std::ifstream CSFile(CSPath.string(), std::ios::ate | std::ios::binary);
     if (!CSFile.is_open())
     {
-        HLVM_LOG(LogRenderer, err, TXT("FDeferredLightingPass: Failed to open compute shader"));
+        HLVM_LOG(LogRenderer, err, TXT("FToneMappingPass: Failed to open compute shader"));
         return false;
     }
     size_t CSBytes = static_cast<size_t>(CSFile.tellg());
@@ -55,7 +55,7 @@ bool FDeferredLightingPass::Initialize(nvrhi::IDevice* InDevice, const FString& 
     size_t CSBinarySize = 0;
     if (!ShaderMake::FindPermutationInBlob(CSData.data(), CSData.size(), nullptr, 0, &CSBinary, &CSBinarySize))
     {
-        HLVM_LOG(LogRenderer, err, TXT("FDeferredLightingPass: Failed to extract compute shader SPIR-V from blob"));
+        HLVM_LOG(LogRenderer, err, TXT("FToneMappingPass: Failed to extract compute shader SPIR-V from blob"));
         return false;
     }
 
@@ -64,7 +64,7 @@ bool FDeferredLightingPass::Initialize(nvrhi::IDevice* InDevice, const FString& 
     ComputeShader = Device->createShader(CSDesc, CSBinary, CSBinarySize);
     if (!ComputeShader)
     {
-        HLVM_LOG(LogRenderer, err, TXT("FDeferredLightingPass: Failed to create compute shader"));
+        HLVM_LOG(LogRenderer, err, TXT("FToneMappingPass: Failed to create compute shader"));
         return false;
     }
 
@@ -79,25 +79,15 @@ bool FDeferredLightingPass::Initialize(nvrhi::IDevice* InDevice, const FString& 
            .setUnorderedAccessViewOffset(0);
     LayoutDesc.setBindingOffsets(Offsets);
 
-    // b0: LightingConstants (CBV) - bRegShift 256 -> SPIR-V binding 256
     LayoutDesc.addItem(nvrhi::BindingLayoutItem::ConstantBuffer(256));
-    // t0-t6: GBuffer textures (SRV) - tRegShift 0 -> SPIR-V bindings 0-6
     LayoutDesc.addItem(nvrhi::BindingLayoutItem::Texture_SRV(0));
     LayoutDesc.addItem(nvrhi::BindingLayoutItem::Texture_SRV(1));
-    LayoutDesc.addItem(nvrhi::BindingLayoutItem::Texture_SRV(2));
-    LayoutDesc.addItem(nvrhi::BindingLayoutItem::Texture_SRV(3));
-    LayoutDesc.addItem(nvrhi::BindingLayoutItem::Texture_SRV(4));
-    LayoutDesc.addItem(nvrhi::BindingLayoutItem::Texture_SRV(5));
-    LayoutDesc.addItem(nvrhi::BindingLayoutItem::Texture_SRV(6));
-    // s1: ShadowSampler - sRegShift 128 -> SPIR-V binding 129
-    LayoutDesc.addItem(nvrhi::BindingLayoutItem::Sampler(129));
-    // u0: Output (UAV) - uRegShift 384 -> SPIR-V binding 384
     LayoutDesc.addItem(nvrhi::BindingLayoutItem::Texture_UAV(384));
 
     BindingLayout = Device->createBindingLayout(LayoutDesc);
     if (!BindingLayout)
     {
-        HLVM_LOG(LogRenderer, err, TXT("FDeferredLightingPass: Failed to create binding layout"));
+        HLVM_LOG(LogRenderer, err, TXT("FToneMappingPass: Failed to create binding layout"));
         return false;
     }
 
@@ -108,7 +98,7 @@ bool FDeferredLightingPass::Initialize(nvrhi::IDevice* InDevice, const FString& 
     Pipeline = Device->createComputePipeline(PipelineDesc);
     if (!Pipeline)
     {
-        HLVM_LOG(LogRenderer, err, TXT("FDeferredLightingPass: Failed to create compute pipeline"));
+        HLVM_LOG(LogRenderer, err, TXT("FToneMappingPass: Failed to create compute pipeline"));
         return false;
     }
 
@@ -121,16 +111,16 @@ bool FDeferredLightingPass::Initialize(nvrhi::IDevice* InDevice, const FString& 
     ConstantBuffer = Device->createBuffer(CBDesc);
     if (!ConstantBuffer)
     {
-        HLVM_LOG(LogRenderer, err, TXT("FDeferredLightingPass: Failed to create constant buffer"));
+        HLVM_LOG(LogRenderer, err, TXT("FToneMappingPass: Failed to create constant buffer"));
         return false;
     }
 
     bIsInitialized = true;
-    HLVM_LOG(LogRenderer, info, TXT("FDeferredLightingPass initialized successfully"));
+    HLVM_LOG(LogRenderer, info, TXT("FToneMappingPass initialized successfully"));
     return true;
 }
 
-void FDeferredLightingPass::Dispatch(nvrhi::ICommandList* CmdList, const FDesc& Desc, const FConstants& Constants)
+void FToneMappingPass::Dispatch(nvrhi::ICommandList* CmdList, const FDesc& Desc, const FConstants& Constants)
 {
     if (!bIsInitialized || !Pipeline || !CmdList)
     {
@@ -143,20 +133,14 @@ void FDeferredLightingPass::Dispatch(nvrhi::ICommandList* CmdList, const FDesc& 
     // Create per-dispatch binding set
     nvrhi::BindingSetDesc SetDesc;
     SetDesc.addItem(nvrhi::BindingSetItem::ConstantBuffer(256, ConstantBuffer));
-    SetDesc.addItem(nvrhi::BindingSetItem::Texture_SRV(0, Desc.GBufferDiffuse));
-    SetDesc.addItem(nvrhi::BindingSetItem::Texture_SRV(1, Desc.GBufferMaterial));
-    SetDesc.addItem(nvrhi::BindingSetItem::Texture_SRV(2, Desc.GBufferNormals));
-    SetDesc.addItem(nvrhi::BindingSetItem::Texture_SRV(3, Desc.GBufferEmissive));
-    SetDesc.addItem(nvrhi::BindingSetItem::Texture_SRV(4, Desc.GBufferDepth));
-    SetDesc.addItem(nvrhi::BindingSetItem::Texture_SRV(5, Desc.ShadowMap));
-    SetDesc.addItem(nvrhi::BindingSetItem::Texture_SRV(6, Desc.SSAOTexture));
-    SetDesc.addItem(nvrhi::BindingSetItem::Sampler(129, Desc.ShadowSampler));
-    SetDesc.addItem(nvrhi::BindingSetItem::Texture_UAV(384, Desc.HDROutputTexture));
+    SetDesc.addItem(nvrhi::BindingSetItem::Texture_SRV(0, Desc.HDRInputTexture));
+    SetDesc.addItem(nvrhi::BindingSetItem::Texture_SRV(1, Desc.BloomTexture));
+    SetDesc.addItem(nvrhi::BindingSetItem::Texture_UAV(384, Desc.SDROutputTexture));
 
     nvrhi::BindingSetHandle BindingSet = Device->createBindingSet(SetDesc, BindingLayout);
     if (!BindingSet)
     {
-        HLVM_LOG(LogRenderer, err, TXT("FDeferredLightingPass: Failed to create binding set"));
+        HLVM_LOG(LogRenderer, err, TXT("FToneMappingPass: Failed to create binding set"));
         return;
     }
 
@@ -171,7 +155,7 @@ void FDeferredLightingPass::Dispatch(nvrhi::ICommandList* CmdList, const FDesc& 
     CmdList->dispatch(DispatchX, DispatchY, 1);
 }
 
-void FDeferredLightingPass::Shutdown()
+void FToneMappingPass::Shutdown()
 {
     ComputeShader = nullptr;
     BindingLayout = nullptr;

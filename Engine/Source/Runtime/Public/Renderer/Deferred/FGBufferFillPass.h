@@ -1,105 +1,115 @@
-// Copyright 2026 HLVM Engine
-// 
-// MIT License
-// 
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
-// 
-// The above copyright notice and this permission notice shall be included in all
-// copies or substantial portions of the Software.
-// 
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-// SOFTWARE.
-
 #pragma once
 
-#include "Renderer/Deferred/FGBufferTextures.h"
-#include "Renderer/Deferred/FViewConstants.h"
-#include "Renderer/RHI/Object/Buffer.h"
+#include "Core/String.h"
 #include <nvrhi/nvrhi.h>
-#include <memory>
 
 class FGBufferFillPass
 {
 public:
-    FGBufferFillPass();
-    ~FGBufferFillPass();
+    struct FDesc
+    {
+        uint32_t Width = 0;
+        uint32_t Height = 0;
+    };
 
+    struct FViewConstants
+    {
+        float ModelMatrix[16];
+        float ViewMatrix[16];
+        float ProjMatrix[16];
+        float CameraPos[4];
+        float Pad[12];
+    };
+    static_assert(sizeof(FViewConstants) == 256, "FViewConstants must be 256 bytes");
+
+    struct FMaterialConstants
+    {
+        float AlbedoTint[4];
+        float Metallic;
+        float Roughness;
+        float EmissiveStrength;
+        float Pad;
+    };
+
+    struct FMaterialBinding
+    {
+        nvrhi::TextureHandle DiffuseTexture;
+        nvrhi::TextureHandle NormalTexture;
+        FMaterialConstants Constants;
+    };
+
+    struct FMeshDrawItem
+    {
+        nvrhi::BufferHandle VertexBuffer;
+        nvrhi::BufferHandle IndexBuffer;
+        uint32_t IndexCount;
+        FMaterialBinding Material;
+    };
+
+    struct FRenderDesc
+    {
+        FViewConstants ViewConstants;
+        const FMeshDrawItem* MeshDrawItems;
+        uint32_t MeshDrawItemCount;
+    };
+
+    bool Initialize(nvrhi::IDevice* InDevice, const FString& InShaderDataDir, const FDesc& Desc);
+    void Render(nvrhi::ICommandList* CmdList, const FRenderDesc& Desc);
+    void Resize(uint32_t Width, uint32_t Height);
+    void Shutdown();
+
+    nvrhi::TextureHandle GetDiffuseTexture() const
+    {
+        return GBufferDiffuseTexture;
+    }
+    nvrhi::TextureHandle GetSpecularTexture() const
+    {
+        return GBufferSpecularTexture;
+    }
+    nvrhi::TextureHandle GetNormalsTexture() const
+    {
+        return GBufferNormalsTexture;
+    }
+    nvrhi::TextureHandle GetEmissiveTexture() const
+    {
+        return GBufferEmissiveTexture;
+    }
+    nvrhi::TextureHandle GetDepthTexture() const
+    {
+        return GBufferDepthTexture;
+    }
+    nvrhi::IFramebuffer* GetFramebuffer() const
+    {
+        return GBufferFramebuffer.Get();
+    }
+    nvrhi::SamplerHandle GetLinearSampler() const
+    {
+        return GBufferLinearSampler;
+    }
+
+    FGBufferFillPass() = default;
+    ~FGBufferFillPass()
+    {
+        Shutdown();
+    }
     FGBufferFillPass(const FGBufferFillPass&) = delete;
     FGBufferFillPass& operator=(const FGBufferFillPass&) = delete;
-    FGBufferFillPass(FGBufferFillPass&&) = delete;
-    FGBufferFillPass& operator=(FGBufferFillPass&&) = delete;
-
-    /**
-     * Initialize the GBuffer fill pass.
-     * @param Device NVRHI device
-     * @param GBuffer GBuffer textures to render into
-     * @param ViewConstants View/projection constants
-     * @return true if initialization succeeded
-     */
-    [[nodiscard]] bool Initialize(
-        nvrhi::IDevice* Device,
-        FGBufferTextures* GBuffer,
-        const FViewConstants* ViewConstants);
-
-    /**
-     * Render the cube to the GBuffer.
-     * @param CommandList Command list to record commands
-     */
-    void Render(nvrhi::ICommandList* CommandList);
-
-    /**
-     * Cleanup resources.
-     */
-    void Cleanup();
 
 private:
     nvrhi::IDevice* Device = nullptr;
-    FGBufferTextures* GBuffer = nullptr;
-    const FViewConstants* ViewConstants = nullptr;
-
-    // Shaders
-    nvrhi::ShaderHandle VertexShader;
-    nvrhi::ShaderHandle PixelShader;
-    nvrhi::SamplerHandle AnisotropicSampler;
-
-    // Pipeline
-    nvrhi::InputLayoutHandle InputLayout;
-    
-    // Binding layouts (2 required for GBuffer pipeline)
-    // Set 0: Material textures + samplers
-    nvrhi::BindingLayoutHandle MaterialBindingLayout;
-    // Set 2: ViewConstants (volatile) + sampler
-    nvrhi::BindingLayoutHandle ViewBindingLayout;
-    nvrhi::GraphicsPipelineHandle Pipeline;
-
-    // Buffers
-    TUniquePtr<FStaticVertexBuffer> PositionBuffer;
-    TUniquePtr<FStaticVertexBuffer> TexCoordBuffer;
-    TUniquePtr<FStaticVertexBuffer> NormalBuffer;
-    TUniquePtr<FStaticVertexBuffer> TangentBuffer;
-    TUniquePtr<FStaticIndexBuffer> IndexBuffer;
-
-    // Binding sets
-    nvrhi::BindingSetHandle MaterialBindingSet;
-    nvrhi::BindingSetHandle ViewBindingSet;
-
+    nvrhi::ShaderHandle GBufferVS;
+    nvrhi::ShaderHandle GBufferPS;
+    nvrhi::InputLayoutHandle GBufferInputLayout;
+    nvrhi::BindingLayoutHandle GBufferBindingLayout;
+    nvrhi::GraphicsPipelineHandle GBufferPipeline;
+    nvrhi::BufferHandle ViewConstantsBuffer;
+    nvrhi::BufferHandle MaterialConstantBuffer;
+    nvrhi::SamplerHandle GBufferLinearSampler;
+    nvrhi::TextureHandle GBufferDiffuseTexture;
+    nvrhi::TextureHandle GBufferSpecularTexture;
+    nvrhi::TextureHandle GBufferNormalsTexture;
+    nvrhi::TextureHandle GBufferEmissiveTexture;
+    nvrhi::TextureHandle GBufferDepthTexture;
+    nvrhi::FramebufferHandle GBufferFramebuffer;
     bool bIsInitialized = false;
-
-    bool CreateMaterialBindingLayout();
-    bool CreateViewBindingLayout();
-    bool CreatePipelines();
-    bool CreateGeometryBuffers(nvrhi::ICommandList* CmdList);
-
-    bool UpdateMaterialBindingSet();
-    bool UpdateViewBindingSet();
 };

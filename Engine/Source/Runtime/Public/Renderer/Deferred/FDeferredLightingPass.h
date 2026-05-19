@@ -1,94 +1,64 @@
-// Copyright 2026 HLVM Engine
-// 
-// MIT License
-// 
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
-// 
-// The above copyright notice and this permission notice shall be included in all
-// copies or substantial portions of the Software.
-// 
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-// SOFTWARE.
-
 #pragma once
 
-#include "Renderer/Deferred/FGBufferTextures.h"
-#include "Renderer/Deferred/FLightingConstants.h"
+#include "Core/String.h"
 #include <nvrhi/nvrhi.h>
-#include <memory>
 
 class FDeferredLightingPass
 {
 public:
-    FDeferredLightingPass();
-    ~FDeferredLightingPass();
+    struct FDesc
+    {
+        nvrhi::TextureHandle GBufferDiffuse;
+        nvrhi::TextureHandle GBufferMaterial;
+        nvrhi::TextureHandle GBufferNormals;
+        nvrhi::TextureHandle GBufferEmissive;
+        nvrhi::TextureHandle GBufferDepth;
+        nvrhi::TextureHandle ShadowMap;
+        nvrhi::TextureHandle SSAOTexture;
+        nvrhi::TextureHandle HDROutputTexture;
+        nvrhi::SamplerHandle ShadowSampler;
+        uint32_t Width = 0;
+        uint32_t Height = 0;
+    };
+
+    // Shader cbuffer is 13 registers (208 bytes). Padded to 256 for alignment consistency.
+    struct FConstants
+    {
+        float InvViewProj[16];
+        float LightDir[3];
+        float LightIntensity;
+        float CameraPos[3];
+        float ShadowHardness;
+        float AmbientColor[3];
+        float MinAO;
+        float ScreenSize[2];
+        float Pad1[2];
+        float LightViewProj[16];
+        float ShadowMapSize;
+        float ShadowBias;
+        float Pad2[2];
+        float Pad3[12];
+    };
+    static_assert(sizeof(FConstants) == 256, "FDeferredLightingPass constants must be 256 bytes");
+
+    FDeferredLightingPass() = default;
+    ~FDeferredLightingPass() { Shutdown(); }
 
     FDeferredLightingPass(const FDeferredLightingPass&) = delete;
     FDeferredLightingPass& operator=(const FDeferredLightingPass&) = delete;
     FDeferredLightingPass(FDeferredLightingPass&&) = delete;
     FDeferredLightingPass& operator=(FDeferredLightingPass&&) = delete;
 
-    /**
-     * Initialize the deferred lighting pass.
-     * @param Device NVRHI device
-     * @param GBuffer GBuffer textures to read from
-     * @param OutputTexture Output texture to write shaded color
-     * @return true if initialization succeeded
-     */
-    [[nodiscard]] bool Initialize(
-        nvrhi::IDevice* Device,
-        FGBufferTextures* GBuffer,
-        nvrhi::TextureHandle OutputTexture);
-
-    /**
-     * Update lighting constants and prepare for rendering.
-     * @param LightingConstants Lighting constants to use
-     */
-    void SetLightingConstants(const FLightingConstants* LightingConstants);
-
-    /**
-     * Execute the deferred lighting compute pass.
-     * @param CommandList Command list to record commands
-     */
-    void Render(nvrhi::ICommandList* CommandList);
-
-    /**
-     * Cleanup resources.
-     */
-    void Cleanup();
+    bool Initialize(nvrhi::IDevice* InDevice, const FString& InShaderDataDir);
+    void Dispatch(nvrhi::ICommandList* CmdList, const FDesc& Desc, const FConstants& Constants);
+    void Shutdown();
 
 private:
     nvrhi::IDevice* Device = nullptr;
-    FGBufferTextures* GBuffer = nullptr;
-    nvrhi::TextureHandle OutputTexture;
-    const FLightingConstants* LightingConstants = nullptr;
-
-    // Compute shader
     nvrhi::ShaderHandle ComputeShader;
-
-    // Binding layout and set
     nvrhi::BindingLayoutHandle BindingLayout;
-    nvrhi::BindingSetHandle BindingSet;
-
-    // Compute pipeline
     nvrhi::ComputePipelineHandle Pipeline;
-
-    // Temporary texture for UAV output (if needed)
-    nvrhi::TextureHandle TempOutputTexture;
-
+    nvrhi::BufferHandle ConstantBuffer;
+    FString ShaderDataDir;
     bool bIsInitialized = false;
-
-    bool LoadShader(const uint8_t* Data, size_t Bytes);
-    bool CreateBindingLayout();
-    bool UpdateBindingSet();
 };

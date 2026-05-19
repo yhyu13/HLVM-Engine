@@ -1,7 +1,7 @@
 /*
  * Tone Mapping Compute Shader - TestSponzaDeferred
- * ACES filmic curve + Reinhard + gamma correction
- * Input: HDR texture from lighting pass
+ * ACES filmic curve + Reinhard + gamma correction + bloom
+ * Input: HDR texture from lighting pass + Bloom texture
  * Output: SDR RGBA8 (blit handles display)
  */
 
@@ -10,11 +10,14 @@ cbuffer TonemapConstants : register(b0)
     float Exposure;       // EV adjustment (default: 1.0)
     float Gamma;          // Gamma correction (default: 2.2)
     int   TonemapMode;    // 0=ACES, 1=Reinhard, 2=None
-    float Pad;
+    float BloomIntensity; // Bloom additive intensity (default: 0.4)
     float2 TextureSize;
+    float2 Pad;
 };
 
-Texture2D<float4> t_HDRInput : register(t0);
+Texture2D<float4> t_HDRInput  : register(t0);
+Texture2D<float4> t_Bloom     : register(t1);
+
 RWTexture2D<float4> u_SDROutput : register(u0);
 
 // ---------------------------------------------------------------------------
@@ -49,6 +52,10 @@ void main(uint2 dispatchThreadId : SV_DispatchThreadID)
         return;
 
     float3 hdr = t_HDRInput[pixelCoord].rgb;
+
+    // Add bloom
+    float3 bloom = t_Bloom[pixelCoord].rgb;
+    hdr += bloom * BloomIntensity;
 
     // Apply exposure
     hdr *= Exposure;
