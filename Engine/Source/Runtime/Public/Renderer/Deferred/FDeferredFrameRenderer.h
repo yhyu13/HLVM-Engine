@@ -8,6 +8,7 @@
 #include "Renderer/PostProcess/FToneMappingPass.h"
 #include "Renderer/PostProcess/FJointBilateralUpsamplePass.h"
 #include "Renderer/PostProcess/FSSAOPass.h"
+#include "Renderer/PostProcess/FSSRPass.h"
 #include "Renderer/Shadow/FShadowMapPass.h"
 #include <nvrhi/nvrhi.h>
 #include <glm/glm.hpp>
@@ -74,6 +75,7 @@ private:
     FShadowMapPass ShadowPass;
     SSao::FSSAOPass HBAOPass;
     FJointBilateralUpsamplePass BilateralBlurPass;
+    SSr::FSSRPass SSRPass;
     FDeferredLightingPass LightingPass;
     FBloomPass BloomPass;
     FToneMappingPass ToneMapPass;
@@ -86,6 +88,7 @@ private:
     nvrhi::TextureHandle BloomHalfResTexture;
     nvrhi::TextureHandle BloomBlurTempTexture;
     nvrhi::TextureHandle BloomTexture;
+    nvrhi::TextureHandle SSRTexture;
 
     // State
     nvrhi::IDevice* Device = nullptr;

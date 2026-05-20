@@ -10,6 +10,7 @@ public:
     {
         nvrhi::TextureHandle HDRInputTexture;
         nvrhi::TextureHandle BloomTexture;
+        nvrhi::TextureHandle SSRTexture;
         nvrhi::TextureHandle SDROutputTexture;
         uint32_t Width = 0;
         uint32_t Height = 0;
@@ -46,6 +47,7 @@ private:
     nvrhi::BindingLayoutHandle BindingLayout;
     nvrhi::ComputePipelineHandle Pipeline;
     nvrhi::BufferHandle ConstantBuffer;
+    nvrhi::SamplerHandle LinearSampler;
     FString ShaderDataDir;
     bool bIsInitialized = false;
 };

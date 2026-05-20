@@ -129,14 +129,15 @@ public:
 		auto DrawData = SceneGPUData.BuildDrawData();
 
 		// =====================================================================
-		// Camera orbit around scene center
+		// Camera orbit around scene center - low angle for visible SSR
 		// =====================================================================
 		float angle = static_cast<float>(FrameCount) * 0.01f;
-		float camX = DrawData.SceneCenter.x + sinf(angle) * 35.0f;
-		float camZ = DrawData.SceneCenter.z + cosf(angle) * 35.0f;
-		float camY = 20.0f;
+		float camX = DrawData.SceneCenter.x + sinf(angle) * 5.0f;
+		float camZ = DrawData.SceneCenter.z + cosf(angle) * 5.0f;
+		float camY = 2.0f;
 
-		glm::mat4 view = glm::lookAtLH(glm::vec3(camX, camY, camZ), DrawData.SceneCenter, glm::vec3(0.f, 1.f, 0.f));
+		glm::vec3 target = DrawData.SceneCenter + glm::vec3(0.0f, 2.0f, 0.0f);
+		glm::mat4 view = glm::lookAtLH(glm::vec3(camX, camY, camZ), target, glm::vec3(0.f, 1.f, 0.f));
 		float	  aspectRatio = float(CurrentFBInfo.width) / float(CurrentFBInfo.height);
 		glm::mat4 proj = glm::perspectiveLH_ZO(glm::radians(90.0f), aspectRatio, 0.1f, 1000.0f);
 

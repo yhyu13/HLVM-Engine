@@ -82,7 +82,18 @@ bool FToneMappingPass::Initialize(nvrhi::IDevice* InDevice, const FString& InSha
     LayoutDesc.addItem(nvrhi::BindingLayoutItem::ConstantBuffer(256));
     LayoutDesc.addItem(nvrhi::BindingLayoutItem::Texture_SRV(0));
     LayoutDesc.addItem(nvrhi::BindingLayoutItem::Texture_SRV(1));
+    LayoutDesc.addItem(nvrhi::BindingLayoutItem::Texture_SRV(2));
+    LayoutDesc.addItem(nvrhi::BindingLayoutItem::Sampler(128));
     LayoutDesc.addItem(nvrhi::BindingLayoutItem::Texture_UAV(384));
+
+    // Create linear sampler
+    nvrhi::SamplerDesc SamplerDesc;
+    SamplerDesc.setAddressU(nvrhi::SamplerAddressMode::ClampToEdge)
+               .setAddressV(nvrhi::SamplerAddressMode::ClampToEdge)
+               .setMinFilter(true)
+               .setMagFilter(true)
+               .setMipFilter(true);
+    LinearSampler = Device->createSampler(SamplerDesc);
 
     BindingLayout = Device->createBindingLayout(LayoutDesc);
     if (!BindingLayout)
@@ -135,6 +146,8 @@ void FToneMappingPass::Dispatch(nvrhi::ICommandList* CmdList, const FDesc& Desc,
     SetDesc.addItem(nvrhi::BindingSetItem::ConstantBuffer(256, ConstantBuffer));
     SetDesc.addItem(nvrhi::BindingSetItem::Texture_SRV(0, Desc.HDRInputTexture));
     SetDesc.addItem(nvrhi::BindingSetItem::Texture_SRV(1, Desc.BloomTexture));
+    SetDesc.addItem(nvrhi::BindingSetItem::Texture_SRV(2, Desc.SSRTexture));
+    SetDesc.addItem(nvrhi::BindingSetItem::Sampler(128, LinearSampler));
     SetDesc.addItem(nvrhi::BindingSetItem::Texture_UAV(384, Desc.SDROutputTexture));
 
     nvrhi::BindingSetHandle BindingSet = Device->createBindingSet(SetDesc, BindingLayout);
@@ -161,6 +174,7 @@ void FToneMappingPass::Shutdown()
     BindingLayout = nullptr;
     Pipeline = nullptr;
     ConstantBuffer = nullptr;
+    LinearSampler = nullptr;
     Device = nullptr;
     bIsInitialized = false;
 }

@@ -10,6 +10,15 @@ DECLARE_LOG_CATEGORY(LogRenderer)
 AUTO_CVAR_FLOAT(r_SSAO_RadiusScale, 0.05f,
     "SSAO sample radius as fraction of scene radius", EConsoleVariableFlag::Saved)
 
+AUTO_CVAR_INT(r_SSR_MaxSteps, 32,
+    "SSR max ray march steps", EConsoleVariableFlag::Saved)
+AUTO_CVAR_FLOAT(r_SSR_StepSize, 5.0f,
+    "SSR view-space step size", EConsoleVariableFlag::Saved)
+AUTO_CVAR_FLOAT(r_SSR_MaxDistance, 500.0f,
+    "SSR max reflection distance", EConsoleVariableFlag::Saved)
+AUTO_CVAR_FLOAT(r_SSR_Thickness, 2.0f,
+    "SSR surface thickness in view-space units", EConsoleVariableFlag::Saved)
+
 bool FDeferredFrameRenderer::Initialize(nvrhi::IDevice* InDevice, const FString& InShaderDataDir)
 {
     if (bIsInitialized)
@@ -44,6 +53,12 @@ bool FDeferredFrameRenderer::Initialize(nvrhi::IDevice* InDevice, const FString&
         return false;
     }
 
+    if (!SSRPass.Initialize(Device, ShaderDataDir))
+    {
+        HLVM_LOG(LogRenderer, err, TXT("FDeferredFrameRenderer: Failed to initialize SSR pass"));
+        return false;
+    }
+
     if (!LightingPass.Initialize(Device, ShaderDataDir))
     {
         HLVM_LOG(LogRenderer, err, TXT("FDeferredFrameRenderer: Failed to initialize lighting pass"));
@@ -73,6 +88,7 @@ void FDeferredFrameRenderer::Shutdown()
     ShadowPass.Shutdown();
     HBAOPass.Shutdown();
     BilateralBlurPass.Shutdown();
+    SSRPass.Shutdown();
     LightingPass.Shutdown();
     BloomPass.Shutdown();
     ToneMapPass.Shutdown();
@@ -84,6 +100,7 @@ void FDeferredFrameRenderer::Shutdown()
     BloomHalfResTexture = nullptr;
     BloomBlurTempTexture = nullptr;
     BloomTexture = nullptr;
+    SSRTexture = nullptr;
 
     BindingCache.Clear();
     Device = nullptr;
@@ -152,6 +169,13 @@ void FDeferredFrameRenderer::CreateIntermediateTextures(uint32_t Width, uint32_t
     Desc.height = Height;
     Desc.debugName = "BloomTexture";
     BloomTexture = Device->createTexture(Desc);
+
+    // SSR texture (half-res RGBA16_FLOAT)
+    Desc.format = nvrhi::Format::RGBA16_FLOAT;
+    Desc.width = std::max(1u, Width / 2);
+    Desc.height = std::max(1u, Height / 2);
+    Desc.debugName = "SSRTexture";
+    SSRTexture = Device->createTexture(Desc);
 }
 
 void FDeferredFrameRenderer::Render(nvrhi::ICommandList* CmdList, const FRenderParams& Params)
@@ -329,6 +353,55 @@ void FDeferredFrameRenderer::Render(nvrhi::ICommandList* CmdList, const FRenderP
         LightingPass.Dispatch(CmdList, LightingDesc, LightingConstants);
     }
 
+    // Transition HDR to SRV for SSR
+    CmdList->setTextureState(HDRTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+    // Transition SSR texture to UAV
+    CmdList->setTextureState(SSRTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
+
+    // =====================================================================
+    // SSR Pass
+    // =====================================================================
+    {
+        SSr::FSSRConstants SSRConstants;
+        memset(&SSRConstants, 0, sizeof(SSRConstants));
+
+        glm::mat4 invProj = glm::inverse(Params.View->ProjMatrix);
+        memcpy(SSRConstants.ProjMatrix, glm::value_ptr(Params.View->ProjMatrix), 64);
+        memcpy(SSRConstants.InvProjMatrix, glm::value_ptr(invProj), 64);
+        memcpy(SSRConstants.ViewMatrix, glm::value_ptr(Params.View->ViewMatrix), 64);
+
+        SSRConstants.FullScreenSize[0] = float(CurrentWidth);
+        SSRConstants.FullScreenSize[1] = float(CurrentHeight);
+        SSRConstants.InvFullScreenSize[0] = 1.0f / float(CurrentWidth);
+        SSRConstants.InvFullScreenSize[1] = 1.0f / float(CurrentHeight);
+
+        uint32_t halfW = std::max(1u, CurrentWidth / 2);
+        uint32_t halfH = std::max(1u, CurrentHeight / 2);
+        SSRConstants.HalfScreenSize[0] = float(halfW);
+        SSRConstants.HalfScreenSize[1] = float(halfH);
+        SSRConstants.InvHalfScreenSize[0] = 1.0f / float(halfW);
+        SSRConstants.InvHalfScreenSize[1] = 1.0f / float(halfH);
+
+        SSRConstants.MaxSteps = CVar_r_SSR_MaxSteps;
+        SSRConstants.StepSize = CVar_r_SSR_StepSize;
+        SSRConstants.MaxDistance = CVar_r_SSR_MaxDistance;
+        SSRConstants.Thickness = CVar_r_SSR_Thickness;
+
+        SSr::FSSRPass::FDesc SSRDesc;
+        SSRDesc.DepthTexture = GBufferPass.GetDepthTexture();
+        SSRDesc.NormalTexture = GBufferPass.GetNormalsTexture();
+        SSRDesc.MaterialTexture = GBufferPass.GetSpecularTexture();
+        SSRDesc.HDRTexture = HDRTexture;
+        SSRDesc.OutputTexture = SSRTexture;
+        SSRDesc.OutputWidth = halfW;
+        SSRDesc.OutputHeight = halfH;
+
+        SSRPass.Dispatch(CmdList, SSRDesc, SSRConstants);
+    }
+
+    // Transition SSR to SRV for tone mapping
+    CmdList->setTextureState(SSRTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+
     // =====================================================================
     // Bloom Pass
     // =====================================================================
@@ -365,6 +438,7 @@ void FDeferredFrameRenderer::Render(nvrhi::ICommandList* CmdList, const FRenderP
         FToneMappingPass::FDesc ToneMapDesc;
         ToneMapDesc.HDRInputTexture = HDRTexture;
         ToneMapDesc.BloomTexture = BloomTexture;
+        ToneMapDesc.SSRTexture = SSRTexture;
         ToneMapDesc.SDROutputTexture = SDRTexture;
         ToneMapDesc.Width = CurrentWidth;
         ToneMapDesc.Height = CurrentHeight;

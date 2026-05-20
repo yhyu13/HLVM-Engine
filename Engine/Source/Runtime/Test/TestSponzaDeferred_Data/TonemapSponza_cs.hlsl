@@ -17,6 +17,9 @@ cbuffer TonemapConstants : register(b0)
 
 Texture2D<float4> t_HDRInput  : register(t0);
 Texture2D<float4> t_Bloom     : register(t1);
+Texture2D<float4> t_SSR       : register(t2);
+
+SamplerState LinearSampler : register(s0);
 
 RWTexture2D<float4> u_SDROutput : register(u0);
 
@@ -52,6 +55,11 @@ void main(uint2 dispatchThreadId : SV_DispatchThreadID)
         return;
 
     float3 hdr = t_HDRInput[pixelCoord].rgb;
+
+    // Add SSR (sample half-res SSR with linear filter at full-res UV)
+    float2 uv = (float2(pixelCoord) + 0.5) / TextureSize;
+    float4 ssr = t_SSR.SampleLevel(LinearSampler, uv, 0);
+    hdr += ssr.rgb * ssr.a;
 
     // Add bloom
     float3 bloom = t_Bloom[pixelCoord].rgb;
