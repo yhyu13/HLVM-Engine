@@ -4,6 +4,8 @@
 #include "Renderer/Mesh/StaticMesh.h"
 #include "Renderer/Material/PBRMaterial.h"
 #include "Renderer/RHI/Object/Buffer.h"
+#include "Renderer/Texture/AsyncTextureLoader.h"
+#include "Core/Parallel/Async/WorkStealThreadPool.h"
 #include "Core/Log.h"
 
 DECLARE_LOG_CATEGORY(LogRenderer)
@@ -53,45 +55,104 @@ bool FSceneGPUData::Initialize(nvrhi::IDevice* InDevice, const FPath& ScenePath)
         CachedSceneCenter.x, CachedSceneCenter.y, CachedSceneCenter.z, sceneRadius);
 
     // =====================================================================
-    // Load PBR textures for materials
+    // Load PBR textures for materials (async decode + batched GPU upload)
     // =====================================================================
     HLVM_LOG(LogRenderer, info, TXT("FSceneGPUData: Loading PBR textures..."));
+
+    struct FPendingTexture {
+        FPath TexturePath;
+        FTexture* OutTexture;
+        std::future<FDecodedImage> Future;
+    };
+    TVector<FPendingTexture> PendingTextures;
+
+    nvrhi::CommandListHandle UploadCmdList = Device->createCommandList();
+    UploadCmdList->open();
+
     for (auto& Mat : Materials)
     {
-        if (Mat->HasTexture(IMaterial::ETextureType::Albedo))
+        auto PBRMat = std::dynamic_pointer_cast<FPBRMaterial>(Mat);
+        if (!PBRMat)
+            continue;
+
+        // Albedo
+        if (PBRMat->HasTexture(IMaterial::ETextureType::Albedo) &&
+            !PBRMat->HasGPUTexture(IMaterial::ETextureType::Albedo))
         {
-            nvrhi::CommandListHandle TexCmdList = Device->createCommandList();
-            TexCmdList->open();
-            bool LoadSuccess = Mat->LoadTexture(IMaterial::ETextureType::Albedo, Device, TexCmdList);
-            if (LoadSuccess)
+            FPath TexturePath = PBRMat->GetTexturePath(IMaterial::ETextureType::Albedo);
+            FString Ext = FPath::GetExtension(TexturePath);
+
+            // KTX: not thread-safe and has ktx2/ fallback logic in LoadTexture.
+            // Use the existing synchronous path on the main thread.
+            // STB is thread-safe; enqueue to worker pool.
+            if (Ext == ".ktx" || Ext == ".KTX" ||
+                Ext == ".ktx2" || Ext == ".KTX2")
             {
-                FTexture& GPUTex = Mat->GetGPUTexture(IMaterial::ETextureType::Albedo);
-                HLVM_LOG(LogRenderer, info, TXT("FSceneGPUData: Loaded albedo texture: {}x{}"),
-                    GPUTex.GetWidth(), GPUTex.GetHeight());
+                nvrhi::CommandListHandle KtxCmdList = Device->createCommandList();
+                KtxCmdList->open();
+                PBRMat->LoadTexture(IMaterial::ETextureType::Albedo, Device, KtxCmdList);
             }
             else
             {
-                HLVM_LOG(LogRenderer, warn, TXT("FSceneGPUData: Failed to load albedo texture"));
+                FPendingTexture Pending;
+                Pending.TexturePath = TexturePath;
+                Pending.OutTexture = &PBRMat->GetGPUTexture(IMaterial::ETextureType::Albedo);
+                Pending.Future = FWorkStealThreadPool::Get()->EnqueueTask(
+                    [TexturePath]() {
+                        return FAsyncTextureLoader::DecodeSTBTexture(TexturePath);
+                    });
+                PendingTextures.push_back(MoveTemp(Pending));
             }
         }
 
-        if (Mat->HasTexture(IMaterial::ETextureType::Normal))
+        // Normal
+        if (PBRMat->HasTexture(IMaterial::ETextureType::Normal) &&
+            !PBRMat->HasGPUTexture(IMaterial::ETextureType::Normal))
         {
-            nvrhi::CommandListHandle TexCmdList = Device->createCommandList();
-            TexCmdList->open();
-            bool LoadSuccess = Mat->LoadTexture(IMaterial::ETextureType::Normal, Device, TexCmdList);
-            if (LoadSuccess)
+            FPath TexturePath = PBRMat->GetTexturePath(IMaterial::ETextureType::Normal);
+            FString Ext = FPath::GetExtension(TexturePath);
+
+            if (Ext == ".ktx" || Ext == ".KTX" ||
+                Ext == ".ktx2" || Ext == ".KTX2")
             {
-                FTexture& GPUTex = Mat->GetGPUTexture(IMaterial::ETextureType::Normal);
-                HLVM_LOG(LogRenderer, info, TXT("FSceneGPUData: Loaded normal texture: {}x{}"),
-                    GPUTex.GetWidth(), GPUTex.GetHeight());
+                nvrhi::CommandListHandle KtxCmdList = Device->createCommandList();
+                KtxCmdList->open();
+                PBRMat->LoadTexture(IMaterial::ETextureType::Normal, Device, KtxCmdList);
             }
             else
             {
-                HLVM_LOG(LogRenderer, warn, TXT("FSceneGPUData: Failed to load normal texture"));
+                FPendingTexture Pending;
+                Pending.TexturePath = TexturePath;
+                Pending.OutTexture = &PBRMat->GetGPUTexture(IMaterial::ETextureType::Normal);
+                Pending.Future = FWorkStealThreadPool::Get()->EnqueueTask(
+                    [TexturePath]() {
+                        return FAsyncTextureLoader::DecodeSTBTexture(TexturePath);
+                    });
+                PendingTextures.push_back(MoveTemp(Pending));
             }
         }
     }
+
+    // Wait for async STB decode jobs and upload on the main thread
+    for (auto& Pending : PendingTextures)
+    {
+        FDecodedImage Decoded = Pending.Future.get();
+        if (Decoded.bIsValid)
+        {
+            FAsyncTextureLoader::UploadTextureToCommandList(
+                Device, UploadCmdList, Decoded, *Pending.OutTexture);
+        }
+        else
+        {
+            HLVM_LOG(LogRenderer, warn,
+                TXT("FSceneGPUData: Failed to async-decode texture: {}"),
+                *FString(Pending.TexturePath.string().c_str()));
+        }
+    }
+
+    UploadCmdList->close();
+    Device->executeCommandList(UploadCmdList);
+    Device->waitForIdle();
 
     // =====================================================================
     // Create placeholder textures (1x1 white albedo + flat normal)

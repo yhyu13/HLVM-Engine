@@ -17,8 +17,10 @@
 #include "Renderer/Scene3D/Scene3DLoader.h"
 #include "Renderer/Mesh/StaticMesh.h"
 #include "Renderer/Material/PBRMaterial.h"
+#include "Renderer/Texture/AsyncTextureLoader.h"
 #include "Renderer/ShaderMake/ShaderBlob.h"
 #include "Image/FImageDump.h"
+#include "Core/Parallel/Async/WorkStealThreadPool.h"
 #include <nvrhi/utils.h>
 #include <Utility/Timer.h>
 #include <glm/glm.hpp>
@@ -161,34 +163,76 @@ public:
             SceneCenter.x, SceneCenter.y, SceneCenter.z, SceneRadius);
 
         // =====================================================================
-        // Load PBR textures for materials (KTX2 redirection happens in LoadTexture)
+        // Load PBR textures for materials (async decode + batched GPU upload)
         // =====================================================================
         HLVM_LOG(LogTest, info, TXT("Loading PBR textures..."));
 
+        struct FPendingTexture {
+            FPath TexturePath;
+            FTexture* OutTexture;
+            std::future<FDecodedImage> Future;
+        };
+        TVector<FPendingTexture> PendingTextures;
+
+        nvrhi::CommandListHandle UploadCmdList = NvrhiDevice->createCommandList();
+        UploadCmdList->open();
+
         for (auto& Mat : Materials)
         {
-            if (Mat->HasTexture(IMaterial::ETextureType::Albedo))
+            auto PBRMat = std::dynamic_pointer_cast<FPBRMaterial>(Mat);
+            if (!PBRMat)
+                continue;
+
+            if (PBRMat->HasTexture(IMaterial::ETextureType::Albedo) &&
+                !PBRMat->HasGPUTexture(IMaterial::ETextureType::Albedo))
             {
-                FPath TexPath = Mat->GetTexturePath(IMaterial::ETextureType::Albedo);
-                HLVM_LOG(LogTest, info, TXT("Loading albedo texture: {}"), *TexPath);
+                FPath TexturePath = PBRMat->GetTexturePath(IMaterial::ETextureType::Albedo);
+                FString Ext = FPath::GetExtension(TexturePath);
 
-                nvrhi::CommandListHandle TexCmdList = NvrhiDevice->createCommandList();
-                TexCmdList->open();
-
-                bool LoadSuccess = Mat->LoadTexture(IMaterial::ETextureType::Albedo, NvrhiDevice, TexCmdList);
-
-                if (LoadSuccess)
+                // KTX: not thread-safe and has ktx2/ fallback logic in LoadTexture.
+                // Use the existing synchronous path on the main thread.
+                // STB is thread-safe; enqueue to worker pool.
+                if (Ext == ".ktx" || Ext == ".KTX" ||
+                    Ext == ".ktx2" || Ext == ".KTX2")
                 {
-                    FTexture& GPUTex = Mat->GetGPUTexture(IMaterial::ETextureType::Albedo);
-                    HLVM_LOG(LogTest, info, TXT("Successfully loaded albedo texture: {}x{}"),
-                        GPUTex.GetWidth(), GPUTex.GetHeight());
+                    nvrhi::CommandListHandle KtxCmdList = NvrhiDevice->createCommandList();
+                    KtxCmdList->open();
+                    PBRMat->LoadTexture(IMaterial::ETextureType::Albedo, NvrhiDevice, KtxCmdList);
                 }
                 else
                 {
-                    HLVM_LOG(LogTest, warn, TXT("Failed to load albedo texture: {}"), *TexPath);
+                    FPendingTexture Pending;
+                    Pending.TexturePath = TexturePath;
+                    Pending.OutTexture = &PBRMat->GetGPUTexture(IMaterial::ETextureType::Albedo);
+                    Pending.Future = FWorkStealThreadPool::Get()->EnqueueTask(
+                        [TexturePath]() {
+                            return FAsyncTextureLoader::DecodeSTBTexture(TexturePath);
+                        });
+                    PendingTextures.push_back(MoveTemp(Pending));
                 }
             }
         }
+
+        // Wait for async STB decode jobs and upload on the main thread
+        for (auto& Pending : PendingTextures)
+        {
+            FDecodedImage Decoded = Pending.Future.get();
+            if (Decoded.bIsValid)
+            {
+                FAsyncTextureLoader::UploadTextureToCommandList(
+                    NvrhiDevice, UploadCmdList, Decoded, *Pending.OutTexture);
+            }
+            else
+            {
+                HLVM_LOG(LogTest, warn,
+                    TXT("Failed to async-decode texture: {}"),
+                    *FString(Pending.TexturePath.string().c_str()));
+            }
+        }
+
+        UploadCmdList->close();
+        NvrhiDevice->executeCommandList(UploadCmdList);
+        NvrhiDevice->waitForIdle();
 
         // =====================================================================
         // Create per-mesh geometry buffers
