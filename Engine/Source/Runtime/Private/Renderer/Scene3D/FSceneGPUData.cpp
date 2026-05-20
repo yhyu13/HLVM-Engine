@@ -50,9 +50,9 @@ bool FSceneGPUData::Initialize(nvrhi::IDevice* InDevice, const FPath& ScenePath)
         }
     }
     CachedSceneCenter = (CachedBBoxMin + CachedBBoxMax) * 0.5f;
-    float sceneRadius = glm::length(CachedBBoxMax - CachedBBoxMin) * 0.5f;
+    CachedSceneRadius = glm::length(CachedBBoxMax - CachedBBoxMin) * 0.5f;
     HLVM_LOG(LogRenderer, info, TXT("FSceneGPUData: Scene center: ({:.2f}, {:.2f}, {:.2f}), radius: {:.2f}"),
-        CachedSceneCenter.x, CachedSceneCenter.y, CachedSceneCenter.z, sceneRadius);
+        CachedSceneCenter.x, CachedSceneCenter.y, CachedSceneCenter.z, CachedSceneRadius);
 
     // =====================================================================
     // Load PBR textures for materials (async decode + batched GPU upload)
@@ -272,6 +272,7 @@ FSceneGPUData::FDrawData FSceneGPUData::BuildDrawData()
     Result.SceneCenter = CachedSceneCenter;
     Result.BBoxMin = CachedBBoxMin;
     Result.BBoxMax = CachedBBoxMax;
+    Result.SceneRadius = CachedSceneRadius;
 
     Result.ShadowItems.reserve(MeshGPUData.size());
     Result.GBufferItems.reserve(MeshGPUData.size());

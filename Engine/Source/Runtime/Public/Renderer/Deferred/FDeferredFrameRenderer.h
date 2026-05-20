@@ -24,6 +24,7 @@ public:
         glm::vec3 CameraPos;
         glm::mat4 LightViewProj;
         glm::mat4 ModelMatrix;
+        float SceneRadius = 0.0f;
     };
 
     struct FGBufferMeshItem

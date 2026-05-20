@@ -161,6 +161,7 @@ public:
 		ViewData.CameraPos = glm::vec3(camX, camY, camZ);
 		ViewData.LightViewProj = LightViewProj;
 		ViewData.ModelMatrix = glm::scale(glm::mat4(1.0f), glm::vec3(2.0f));
+		ViewData.SceneRadius = DrawData.SceneRadius;
 
 		// Render
 		FDeferredFrameRenderer::FRenderParams Params;

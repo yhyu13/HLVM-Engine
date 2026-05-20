@@ -163,10 +163,7 @@ namespace SSao
         ConstantsData[54] = Constants.MaxRadiusPixels;
         ConstantsData[55] = Constants.AttenuationScale;
         ConstantsData[56] = Constants.MinAO;
-
-        // Integers need careful copying to preserve bit pattern
-        memcpy(&ConstantsData[57], &Constants.DirectionCount, sizeof(TINT32));
-        memcpy(&ConstantsData[58], &Constants.StepCount,      sizeof(TINT32));
+        // DirectionCount and StepCount are now compile-time #defines in shader
 
         CmdList->writeBuffer(ConstantBuffer, ConstantsData, sizeof(ConstantsData));
 

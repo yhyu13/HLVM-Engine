@@ -18,10 +18,8 @@ namespace SSao
         TFP32 MaxRadiusPixels;
         TFP32 AttenuationScale;
         TFP32 MinAO;
-        TINT32 DirectionCount;
-        TINT32 StepCount;
-        TFP32 Pad0[2];
-        TFP32 Pad1[3];
+        TFP32 Pad0[3];
+        TFP32 Pad1[4];
     };
     static_assert(sizeof(FHBAOConstants) == 256, "FHBAOConstants must be 256 bytes");
 
@@ -41,8 +39,6 @@ namespace SSao
             float MaxRadiusPixels = 50.0f;
             float AttenuationScale = 1.0f;
             float MinAO = 0.0f;
-            int32_t DirectionCount = 4;
-            int32_t StepCount = 6;
         };
 
         FSSAOPass();

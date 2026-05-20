@@ -19,6 +19,7 @@ public:
         glm::vec3 SceneCenter;
         glm::vec3 BBoxMin;
         glm::vec3 BBoxMax;
+        float SceneRadius = 0.0f;
     };
 
     bool Initialize(nvrhi::IDevice* InDevice, const FPath& ScenePath);
@@ -64,5 +65,6 @@ private:
     glm::vec3 CachedSceneCenter = glm::vec3(0.f);
     glm::vec3 CachedBBoxMin = glm::vec3(0.f);
     glm::vec3 CachedBBoxMax = glm::vec3(0.f);
+    float CachedSceneRadius = 0.0f;
     bool bIsInitialized = false;
 };

@@ -2,9 +2,13 @@
 #include "Renderer/Common/FCommonRenderPasses.h"
 #include "Image/FRenderPassDumper.h"
 #include "Core/Log.h"
+#include "Utility/CVar/CVarMacros.h"
 #include <glm/gtc/type_ptr.hpp>
 
 DECLARE_LOG_CATEGORY(LogRenderer)
+
+AUTO_CVAR_FLOAT(r_SSAO_RadiusScale, 0.05f,
+    "SSAO sample radius as fraction of scene radius", EConsoleVariableFlag::Saved)
 
 bool FDeferredFrameRenderer::Initialize(nvrhi::IDevice* InDevice, const FString& InShaderDataDir)
 {
@@ -241,13 +245,11 @@ void FDeferredFrameRenderer::Render(nvrhi::ICommandList* CmdList, const FRenderP
         HBAOConstants.ScreenSize[1] = float(CurrentHeight);
         HBAOConstants.InvScreenSize[0] = 1.0f / float(CurrentWidth);
         HBAOConstants.InvScreenSize[1] = 1.0f / float(CurrentHeight);
-        HBAOConstants.SampleRadius = 2.0f;
+        HBAOConstants.SampleRadius = Params.View->SceneRadius * CVar_r_SSAO_RadiusScale;
         HBAOConstants.AngleBias = 0.2f;
         HBAOConstants.MaxRadiusPixels = 50.0f;
         HBAOConstants.AttenuationScale = 1.0f;
         HBAOConstants.MinAO = 0.3f;
-        HBAOConstants.DirectionCount = 4;
-        HBAOConstants.StepCount = 6;
 
         SSao::FSSAOPass::FDesc HBAODesc;
         HBAODesc.DepthTexture = GBufferPass.GetDepthTexture();
