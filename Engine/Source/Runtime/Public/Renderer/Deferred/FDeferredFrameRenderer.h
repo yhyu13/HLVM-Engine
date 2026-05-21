@@ -10,6 +10,7 @@
 #include "Renderer/PostProcess/FSSAOPass.h"
 #include "Renderer/PostProcess/FSSRPass.h"
 #include "Renderer/PostProcess/FTAAPass.h"
+#include "Renderer/PostProcess/FMotionBlurPass.h"
 #include "Renderer/Shadow/FShadowMapPass.h"
 #include <nvrhi/nvrhi.h>
 #include <glm/glm.hpp>
@@ -81,6 +82,7 @@ private:
     SSr::FSSRPass SSRPass;
     FDeferredLightingPass LightingPass;
     TAA::FTAAPass TAAPass;
+    MotionBlur::FMotionBlurPass MotionBlurPass;
     FBloomPass BloomPass;
     FToneMappingPass ToneMapPass;
 
@@ -95,6 +97,7 @@ private:
     nvrhi::TextureHandle SSRTexture;
     nvrhi::TextureHandle TAAOutputTexture;
     nvrhi::TextureHandle TAAHistoryTexture;
+    nvrhi::TextureHandle MotionBlurTexture;
 
     uint32_t FrameIndex = 0;
     bool bTAANeedsHistoryInit = true;
@@ -107,4 +110,5 @@ private:
     FBindingCache BindingCache;
     bool bIsInitialized = false;
     bool bTAAInitialized = false;
+    bool bMotionBlurInitialized = false;
 };

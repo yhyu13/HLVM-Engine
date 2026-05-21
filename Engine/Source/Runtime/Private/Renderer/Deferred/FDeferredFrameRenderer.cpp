@@ -26,6 +26,13 @@ AUTO_CVAR_FLOAT(r_TAA_BlendFactor, 0.1f,
 AUTO_CVAR_FLOAT(r_TAA_DepthThreshold, 0.1f,
     "TAA disocclusion depth threshold", EConsoleVariableFlag::Saved)
 
+AUTO_CVAR_BOOL(r_MotionBlur, true,
+    "Enable camera motion blur", EConsoleVariableFlag::Saved)
+AUTO_CVAR_FLOAT(r_MotionBlur_VelocityScale, 1.0f,
+    "Motion blur strength multiplier", EConsoleVariableFlag::Saved)
+AUTO_CVAR_FLOAT(r_MotionBlur_MinVelocity, 0.5f,
+    "Min pixel velocity to trigger motion blur", EConsoleVariableFlag::Saved)
+
 bool FDeferredFrameRenderer::Initialize(nvrhi::IDevice* InDevice, const FString& InShaderDataDir)
 {
     if (bIsInitialized)
@@ -87,6 +94,7 @@ bool FDeferredFrameRenderer::Initialize(nvrhi::IDevice* InDevice, const FString&
     HLVM_LOG(LogRenderer, info, TXT("FDeferredFrameRenderer initialized successfully"));
     bIsInitialized = true;
     bTAAInitialized = false;
+    bMotionBlurInitialized = false;
     return true;
 }
 
@@ -99,6 +107,7 @@ void FDeferredFrameRenderer::Shutdown()
     SSRPass.Shutdown();
     LightingPass.Shutdown();
     TAAPass.Shutdown();
+    MotionBlurPass.Shutdown();
     BloomPass.Shutdown();
     ToneMapPass.Shutdown();
 
@@ -112,6 +121,7 @@ void FDeferredFrameRenderer::Shutdown()
     SSRTexture = nullptr;
     TAAOutputTexture = nullptr;
     TAAHistoryTexture = nullptr;
+    MotionBlurTexture = nullptr;
 
     BindingCache.Clear();
     Device = nullptr;
@@ -119,6 +129,7 @@ void FDeferredFrameRenderer::Shutdown()
     CurrentHeight = 0;
     bIsInitialized = false;
     bTAAInitialized = false;
+    bMotionBlurInitialized = false;
 }
 
 void FDeferredFrameRenderer::ResizeIfNeeded(uint32_t Width, uint32_t Height)
@@ -198,6 +209,10 @@ void FDeferredFrameRenderer::CreateIntermediateTextures(uint32_t Width, uint32_t
     Desc.debugName = "TAAHistory";
     TAAHistoryTexture = Device->createTexture(Desc);
 
+    // Motion blur texture (full-res RGBA32_FLOAT)
+    Desc.debugName = "MotionBlur";
+    MotionBlurTexture = Device->createTexture(Desc);
+
     bTAANeedsHistoryInit = true;
 }
 
@@ -233,6 +248,17 @@ void FDeferredFrameRenderer::Render(nvrhi::ICommandList* CmdList, const FRenderP
             return;
         }
         bTAAInitialized = true;
+    }
+
+    // Initialize motion blur pass on first render if enabled
+    if (CVar_r_MotionBlur && !bMotionBlurInitialized)
+    {
+        if (!MotionBlurPass.Initialize(Device, ShaderDataDir))
+        {
+            HLVM_LOG(LogRenderer, err, TXT("FDeferredFrameRenderer: Failed to initialize motion blur pass"));
+            return;
+        }
+        bMotionBlurInitialized = true;
     }
 
     // =====================================================================
@@ -504,15 +530,62 @@ void FDeferredFrameRenderer::Render(nvrhi::ICommandList* CmdList, const FRenderP
 
         TAAPass.Dispatch(CmdList, TAADesc, TAAConstants);
 
-        // Transition TAA output to SRV for bloom/tone mapping
+        // Transition TAA output to SRV for motion blur / bloom
         CmdList->setTextureState(TAAOutputTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
 
-        // Copy TAA output to history for next frame
+        ToneMapInputTexture = TAAOutputTexture;
+    }
+
+    // =====================================================================
+    // Motion Blur Pass
+    // =====================================================================
+    if (CVar_r_MotionBlur && bMotionBlurInitialized)
+    {
+        nvrhi::TextureHandle MotionBlurInput = ToneMapInputTexture;
+
+        CmdList->setTextureState(MotionBlurInput, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+        CmdList->setTextureState(GBufferPass.GetDepthTexture(), nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+        CmdList->setTextureState(MotionBlurTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
+
+        MotionBlur::FMotionBlurConstants MBConstants;
+        memset(&MBConstants, 0, sizeof(MBConstants));
+
+        glm::mat4 currViewProj = jitteredProj * Params.View->ViewMatrix;
+        glm::mat4 invCurrViewProj = glm::inverse(currViewProj);
+        glm::mat4 prevViewProj = Params.View->PrevProjMatrix * Params.View->PrevViewMatrix;
+
+        memcpy(MBConstants.InverseCurrViewProj, glm::value_ptr(invCurrViewProj), 64);
+        memcpy(MBConstants.PrevViewProj, glm::value_ptr(prevViewProj), 64);
+        MBConstants.OutputSize[0] = float(CurrentWidth);
+        MBConstants.OutputSize[1] = float(CurrentHeight);
+        MBConstants.RcpOutputSize[0] = 1.0f / float(CurrentWidth);
+        MBConstants.RcpOutputSize[1] = 1.0f / float(CurrentHeight);
+        MBConstants.VelocityScale = CVar_r_MotionBlur_VelocityScale;
+        MBConstants.MinVelocity = CVar_r_MotionBlur_MinVelocity;
+
+        MotionBlur::FMotionBlurPass::FDesc MBDesc;
+        MBDesc.ColorTexture = MotionBlurInput;
+        MBDesc.DepthTexture = GBufferPass.GetDepthTexture();
+        MBDesc.OutputTexture = MotionBlurTexture;
+        MBDesc.OutputWidth = CurrentWidth;
+        MBDesc.OutputHeight = CurrentHeight;
+
+        MotionBlurPass.Dispatch(CmdList, MBDesc, MBConstants);
+
+        // Transition motion blur output to SRV for bloom/tone mapping
+        CmdList->setTextureState(MotionBlurTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+
+        ToneMapInputTexture = MotionBlurTexture;
+    }
+
+    // =====================================================================
+    // TAA History Copy (after motion blur, history is pre-motion-blur)
+    // =====================================================================
+    if (CVar_r_TAA && bTAAInitialized)
+    {
         CmdList->setTextureState(TAAOutputTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::CopySource);
         CmdList->setTextureState(TAAHistoryTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::CopyDest);
         CmdList->copyTexture(TAAHistoryTexture.Get(), nvrhi::TextureSlice(), TAAOutputTexture.Get(), nvrhi::TextureSlice());
-
-        ToneMapInputTexture = TAAOutputTexture;
     }
 
     // =====================================================================
