@@ -19,6 +19,13 @@ AUTO_CVAR_FLOAT(r_SSR_MaxDistance, 500.0f,
 AUTO_CVAR_FLOAT(r_SSR_Thickness, 2.0f,
     "SSR surface thickness in view-space units", EConsoleVariableFlag::Saved)
 
+AUTO_CVAR_BOOL(r_TAA, true,
+    "Enable temporal anti-aliasing", EConsoleVariableFlag::Saved)
+AUTO_CVAR_FLOAT(r_TAA_BlendFactor, 0.1f,
+    "TAA history blend factor (0=none, 1=full)", EConsoleVariableFlag::Saved)
+AUTO_CVAR_FLOAT(r_TAA_DepthThreshold, 0.1f,
+    "TAA disocclusion depth threshold", EConsoleVariableFlag::Saved)
+
 bool FDeferredFrameRenderer::Initialize(nvrhi::IDevice* InDevice, const FString& InShaderDataDir)
 {
     if (bIsInitialized)
@@ -79,6 +86,7 @@ bool FDeferredFrameRenderer::Initialize(nvrhi::IDevice* InDevice, const FString&
 
     HLVM_LOG(LogRenderer, info, TXT("FDeferredFrameRenderer initialized successfully"));
     bIsInitialized = true;
+    bTAAInitialized = false;
     return true;
 }
 
@@ -90,6 +98,7 @@ void FDeferredFrameRenderer::Shutdown()
     BilateralBlurPass.Shutdown();
     SSRPass.Shutdown();
     LightingPass.Shutdown();
+    TAAPass.Shutdown();
     BloomPass.Shutdown();
     ToneMapPass.Shutdown();
 
@@ -101,12 +110,15 @@ void FDeferredFrameRenderer::Shutdown()
     BloomBlurTempTexture = nullptr;
     BloomTexture = nullptr;
     SSRTexture = nullptr;
+    TAAOutputTexture = nullptr;
+    TAAHistoryTexture = nullptr;
 
     BindingCache.Clear();
     Device = nullptr;
     CurrentWidth = 0;
     CurrentHeight = 0;
     bIsInitialized = false;
+    bTAAInitialized = false;
 }
 
 void FDeferredFrameRenderer::ResizeIfNeeded(uint32_t Width, uint32_t Height)
@@ -176,6 +188,17 @@ void FDeferredFrameRenderer::CreateIntermediateTextures(uint32_t Width, uint32_t
     Desc.height = std::max(1u, Height / 2);
     Desc.debugName = "SSRTexture";
     SSRTexture = Device->createTexture(Desc);
+
+    // TAA textures (full-res RGBA32_FLOAT to match HDRTexture for copy compatibility)
+    Desc.format = nvrhi::Format::RGBA32_FLOAT;
+    Desc.width = Width;
+    Desc.height = Height;
+    Desc.debugName = "TAAOutput";
+    TAAOutputTexture = Device->createTexture(Desc);
+    Desc.debugName = "TAAHistory";
+    TAAHistoryTexture = Device->createTexture(Desc);
+
+    bTAANeedsHistoryInit = true;
 }
 
 void FDeferredFrameRenderer::Render(nvrhi::ICommandList* CmdList, const FRenderParams& Params)
@@ -201,6 +224,17 @@ void FDeferredFrameRenderer::Render(nvrhi::ICommandList* CmdList, const FRenderP
         }
     }
 
+    // Initialize TAA pass on first render if enabled
+    if (CVar_r_TAA && !bTAAInitialized)
+    {
+        if (!TAAPass.Initialize(Device, ShaderDataDir))
+        {
+            HLVM_LOG(LogRenderer, err, TXT("FDeferredFrameRenderer: Failed to initialize TAA pass"));
+            return;
+        }
+        bTAAInitialized = true;
+    }
+
     // =====================================================================
     // Shadow Pass
     // =====================================================================
@@ -215,6 +249,26 @@ void FDeferredFrameRenderer::Render(nvrhi::ICommandList* CmdList, const FRenderP
     }
 
     // =====================================================================
+    // Camera Jitter (for TAA)
+    // =====================================================================
+    glm::vec2 jitter(0.0f, 0.0f);
+    glm::mat4 jitteredProj = Params.View->ProjMatrix;
+    if (CVar_r_TAA)
+    {
+        static const float Halton23[16][2] = {
+            {0.5000f, 0.3333f}, {0.2500f, 0.6667f}, {0.7500f, 0.1111f}, {0.1250f, 0.4444f},
+            {0.6250f, 0.7778f}, {0.3750f, 0.2222f}, {0.8750f, 0.5556f}, {0.0625f, 0.8889f},
+            {0.5625f, 0.0370f}, {0.3125f, 0.3704f}, {0.8125f, 0.7037f}, {0.1875f, 0.1481f},
+            {0.6875f, 0.4815f}, {0.4375f, 0.8148f}, {0.9375f, 0.2593f}, {0.0313f, 0.5926f}
+        };
+        uint32_t idx = FrameIndex % 16;
+        jitter.x = (Halton23[idx][0] - 0.5f) * (2.0f / float(CurrentWidth));
+        jitter.y = (Halton23[idx][1] - 0.5f) * (2.0f / float(CurrentHeight));
+        jitteredProj[2][0] += jitter.x;
+        jitteredProj[2][1] += jitter.y;
+    }
+
+    // =====================================================================
     // GBuffer Pass
     // =====================================================================
     {
@@ -223,7 +277,7 @@ void FDeferredFrameRenderer::Render(nvrhi::ICommandList* CmdList, const FRenderP
         memset(&ViewConstants, 0, sizeof(ViewConstants));
         memcpy(ViewConstants.ModelMatrix, glm::value_ptr(Params.View->ModelMatrix), 64);
         memcpy(ViewConstants.ViewMatrix, glm::value_ptr(Params.View->ViewMatrix), 64);
-        memcpy(ViewConstants.ProjMatrix, glm::value_ptr(Params.View->ProjMatrix), 64);
+        memcpy(ViewConstants.ProjMatrix, glm::value_ptr(jitteredProj), 64);
         ViewConstants.CameraPos[0] = Params.View->CameraPos.x;
         ViewConstants.CameraPos[1] = Params.View->CameraPos.y;
         ViewConstants.CameraPos[2] = Params.View->CameraPos.z;
@@ -365,8 +419,8 @@ void FDeferredFrameRenderer::Render(nvrhi::ICommandList* CmdList, const FRenderP
         SSr::FSSRConstants SSRConstants;
         memset(&SSRConstants, 0, sizeof(SSRConstants));
 
-        glm::mat4 invProj = glm::inverse(Params.View->ProjMatrix);
-        memcpy(SSRConstants.ProjMatrix, glm::value_ptr(Params.View->ProjMatrix), 64);
+        glm::mat4 invProj = glm::inverse(jitteredProj);
+        memcpy(SSRConstants.ProjMatrix, glm::value_ptr(jitteredProj), 64);
         memcpy(SSRConstants.InvProjMatrix, glm::value_ptr(invProj), 64);
         memcpy(SSRConstants.ViewMatrix, glm::value_ptr(Params.View->ViewMatrix), 64);
 
@@ -403,11 +457,70 @@ void FDeferredFrameRenderer::Render(nvrhi::ICommandList* CmdList, const FRenderP
     CmdList->setTextureState(SSRTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
 
     // =====================================================================
+    // TAA Pass
+    // =====================================================================
+    nvrhi::TextureHandle ToneMapInputTexture = HDRTexture;
+    if (CVar_r_TAA && bTAAInitialized)
+    {
+        // Initialize history on first frame by copying current HDR to history
+        bool bIsFirstFrame = bTAANeedsHistoryInit;
+        if (bTAANeedsHistoryInit)
+        {
+            CmdList->setTextureState(HDRTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::CopySource);
+            CmdList->setTextureState(TAAHistoryTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::CopyDest);
+            CmdList->copyTexture(TAAHistoryTexture.Get(), nvrhi::TextureSlice(), HDRTexture.Get(), nvrhi::TextureSlice());
+            bTAANeedsHistoryInit = false;
+        }
+
+        // Ensure resources are in correct states
+        CmdList->setTextureState(HDRTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+        CmdList->setTextureState(TAAHistoryTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+        CmdList->setTextureState(GBufferPass.GetDepthTexture(), nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+        CmdList->setTextureState(TAAOutputTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
+
+        TAA::FTAAConstants TAAConstants;
+        memset(&TAAConstants, 0, sizeof(TAAConstants));
+
+        glm::mat4 currViewProj = jitteredProj * Params.View->ViewMatrix;
+        glm::mat4 invCurrViewProj = glm::inverse(currViewProj);
+        glm::mat4 prevViewProj = Params.View->PrevProjMatrix * Params.View->PrevViewMatrix;
+
+        memcpy(TAAConstants.InverseCurrViewProj, glm::value_ptr(invCurrViewProj), 64);
+        memcpy(TAAConstants.PrevViewProj, glm::value_ptr(prevViewProj), 64);
+        TAAConstants.OutputSize[0] = float(CurrentWidth);
+        TAAConstants.OutputSize[1] = float(CurrentHeight);
+        TAAConstants.RcpOutputSize[0] = 1.0f / float(CurrentWidth);
+        TAAConstants.RcpOutputSize[1] = 1.0f / float(CurrentHeight);
+        TAAConstants.BlendFactor = bIsFirstFrame ? 1.0f : CVar_r_TAA_BlendFactor;
+        TAAConstants.DepthThreshold = CVar_r_TAA_DepthThreshold;
+
+        TAA::FTAAPass::FDesc TAADesc;
+        TAADesc.CurrentFrameTexture = HDRTexture;
+        TAADesc.HistoryFrameTexture = TAAHistoryTexture;
+        TAADesc.DepthTexture = GBufferPass.GetDepthTexture();
+        TAADesc.OutputTexture = TAAOutputTexture;
+        TAADesc.OutputWidth = CurrentWidth;
+        TAADesc.OutputHeight = CurrentHeight;
+
+        TAAPass.Dispatch(CmdList, TAADesc, TAAConstants);
+
+        // Transition TAA output to SRV for bloom/tone mapping
+        CmdList->setTextureState(TAAOutputTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+
+        // Copy TAA output to history for next frame
+        CmdList->setTextureState(TAAOutputTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::CopySource);
+        CmdList->setTextureState(TAAHistoryTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::CopyDest);
+        CmdList->copyTexture(TAAHistoryTexture.Get(), nvrhi::TextureSlice(), TAAOutputTexture.Get(), nvrhi::TextureSlice());
+
+        ToneMapInputTexture = TAAOutputTexture;
+    }
+
+    // =====================================================================
     // Bloom Pass
     // =====================================================================
     {
         FBloomPass::FDesc BloomDesc;
-        BloomDesc.HDRTexture = HDRTexture;
+        BloomDesc.HDRTexture = ToneMapInputTexture;
         BloomDesc.OutputTexture = BloomTexture;
         BloomDesc.HalfResTexture = BloomHalfResTexture;
         BloomDesc.BlurTempTexture = BloomBlurTempTexture;
@@ -419,7 +532,7 @@ void FDeferredFrameRenderer::Render(nvrhi::ICommandList* CmdList, const FRenderP
         BloomDesc.Sigma = 2.0f;
         BloomDesc.BlurIterations = 2;
 
-        CmdList->setTextureState(HDRTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+        CmdList->setTextureState(ToneMapInputTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
         CmdList->setTextureState(BloomTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
 
         BloomPass.Dispatch(CmdList, BloomDesc);
@@ -431,12 +544,12 @@ void FDeferredFrameRenderer::Render(nvrhi::ICommandList* CmdList, const FRenderP
     // Tone Mapping Pass
     // =====================================================================
     {
-        CmdList->setTextureState(HDRTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+        CmdList->setTextureState(ToneMapInputTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
         CmdList->setTextureState(BloomTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
         CmdList->setTextureState(SDRTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
 
         FToneMappingPass::FDesc ToneMapDesc;
-        ToneMapDesc.HDRInputTexture = HDRTexture;
+        ToneMapDesc.HDRInputTexture = ToneMapInputTexture;
         ToneMapDesc.BloomTexture = BloomTexture;
         ToneMapDesc.SSRTexture = SSRTexture;
         ToneMapDesc.SDROutputTexture = SDRTexture;
@@ -488,4 +601,7 @@ void FDeferredFrameRenderer::Render(nvrhi::ICommandList* CmdList, const FRenderP
     CmdList->setTextureState(GBufferPass.GetNormalsTexture(), nvrhi::AllSubresources, nvrhi::ResourceStates::RenderTarget);
     CmdList->setTextureState(GBufferPass.GetEmissiveTexture(), nvrhi::AllSubresources, nvrhi::ResourceStates::RenderTarget);
     CmdList->setTextureState(GBufferPass.GetDepthTexture(), nvrhi::AllSubresources, nvrhi::ResourceStates::DepthWrite);
+
+    // Update frame state for TAA
+    FrameIndex++;
 }

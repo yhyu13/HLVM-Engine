@@ -9,6 +9,7 @@
 #include "Renderer/PostProcess/FJointBilateralUpsamplePass.h"
 #include "Renderer/PostProcess/FSSAOPass.h"
 #include "Renderer/PostProcess/FSSRPass.h"
+#include "Renderer/PostProcess/FTAAPass.h"
 #include "Renderer/Shadow/FShadowMapPass.h"
 #include <nvrhi/nvrhi.h>
 #include <glm/glm.hpp>
@@ -26,6 +27,8 @@ public:
         glm::mat4 LightViewProj;
         glm::mat4 ModelMatrix;
         float SceneRadius = 0.0f;
+        glm::mat4 PrevViewMatrix = glm::mat4(1.0f);
+        glm::mat4 PrevProjMatrix = glm::mat4(1.0f);
     };
 
     struct FGBufferMeshItem
@@ -77,6 +80,7 @@ private:
     FJointBilateralUpsamplePass BilateralBlurPass;
     SSr::FSSRPass SSRPass;
     FDeferredLightingPass LightingPass;
+    TAA::FTAAPass TAAPass;
     FBloomPass BloomPass;
     FToneMappingPass ToneMapPass;
 
@@ -89,6 +93,11 @@ private:
     nvrhi::TextureHandle BloomBlurTempTexture;
     nvrhi::TextureHandle BloomTexture;
     nvrhi::TextureHandle SSRTexture;
+    nvrhi::TextureHandle TAAOutputTexture;
+    nvrhi::TextureHandle TAAHistoryTexture;
+
+    uint32_t FrameIndex = 0;
+    bool bTAANeedsHistoryInit = true;
 
     // State
     nvrhi::IDevice* Device = nullptr;
@@ -97,4 +106,5 @@ private:
     uint32_t CurrentHeight = 0;
     FBindingCache BindingCache;
     bool bIsInitialized = false;
+    bool bTAAInitialized = false;
 };

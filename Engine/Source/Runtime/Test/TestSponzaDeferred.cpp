@@ -163,6 +163,12 @@ public:
 		ViewData.LightViewProj = LightViewProj;
 		ViewData.ModelMatrix = glm::scale(glm::mat4(1.0f), glm::vec3(2.0f));
 		ViewData.SceneRadius = DrawData.SceneRadius;
+		ViewData.PrevViewMatrix = PrevViewMatrix;
+		ViewData.PrevProjMatrix = PrevProjMatrix;
+
+		// Store current matrices for next frame's TAA
+		PrevViewMatrix = view;
+		PrevProjMatrix = proj;
 
 		// Render
 		FDeferredFrameRenderer::FRenderParams Params;
@@ -222,6 +228,8 @@ private:
 
 	uint32_t FrameCount = 0;
 	float	 FPSUpdateTimer = 0.0f;
+	glm::mat4 PrevViewMatrix = glm::mat4(1.0f);
+	glm::mat4 PrevProjMatrix = glm::mat4(1.0f);
 };
 
 // =============================================================================
