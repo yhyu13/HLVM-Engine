@@ -11,6 +11,10 @@
 #include "Renderer/PostProcess/FSSRPass.h"
 #include "Renderer/PostProcess/FTAAPass.h"
 #include "Renderer/PostProcess/FMotionBlurPass.h"
+#include "Renderer/PostProcess/FDOFPass.h"
+#include "Renderer/PostProcess/FLensEffectsPass.h"
+#include "Renderer/PostProcess/FExposureAdaptationPass.h"
+#include "Renderer/PostProcess/FContactShadowsPass.h"
 #include "Renderer/Shadow/FShadowMapPass.h"
 #include <nvrhi/nvrhi.h>
 #include <glm/glm.hpp>
@@ -83,8 +87,12 @@ private:
     FDeferredLightingPass LightingPass;
     TAA::FTAAPass TAAPass;
     MotionBlur::FMotionBlurPass MotionBlurPass;
+    DOF::FDOFPass DOFPass;
     FBloomPass BloomPass;
     FToneMappingPass ToneMapPass;
+    LensEffects::FLensEffectsPass LensEffectsPass;
+    Exposure::FExposureAdaptationPass ExposurePass;
+    ContactShadows::FContactShadowsPass ContactShadowsPass;
 
     // Intermediate textures
     nvrhi::TextureHandle HDRTexture;
@@ -98,6 +106,10 @@ private:
     nvrhi::TextureHandle TAAOutputTexture;
     nvrhi::TextureHandle TAAHistoryTexture;
     nvrhi::TextureHandle MotionBlurTexture;
+    nvrhi::TextureHandle DOFTexture;
+    nvrhi::TextureHandle LensEffectsTexture;
+    nvrhi::TextureHandle AdaptedLuminanceTexture;
+    nvrhi::TextureHandle ContactShadowTexture;
 
     uint32_t FrameIndex = 0;
     bool bTAANeedsHistoryInit = true;
@@ -111,4 +123,7 @@ private:
     bool bIsInitialized = false;
     bool bTAAInitialized = false;
     bool bMotionBlurInitialized = false;
+    bool bDOFInitialized = false;
+    bool bLensEffectsInitialized = false;
+    bool bExposureAdaptationInitialized = false;
 };

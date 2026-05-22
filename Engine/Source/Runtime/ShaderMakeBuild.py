@@ -250,6 +250,8 @@ def create_sponza_deferred_shadermake(test_target_name: str) -> ShaderMakeModule
         test_data_dir + "/GBufferSponzaVS.hlsl",
         test_data_dir + "/GBufferSponzaPS.hlsl",
         test_data_dir + "/SponzaDeferredLighting_cs.hlsl",
+        test_data_dir + "/ContactShadows_cs.hlsl",
+        test_data_dir + "/ExposureAdaptation_cs.hlsl",
         test_data_dir + "/TonemapSponza_cs.hlsl",
     ]
 

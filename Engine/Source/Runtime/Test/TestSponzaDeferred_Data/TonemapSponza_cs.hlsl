@@ -1,23 +1,25 @@
 /*
  * Tone Mapping Compute Shader - TestSponzaDeferred
- * ACES filmic curve + Reinhard + gamma correction + bloom
- * Input: HDR texture from lighting pass + Bloom texture
+ * ACES filmic curve + Reinhard + gamma correction + bloom + exposure adaptation
+ * Input: HDR texture from lighting pass + Bloom texture + SSR + Adapted Luminance
  * Output: SDR RGBA8 (blit handles display)
  */
 
 cbuffer TonemapConstants : register(b0)
 {
-    float Exposure;       // EV adjustment (default: 1.0)
-    float Gamma;          // Gamma correction (default: 2.2)
-    int   TonemapMode;    // 0=ACES, 1=Reinhard, 2=None
-    float BloomIntensity; // Bloom additive intensity (default: 0.4)
+    float Exposure;              // EV adjustment (default: 1.0)
+    float Gamma;                 // Gamma correction (default: 2.2)
+    int   TonemapMode;           // 0=ACES, 1=Reinhard, 2=None
+    float BloomIntensity;        // Bloom additive intensity (default: 0.4)
     float2 TextureSize;
-    float2 Pad;
+    float KeyValue;              // Target middle gray (default: 0.18)
+    int   UseExposureAdaptation; // 0=disabled, 1=enabled
 };
 
 Texture2D<float4> t_HDRInput  : register(t0);
 Texture2D<float4> t_Bloom     : register(t1);
 Texture2D<float4> t_SSR       : register(t2);
+Texture2D<float>  t_AdaptedLuminance : register(t3);
 
 SamplerState LinearSampler : register(s0);
 
@@ -65,8 +67,14 @@ void main(uint2 dispatchThreadId : SV_DispatchThreadID)
     float3 bloom = t_Bloom[pixelCoord].rgb;
     hdr += bloom * BloomIntensity;
 
-    // Apply exposure
-    hdr *= Exposure;
+    // Apply exposure (fixed or adapted)
+    float exposure = Exposure;
+    if (UseExposureAdaptation != 0)
+    {
+        float adaptedLuminance = t_AdaptedLuminance[int2(0, 0)];
+        exposure = KeyValue / max(adaptedLuminance, 0.0001);
+    }
+    hdr *= exposure;
 
     // Tone mapping
     float3 mapped;

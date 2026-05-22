@@ -81,7 +81,7 @@ bool FDeferredLightingPass::Initialize(nvrhi::IDevice* InDevice, const FString& 
 
     // b0: LightingConstants (CBV) - bRegShift 256 -> SPIR-V binding 256
     LayoutDesc.addItem(nvrhi::BindingLayoutItem::ConstantBuffer(256));
-    // t0-t6: GBuffer textures (SRV) - tRegShift 0 -> SPIR-V bindings 0-6
+    // t0-t7: GBuffer textures + contact shadows (SRV) - tRegShift 0 -> SPIR-V bindings 0-7
     LayoutDesc.addItem(nvrhi::BindingLayoutItem::Texture_SRV(0));
     LayoutDesc.addItem(nvrhi::BindingLayoutItem::Texture_SRV(1));
     LayoutDesc.addItem(nvrhi::BindingLayoutItem::Texture_SRV(2));
@@ -89,6 +89,7 @@ bool FDeferredLightingPass::Initialize(nvrhi::IDevice* InDevice, const FString& 
     LayoutDesc.addItem(nvrhi::BindingLayoutItem::Texture_SRV(4));
     LayoutDesc.addItem(nvrhi::BindingLayoutItem::Texture_SRV(5));
     LayoutDesc.addItem(nvrhi::BindingLayoutItem::Texture_SRV(6));
+    LayoutDesc.addItem(nvrhi::BindingLayoutItem::Texture_SRV(7));
     // s1: ShadowSampler - sRegShift 128 -> SPIR-V binding 129
     LayoutDesc.addItem(nvrhi::BindingLayoutItem::Sampler(129));
     // u0: Output (UAV) - uRegShift 384 -> SPIR-V binding 384
@@ -150,6 +151,7 @@ void FDeferredLightingPass::Dispatch(nvrhi::ICommandList* CmdList, const FDesc& 
     SetDesc.addItem(nvrhi::BindingSetItem::Texture_SRV(4, Desc.GBufferDepth));
     SetDesc.addItem(nvrhi::BindingSetItem::Texture_SRV(5, Desc.ShadowMap));
     SetDesc.addItem(nvrhi::BindingSetItem::Texture_SRV(6, Desc.SSAOTexture));
+    SetDesc.addItem(nvrhi::BindingSetItem::Texture_SRV(7, Desc.ContactShadowTexture));
     SetDesc.addItem(nvrhi::BindingSetItem::Sampler(129, Desc.ShadowSampler));
     SetDesc.addItem(nvrhi::BindingSetItem::Texture_UAV(384, Desc.HDROutputTexture));
 

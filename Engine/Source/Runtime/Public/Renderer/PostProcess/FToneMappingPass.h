@@ -12,6 +12,7 @@ public:
         nvrhi::TextureHandle BloomTexture;
         nvrhi::TextureHandle SSRTexture;
         nvrhi::TextureHandle SDROutputTexture;
+        nvrhi::TextureHandle AdaptedLuminanceTexture;
         uint32_t Width = 0;
         uint32_t Height = 0;
     };
@@ -24,8 +25,9 @@ public:
         int32_t TonemapMode;
         float BloomIntensity;
         float TextureSize[2];
-        float Pad[2];
-        float Pad2[56];
+        float KeyValue;
+        int32_t UseExposureAdaptation;
+        float Pad[56];
     };
     static_assert(sizeof(FConstants) == 256, "FToneMappingPass constants must be 256 bytes");
 

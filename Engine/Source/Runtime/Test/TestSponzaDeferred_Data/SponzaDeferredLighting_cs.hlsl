@@ -26,8 +26,9 @@ Texture2D<float4> t_Material : register(t1); // Metallic(R) + Roughness(G)
 Texture2D<float4> t_Normal   : register(t2);
 Texture2D<float4> t_Emissive : register(t3);
 Texture2D<float>  t_Depth    : register(t4);
-Texture2D<float>  t_ShadowMap : register(t5); // NEW
-Texture2D<float>  t_SSAO      : register(t6); // NEW
+Texture2D<float>  t_ShadowMap      : register(t5); // NEW
+Texture2D<float>  t_SSAO           : register(t6); // NEW
+Texture2D<float>  t_ContactShadows : register(t7); // NEW
 
 SamplerState ShadowSampler : register(s1); // NEW
 
@@ -197,6 +198,9 @@ void main(uint2 dispatchThreadId : SV_DispatchThreadID)
 
     // Shadow factor: use PCF 2x2 for soft edges
     float shadowFactor = SampleShadowPCF2x2(worldPos);
+
+    // Contact shadows: screen-space high-frequency shadow detail
+    shadowFactor *= t_ContactShadows[pixelCoord];
 
     // Combined direct lighting (attenuated by shadow)
     float3 Lo = (diffuse + specular) * NdotL * LightIntensity * shadowFactor;

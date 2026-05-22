@@ -15,6 +15,7 @@ public:
         nvrhi::TextureHandle GBufferDepth;
         nvrhi::TextureHandle ShadowMap;
         nvrhi::TextureHandle SSAOTexture;
+        nvrhi::TextureHandle ContactShadowTexture;
         nvrhi::TextureHandle HDROutputTexture;
         nvrhi::SamplerHandle ShadowSampler;
         uint32_t Width = 0;
