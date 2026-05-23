@@ -27,8 +27,12 @@ Texture2D<float4> t_Normal   : register(t2);
 Texture2D<float4> t_Emissive : register(t3);
 Texture2D<float>  t_Depth    : register(t4);
 Texture2D<float>  t_ShadowMap      : register(t5); // NEW
+#ifdef ENABLE_SSAO
 Texture2D<float>  t_SSAO           : register(t6); // NEW
+#endif
+#ifdef ENABLE_CONTACT_SHADOWS
 Texture2D<float>  t_ContactShadows : register(t7); // NEW
+#endif
 
 SamplerState ShadowSampler : register(s1); // NEW
 
@@ -200,13 +204,19 @@ void main(uint2 dispatchThreadId : SV_DispatchThreadID)
     float shadowFactor = SampleShadowPCF2x2(worldPos);
 
     // Contact shadows: screen-space high-frequency shadow detail
+#ifdef ENABLE_CONTACT_SHADOWS
     shadowFactor *= t_ContactShadows[pixelCoord];
+#endif
 
     // Combined direct lighting (attenuated by shadow)
     float3 Lo = (diffuse + specular) * NdotL * LightIntensity * shadowFactor;
 
     // Ambient: modulated by SSAO with minimum clamp
+#ifdef ENABLE_SSAO
     float ao = t_SSAO[pixelCoord];
+#else
+    float ao = 1.0;
+#endif
     float3 ambient = albedo * AmbientColor * max(ao, MinAO);
 
     float3 finalColor = ambient + Lo + emissiveData.rgb;

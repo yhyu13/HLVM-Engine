@@ -36,12 +36,32 @@ bool FDeferredLightingPass::Initialize(nvrhi::IDevice* InDevice, const FString& 
     Device = InDevice;
     ShaderDataDir = InShaderDataDir;
 
-    ComputeShader = FShaderLibrary::Get().LoadShader(
-        Device, ShaderDataDir, TXT("SponzaDeferredLighting_cs.sblob"), nvrhi::ShaderType::Compute);
-    if (!ComputeShader)
+    // Load all 4 permutations of the deferred lighting shader
+    // Index: (bSSAO ? 1 : 0) | (bContactShadows ? 2 : 0)
+    // All macros must be explicitly specified because the blob is a multi-permutation blob;
+    // FindPermutationInBlob with numConstants==0 only works on single-permutation blobs.
+    const TVector<FShaderMacro> PermutationMacros[PERMUTATION_COUNT] = {
+        { FShaderMacro(TXT("ENABLE_SSAO"), TXT("0")),
+          FShaderMacro(TXT("ENABLE_CONTACT_SHADOWS"), TXT("0")) }, // 0: no features
+        { FShaderMacro(TXT("ENABLE_SSAO"), TXT("1")),
+          FShaderMacro(TXT("ENABLE_CONTACT_SHADOWS"), TXT("0")) }, // 1: SSAO only
+        { FShaderMacro(TXT("ENABLE_SSAO"), TXT("0")),
+          FShaderMacro(TXT("ENABLE_CONTACT_SHADOWS"), TXT("1")) }, // 2: ContactShadows only
+        { FShaderMacro(TXT("ENABLE_SSAO"), TXT("1")),
+          FShaderMacro(TXT("ENABLE_CONTACT_SHADOWS"), TXT("1")) }, // 3: both
+    };
+
+    nvrhi::ShaderHandle PermutationShaders[PERMUTATION_COUNT];
+    for (uint32_t i = 0; i < PERMUTATION_COUNT; ++i)
     {
-        HLVM_LOG(LogRenderer, err, TXT("FDeferredLightingPass: Failed to load compute shader"));
-        return false;
+        PermutationShaders[i] = FShaderLibrary::Get().LoadShader(
+            Device, ShaderDataDir, TXT("SponzaDeferredLighting_cs.sblob"),
+            nvrhi::ShaderType::Compute, PermutationMacros[i]);
+        if (!PermutationShaders[i])
+        {
+            HLVM_LOG(LogRenderer, err, TXT("FDeferredLightingPass: Failed to load compute shader permutation {}"), i);
+            return false;
+        }
     }
 
     // Create binding layout
@@ -78,15 +98,18 @@ bool FDeferredLightingPass::Initialize(nvrhi::IDevice* InDevice, const FString& 
         return false;
     }
 
-    // Create compute pipeline
-    nvrhi::ComputePipelineDesc PipelineDesc;
-    PipelineDesc.setComputeShader(ComputeShader);
-    PipelineDesc.addBindingLayout(BindingLayout);
-    Pipeline = Device->createComputePipeline(PipelineDesc);
-    if (!Pipeline)
+    // Create compute pipelines for all permutations
+    for (uint32_t i = 0; i < PERMUTATION_COUNT; ++i)
     {
-        HLVM_LOG(LogRenderer, err, TXT("FDeferredLightingPass: Failed to create compute pipeline"));
-        return false;
+        nvrhi::ComputePipelineDesc PipelineDesc;
+        PipelineDesc.setComputeShader(PermutationShaders[i]);
+        PipelineDesc.addBindingLayout(BindingLayout);
+        Pipelines[i] = Device->createComputePipeline(PipelineDesc);
+        if (!Pipelines[i])
+        {
+            HLVM_LOG(LogRenderer, err, TXT("FDeferredLightingPass: Failed to create compute pipeline for permutation {}"), i);
+            return false;
+        }
     }
 
     // Create constant buffer
@@ -109,7 +132,8 @@ bool FDeferredLightingPass::Initialize(nvrhi::IDevice* InDevice, const FString& 
 
 void FDeferredLightingPass::Dispatch(nvrhi::ICommandList* CmdList, const FDesc& Desc, const FConstants& Constants)
 {
-    if (!bIsInitialized || !Pipeline || !CmdList)
+    uint32_t PermIdx = GetPermutationIndex(Desc.bEnableSSAO, Desc.bEnableContactShadows);
+    if (!bIsInitialized || !Pipelines[PermIdx] || !CmdList)
     {
         return;
     }
@@ -140,7 +164,7 @@ void FDeferredLightingPass::Dispatch(nvrhi::ICommandList* CmdList, const FDesc& 
 
     // Dispatch
     nvrhi::ComputeState State;
-    State.setPipeline(Pipeline);
+    State.setPipeline(Pipelines[PermIdx]);
     State.addBindingSet(BindingSet);
     CmdList->setComputeState(State);
 
@@ -151,9 +175,11 @@ void FDeferredLightingPass::Dispatch(nvrhi::ICommandList* CmdList, const FDesc& 
 
 void FDeferredLightingPass::Shutdown()
 {
-    ComputeShader = nullptr;
+    for (uint32_t i = 0; i < PERMUTATION_COUNT; ++i)
+    {
+        Pipelines[i] = nullptr;
+    }
     BindingLayout = nullptr;
-    Pipeline = nullptr;
     ConstantBuffer = nullptr;
     Device = nullptr;
     bIsInitialized = false;

@@ -20,6 +20,8 @@ public:
         nvrhi::SamplerHandle ShadowSampler;
         uint32_t Width = 0;
         uint32_t Height = 0;
+        bool bEnableSSAO = true;
+        bool bEnableContactShadows = true;
     };
 
     // Shader cbuffer is 13 registers (208 bytes). Padded to 256 for alignment consistency.
@@ -55,11 +57,17 @@ public:
     void Shutdown();
 
 private:
+    static constexpr uint32_t PERMUTATION_COUNT = 4;
+
     nvrhi::IDevice* Device = nullptr;
-    nvrhi::ShaderHandle ComputeShader;
     nvrhi::BindingLayoutHandle BindingLayout;
-    nvrhi::ComputePipelineHandle Pipeline;
+    nvrhi::ComputePipelineHandle Pipelines[PERMUTATION_COUNT];
     nvrhi::BufferHandle ConstantBuffer;
     FString ShaderDataDir;
     bool bIsInitialized = false;
+
+    uint32_t GetPermutationIndex(bool bSSAO, bool bContactShadows) const
+    {
+        return (bSSAO ? 1u : 0u) | (bContactShadows ? 2u : 0u);
+    }
 };

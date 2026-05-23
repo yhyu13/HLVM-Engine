@@ -65,6 +65,9 @@ public:
      * Async decode + batched GPU upload for material textures.
      * Consolidates the common PendingTextures pattern used across tests and scene loading.
      *
+     * This is the BLOCKING variant: enqueues decodes, waits for all to complete,
+     * uploads in one batch, and calls Device->waitForIdle().
+     *
      * @param Device         NVRHI device
      * @param Materials      Materials to load textures for
      * @param TypesToLoad    Which texture types to load (e.g., Albedo, Normal)
@@ -74,4 +77,35 @@ public:
         nvrhi::IDevice* Device,
         const TVector<std::shared_ptr<FPBRMaterial>>& Materials,
         const TVector<IMaterial::ETextureType>& TypesToLoad);
+
+    /**
+     * Begin non-blocking async texture loading.
+     *
+     * Enqueues decode tasks for all missing textures and returns immediately.
+     * Call Poll() each frame to process completed decodes and upload to GPU.
+     *
+     * @param Device         NVRHI device
+     * @param Materials      Materials to load textures for
+     * @param TypesToLoad    Which texture types to load
+     */
+    static void BeginAsyncLoad(
+        nvrhi::IDevice* Device,
+        const TVector<std::shared_ptr<FPBRMaterial>>& Materials,
+        const TVector<IMaterial::ETextureType>& TypesToLoad);
+
+    /**
+     * Poll for completed texture decodes and upload them to GPU.
+     *
+     * Call this from the main thread each frame (e.g., in Animate()).
+     * Processes all futures that have completed since the last call.
+     *
+     * @param Device         NVRHI device
+     * @return Number of newly uploaded textures this call
+     */
+    static uint32_t Poll(nvrhi::IDevice* Device);
+
+    /**
+     * @return true if any texture loads are still pending
+     */
+    static bool HasPendingLoads();
 };

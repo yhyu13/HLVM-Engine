@@ -632,6 +632,8 @@ void FDeferredFrameRenderer::Render(nvrhi::ICommandList* CmdList, const FRenderP
         LightingDesc.ShadowSampler = ShadowPass.GetShadowSampler();
         LightingDesc.Width = CurrentWidth;
         LightingDesc.Height = CurrentHeight;
+        LightingDesc.bEnableSSAO = CVar_r_SSAO.GetValue();
+        LightingDesc.bEnableContactShadows = CVar_r_ContactShadows.GetValue();
 
         FDeferredLightingPass::FConstants LightingConstants;
         memset(&LightingConstants, 0, sizeof(LightingConstants));

@@ -9,6 +9,7 @@
 
 #include <boost/filesystem.hpp>
 #include <fstream>
+#include <algorithm>
 
 DECLARE_LOG_CATEGORY(LogShaderLibrary)
 
@@ -51,7 +52,67 @@ bool FShaderLibrary::ReadBlobFromDisk(const FPath& BlobPath, FEntry& OutEntry)
     return true;
 }
 
+static TVector<FShaderMacro> SortMacros(const TVector<FShaderMacro>& Macros)
+{
+    TVector<FShaderMacro> Sorted = Macros;
+    std::sort(Sorted.begin(), Sorted.end(), [](const FShaderMacro& A, const FShaderMacro& B)
+    {
+        return A.Name < B.Name;
+    });
+    return Sorted;
+}
+
+static bool ExtractSPIRVFromBlob(const TVector<uint8_t>& BlobData, const TVector<FShaderMacro>& SortedMacros,
+                                 const void** OutBinary, size_t* OutSize, const FPath& AbsolutePath)
+{
+    if (SortedMacros.IsEmpty())
+    {
+        if (!ShaderMake::FindPermutationInBlob(BlobData.data(), BlobData.size(), nullptr, 0, OutBinary, OutSize))
+        {
+            HLVM_LOG(LogShaderLibrary, err, TXT("FShaderLibrary: Failed to extract SPIR-V from blob: {}"), AbsolutePath.ToTCharCStr());
+            return false;
+        }
+        return true;
+    }
+
+    TVector<ShaderMake::ShaderConstant> Constants;
+    Constants.Reserve(SortedMacros.Num32());
+    TVector<std::string> NameBuffers;
+    TVector<std::string> ValueBuffers;
+    NameBuffers.Reserve(SortedMacros.Num32());
+    ValueBuffers.Reserve(SortedMacros.Num32());
+
+    for (const auto& Macro : SortedMacros)
+    {
+        NameBuffers.emplace_back(Macro.Name.ToCharCStr());
+        ValueBuffers.emplace_back(Macro.Value.ToCharCStr());
+    }
+
+    for (size_t i = 0; i < SortedMacros.size(); ++i)
+    {
+        ShaderMake::ShaderConstant Constant;
+        Constant.name = NameBuffers[i].c_str();
+        Constant.value = ValueBuffers[i].c_str();
+        Constants.Add(Constant);
+    }
+
+    if (!ShaderMake::FindPermutationInBlob(BlobData.data(), BlobData.size(), Constants.data(),
+                                           static_cast<uint32_t>(Constants.size()), OutBinary, OutSize))
+    {
+        HLVM_LOG(LogShaderLibrary, err, TXT("FShaderLibrary: Failed to find permutation in blob: {}"), AbsolutePath.ToTCharCStr());
+        return false;
+    }
+
+    return true;
+}
+
 nvrhi::ShaderHandle FShaderLibrary::LoadShader(nvrhi::IDevice* Device, const FPath& BlobPath, nvrhi::ShaderType Type)
+{
+    return LoadShader(Device, BlobPath, Type, {});
+}
+
+nvrhi::ShaderHandle FShaderLibrary::LoadShader(nvrhi::IDevice* Device, const FPath& BlobPath, nvrhi::ShaderType Type,
+                                               const TVector<FShaderMacro>& Macros)
 {
     if (!Device)
     {
@@ -60,6 +121,7 @@ nvrhi::ShaderHandle FShaderLibrary::LoadShader(nvrhi::IDevice* Device, const FPa
     }
 
     FPath AbsolutePath = FPath::Absolute(BlobPath);
+    TVector<FShaderMacro> SortedMacros = SortMacros(Macros);
 
     FEntry Entry;
     {
@@ -86,9 +148,8 @@ nvrhi::ShaderHandle FShaderLibrary::LoadShader(nvrhi::IDevice* Device, const FPa
 
     const void* Binary = nullptr;
     size_t BinarySize = 0;
-    if (!ShaderMake::FindPermutationInBlob(Entry.BlobData.data(), Entry.BlobData.size(), nullptr, 0, &Binary, &BinarySize))
+    if (!ExtractSPIRVFromBlob(Entry.BlobData, SortedMacros, &Binary, &BinarySize, AbsolutePath))
     {
-        HLVM_LOG(LogShaderLibrary, err, TXT("FShaderLibrary: Failed to extract SPIR-V from blob: {}"), AbsolutePath.ToTCharCStr());
         return nullptr;
     }
 
@@ -108,6 +169,13 @@ nvrhi::ShaderHandle FShaderLibrary::LoadShader(nvrhi::IDevice* Device, const FSt
 {
     FPath BlobPath = FPath::Combine(ShaderDataDir, FileName);
     return LoadShader(Device, BlobPath, Type);
+}
+
+nvrhi::ShaderHandle FShaderLibrary::LoadShader(nvrhi::IDevice* Device, const FString& ShaderDataDir, const FString& FileName,
+                                               nvrhi::ShaderType Type, const TVector<FShaderMacro>& Macros)
+{
+    FPath BlobPath = FPath::Combine(ShaderDataDir, FileName);
+    return LoadShader(Device, BlobPath, Type, Macros);
 }
 
 bool FShaderLibrary::PollFile(const FPath& BlobPath)

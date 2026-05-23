@@ -25,6 +25,7 @@
 #include "Renderer/ImGui/FImgui_Renderer.h"
 #include "Renderer/ImGui/FCVarBrowser.h"
 #include "Renderer/Texture/TextureCache.h"
+#include "Renderer/Texture/AsyncTextureLoader.h"
 #include "Renderer/FShaderFactory.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -127,6 +128,9 @@ public:
 		}
 
 		DeferredRenderer.UpdateShaderHotReload();
+
+		// Poll for completed async texture uploads
+		FAsyncTextureLoader::Poll(NvrhiDevice);
 	}
 
 	virtual void Render(nvrhi::IFramebuffer* Framebuffer) override

@@ -21,6 +21,21 @@
 
 DECLARE_LOG_CATEGORY(LogTexture)
 
+// =====================================================================
+// Non-blocking async load state
+// =====================================================================
+
+struct FPendingTextureLoad
+{
+    FPath TexturePath;
+    std::future<FDecodedImage> Future;
+    TVector<FTexture*> TargetTextures;
+    nvrhi::IDevice* Device = nullptr;
+};
+
+static TVector<FPendingTextureLoad> GPendingLoads;
+static std::mutex GPendingLoadsMutex;
+
 // Vulkan format values
 #ifndef VK_FORMAT_R8G8B8A8_UNORM
 #define VK_FORMAT_R8G8B8A8_UNORM 37
@@ -396,4 +411,199 @@ uint32_t FAsyncTextureLoader::LoadMaterialTexturesAsync(
         UniqueSuccessCount, DecodeTasks.size(), MaterialRefSuccessCount);
 
     return UniqueSuccessCount;
+}
+
+// =====================================================================
+// Non-blocking async load implementation
+// =====================================================================
+
+void FAsyncTextureLoader::BeginAsyncLoad(
+    nvrhi::IDevice* Device,
+    const TVector<std::shared_ptr<FPBRMaterial>>& Materials,
+    const TVector<IMaterial::ETextureType>& TypesToLoad)
+{
+    TMap<FPath, TVector<FTexture*>> PathToTextures;
+    TVector<FPendingTextureLoad> NewPending;
+
+    for (auto& PBRMat : Materials)
+    {
+        if (!PBRMat)
+            continue;
+
+        for (IMaterial::ETextureType Type : TypesToLoad)
+        {
+            if (PBRMat->HasTexture(Type) && !PBRMat->HasGPUTexture(Type))
+            {
+                FPath TexturePath = PBRMat->GetTexturePath(Type);
+                FPath AbsolutePath = FPath::Absolute(TexturePath);
+
+                // Check texture cache first
+                nvrhi::TextureHandle CachedTexture = FTextureCache::Get().GetTexture(AbsolutePath);
+                if (CachedTexture)
+                {
+                    FTexture& OutTexture = PBRMat->GetGPUTexture(Type);
+                    if (OutTexture.InitializeFromHandle(CachedTexture, Device))
+                    {
+                        continue;
+                    }
+                }
+
+                FTexture* OutTexture = &PBRMat->GetGPUTexture(Type);
+
+                if (!PathToTextures.contains(AbsolutePath))
+                {
+                    PathToTextures[AbsolutePath] = TVector<FTexture*>{};
+
+                    FString Ext = FPath::GetExtension(TexturePath);
+                    if (Ext == ".ktx" || Ext == ".KTX" ||
+                        Ext == ".ktx2" || Ext == ".KTX2")
+                    {
+                        FPath KTX2Path = TexturePath.parent_path() / "ktx2" /
+                                         (TexturePath.stem().string() + ".ktx2");
+                        FPath DecodePath = std::filesystem::exists(KTX2Path.string())
+                                               ? KTX2Path
+                                               : TexturePath;
+                        NewPending.push_back({AbsolutePath,
+                            FWorkStealThreadPool::Get()->EnqueueTask(
+                                [DecodePath]() {
+                                    return FAsyncTextureLoader::DecodeKTXTexture(DecodePath);
+                                }),
+                            {}, Device});
+                    }
+                    else
+                    {
+                        NewPending.push_back({AbsolutePath,
+                            FWorkStealThreadPool::Get()->EnqueueTask(
+                                [TexturePath]() {
+                                    return FAsyncTextureLoader::DecodeSTBTexture(TexturePath);
+                                }),
+                            {}, Device});
+                    }
+                }
+
+                PathToTextures[AbsolutePath].push_back(OutTexture);
+            }
+        }
+    }
+
+    // Link target textures to pending loads
+    for (auto& Pending : NewPending)
+    {
+        auto It = PathToTextures.find(Pending.TexturePath);
+        if (It != PathToTextures.end())
+        {
+            Pending.TargetTextures = It->second;
+        }
+    }
+
+    if (!NewPending.empty())
+    {
+        std::lock_guard<std::mutex> Lock(GPendingLoadsMutex);
+        for (auto& Pending : NewPending)
+        {
+            GPendingLoads.push_back(std::move(Pending));
+        }
+        HLVM_LOG(LogTexture, info,
+            TXT("BeginAsyncLoad: Enqueued {} texture decode tasks"),
+            NewPending.size());
+    }
+}
+
+uint32_t FAsyncTextureLoader::Poll(nvrhi::IDevice* Device)
+{
+    TVector<FPendingTextureLoad> Completed;
+    {
+        std::lock_guard<std::mutex> Lock(GPendingLoadsMutex);
+
+        for (auto It = GPendingLoads.begin(); It != GPendingLoads.end(); )
+        {
+            if (It->Future.wait_for(std::chrono::seconds(0)) == std::future_status::ready)
+            {
+                Completed.push_back(std::move(*It));
+                It = GPendingLoads.erase(It);
+            }
+            else
+            {
+                ++It;
+            }
+        }
+    }
+
+    if (Completed.empty())
+    {
+        return 0;
+    }
+
+    // Collect valid decodes and create command list only when needed
+    TVector<std::pair<FDecodedImage, FPendingTextureLoad>> ValidUploads;
+    ValidUploads.reserve(Completed.size());
+
+    for (auto& Task : Completed)
+    {
+        FDecodedImage Decoded = Task.Future.get();
+        if (!Decoded.bIsValid)
+        {
+            HLVM_LOG(LogTexture, warn,
+                TXT("Poll: Failed to async-decode texture: {}"),
+                *FString(Task.TexturePath.string().c_str()));
+            continue;
+        }
+        ValidUploads.emplace_back(std::move(Decoded), std::move(Task));
+    }
+
+    if (ValidUploads.empty())
+    {
+        return 0;
+    }
+
+    nvrhi::CommandListHandle UploadCmdList = Device->createCommandList();
+    UploadCmdList->open();
+
+    uint32_t UploadCount = 0;
+    uint32_t RefCount = 0;
+
+    for (auto& [Decoded, Task] : ValidUploads)
+    {
+        FTexture TempTexture;
+        if (!UploadTextureToCommandList(Device, UploadCmdList, Decoded, TempTexture))
+        {
+            HLVM_LOG(LogTexture, err,
+                TXT("Poll: Failed to upload texture: {}"),
+                *FString(Task.TexturePath.string().c_str()));
+            continue;
+        }
+
+        nvrhi::TextureHandle Handle = TempTexture.GetTextureHandle();
+        FTextureCache::Get().Insert(Task.TexturePath, Handle);
+        ++UploadCount;
+
+        for (FTexture* OutTexture : Task.TargetTextures)
+        {
+            if (OutTexture->InitializeFromHandle(Handle, Device))
+            {
+                ++RefCount;
+            }
+        }
+    }
+
+    UploadCmdList->close();
+    Device->executeCommandList(UploadCmdList);
+    // NOTE: Intentionally NO waitForIdle() — upload command list executes
+    // asynchronously. The render command list submitted later will see the
+    // data because GPU execution is FIFO-ordered.
+
+    if (UploadCount > 0)
+    {
+        HLVM_LOG(LogTexture, info,
+            TXT("Poll: Uploaded {} textures ({} material refs), {} pending remaining"),
+            UploadCount, RefCount, GPendingLoads.size());
+    }
+
+    return UploadCount;
+}
+
+bool FAsyncTextureLoader::HasPendingLoads()
+{
+    std::lock_guard<std::mutex> Lock(GPendingLoadsMutex);
+    return !GPendingLoads.empty();
 }

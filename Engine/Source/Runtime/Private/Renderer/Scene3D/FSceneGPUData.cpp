@@ -56,16 +56,8 @@ bool FSceneGPUData::Initialize(nvrhi::IDevice* InDevice, const FPath& ScenePath)
         CachedSceneCenter.x, CachedSceneCenter.y, CachedSceneCenter.z, CachedSceneRadius);
 
     // =====================================================================
-    // Load PBR textures for materials (async decode + batched GPU upload)
-    // =====================================================================
-    HLVM_LOG(LogRenderer, info, TXT("FSceneGPUData: Loading PBR textures..."));
-
-    FAsyncTextureLoader::LoadMaterialTexturesAsync(
-        Device, Materials,
-        {IMaterial::ETextureType::Albedo, IMaterial::ETextureType::Normal});
-
-    // =====================================================================
     // Create placeholder textures (1x1 white albedo + flat normal)
+    // These are used while real textures are loading asynchronously.
     // =====================================================================
     {
         nvrhi::TextureDesc Desc;
@@ -94,6 +86,15 @@ bool FSceneGPUData::Initialize(nvrhi::IDevice* InDevice, const FPath& ScenePath)
         TexCmdList->close();
         Device->executeCommandList(TexCmdList);
     }
+
+    // =====================================================================
+    // Begin async texture loading (non-blocking)
+    // =====================================================================
+    HLVM_LOG(LogRenderer, info, TXT("FSceneGPUData: Starting async PBR texture loading..."));
+
+    FAsyncTextureLoader::BeginAsyncLoad(
+        Device, Materials,
+        {IMaterial::ETextureType::Albedo, IMaterial::ETextureType::Normal});
 
     // =====================================================================
     // Create geometry buffers (batched per-mesh)
