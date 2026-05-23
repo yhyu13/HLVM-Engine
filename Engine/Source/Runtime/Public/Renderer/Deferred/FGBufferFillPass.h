@@ -35,6 +35,9 @@ public:
     {
         nvrhi::TextureHandle DiffuseTexture;
         nvrhi::TextureHandle NormalTexture;
+        nvrhi::TextureHandle MetallicTexture;
+        nvrhi::TextureHandle RoughnessTexture;
+        nvrhi::TextureHandle AOTexture;
         FMaterialConstants Constants;
     };
 

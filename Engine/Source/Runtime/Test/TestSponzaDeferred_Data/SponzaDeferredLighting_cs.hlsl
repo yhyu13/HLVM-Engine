@@ -171,6 +171,7 @@ void main(uint2 dispatchThreadId : SV_DispatchThreadID)
     float3 albedo = diffuseData.rgb;
     float metallic = materialData.r;
     float roughness = materialData.g;
+    float materialAO = materialData.b;
 
     // View and light vectors
     float3 V = normalize(CameraPos - worldPos);
@@ -212,10 +213,9 @@ void main(uint2 dispatchThreadId : SV_DispatchThreadID)
     float3 Lo = (diffuse + specular) * NdotL * LightIntensity * shadowFactor;
 
     // Ambient: modulated by SSAO with minimum clamp
+    float ao = materialAO;
 #ifdef ENABLE_SSAO
-    float ao = t_SSAO[pixelCoord];
-#else
-    float ao = 1.0;
+    ao *= t_SSAO[pixelCoord];
 #endif
     float3 ambient = albedo * AmbientColor * max(ao, MinAO);
 

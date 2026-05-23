@@ -1,14 +1,17 @@
 /*
  * GBuffer Sponza Pixel Shader - TestSponzaDeferred
  * MRT0: Diffuse RGBA
- * MRT1: Metallic(R) + Roughness(G) + Unused(BA)
+ * MRT1: Metallic(R) + Roughness(G) + AO(B) + 1.0(A)
  * MRT2: Normal XYZ [0,1]
  * MRT3: Emissive RGB
  */
 
 SamplerState LinearSampler : register(s0);
-Texture2D DiffuseTexture : register(t0);
-Texture2D NormalTexture  : register(t1);
+Texture2D DiffuseTexture  : register(t0);
+Texture2D NormalTexture   : register(t1);
+Texture2D MetallicTexture : register(t2);
+Texture2D RoughnessTexture : register(t3);
+Texture2D AOTexture       : register(t4);
 
 cbuffer MaterialConstants : register(b1) {
     float4 AlbedoTint;
@@ -28,7 +31,7 @@ struct PSInput {
 
 struct MRTOutput {
     float4 MRT0 : SV_TARGET0; // Diffuse RGBA
-    float4 MRT1 : SV_TARGET1; // Metallic(R) + Roughness(G)
+    float4 MRT1 : SV_TARGET1; // Metallic(R) + Roughness(G) + AO(B)
     float4 MRT2 : SV_TARGET2; // Normal XYZ [0,1]
     float4 MRT3 : SV_TARGET3; // Emissive RGB
 };
@@ -43,8 +46,11 @@ MRTOutput main(PSInput input) {
     }
     output.MRT0 = diffuseColor * AlbedoTint;
 
-    // Use material constants instead of luminance heuristic
-    output.MRT1 = float4(Metallic, Roughness, 0.0, 0.0);
+    // Sample PBR material textures (placeholders return 1.0, so constants pass through)
+    float metallic = MetallicTexture.Sample(LinearSampler, input.TexCoord).r * Metallic;
+    float roughness = RoughnessTexture.Sample(LinearSampler, input.TexCoord).r * Roughness;
+    float ao = AOTexture.Sample(LinearSampler, input.TexCoord).r;
+    output.MRT1 = float4(metallic, roughness, ao, 1.0);
 
     // Normal mapping: sample tangent-space normal and transform to world space
     float3 worldNormal = normalize(input.Normal);

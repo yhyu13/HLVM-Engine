@@ -46,6 +46,9 @@ public:
         uint32_t IndexCount;
         nvrhi::TextureHandle DiffuseTexture;
         nvrhi::TextureHandle NormalTexture;
+        nvrhi::TextureHandle MetallicTexture;
+        nvrhi::TextureHandle RoughnessTexture;
+        nvrhi::TextureHandle AOTexture;
         FGBufferFillPass::FMaterialConstants MaterialConstants;
     };
 

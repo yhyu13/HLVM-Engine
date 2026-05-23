@@ -94,7 +94,9 @@ bool FSceneGPUData::Initialize(nvrhi::IDevice* InDevice, const FPath& ScenePath)
 
     FAsyncTextureLoader::BeginAsyncLoad(
         Device, Materials,
-        {IMaterial::ETextureType::Albedo, IMaterial::ETextureType::Normal});
+        {IMaterial::ETextureType::Albedo, IMaterial::ETextureType::Normal,
+         IMaterial::ETextureType::Metallic, IMaterial::ETextureType::Roughness,
+         IMaterial::ETextureType::AmbientOcclusion});
 
     // =====================================================================
     // Create geometry buffers (batched per-mesh)
@@ -208,12 +210,16 @@ FSceneGPUData::FDrawData FSceneGPUData::BuildDrawData()
 
         nvrhi::TextureHandle DiffuseTex = PlaceholderTexture;
         nvrhi::TextureHandle NormalTex = NormalPlaceholderTexture;
+        nvrhi::TextureHandle MetallicTex = PlaceholderTexture;
+        nvrhi::TextureHandle RoughnessTex = PlaceholderTexture;
+        nvrhi::TextureHandle AOTex = PlaceholderTexture;
         FGBufferFillPass::FMaterialConstants MatConst;
         memset(&MatConst, 0, sizeof(MatConst));
         MatConst.AlbedoTint[0] = 1.0f;
         MatConst.AlbedoTint[1] = 1.0f;
         MatConst.AlbedoTint[2] = 1.0f;
         MatConst.AlbedoTint[3] = 1.0f;
+        MatConst.Metallic = 0.0f;
         MatConst.Roughness = 1.0f;
 
         if (MeshData.Mesh && Scene)
@@ -227,6 +233,12 @@ FSceneGPUData::FDrawData FSceneGPUData::BuildDrawData()
                         DiffuseTex = PBRMat->GetGPUTexture(IMaterial::ETextureType::Albedo).GetTextureSRV();
                     if (PBRMat->HasGPUTexture(IMaterial::ETextureType::Normal))
                         NormalTex = PBRMat->GetGPUTexture(IMaterial::ETextureType::Normal).GetTextureSRV();
+                    if (PBRMat->HasGPUTexture(IMaterial::ETextureType::Metallic))
+                        MetallicTex = PBRMat->GetGPUTexture(IMaterial::ETextureType::Metallic).GetTextureSRV();
+                    if (PBRMat->HasGPUTexture(IMaterial::ETextureType::Roughness))
+                        RoughnessTex = PBRMat->GetGPUTexture(IMaterial::ETextureType::Roughness).GetTextureSRV();
+                    if (PBRMat->HasGPUTexture(IMaterial::ETextureType::AmbientOcclusion))
+                        AOTex = PBRMat->GetGPUTexture(IMaterial::ETextureType::AmbientOcclusion).GetTextureSRV();
                     FVec3 albedo = PBRMat->GetAlbedoColor();
                     MatConst.AlbedoTint[0] = albedo.x;
                     MatConst.AlbedoTint[1] = albedo.y;
@@ -239,6 +251,9 @@ FSceneGPUData::FDrawData FSceneGPUData::BuildDrawData()
 
         GBufferItem.DiffuseTexture = DiffuseTex;
         GBufferItem.NormalTexture = NormalTex;
+        GBufferItem.MetallicTexture = MetallicTex;
+        GBufferItem.RoughnessTexture = RoughnessTex;
+        GBufferItem.AOTexture = AOTex;
         GBufferItem.MaterialConstants = MatConst;
         Result.GBufferItems.push_back(GBufferItem);
     }

@@ -496,6 +496,9 @@ void FDeferredFrameRenderer::Render(nvrhi::ICommandList* CmdList, const FRenderP
             Item.IndexCount = Src.IndexCount;
             Item.Material.DiffuseTexture = Src.DiffuseTexture;
             Item.Material.NormalTexture = Src.NormalTexture;
+            Item.Material.MetallicTexture = Src.MetallicTexture;
+            Item.Material.RoughnessTexture = Src.RoughnessTexture;
+            Item.Material.AOTexture = Src.AOTexture;
             Item.Material.Constants = Src.MaterialConstants;
             GBufferItems.push_back(Item);
         }

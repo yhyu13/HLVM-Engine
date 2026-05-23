@@ -94,6 +94,9 @@ bool FGBufferFillPass::Initialize(nvrhi::IDevice* InDevice, const FString& InSha
     LayoutDesc.addItem(nvrhi::BindingLayoutItem::ConstantBuffer(257));
     LayoutDesc.addItem(nvrhi::BindingLayoutItem::Texture_SRV(0));
     LayoutDesc.addItem(nvrhi::BindingLayoutItem::Texture_SRV(1));
+    LayoutDesc.addItem(nvrhi::BindingLayoutItem::Texture_SRV(2));
+    LayoutDesc.addItem(nvrhi::BindingLayoutItem::Texture_SRV(3));
+    LayoutDesc.addItem(nvrhi::BindingLayoutItem::Texture_SRV(4));
     LayoutDesc.addItem(nvrhi::BindingLayoutItem::Sampler(128));
 
     GBufferBindingLayout = Device->createBindingLayout(LayoutDesc);
@@ -242,6 +245,9 @@ void FGBufferFillPass::Render(nvrhi::ICommandList* CmdList, const FRenderDesc& D
         SetDesc.addItem(nvrhi::BindingSetItem::ConstantBuffer(257, MaterialConstantBuffer));
         SetDesc.addItem(nvrhi::BindingSetItem::Texture_SRV(0, DrawData.Material.DiffuseTexture));
         SetDesc.addItem(nvrhi::BindingSetItem::Texture_SRV(1, DrawData.Material.NormalTexture));
+        SetDesc.addItem(nvrhi::BindingSetItem::Texture_SRV(2, DrawData.Material.MetallicTexture));
+        SetDesc.addItem(nvrhi::BindingSetItem::Texture_SRV(3, DrawData.Material.RoughnessTexture));
+        SetDesc.addItem(nvrhi::BindingSetItem::Texture_SRV(4, DrawData.Material.AOTexture));
         SetDesc.addItem(nvrhi::BindingSetItem::Sampler(128, GBufferLinearSampler));
         nvrhi::BindingSetHandle BindingSet = Device->createBindingSet(SetDesc, GBufferBindingLayout);
 
