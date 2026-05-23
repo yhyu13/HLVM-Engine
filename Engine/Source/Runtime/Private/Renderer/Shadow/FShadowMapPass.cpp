@@ -21,11 +21,10 @@
 // SOFTWARE.
 
 #include "Renderer/Shadow/FShadowMapPass.h"
-#include "Renderer/ShaderMake/ShaderBlob.h"
+#include "Renderer/Shader/ShaderLibrary.h"
+#include "Renderer/Mesh/IMesh.h"
 #include "Core/Log.h"
 #include <glm/gtc/type_ptr.hpp>
-#include <fstream>
-#include <vector>
 
 DECLARE_LOG_CATEGORY(LogRenderer)
 
@@ -39,33 +38,11 @@ bool FShadowMapPass::Initialize(nvrhi::IDevice* InDevice, const FString& InShade
     Device = InDevice;
     ShadowMapSize = Desc.ShadowMapSize;
 
-    auto VSPath = FPath::Combine(InShaderDataDir, TXT("ShadowVS.sblob"));
-    std::ifstream VSFile(VSPath.string(), std::ios::ate | std::ios::binary);
-    if (!VSFile.is_open())
-    {
-        HLVM_LOG(LogRenderer, err, TXT("FShadowMapPass: Failed to open vertex shader"));
-        return false;
-    }
-    size_t VSBytes = static_cast<size_t>(VSFile.tellg());
-    std::vector<uint8_t> VSData(VSBytes);
-    VSFile.seekg(0);
-    VSFile.read(reinterpret_cast<char*>(VSData.data()), static_cast<std::streamsize>(VSBytes));
-    VSFile.close();
-
-    const void* VSBinary = nullptr;
-    size_t VSBinarySize = 0;
-    if (!ShaderMake::FindPermutationInBlob(VSData.data(), VSData.size(), nullptr, 0, &VSBinary, &VSBinarySize))
-    {
-        HLVM_LOG(LogRenderer, err, TXT("FShadowMapPass: Failed to extract vertex shader SPIR-V from blob"));
-        return false;
-    }
-
-    nvrhi::ShaderDesc VSDesc;
-    VSDesc.setShaderType(nvrhi::ShaderType::Vertex);
-    ShadowVS = Device->createShader(VSDesc, VSBinary, VSBinarySize);
+    ShadowVS = FShaderLibrary::Get().LoadShader(
+        Device, InShaderDataDir, TXT("ShadowVS.sblob"), nvrhi::ShaderType::Vertex);
     if (!ShadowVS)
     {
-        HLVM_LOG(LogRenderer, err, TXT("FShadowMapPass: Failed to create vertex shader"));
+        HLVM_LOG(LogRenderer, err, TXT("FShadowMapPass: Failed to load vertex shader"));
         return false;
     }
 
@@ -148,9 +125,36 @@ bool FShadowMapPass::Initialize(nvrhi::IDevice* InDevice, const FString& InShade
         return false;
     }
 
+    // Create input layout matching the shadow vertex shader
+    nvrhi::VertexAttributeDesc Attrs[4];
+    Attrs[0].setName("POSITION")
+        .setFormat(nvrhi::Format::RGB32_FLOAT)
+        .setOffset(offsetof(FVertex, Position))
+        .setElementStride(sizeof(FVertex));
+    Attrs[1].setName("NORMAL")
+        .setFormat(nvrhi::Format::RGB32_FLOAT)
+        .setOffset(offsetof(FVertex, Normal))
+        .setElementStride(sizeof(FVertex));
+    Attrs[2].setName("TEXCOORD0")
+        .setFormat(nvrhi::Format::RG32_FLOAT)
+        .setOffset(offsetof(FVertex, UV))
+        .setElementStride(sizeof(FVertex));
+    Attrs[3].setName("TANGENT")
+        .setFormat(nvrhi::Format::RGB32_FLOAT)
+        .setOffset(offsetof(FVertex, Tangent))
+        .setElementStride(sizeof(FVertex));
+
+    ShadowInputLayout = Device->createInputLayout(Attrs, 4, ShadowVS);
+    if (!ShadowInputLayout)
+    {
+        HLVM_LOG(LogRenderer, err, TXT("FShadowMapPass: Failed to create input layout"));
+        return false;
+    }
+
     // Create shadow pipeline
     nvrhi::GraphicsPipelineDesc PipelineDesc;
     PipelineDesc.setVertexShader(ShadowVS)
+        .setInputLayout(ShadowInputLayout)
         .addBindingLayout(ShadowBindingLayout)
         .setPrimType(nvrhi::PrimitiveType::TriangleList);
     PipelineDesc.renderState.depthStencilState
@@ -229,6 +233,7 @@ void FShadowMapPass::Render(nvrhi::ICommandList* CmdList, const FRenderDesc& Des
 void FShadowMapPass::Shutdown()
 {
     ShadowVS = nullptr;
+    ShadowInputLayout = nullptr;
     ShadowBindingLayout = nullptr;
     ShadowPipeline = nullptr;
     ShadowMapTexture = nullptr;

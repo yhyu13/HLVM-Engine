@@ -4,8 +4,12 @@
  */
 
 #include "Renderer/Texture/AsyncTextureLoader.h"
+#include "Renderer/Texture/TextureCache.h"
 #include "Core/Log.h"
 #include "Renderer/RHI/Object/Texture.h"
+#include "Renderer/Material/IMaterial.h"
+#include "Renderer/Material/PBRMaterial.h"
+#include "Core/Parallel/Async/WorkStealThreadPool.h"
 
 // stb_image is already implemented in STBTextureLoader.cpp; just get declarations here
 #include "stb_image_wrapper.h"
@@ -13,6 +17,7 @@
 // KTX2 decode
 #include <ktx.h>
 #include <mutex>
+#include <future>
 
 DECLARE_LOG_CATEGORY(LogTexture)
 
@@ -255,4 +260,140 @@ bool FAsyncTextureLoader::UploadTextureToCommandList(
     }
 
     return true;
+}
+
+uint32_t FAsyncTextureLoader::LoadMaterialTexturesAsync(
+    nvrhi::IDevice* Device,
+    const TVector<std::shared_ptr<FPBRMaterial>>& Materials,
+    const TVector<IMaterial::ETextureType>& TypesToLoad)
+{
+    struct FDecodeTask
+    {
+        FPath TexturePath;
+        std::future<FDecodedImage> Future;
+    };
+
+    TMap<FPath, TVector<FTexture*>> PathToTextures;
+    TVector<FDecodeTask> DecodeTasks;
+
+    // First pass: check cache and build deduplicated decode list
+    for (auto& PBRMat : Materials)
+    {
+        if (!PBRMat)
+            continue;
+
+        for (IMaterial::ETextureType Type : TypesToLoad)
+        {
+            if (PBRMat->HasTexture(Type) && !PBRMat->HasGPUTexture(Type))
+            {
+                FPath TexturePath = PBRMat->GetTexturePath(Type);
+                FPath AbsolutePath = FPath::Absolute(TexturePath);
+
+                // Check texture cache first
+                nvrhi::TextureHandle CachedTexture = FTextureCache::Get().GetTexture(AbsolutePath);
+                if (CachedTexture)
+                {
+                    FTexture& OutTexture = PBRMat->GetGPUTexture(Type);
+                    if (OutTexture.InitializeFromHandle(CachedTexture, Device))
+                    {
+                        continue;
+                    }
+                }
+
+                FTexture* OutTexture = &PBRMat->GetGPUTexture(Type);
+
+                // Deduplicate: only enqueue one decode task per unique path
+                if (!PathToTextures.contains(AbsolutePath))
+                {
+                    PathToTextures[AbsolutePath] = TVector<FTexture*>{};
+
+                    FString Ext = FPath::GetExtension(TexturePath);
+                    if (Ext == ".ktx" || Ext == ".KTX" ||
+                        Ext == ".ktx2" || Ext == ".KTX2")
+                    {
+                        FPath KTX2Path = TexturePath.parent_path() / "ktx2" /
+                                         (TexturePath.stem().string() + ".ktx2");
+                        FPath DecodePath = std::filesystem::exists(KTX2Path.string())
+                                               ? KTX2Path
+                                               : TexturePath;
+                        DecodeTasks.push_back({AbsolutePath,
+                            FWorkStealThreadPool::Get()->EnqueueTask(
+                                [DecodePath]() {
+                                    return FAsyncTextureLoader::DecodeKTXTexture(DecodePath);
+                                })});
+                    }
+                    else
+                    {
+                        DecodeTasks.push_back({AbsolutePath,
+                            FWorkStealThreadPool::Get()->EnqueueTask(
+                                [TexturePath]() {
+                                    return FAsyncTextureLoader::DecodeSTBTexture(TexturePath);
+                                })});
+                    }
+                }
+
+                PathToTextures[AbsolutePath].push_back(OutTexture);
+            }
+        }
+    }
+
+    if (DecodeTasks.empty())
+    {
+        return 0;
+    }
+
+    // Batch upload on main thread
+    nvrhi::CommandListHandle UploadCmdList = Device->createCommandList();
+    UploadCmdList->open();
+
+    uint32_t UniqueSuccessCount = 0;
+    uint32_t MaterialRefSuccessCount = 0;
+    for (auto& Task : DecodeTasks)
+    {
+        FDecodedImage Decoded = Task.Future.get();
+        if (!Decoded.bIsValid)
+        {
+            HLVM_LOG(LogTexture, warn,
+                TXT("LoadMaterialTexturesAsync: Failed to async-decode texture: {}"),
+                *FString(Task.TexturePath.string().c_str()));
+            continue;
+        }
+
+        // Upload once per unique path
+        FTexture TempTexture;
+        if (!UploadTextureToCommandList(Device, UploadCmdList, Decoded, TempTexture))
+        {
+            HLVM_LOG(LogTexture, err,
+                TXT("LoadMaterialTexturesAsync: Failed to upload texture: {}"),
+                *FString(Task.TexturePath.string().c_str()));
+            continue;
+        }
+
+        nvrhi::TextureHandle Handle = TempTexture.GetTextureHandle();
+        FTextureCache::Get().Insert(Task.TexturePath, Handle);
+        ++UniqueSuccessCount;
+
+        // Share the handle with all materials that reference this path
+        auto It = PathToTextures.find(Task.TexturePath);
+        if (It != PathToTextures.end())
+        {
+            for (FTexture* OutTexture : It->second)
+            {
+                if (OutTexture->InitializeFromHandle(Handle, Device))
+                {
+                    ++MaterialRefSuccessCount;
+                }
+            }
+        }
+    }
+
+    UploadCmdList->close();
+    Device->executeCommandList(UploadCmdList);
+    Device->waitForIdle();
+
+    HLVM_LOG(LogTexture, info,
+        TXT("LoadMaterialTexturesAsync: Uploaded {}/{} unique textures, shared across {} material references"),
+        UniqueSuccessCount, DecodeTasks.size(), MaterialRefSuccessCount);
+
+    return UniqueSuccessCount;
 }

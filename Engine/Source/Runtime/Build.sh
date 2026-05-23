@@ -80,8 +80,8 @@ for arg in "$@"; do
         Jobs=${arg#*=}
     fi
 
-    # Step 12: Check for --TestRepeatNum
-    if [[ $arg == --TestRepeatNum ]]; then
+    # Step 12: Check for --TestRepeatNum=value
+    if [[ $arg == --TestRepeatNum=* ]]; then
         TestRepeatNum=${arg#*=}
     fi
 
@@ -196,7 +196,12 @@ for config in "${buildConfigs[@]}"; do
         cbuild_param+=" --verbose"
     fi
     if [ -n "${BuildTarget}" ]; then
-        cbuild_param="--target ${BuildTarget} ${cbuild_param}"
+        if [ "${BuildTarget}" == "Test" ]; then
+            # Build all targets (including tests) for aggregate test run
+            echo_color 34 "Building all targets for aggregate test..."
+        else
+            cbuild_param="--target ${BuildTarget} ${cbuild_param}"
+        fi
     fi
     if [ ${RunRebuild} -eq 1 ]; then
         cbuild_param1="--clean-first ${cbuild_param}"

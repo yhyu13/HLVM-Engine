@@ -64,6 +64,31 @@ bool FTexture::Initialize(
 	return true;
 }
 
+bool FTexture::InitializeFromHandle(nvrhi::TextureHandle InHandle, nvrhi::IDevice* InDevice)
+{
+	HLVM_ENSURE_F(!TextureHandle, TXT("Texture already initialized"));
+	HLVM_ENSURE_F(InHandle, TXT("Null texture handle"));
+	HLVM_ENSURE_F(InDevice, TXT("Device is null"));
+
+	const nvrhi::TextureDesc& Desc = InHandle->getDesc();
+
+	Width = Desc.width;
+	Height = Desc.height;
+	MipLevels = Desc.mipLevels > 0 ? Desc.mipLevels : 1;
+	ArraySize = Desc.arraySize;
+	SampleCount = Desc.sampleCount;
+	Format = Desc.format;
+	Dimension = Desc.dimension;
+	Device = InDevice;
+
+	TextureHandle = InHandle;
+
+	// Create views
+	CreateViews();
+
+	return true;
+}
+
 bool FTexture::InitializeRenderTarget(
 	TUINT32			InWidth,
 	TUINT32			InHeight,

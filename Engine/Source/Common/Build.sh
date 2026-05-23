@@ -78,8 +78,8 @@ for arg in "$@"; do
         Jobs=${arg#*=}
     fi
 
-    # Step 12: Check for --TestRepeatNum
-    if [[ $arg == --TestRepeatNum ]]; then
+    # Step 12: Check for --TestRepeatNum=value
+    if [[ $arg == --TestRepeatNum=* ]]; then
         TestRepeatNum=${arg#*=}
     fi
 done
@@ -179,10 +179,10 @@ for config in "${buildConfigs[@]}"; do
     # 构建参数s
     cbuild_param="-j ${Jobs}"
     if [ ${Verbose} -eq 1 ]; then
-        cbuild_param+="--verbose"
+        cbuild_param+=" --verbose"
     fi
     if [ -n "${BuildTarget}" ]; then
-        cbuild_param+="--target ${BuildTarget} ${cbuild_param}"
+        cbuild_param="--target ${BuildTarget} ${cbuild_param}"
     fi
     if [ ${RunRebuild} -eq 1 ]; then
         cbuild_param1="--clean-first ${cbuild_param}"

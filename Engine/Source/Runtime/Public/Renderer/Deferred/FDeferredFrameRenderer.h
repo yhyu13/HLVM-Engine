@@ -4,6 +4,7 @@
 #include "Renderer/Common/FBindingCache.h"
 #include "Renderer/Deferred/FGBufferFillPass.h"
 #include "Renderer/Deferred/FDeferredLightingPass.h"
+#include "Renderer/Deferred/FLightData.h"
 #include "Renderer/PostProcess/FBloomPass.h"
 #include "Renderer/PostProcess/FToneMappingPass.h"
 #include "Renderer/PostProcess/FJointBilateralUpsamplePass.h"
@@ -16,12 +17,14 @@
 #include "Renderer/PostProcess/FExposureAdaptationPass.h"
 #include "Renderer/PostProcess/FContactShadowsPass.h"
 #include "Renderer/Shadow/FShadowMapPass.h"
+#include "Renderer/Utility/FGPUProfiler.h"
+#include "Renderer/Shader/ShaderHotReloader.h"
 #include <nvrhi/nvrhi.h>
 #include <glm/glm.hpp>
 
 class FRenderPassDumper;
 
-class FDeferredFrameRenderer
+class FDeferredFrameRenderer : public IShaderReloadable
 {
 public:
     struct FViewData
@@ -55,11 +58,26 @@ public:
         uint32_t ShadowMeshCount;
         nvrhi::IFramebuffer* OutputFramebuffer;
         FRenderPassDumper* FrameDumper;
+
+        // Lighting data (single directional light for now)
+        const FLightData* Lights = nullptr;
+        uint32_t LightCount = 0;
     };
 
     bool Initialize(nvrhi::IDevice* InDevice, const FString& InShaderDataDir);
     void Render(nvrhi::ICommandList* CmdList, const FRenderParams& Params);
     void Shutdown();
+
+    // IShaderReloadable
+    virtual void ReloadShaders() override;
+
+    // Shader hot-reload update (call once per frame)
+    void UpdateShaderHotReload();
+
+    // GPU profiling
+    void EndProfilingFrame() { Profiler.EndFrame(); }
+    [[nodiscard]] const FGPUProfiler& GetProfiler() const { return Profiler; }
+    [[nodiscard]] FGPUProfiler& GetProfiler() { return Profiler; }
 
     nvrhi::TextureHandle GetSDRTexture() const
     {
@@ -67,7 +85,7 @@ public:
     }
 
     FDeferredFrameRenderer() = default;
-    ~FDeferredFrameRenderer()
+    ~FDeferredFrameRenderer() override
     {
         Shutdown();
     }
@@ -126,4 +144,7 @@ private:
     bool bDOFInitialized = false;
     bool bLensEffectsInitialized = false;
     bool bExposureAdaptationInitialized = false;
+
+    FGPUProfiler Profiler;
+    bool bHotReloadRegistered = false;
 };

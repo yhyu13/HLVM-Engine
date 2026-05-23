@@ -58,6 +58,7 @@ public:
 private:
     nvrhi::IDevice* Device = nullptr;
     nvrhi::ShaderHandle ShadowVS;
+    nvrhi::InputLayoutHandle ShadowInputLayout;
     nvrhi::BindingLayoutHandle ShadowBindingLayout;
     nvrhi::GraphicsPipelineHandle ShadowPipeline;
     nvrhi::TextureHandle ShadowMapTexture;

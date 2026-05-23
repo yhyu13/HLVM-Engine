@@ -21,12 +21,10 @@
 // SOFTWARE.
 
 #include "Renderer/Deferred/FGBufferFillPass.h"
-#include "Renderer/ShaderMake/ShaderBlob.h"
+#include "Renderer/Shader/ShaderLibrary.h"
 #include "Core/Log.h"
 #include "Renderer/Mesh/StaticMesh.h"
 #include <nvrhi/utils.h>
-#include <fstream>
-#include <vector>
 
 DECLARE_LOG_CATEGORY(LogRenderer)
 
@@ -39,65 +37,19 @@ bool FGBufferFillPass::Initialize(nvrhi::IDevice* InDevice, const FString& InSha
 
     Device = InDevice;
 
-    // Load GBuffer vertex shader
-    auto VSPath = FPath::Combine(InShaderDataDir, TXT("GBufferSponzaVS.sblob"));
-    std::ifstream VSFile(VSPath.string(), std::ios::ate | std::ios::binary);
-    if (!VSFile.is_open())
-    {
-        HLVM_LOG(LogRenderer, err, TXT("FGBufferFillPass: Failed to open vertex shader"));
-        return false;
-    }
-    size_t VSBytes = static_cast<size_t>(VSFile.tellg());
-    std::vector<uint8_t> VSData(VSBytes);
-    VSFile.seekg(0);
-    VSFile.read(reinterpret_cast<char*>(VSData.data()), static_cast<std::streamsize>(VSBytes));
-    VSFile.close();
-
-    const void* VSBinary = nullptr;
-    size_t VSBinarySize = 0;
-    if (!ShaderMake::FindPermutationInBlob(VSData.data(), VSData.size(), nullptr, 0, &VSBinary, &VSBinarySize))
-    {
-        HLVM_LOG(LogRenderer, err, TXT("FGBufferFillPass: Failed to extract vertex shader SPIR-V from blob"));
-        return false;
-    }
-
-    nvrhi::ShaderDesc VSDesc;
-    VSDesc.setShaderType(nvrhi::ShaderType::Vertex);
-    GBufferVS = Device->createShader(VSDesc, VSBinary, VSBinarySize);
+    GBufferVS = FShaderLibrary::Get().LoadShader(
+        Device, InShaderDataDir, TXT("GBufferSponzaVS.sblob"), nvrhi::ShaderType::Vertex);
     if (!GBufferVS)
     {
-        HLVM_LOG(LogRenderer, err, TXT("FGBufferFillPass: Failed to create vertex shader"));
+        HLVM_LOG(LogRenderer, err, TXT("FGBufferFillPass: Failed to load vertex shader"));
         return false;
     }
 
-    // Load GBuffer pixel shader
-    auto PSPath = FPath::Combine(InShaderDataDir, TXT("GBufferSponzaPS.sblob"));
-    std::ifstream PSFile(PSPath.string(), std::ios::ate | std::ios::binary);
-    if (!PSFile.is_open())
-    {
-        HLVM_LOG(LogRenderer, err, TXT("FGBufferFillPass: Failed to open pixel shader"));
-        return false;
-    }
-    size_t PSBytes = static_cast<size_t>(PSFile.tellg());
-    std::vector<uint8_t> PSData(PSBytes);
-    PSFile.seekg(0);
-    PSFile.read(reinterpret_cast<char*>(PSData.data()), static_cast<std::streamsize>(PSBytes));
-    PSFile.close();
-
-    const void* PSBinary = nullptr;
-    size_t PSBinarySize = 0;
-    if (!ShaderMake::FindPermutationInBlob(PSData.data(), PSData.size(), nullptr, 0, &PSBinary, &PSBinarySize))
-    {
-        HLVM_LOG(LogRenderer, err, TXT("FGBufferFillPass: Failed to extract pixel shader SPIR-V from blob"));
-        return false;
-    }
-
-    nvrhi::ShaderDesc PSDesc;
-    PSDesc.setShaderType(nvrhi::ShaderType::Pixel);
-    GBufferPS = Device->createShader(PSDesc, PSBinary, PSBinarySize);
+    GBufferPS = FShaderLibrary::Get().LoadShader(
+        Device, InShaderDataDir, TXT("GBufferSponzaPS.sblob"), nvrhi::ShaderType::Pixel);
     if (!GBufferPS)
     {
-        HLVM_LOG(LogRenderer, err, TXT("FGBufferFillPass: Failed to create pixel shader"));
+        HLVM_LOG(LogRenderer, err, TXT("FGBufferFillPass: Failed to load pixel shader"));
         return false;
     }
 

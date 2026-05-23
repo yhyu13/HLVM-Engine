@@ -267,77 +267,9 @@ public:
         // =====================================================================
         HLVM_LOG(LogTest, info, TXT("Loading PBR textures..."));
 
-        struct FPendingTexture {
-            FPath TexturePath;
-            FTexture* OutTexture;
-            std::future<FDecodedImage> Future;
-        };
-        TVector<FPendingTexture> PendingTextures;
-
-        nvrhi::CommandListHandle UploadCmdList = NvrhiDevice->createCommandList();
-
-        for (auto& Mat : Materials)
-        {
-            auto PBRMat = std::dynamic_pointer_cast<FPBRMaterial>(Mat);
-            if (!PBRMat)
-                continue;
-
-            if (PBRMat->HasTexture(IMaterial::ETextureType::Albedo) &&
-                !PBRMat->HasGPUTexture(IMaterial::ETextureType::Albedo))
-            {
-                FPath TexturePath = PBRMat->GetTexturePath(IMaterial::ETextureType::Albedo);
-                FString Ext = FPath::GetExtension(TexturePath);
-
-                // All textures decode async on worker threads, upload batched on main thread.
-                FPendingTexture Pending;
-                Pending.TexturePath = TexturePath;
-                Pending.OutTexture = &PBRMat->GetGPUTexture(IMaterial::ETextureType::Albedo);
-
-                if (Ext == ".ktx" || Ext == ".KTX" ||
-                    Ext == ".ktx2" || Ext == ".KTX2")
-                {
-                    // Async KTX decode (file I/O + decompression + transcoding on worker).
-                    // Replicate the ktx2/ subdirectory fallback from LoadTexture.
-                    FPath KTX2Path = TexturePath.parent_path() / "ktx2" / (TexturePath.stem().string() + ".ktx2");
-                    FPath DecodePath = std::filesystem::exists(KTX2Path.string()) ? KTX2Path : TexturePath;
-                    Pending.Future = FWorkStealThreadPool::Get()->EnqueueTask(
-                        [DecodePath]() {
-                            return FAsyncTextureLoader::DecodeKTXTexture(DecodePath);
-                        });
-                }
-                else
-                {
-                    // Async STB decode (PNG/JPEG/BMP/TGA decompression on worker).
-                    Pending.Future = FWorkStealThreadPool::Get()->EnqueueTask(
-                        [TexturePath]() {
-                            return FAsyncTextureLoader::DecodeSTBTexture(TexturePath);
-                        });
-                }
-                PendingTextures.push_back(MoveTemp(Pending));
-            }
-        }
-
-        // Wait for async STB decode jobs and upload on the main thread
-        UploadCmdList->open();
-        for (auto& Pending : PendingTextures)
-        {
-            FDecodedImage Decoded = Pending.Future.get();
-            if (Decoded.bIsValid)
-            {
-                FAsyncTextureLoader::UploadTextureToCommandList(
-                    NvrhiDevice, UploadCmdList, Decoded, *Pending.OutTexture);
-            }
-            else
-            {
-                HLVM_LOG(LogTest, warn,
-                    TXT("Failed to async-decode texture: {}"),
-                    *FString(Pending.TexturePath.string().c_str()));
-            }
-        }
-
-        UploadCmdList->close();
-        NvrhiDevice->executeCommandList(UploadCmdList);
-        NvrhiDevice->waitForIdle();
+        FAsyncTextureLoader::LoadMaterialTexturesAsync(
+            NvrhiDevice, Materials,
+            {IMaterial::ETextureType::Albedo});
 
         // =====================================================================
         // Create GBuffer textures and framebuffer

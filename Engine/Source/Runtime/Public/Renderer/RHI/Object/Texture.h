@@ -49,6 +49,9 @@ public:
 		const void*			 InitialData = nullptr,
 		nvrhi::ICommandList* CommandList = nullptr);
 
+	// Initialize from an existing NVRHI texture handle (for cache sharing)
+	bool InitializeFromHandle(nvrhi::TextureHandle InHandle, nvrhi::IDevice* InDevice);
+
 	// Render target initialization
 	bool InitializeRenderTarget(
 		TUINT32			Width,

@@ -20,7 +20,12 @@
 #include "Renderer/Common/FCommonRenderPasses.h"
 #include "Image/FRenderPassDumper.h"
 #include "Renderer/Deferred/FDeferredFrameRenderer.h"
+#include "Renderer/Deferred/FLightData.h"
 #include "Renderer/Scene3D/FSceneGPUData.h"
+#include "Renderer/ImGui/FImgui_Renderer.h"
+#include "Renderer/ImGui/FCVarBrowser.h"
+#include "Renderer/Texture/TextureCache.h"
+#include "Renderer/FShaderFactory.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -99,6 +104,9 @@ public:
 
 		DeferredRenderer.Shutdown();
 		SceneGPUData.Shutdown();
+
+		// Clear texture cache to release NVRHI handles before device destruction
+		FTextureCache::Get().Clear();
 	}
 
 	virtual void Animate(float fElapsedTimeSeconds) override
@@ -117,6 +125,8 @@ public:
 			FPSUpdateTimer = 0.0f;
 			FrameCount = 0;
 		}
+
+		DeferredRenderer.UpdateShaderHotReload();
 	}
 
 	virtual void Render(nvrhi::IFramebuffer* Framebuffer) override
@@ -171,6 +181,11 @@ public:
 		PrevProjMatrix = proj;
 
 		// Render
+		FLightData LightData;
+		LightData.Direction = glm::vec3(0.577f, 0.577f, 0.577f);
+		LightData.Intensity = 0.8f;
+		LightData.Color = glm::vec3(1.0f, 1.0f, 1.0f);
+
 		FDeferredFrameRenderer::FRenderParams Params;
 		Params.View = &ViewData;
 		Params.GBufferMeshes = DrawData.GBufferItems.data();
@@ -179,6 +194,8 @@ public:
 		Params.ShadowMeshCount = static_cast<uint32_t>(DrawData.ShadowItems.size());
 		Params.OutputFramebuffer = Framebuffer;
 		Params.FrameDumper = FrameDumper.IsEnabled() ? &FrameDumper : nullptr;
+		Params.Lights = &LightData;
+		Params.LightCount = 1;
 
 		nvrhi::CommandListParameters CmdListParams;
 		CmdListParams.enableImmediateExecution = false;
@@ -190,6 +207,26 @@ public:
 		CmdList->close();
 		NvrhiDevice->executeCommandList(CmdList);
 		NvrhiDevice->waitForIdle();
+
+		// GPU profiler: collect previous frame timings
+		DeferredRenderer.EndProfilingFrame();
+		if (FrameCount % 30 == 0)
+		{
+			const auto& Timings = DeferredRenderer.GetProfiler().GetTimings();
+			if (!Timings.empty())
+			{
+				FString ProfilingLog = TXT("GPU Profile (us):");
+				float TotalUs = 0.0f;
+				for (const auto& [Name, Ms] : Timings)
+				{
+					float Us = Ms * 1000.0f;
+					ProfilingLog += FString::Format(TXT(" {}={:.1f}"), *Name, Us);
+					TotalUs += Us;
+				}
+				ProfilingLog += FString::Format(TXT(" | Total={:.1f}"), TotalUs);
+				HLVM_LOG(LogTest, info, *ProfilingLog);
+			}
+		}
 
 		// =====================================================================
 		// Frame dump readback
@@ -217,6 +254,11 @@ public:
 		// Renderer auto-resizes on next Render() call
 	}
 
+	[[nodiscard]] FGPUProfiler& GetProfiler()
+	{
+		return DeferredRenderer.GetProfiler();
+	}
+
 private:
 	nvrhi::IDevice*		   NvrhiDevice = nullptr;
 	nvrhi::FramebufferInfoEx FBInfo;
@@ -230,6 +272,36 @@ private:
 	float	 FPSUpdateTimer = 0.0f;
 	glm::mat4 PrevViewMatrix = glm::mat4(1.0f);
 	glm::mat4 PrevProjMatrix = glm::mat4(1.0f);
+};
+
+// =============================================================================
+// FSponzaUIRenderer - ImGui overlay for profiler and CVars
+// =============================================================================
+
+class FSponzaUIRenderer : public FImgui_Renderer
+{
+public:
+    using FImgui_Renderer::FImgui_Renderer;
+
+    void SetProfiler(FGPUProfiler* InProfiler)
+    {
+        Profiler = InProfiler;
+    }
+
+protected:
+    virtual void buildUI() override
+    {
+        if (Profiler)
+        {
+            Profiler->DrawUI();
+        }
+        CVarBrowser.DrawUI();
+        FTextureCache::Get().DrawUI();
+    }
+
+private:
+    FGPUProfiler* Profiler = nullptr;
+    FCVarBrowser CVarBrowser;
 };
 
 // =============================================================================
@@ -283,6 +355,21 @@ RECORD_BOOL(test_SponzaDeferred)
 		}
 
 		DeviceManager->AddRenderPassToBack(DeferredPass);
+
+		// Create ImGui UI renderer for profiler overlay
+		HLVM_LOG(LogTest, info, TXT("Creating UI renderer..."));
+		std::shared_ptr<FShaderFactoryImpl> ShaderFactory = std::make_shared<FShaderFactoryImpl>();
+		if (!ShaderFactory->Initialize(NvrhiDevice))
+		{
+			throw std::runtime_error("Failed to initialize ShaderFactory");
+		}
+		TSharedPtr<FSponzaUIRenderer> UIRenderer = std::make_shared<FSponzaUIRenderer>(DeviceManager.get());
+		if (!UIRenderer->Initialize(NvrhiDevice, ShaderFactory))
+		{
+			throw std::runtime_error("Failed to initialize FSponzaUIRenderer");
+		}
+		UIRenderer->SetProfiler(&DeferredPass->GetProfiler());
+		DeviceManager->AddRenderPassToBack(UIRenderer);
 
 		HLVM_LOG(LogTest, info, TXT("Starting render loop..."));
 

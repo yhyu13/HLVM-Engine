@@ -3,37 +3,10 @@
 // MIT License
 
 #include "Renderer/PostProcess/FBloomPass.h"
+#include "Renderer/Shader/ShaderLibrary.h"
 #include "Core/Log.h"
-#include "Renderer/ShaderMake/ShaderBlob.h"
-#include <fstream>
 
 DECLARE_LOG_CATEGORY(LogPostProcess)
-
-// ---------------------------------------------------------------------------
-// Helper
-// ---------------------------------------------------------------------------
-
-static std::vector<char> ReadBinaryFile(const std::string& Filename)
-{
-    std::ifstream file(Filename, std::ios::ate | std::ios::binary);
-    if (!file.is_open())
-    {
-        return {};
-    }
-
-    size_t fileSize = static_cast<size_t>(file.tellg());
-    std::vector<char> buffer(fileSize);
-
-    file.seekg(0);
-    file.read(buffer.data(), static_cast<std::streamsize>(fileSize));
-    file.close();
-
-    return buffer;
-}
-
-// ---------------------------------------------------------------------------
-// FBloomPass
-// ---------------------------------------------------------------------------
 
 namespace
 {
@@ -59,24 +32,13 @@ bool FBloomPass::Initialize(nvrhi::IDevice* InDevice, const FString& InShaderDat
     Device = InDevice;
     ShaderDataDir = InShaderDataDir;
 
-    // Load shaders from .sblob
     auto LoadShader = [&](const FString& Name, nvrhi::ShaderHandle& OutShader) -> bool
     {
-        auto Blob = ReadBinaryFile(FPath::Combine(ShaderDataDir, Name).string());
-        const void* Binary = nullptr;
-        size_t BinarySize = 0;
-        if (!ShaderMake::FindPermutationInBlob(Blob.data(), Blob.size(), nullptr, 0, &Binary, &BinarySize))
-        {
-            HLVM_LOG(LogPostProcess, err, TXT("Failed to extract {} from blob"), *Name);
-            return false;
-        }
-
-        nvrhi::ShaderDesc Desc;
-        Desc.setShaderType(nvrhi::ShaderType::Compute);
-        OutShader = Device->createShader(Desc, Binary, BinarySize);
+        OutShader = FShaderLibrary::Get().LoadShader(
+            Device, ShaderDataDir, Name, nvrhi::ShaderType::Compute);
         if (!OutShader)
         {
-            HLVM_LOG(LogPostProcess, err, TXT("Failed to create {} shader"), *Name);
+            HLVM_LOG(LogPostProcess, err, TXT("Failed to load {} shader"), *Name);
             return false;
         }
         return true;

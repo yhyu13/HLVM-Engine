@@ -6,6 +6,7 @@
 #include "Renderer/Material/PBRMaterial.h"
 #include "Renderer/Texture/KTXTextureLoader.h"
 #include "Renderer/Texture/STBTextureLoader.h"
+#include "Renderer/Texture/TextureCache.h"
 #include "AssetManager/AssetLoader.h"
 #include "Platform/FileSystem/FileSystem.h"
 
@@ -65,6 +66,18 @@ bool FPBRMaterial::LoadTexture(ETextureType Type, nvrhi::IDevice* Device, nvrhi:
 		return true;
 	}
 
+	// Check texture cache
+	FPath AbsolutePath = FPath::Absolute(TexturePath);
+	nvrhi::TextureHandle CachedTexture = FTextureCache::Get().GetTexture(AbsolutePath);
+	if (CachedTexture)
+	{
+		if (GPUTexture->InitializeFromHandle(CachedTexture, Device))
+		{
+			HLVM_LOG(LogMaterial, info, TXT("FPBRMaterial::LoadTexture: Cache hit for {}"), *AbsolutePath);
+			return true;
+		}
+	}
+
 	// Use KTX loader for .ktx files
 	FString Extension = FPath::GetExtension(TexturePath);
 	if (Extension == ".ktx" || Extension == ".KTX")
@@ -78,6 +91,7 @@ bool FPBRMaterial::LoadTexture(ETextureType Type, nvrhi::IDevice* Device, nvrhi:
 			{
 				HLVM_LOG(LogMaterial, info, TXT("FPBRMaterial::LoadTexture: Successfully loaded {}x{} KTX2 texture"),
 					GPUTexture->GetWidth(), GPUTexture->GetHeight());
+				FTextureCache::Get().Insert(AbsolutePath, GPUTexture->GetTextureHandle());
 				return true;
 			}
 			else
@@ -93,6 +107,7 @@ bool FPBRMaterial::LoadTexture(ETextureType Type, nvrhi::IDevice* Device, nvrhi:
 		{
 			HLVM_LOG(LogMaterial, info, TXT("FPBRMaterial::LoadTexture: Successfully loaded {}x{} texture"),
 				GPUTexture->GetWidth(), GPUTexture->GetHeight());
+			FTextureCache::Get().Insert(AbsolutePath, GPUTexture->GetTextureHandle());
 			return true;
 		}
 		else
@@ -117,6 +132,7 @@ bool FPBRMaterial::LoadTexture(ETextureType Type, nvrhi::IDevice* Device, nvrhi:
 		{
 			HLVM_LOG(LogMaterial, info, TXT("FPBRMaterial::LoadTexture: Successfully loaded {}x{} texture"),
 				GPUTexture->GetWidth(), GPUTexture->GetHeight());
+			FTextureCache::Get().Insert(AbsolutePath, GPUTexture->GetTextureHandle());
 			return true;
 		}
 		else

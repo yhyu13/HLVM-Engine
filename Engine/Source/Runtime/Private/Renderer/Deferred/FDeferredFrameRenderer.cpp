@@ -7,9 +7,13 @@
 
 DECLARE_LOG_CATEGORY(LogRenderer)
 
+AUTO_CVAR_BOOL(r_SSAO, true,
+    "Enable SSAO (HBAO)", EConsoleVariableFlag::Saved)
 AUTO_CVAR_FLOAT(r_SSAO_RadiusScale, 0.05f,
     "SSAO sample radius as fraction of scene radius", EConsoleVariableFlag::Saved)
 
+AUTO_CVAR_BOOL(r_SSR, true,
+    "Enable screen-space reflections", EConsoleVariableFlag::Saved)
 AUTO_CVAR_INT(r_SSR_MaxSteps, 32,
     "SSR max ray march steps", EConsoleVariableFlag::Saved)
 AUTO_CVAR_FLOAT(r_SSR_StepSize, 5.0f,
@@ -53,6 +57,9 @@ AUTO_CVAR_FLOAT(r_Vignette_Intensity, 0.8f,
 AUTO_CVAR_FLOAT(r_Grain_Intensity, 0.03f,
     "Film grain intensity", EConsoleVariableFlag::Saved)
 
+AUTO_CVAR_BOOL(r_Bloom, true,
+    "Enable bloom post-process", EConsoleVariableFlag::Saved)
+
 AUTO_CVAR_BOOL(r_ExposureAdaptation, true,
     "Enable automatic exposure adaptation", EConsoleVariableFlag::Saved)
 AUTO_CVAR_FLOAT(r_Exposure_KeyValue, 0.18f,
@@ -68,6 +75,9 @@ AUTO_CVAR_INT(r_ContactShadows_StepCount, 16,
     "Contact shadow ray march steps", EConsoleVariableFlag::Saved)
 AUTO_CVAR_FLOAT(r_ContactShadows_Thickness, 0.05f,
     "Contact shadow depth bias", EConsoleVariableFlag::Saved)
+
+AUTO_CVAR_BOOL(r_ShaderHotReload, false,
+    "Enable automatic shader hot-reload polling", EConsoleVariableFlag::Saved)
 
 bool FDeferredFrameRenderer::Initialize(nvrhi::IDevice* InDevice, const FString& InShaderDataDir)
 {
@@ -134,6 +144,11 @@ bool FDeferredFrameRenderer::Initialize(nvrhi::IDevice* InDevice, const FString&
     }
 
     HLVM_LOG(LogRenderer, info, TXT("FDeferredFrameRenderer initialized successfully"));
+    Profiler.Initialize(Device);
+
+    FShaderHotReloader::Get().Register(this);
+    bHotReloadRegistered = true;
+
     bIsInitialized = true;
     bTAAInitialized = false;
     bMotionBlurInitialized = false;
@@ -145,6 +160,13 @@ bool FDeferredFrameRenderer::Initialize(nvrhi::IDevice* InDevice, const FString&
 
 void FDeferredFrameRenderer::Shutdown()
 {
+    if (bHotReloadRegistered)
+    {
+        FShaderHotReloader::Get().Unregister(this);
+        bHotReloadRegistered = false;
+    }
+
+    Profiler.Shutdown();
     GBufferPass.Shutdown();
     ShadowPass.Shutdown();
     HBAOPass.Shutdown();
@@ -185,6 +207,42 @@ void FDeferredFrameRenderer::Shutdown()
     bMotionBlurInitialized = false;
     bDOFInitialized = false;
     bLensEffectsInitialized = false;
+}
+
+void FDeferredFrameRenderer::ReloadShaders()
+{
+    if (!bIsInitialized || !Device)
+    {
+        return;
+    }
+
+    HLVM_LOG(LogRenderer, info, TXT("FDeferredFrameRenderer: Reloading shaders..."));
+
+    // Preserve current state
+    FString SavedShaderDataDir = ShaderDataDir;
+    nvrhi::IDevice* SavedDevice = Device;
+
+    // Full shutdown + re-initialize
+    // Note: this destroys and recreates all intermediate textures;
+    // they will be recreated on the next Render() call via ResizeIfNeeded()
+    Shutdown();
+
+    if (!Initialize(SavedDevice, SavedShaderDataDir))
+    {
+        HLVM_LOG(LogRenderer, err, TXT("FDeferredFrameRenderer: Shader reload failed"));
+    }
+    else
+    {
+        HLVM_LOG(LogRenderer, info, TXT("FDeferredFrameRenderer: Shader reload completed"));
+    }
+}
+
+void FDeferredFrameRenderer::UpdateShaderHotReload()
+{
+    if (CVar_r_ShaderHotReload)
+    {
+        FShaderHotReloader::Get().Update();
+    }
 }
 
 void FDeferredFrameRenderer::ResizeIfNeeded(uint32_t Width, uint32_t Height)
@@ -372,10 +430,14 @@ void FDeferredFrameRenderer::Render(nvrhi::ICommandList* CmdList, const FRenderP
         bExposureAdaptationInitialized = true;
     }
 
+    // Begin GPU profiling frame
+    Profiler.BeginFrame();
+
     // =====================================================================
     // Shadow Pass
     // =====================================================================
     {
+        Profiler.BeginPass(CmdList, TXT("Shadow"));
         FShadowMapPass::FRenderDesc ShadowDesc;
         ShadowDesc.LightViewProj = Params.View->LightViewProj;
         ShadowDesc.ModelMatrix = Params.View->ModelMatrix;
@@ -383,6 +445,7 @@ void FDeferredFrameRenderer::Render(nvrhi::ICommandList* CmdList, const FRenderP
         ShadowDesc.MeshDrawItemCount = Params.ShadowMeshCount;
 
         ShadowPass.Render(CmdList, ShadowDesc);
+        Profiler.EndPass(CmdList);
     }
 
     // =====================================================================
@@ -409,6 +472,7 @@ void FDeferredFrameRenderer::Render(nvrhi::ICommandList* CmdList, const FRenderP
     // GBuffer Pass
     // =====================================================================
     {
+        Profiler.BeginPass(CmdList, TXT("GBuffer"));
         // Build view constants
         FGBufferFillPass::FViewConstants ViewConstants;
         memset(&ViewConstants, 0, sizeof(ViewConstants));
@@ -442,12 +506,15 @@ void FDeferredFrameRenderer::Render(nvrhi::ICommandList* CmdList, const FRenderP
         GBufferDesc.MeshDrawItemCount = static_cast<uint32_t>(GBufferItems.size());
 
         GBufferPass.Render(CmdList, GBufferDesc);
+        Profiler.EndPass(CmdList);
     }
 
     // =====================================================================
     // HBAO Pass
     // =====================================================================
+    if (CVar_r_SSAO)
     {
+        Profiler.BeginPass(CmdList, TXT("SSAO"));
         SSao::FHBAOConstants HBAOConstants;
         memset(&HBAOConstants, 0, sizeof(HBAOConstants));
 
@@ -475,17 +542,17 @@ void FDeferredFrameRenderer::Render(nvrhi::ICommandList* CmdList, const FRenderP
 
         CmdList->setTextureState(SSAOTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
         HBAOPass.Dispatch(CmdList, HBAODesc, HBAOConstants);
-    }
+        Profiler.EndPass(CmdList);
 
-    // Transition SSAO to SRV for blur
-    CmdList->setTextureState(SSAOTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
-    // Transition SSAO blur to UAV
-    CmdList->setTextureState(SSAOBlurTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
+        // Transition SSAO to SRV for blur
+        CmdList->setTextureState(SSAOTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+        // Transition SSAO blur to UAV
+        CmdList->setTextureState(SSAOBlurTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
 
-    // =====================================================================
-    // Bilateral Blur Pass
-    // =====================================================================
-    {
+        // =====================================================================
+        // Bilateral Blur Pass
+        // =====================================================================
+        Profiler.BeginPass(CmdList, TXT("BilateralBlur"));
         FJointBilateralUpsamplePass::FDesc BilateralDesc;
         BilateralDesc.InputTexture = SSAOTexture;
         BilateralDesc.DepthTexture = GBufferPass.GetDepthTexture();
@@ -494,6 +561,7 @@ void FDeferredFrameRenderer::Render(nvrhi::ICommandList* CmdList, const FRenderP
         BilateralDesc.OutputHeight = CurrentHeight;
         BilateralDesc.DepthSigma = 0.01f;
         BilateralBlurPass.Dispatch(CmdList, BilateralDesc);
+        Profiler.EndPass(CmdList);
     }
 
     // Transition SSAO blur to SRV for lighting
@@ -503,6 +571,7 @@ void FDeferredFrameRenderer::Render(nvrhi::ICommandList* CmdList, const FRenderP
     // Contact Shadows Pass
     // =====================================================================
     {
+        Profiler.BeginPass(CmdList, TXT("ContactShadows"));
         CmdList->setTextureState(GBufferPass.GetDepthTexture(), nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
         CmdList->setTextureState(ContactShadowTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
 
@@ -513,9 +582,13 @@ void FDeferredFrameRenderer::Render(nvrhi::ICommandList* CmdList, const FRenderP
         glm::mat4 invViewProj = glm::inverse(viewProj);
         memcpy(CSConstants.ViewProj, glm::value_ptr(viewProj), 64);
         memcpy(CSConstants.InvViewProj, glm::value_ptr(invViewProj), 64);
-        CSConstants.LightDir[0] = 0.577f;
-        CSConstants.LightDir[1] = 0.577f;
-        CSConstants.LightDir[2] = 0.577f;
+        static const glm::vec3 DefaultLightDir = glm::vec3(0.577f, 0.577f, 0.577f);
+        glm::vec3 LightDir = (Params.Lights && Params.LightCount > 0)
+            ? Params.Lights[0].Direction
+            : DefaultLightDir;
+        CSConstants.LightDir[0] = LightDir.x;
+        CSConstants.LightDir[1] = LightDir.y;
+        CSConstants.LightDir[2] = LightDir.z;
         CSConstants.MaxDistance = CVar_r_ContactShadows_MaxDistance;
         CSConstants.ScreenSize[0] = float(CurrentWidth);
         CSConstants.ScreenSize[1] = float(CurrentHeight);
@@ -534,12 +607,14 @@ void FDeferredFrameRenderer::Render(nvrhi::ICommandList* CmdList, const FRenderP
 
         // Transition contact shadow texture to SRV for lighting
         CmdList->setTextureState(ContactShadowTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+        Profiler.EndPass(CmdList);
     }
 
     // =====================================================================
     // Lighting Pass
     // =====================================================================
     {
+        Profiler.BeginPass(CmdList, TXT("Lighting"));
         glm::mat4 invViewProj = glm::inverse(Params.View->ProjMatrix * Params.View->ViewMatrix);
 
         CmdList->setTextureState(HDRTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
@@ -561,17 +636,31 @@ void FDeferredFrameRenderer::Render(nvrhi::ICommandList* CmdList, const FRenderP
         FDeferredLightingPass::FConstants LightingConstants;
         memset(&LightingConstants, 0, sizeof(LightingConstants));
         memcpy(LightingConstants.InvViewProj, glm::value_ptr(invViewProj), 64);
-        LightingConstants.LightDir[0] = 0.577f;
-        LightingConstants.LightDir[1] = 0.577f;
-        LightingConstants.LightDir[2] = 0.577f;
-        LightingConstants.LightIntensity = 0.8f;
+        static const glm::vec3 DefaultLightDir = glm::vec3(0.577f, 0.577f, 0.577f);
+        static const float DefaultLightIntensity = 0.8f;
+        static const glm::vec3 DefaultAmbientColor = glm::vec3(0.03f, 0.03f, 0.03f);
+
+        glm::vec3 LightDir = (Params.Lights && Params.LightCount > 0)
+            ? Params.Lights[0].Direction
+            : DefaultLightDir;
+        float LightIntensity = (Params.Lights && Params.LightCount > 0)
+            ? Params.Lights[0].Intensity
+            : DefaultLightIntensity;
+        glm::vec3 AmbientColor = (Params.Lights && Params.LightCount > 0)
+            ? DefaultAmbientColor  // TODO: add AmbientColor to FLightData
+            : DefaultAmbientColor;
+
+        LightingConstants.LightDir[0] = LightDir.x;
+        LightingConstants.LightDir[1] = LightDir.y;
+        LightingConstants.LightDir[2] = LightDir.z;
+        LightingConstants.LightIntensity = LightIntensity;
         LightingConstants.CameraPos[0] = Params.View->CameraPos.x;
         LightingConstants.CameraPos[1] = Params.View->CameraPos.y;
         LightingConstants.CameraPos[2] = Params.View->CameraPos.z;
         LightingConstants.ShadowHardness = 16.0f;
-        LightingConstants.AmbientColor[0] = 0.03f;
-        LightingConstants.AmbientColor[1] = 0.03f;
-        LightingConstants.AmbientColor[2] = 0.03f;
+        LightingConstants.AmbientColor[0] = AmbientColor.x;
+        LightingConstants.AmbientColor[1] = AmbientColor.y;
+        LightingConstants.AmbientColor[2] = AmbientColor.z;
         LightingConstants.MinAO = 0.3f;
         LightingConstants.ScreenSize[0] = float(CurrentWidth);
         LightingConstants.ScreenSize[1] = float(CurrentHeight);
@@ -580,6 +669,7 @@ void FDeferredFrameRenderer::Render(nvrhi::ICommandList* CmdList, const FRenderP
         LightingConstants.ShadowBias = 0.005f;
 
         LightingPass.Dispatch(CmdList, LightingDesc, LightingConstants);
+        Profiler.EndPass(CmdList);
     }
 
     // Transition HDR to SRV for SSR
@@ -590,7 +680,9 @@ void FDeferredFrameRenderer::Render(nvrhi::ICommandList* CmdList, const FRenderP
     // =====================================================================
     // SSR Pass
     // =====================================================================
+    if (CVar_r_SSR)
     {
+        Profiler.BeginPass(CmdList, TXT("SSR"));
         SSr::FSSRConstants SSRConstants;
         memset(&SSRConstants, 0, sizeof(SSRConstants));
 
@@ -626,6 +718,7 @@ void FDeferredFrameRenderer::Render(nvrhi::ICommandList* CmdList, const FRenderP
         SSRDesc.OutputHeight = halfH;
 
         SSRPass.Dispatch(CmdList, SSRDesc, SSRConstants);
+        Profiler.EndPass(CmdList);
     }
 
     // Transition SSR to SRV for tone mapping
@@ -637,6 +730,7 @@ void FDeferredFrameRenderer::Render(nvrhi::ICommandList* CmdList, const FRenderP
     nvrhi::TextureHandle ToneMapInputTexture = HDRTexture;
     if (CVar_r_TAA && bTAAInitialized)
     {
+        Profiler.BeginPass(CmdList, TXT("TAA"));
         // Initialize history on first frame by copying current HDR to history
         bool bIsFirstFrame = bTAANeedsHistoryInit;
         if (bTAANeedsHistoryInit)
@@ -683,6 +777,15 @@ void FDeferredFrameRenderer::Render(nvrhi::ICommandList* CmdList, const FRenderP
         CmdList->setTextureState(TAAOutputTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
 
         ToneMapInputTexture = TAAOutputTexture;
+        Profiler.EndPass(CmdList);
+
+        // =====================================================================
+        // TAA History Copy — must happen BEFORE motion blur so history
+        // matches TAA output for correct temporal reprojection next frame.
+        // =====================================================================
+        CmdList->setTextureState(TAAOutputTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::CopySource);
+        CmdList->setTextureState(TAAHistoryTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::CopyDest);
+        CmdList->copyTexture(TAAHistoryTexture.Get(), nvrhi::TextureSlice(), TAAOutputTexture.Get(), nvrhi::TextureSlice());
     }
 
     // =====================================================================
@@ -690,6 +793,7 @@ void FDeferredFrameRenderer::Render(nvrhi::ICommandList* CmdList, const FRenderP
     // =====================================================================
     if (CVar_r_MotionBlur && bMotionBlurInitialized)
     {
+        Profiler.BeginPass(CmdList, TXT("MotionBlur"));
         nvrhi::TextureHandle MotionBlurInput = ToneMapInputTexture;
 
         CmdList->setTextureState(MotionBlurInput, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
@@ -725,6 +829,7 @@ void FDeferredFrameRenderer::Render(nvrhi::ICommandList* CmdList, const FRenderP
         CmdList->setTextureState(MotionBlurTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
 
         ToneMapInputTexture = MotionBlurTexture;
+        Profiler.EndPass(CmdList);
     }
 
     // =====================================================================
@@ -732,6 +837,7 @@ void FDeferredFrameRenderer::Render(nvrhi::ICommandList* CmdList, const FRenderP
     // =====================================================================
     if (CVar_r_DOF && bDOFInitialized)
     {
+        Profiler.BeginPass(CmdList, TXT("DOF"));
         nvrhi::TextureHandle DOFInput = ToneMapInputTexture;
 
         CmdList->setTextureState(DOFInput, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
@@ -762,22 +868,15 @@ void FDeferredFrameRenderer::Render(nvrhi::ICommandList* CmdList, const FRenderP
         CmdList->setTextureState(DOFTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
 
         ToneMapInputTexture = DOFTexture;
-    }
-
-    // =====================================================================
-    // TAA History Copy (after motion blur, history is pre-motion-blur)
-    // =====================================================================
-    if (CVar_r_TAA && bTAAInitialized)
-    {
-        CmdList->setTextureState(TAAOutputTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::CopySource);
-        CmdList->setTextureState(TAAHistoryTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::CopyDest);
-        CmdList->copyTexture(TAAHistoryTexture.Get(), nvrhi::TextureSlice(), TAAOutputTexture.Get(), nvrhi::TextureSlice());
+        Profiler.EndPass(CmdList);
     }
 
     // =====================================================================
     // Bloom Pass
     // =====================================================================
+    if (CVar_r_Bloom)
     {
+        Profiler.BeginPass(CmdList, TXT("Bloom"));
         FBloomPass::FDesc BloomDesc;
         BloomDesc.HDRTexture = ToneMapInputTexture;
         BloomDesc.OutputTexture = BloomTexture;
@@ -797,6 +896,7 @@ void FDeferredFrameRenderer::Render(nvrhi::ICommandList* CmdList, const FRenderP
         BloomPass.Dispatch(CmdList, BloomDesc);
 
         CmdList->setTextureState(BloomTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+        Profiler.EndPass(CmdList);
     }
 
     // =====================================================================
@@ -804,6 +904,7 @@ void FDeferredFrameRenderer::Render(nvrhi::ICommandList* CmdList, const FRenderP
     // =====================================================================
     if (CVar_r_ExposureAdaptation && bExposureAdaptationInitialized)
     {
+        Profiler.BeginPass(CmdList, TXT("Exposure"));
         CmdList->setTextureState(ToneMapInputTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
         CmdList->setTextureState(AdaptedLuminanceTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
 
@@ -820,12 +921,14 @@ void FDeferredFrameRenderer::Render(nvrhi::ICommandList* CmdList, const FRenderP
 
         // Transition adapted luminance to SRV for tone mapping
         CmdList->setTextureState(AdaptedLuminanceTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+        Profiler.EndPass(CmdList);
     }
 
     // =====================================================================
     // Tone Mapping Pass
     // =====================================================================
     {
+        Profiler.BeginPass(CmdList, TXT("ToneMap"));
         CmdList->setTextureState(ToneMapInputTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
         CmdList->setTextureState(BloomTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
         CmdList->setTextureState(SDRTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
@@ -851,6 +954,7 @@ void FDeferredFrameRenderer::Render(nvrhi::ICommandList* CmdList, const FRenderP
         ToneMapConstants.UseExposureAdaptation = CVar_r_ExposureAdaptation ? 1 : 0;
 
         ToneMapPass.Dispatch(CmdList, ToneMapDesc, ToneMapConstants);
+        Profiler.EndPass(CmdList);
     }
 
     // =====================================================================
@@ -859,6 +963,7 @@ void FDeferredFrameRenderer::Render(nvrhi::ICommandList* CmdList, const FRenderP
     nvrhi::TextureHandle BlitSourceTexture = SDRTexture;
     if (CVar_r_LensEffects && bLensEffectsInitialized)
     {
+        Profiler.BeginPass(CmdList, TXT("LensEffects"));
         // Transition SDR to SRV for lens effects read
         CmdList->setTextureState(SDRTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
         CmdList->setTextureState(LensEffectsTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
@@ -886,6 +991,7 @@ void FDeferredFrameRenderer::Render(nvrhi::ICommandList* CmdList, const FRenderP
         CmdList->setTextureState(LensEffectsTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
 
         BlitSourceTexture = LensEffectsTexture;
+        Profiler.EndPass(CmdList);
     }
 
     // =====================================================================

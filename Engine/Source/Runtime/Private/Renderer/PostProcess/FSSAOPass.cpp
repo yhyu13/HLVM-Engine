@@ -3,37 +3,10 @@
 // MIT License
 
 #include "Renderer/PostProcess/FSSAOPass.h"
+#include "Renderer/Shader/ShaderLibrary.h"
 #include "Core/Log.h"
-#include "Renderer/ShaderMake/ShaderBlob.h"
-#include <fstream>
 
 DECLARE_LOG_CATEGORY(LogPostProcess)
-
-// ---------------------------------------------------------------------------
-// Helper
-// ---------------------------------------------------------------------------
-
-static std::vector<char> ReadBinaryFile(const std::string& Filename)
-{
-    std::ifstream file(Filename, std::ios::ate | std::ios::binary);
-    if (!file.is_open())
-    {
-        return {};
-    }
-
-    size_t fileSize = static_cast<size_t>(file.tellg());
-    std::vector<char> buffer(fileSize);
-
-    file.seekg(0);
-    file.read(buffer.data(), static_cast<std::streamsize>(fileSize));
-    file.close();
-
-    return buffer;
-}
-
-// ---------------------------------------------------------------------------
-// FSSAOPass
-// ---------------------------------------------------------------------------
 
 namespace SSao
 {
@@ -46,23 +19,11 @@ namespace SSao
 
         Device = InDevice;
 
-        // Load compute shader from .sblob
-        auto ShaderBlob = ReadBinaryFile(
-            FPath::Combine(InShaderDataDir, TXT("HBAO_cs.sblob")).string());
-        const void* ShaderBinary = nullptr;
-        size_t ShaderBinarySize = 0;
-        if (!ShaderMake::FindPermutationInBlob(ShaderBlob.data(), ShaderBlob.size(), nullptr, 0, &ShaderBinary, &ShaderBinarySize))
-        {
-            HLVM_LOG(LogPostProcess, err, TXT("Failed to extract HBAO_cs from blob"));
-            return false;
-        }
-
-        nvrhi::ShaderDesc CSDesc;
-        CSDesc.setShaderType(nvrhi::ShaderType::Compute);
-        ComputeShader = Device->createShader(CSDesc, ShaderBinary, ShaderBinarySize);
+        ComputeShader = FShaderLibrary::Get().LoadShader(
+            Device, InShaderDataDir, TXT("HBAO_cs.sblob"), nvrhi::ShaderType::Compute);
         if (!ComputeShader)
         {
-            HLVM_LOG(LogPostProcess, err, TXT("Failed to create HBAO_cs shader"));
+            HLVM_LOG(LogPostProcess, err, TXT("Failed to load HBAO_cs shader"));
             return false;
         }
 

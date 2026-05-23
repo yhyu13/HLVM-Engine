@@ -21,10 +21,8 @@
 // SOFTWARE.
 
 #include "Renderer/Deferred/FDeferredLightingPass.h"
-#include "Renderer/ShaderMake/ShaderBlob.h"
+#include "Renderer/Shader/ShaderLibrary.h"
 #include "Core/Log.h"
-#include <fstream>
-#include <vector>
 
 DECLARE_LOG_CATEGORY(LogRenderer)
 
@@ -38,33 +36,11 @@ bool FDeferredLightingPass::Initialize(nvrhi::IDevice* InDevice, const FString& 
     Device = InDevice;
     ShaderDataDir = InShaderDataDir;
 
-    auto CSPath = FPath::Combine(ShaderDataDir, TXT("SponzaDeferredLighting_cs.sblob"));
-    std::ifstream CSFile(CSPath.string(), std::ios::ate | std::ios::binary);
-    if (!CSFile.is_open())
-    {
-        HLVM_LOG(LogRenderer, err, TXT("FDeferredLightingPass: Failed to open compute shader"));
-        return false;
-    }
-    size_t CSBytes = static_cast<size_t>(CSFile.tellg());
-    std::vector<uint8_t> CSData(CSBytes);
-    CSFile.seekg(0);
-    CSFile.read(reinterpret_cast<char*>(CSData.data()), static_cast<std::streamsize>(CSBytes));
-    CSFile.close();
-
-    const void* CSBinary = nullptr;
-    size_t CSBinarySize = 0;
-    if (!ShaderMake::FindPermutationInBlob(CSData.data(), CSData.size(), nullptr, 0, &CSBinary, &CSBinarySize))
-    {
-        HLVM_LOG(LogRenderer, err, TXT("FDeferredLightingPass: Failed to extract compute shader SPIR-V from blob"));
-        return false;
-    }
-
-    nvrhi::ShaderDesc CSDesc;
-    CSDesc.setShaderType(nvrhi::ShaderType::Compute);
-    ComputeShader = Device->createShader(CSDesc, CSBinary, CSBinarySize);
+    ComputeShader = FShaderLibrary::Get().LoadShader(
+        Device, ShaderDataDir, TXT("SponzaDeferredLighting_cs.sblob"), nvrhi::ShaderType::Compute);
     if (!ComputeShader)
     {
-        HLVM_LOG(LogRenderer, err, TXT("FDeferredLightingPass: Failed to create compute shader"));
+        HLVM_LOG(LogRenderer, err, TXT("FDeferredLightingPass: Failed to load compute shader"));
         return false;
     }
 

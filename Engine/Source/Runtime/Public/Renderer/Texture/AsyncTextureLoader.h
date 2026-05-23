@@ -2,6 +2,7 @@
 
 #include "Core/String.h"
 #include "Renderer/RHI/Object/Texture.h"
+#include "Renderer/Material/PBRMaterial.h"
 #include <nvrhi/nvrhi.h>
 
 /**
@@ -59,4 +60,18 @@ public:
         nvrhi::ICommandList* CmdList,
         const FDecodedImage& Decoded,
         FTexture& OutTexture);
+
+    /**
+     * Async decode + batched GPU upload for material textures.
+     * Consolidates the common PendingTextures pattern used across tests and scene loading.
+     *
+     * @param Device         NVRHI device
+     * @param Materials      Materials to load textures for
+     * @param TypesToLoad    Which texture types to load (e.g., Albedo, Normal)
+     * @return Number of textures successfully uploaded
+     */
+    static uint32_t LoadMaterialTexturesAsync(
+        nvrhi::IDevice* Device,
+        const TVector<std::shared_ptr<FPBRMaterial>>& Materials,
+        const TVector<IMaterial::ETextureType>& TypesToLoad);
 };
