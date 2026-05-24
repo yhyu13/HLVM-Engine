@@ -70,6 +70,7 @@ struct FDeviceCreationParameters
 	// Feature flags
 	bool	bEnableImageFormatD24S8 = true;
 	TUINT32 MaxPushConstantSize = 0;
+	TUINT32 MaxTimerQueries = 1024;
 };
 
 /*-----------------------------------------------------------------------------

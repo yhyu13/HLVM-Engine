@@ -7,6 +7,7 @@
 #include "Core/String.h"
 #include "Core/Parallel/Lock.h"
 #include "Platform/FileSystem/Path.h"
+#include "Renderer/Utility/FMemoryBudget.h"
 
 #include <nvrhi/nvrhi.h>
 
@@ -27,7 +28,7 @@
 class FTextureCache : private FAtomicFlagNC
 {
 public:
-    static FTextureCache& Get();
+    FTextureCache() = default;
 
     /**
      * @brief Get cached texture or nullptr if not loaded
@@ -67,6 +68,9 @@ public:
      */
     void DrawUI();
 
+    // Memory budget integration
+    void SetMemoryBudget(FMemoryBudget* InBudget) { MemoryBudget = InBudget; }
+
 private:
     struct FEntry
     {
@@ -78,4 +82,5 @@ private:
     static size_t EstimateTextureMemory(const nvrhi::TextureDesc& Desc);
 
     mutable TMap<FPath, FEntry> Cache;
+    FMemoryBudget* MemoryBudget = nullptr;
 };

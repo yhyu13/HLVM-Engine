@@ -713,9 +713,6 @@ public:
 
         BindingCache.Clear();
 
-        // Clear texture cache to prevent VUID-vkDestroyDevice-device-05137
-        FTextureCache::Get().Clear();
-
         CommandList = nullptr;
         RTBindingLayout = nullptr;
         ShaderTable = nullptr;

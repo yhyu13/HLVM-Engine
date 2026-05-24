@@ -6,7 +6,9 @@
 
 #include "Core/String.h"
 #include "Renderer/Scene3D/FSceneGPUData.h"
+#include "Renderer/Mesh/MeshCache.h"
 #include "Renderer/Texture/TextureCache.h"
+#include "Renderer/Utility/FMemoryBudget.h"
 #include <nvrhi/nvrhi.h>
 
 /**
@@ -67,6 +69,11 @@ public:
     ~FSceneResourceManager()
     {
         Shutdown();
+        if (MeshCache)
+        {
+            MeshCache->Clear();
+            MeshCache.reset();
+        }
     }
     FSceneResourceManager(const FSceneResourceManager&) = delete;
     FSceneResourceManager& operator=(const FSceneResourceManager&) = delete;
@@ -74,5 +81,8 @@ public:
 private:
     nvrhi::IDevice* Device = nullptr;
     TUniquePtr<FSceneGPUData> SceneGPUData;
+    TUniquePtr<FMeshCache> MeshCache;
+    FTextureCache TextureCache;
+    FMemoryBudget MemoryBudget;
     bool bIsInitialized = false;
 };

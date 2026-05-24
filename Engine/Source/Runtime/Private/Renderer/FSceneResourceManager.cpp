@@ -17,8 +17,17 @@ bool FSceneResourceManager::Initialize(nvrhi::IDevice* InDevice, const FPath& Sc
 
     Device = InDevice;
 
+    if (!MeshCache)
+    {
+        MeshCache = std::make_unique<FMeshCache>();
+        MeshCache->SetMemoryBudget(&MemoryBudget);
+    }
+
+    TextureCache.SetMemoryBudget(&MemoryBudget);
+    FAsyncTextureLoader::SetTextureCache(&TextureCache);
+
     SceneGPUData = std::make_unique<FSceneGPUData>();
-    if (!SceneGPUData->Initialize(Device, ScenePath))
+    if (!SceneGPUData->Initialize(Device, ScenePath, MeshCache.get()))
     {
         HLVM_LOG(LogResourceManager, err, TXT("FSceneResourceManager: Failed to initialize scene GPU data"));
         SceneGPUData.reset();
@@ -27,7 +36,13 @@ bool FSceneResourceManager::Initialize(nvrhi::IDevice* InDevice, const FPath& Sc
     }
 
     bIsInitialized = true;
-    HLVM_LOG(LogResourceManager, info, TXT("FSceneResourceManager: Initialized successfully"));
+    HLVM_LOG(LogResourceManager, info,
+        TXT("FSceneResourceManager: Initialized successfully (mesh cache: {} entries, texture cache: {} entries, memory used: {}/{} bytes, {:.1f}% util)"),
+        MeshCache->GetNumEntries(),
+        TextureCache.GetNumEntries(),
+        MemoryBudget.GetUsedBytes(),
+        MemoryBudget.GetBudgetBytes(),
+        MemoryBudget.GetUtilization() * 100.0f);
     return true;
 }
 
@@ -47,9 +62,26 @@ void FSceneResourceManager::Shutdown()
         SceneGPUData.reset();
     }
 
-    // Clear texture cache to release NVRHI handles before device destruction
+    // MeshCache persists across scene reloads — log current stats
+    if (MeshCache)
+    {
+        HLVM_LOG(LogResourceManager, info,
+            TXT("FMeshCache stats: {} entries, {} vertex bytes, {} index bytes"),
+            MeshCache->GetNumEntries(),
+            MeshCache->GetTotalVertexBytes(),
+            MeshCache->GetTotalIndexBytes());
+    }
+
+    HLVM_LOG(LogResourceManager, info,
+        TXT("FTextureCache stats: {} entries, {} bytes, total memory util: {:.1f}%"),
+        TextureCache.GetNumEntries(),
+        TextureCache.GetTotalMemoryBytes(),
+        MemoryBudget.GetUtilization() * 100.0f);
+
+    // Clear owned caches to release NVRHI handles before device destruction
     // This prevents VUID-vkDestroyDevice-device-05137 validation errors
-    FTextureCache::Get().Clear();
+    TextureCache.Clear();
+    FAsyncTextureLoader::SetTextureCache(nullptr);
 
     Device = nullptr;
     bIsInitialized = false;

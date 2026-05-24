@@ -7,6 +7,7 @@
 #include "Renderer/Texture/KTXTextureLoader.h"
 #include "Renderer/Texture/STBTextureLoader.h"
 #include "Renderer/Texture/TextureCache.h"
+#include "Renderer/Texture/AsyncTextureLoader.h"
 #include "AssetManager/AssetLoader.h"
 #include "Platform/FileSystem/FileSystem.h"
 
@@ -14,7 +15,7 @@
 
 DECLARE_LOG_CATEGORY(LogMaterial)
 
-bool FPBRMaterial::LoadTexture(ETextureType Type, nvrhi::IDevice* Device, nvrhi::ICommandList* CommandList)
+bool FPBRMaterial::LoadTexture(ETextureType Type, nvrhi::IDevice* Device, nvrhi::ICommandList* CommandList, FTextureCache* TextureCache)
 {
 	if (!Device || !CommandList)
 	{
@@ -68,7 +69,8 @@ bool FPBRMaterial::LoadTexture(ETextureType Type, nvrhi::IDevice* Device, nvrhi:
 
 	// Check texture cache
 	FPath AbsolutePath = FPath::Absolute(TexturePath);
-	nvrhi::TextureHandle CachedTexture = FTextureCache::Get().GetTexture(AbsolutePath);
+	FTextureCache* EffectiveCache = TextureCache ? TextureCache : FAsyncTextureLoader::GetTextureCache();
+	nvrhi::TextureHandle CachedTexture = EffectiveCache ? EffectiveCache->GetTexture(AbsolutePath) : nullptr;
 	if (CachedTexture)
 	{
 		if (GPUTexture->InitializeFromHandle(CachedTexture, Device))
@@ -91,7 +93,7 @@ bool FPBRMaterial::LoadTexture(ETextureType Type, nvrhi::IDevice* Device, nvrhi:
 			{
 				HLVM_LOG(LogMaterial, info, TXT("FPBRMaterial::LoadTexture: Successfully loaded {}x{} KTX2 texture"),
 					GPUTexture->GetWidth(), GPUTexture->GetHeight());
-				FTextureCache::Get().Insert(AbsolutePath, GPUTexture->GetTextureHandle());
+				if (EffectiveCache) { EffectiveCache->Insert(AbsolutePath, GPUTexture->GetTextureHandle()); }
 				return true;
 			}
 			else
@@ -107,7 +109,7 @@ bool FPBRMaterial::LoadTexture(ETextureType Type, nvrhi::IDevice* Device, nvrhi:
 		{
 			HLVM_LOG(LogMaterial, info, TXT("FPBRMaterial::LoadTexture: Successfully loaded {}x{} texture"),
 				GPUTexture->GetWidth(), GPUTexture->GetHeight());
-			FTextureCache::Get().Insert(AbsolutePath, GPUTexture->GetTextureHandle());
+			if (EffectiveCache) { EffectiveCache->Insert(AbsolutePath, GPUTexture->GetTextureHandle()); }
 			return true;
 		}
 		else
@@ -132,7 +134,7 @@ bool FPBRMaterial::LoadTexture(ETextureType Type, nvrhi::IDevice* Device, nvrhi:
 		{
 			HLVM_LOG(LogMaterial, info, TXT("FPBRMaterial::LoadTexture: Successfully loaded {}x{} texture"),
 				GPUTexture->GetWidth(), GPUTexture->GetHeight());
-			FTextureCache::Get().Insert(AbsolutePath, GPUTexture->GetTextureHandle());
+			if (EffectiveCache) { EffectiveCache->Insert(AbsolutePath, GPUTexture->GetTextureHandle()); }
 			return true;
 		}
 		else

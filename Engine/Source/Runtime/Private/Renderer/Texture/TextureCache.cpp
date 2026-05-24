@@ -10,12 +10,6 @@
 
 DECLARE_LOG_CATEGORY(LogTextureCache)
 
-FTextureCache& FTextureCache::Get()
-{
-    static FTextureCache Instance;
-    return Instance;
-}
-
 size_t FTextureCache::EstimateTextureMemory(const nvrhi::TextureDesc& Desc)
 {
     uint32_t BytesPerPixel = 4; // Default to 4 bytes (RGBA8)
@@ -127,6 +121,11 @@ void FTextureCache::Insert(const FPath& FilePath, nvrhi::TextureHandle Texture)
         Cache[AbsolutePath] = Entry;
     }
 
+    if (MemoryBudget)
+    {
+        MemoryBudget->TryAllocate(Entry.MemoryBytes);
+    }
+
     HLVM_LOG(LogTextureCache, info, TXT("FTextureCache: Inserted {} ({} bytes)"), AbsolutePath.ToTCharCStr(), Entry.MemoryBytes);
 }
 
@@ -138,6 +137,10 @@ void FTextureCache::Invalidate(const FPath& FilePath)
     auto It = Cache.find(AbsolutePath);
     if (It != Cache.end())
     {
+        if (MemoryBudget)
+        {
+            MemoryBudget->Free(It->second.MemoryBytes);
+        }
         HLVM_LOG(LogTextureCache, info, TXT("FTextureCache: Invalidated {}"), AbsolutePath.ToTCharCStr());
         Cache.erase(It);
     }
@@ -146,6 +149,13 @@ void FTextureCache::Invalidate(const FPath& FilePath)
 void FTextureCache::Clear()
 {
     LOCK_GUARD_NC();
+    if (MemoryBudget)
+    {
+        for (const auto& Pair : Cache)
+        {
+            MemoryBudget->Free(Pair.second.MemoryBytes);
+        }
+    }
     Cache.clear();
 }
 

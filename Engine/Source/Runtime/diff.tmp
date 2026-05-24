@@ -1,0 +1,1742 @@
+diff --git a/Engine/Source/Common/Private/Platform/GenericPlatformFile.cpp b/Engine/Source/Common/Private/Platform/GenericPlatformFile.cpp
+index a66c94c..f9edeeb 100644
+--- a/Engine/Source/Common/Private/Platform/GenericPlatformFile.cpp
++++ b/Engine/Source/Common/Private/Platform/GenericPlatformFile.cpp
+@@ -48,7 +48,16 @@ bool FGenericPlatformFile::IsDirectory(const FPath& path)
+ 	}
+ 	else
+ 	{
+-		return S_C(FBoostPlatformFile*, sPlatformFileRedirector[HLVM_ENUM_VALUE(EPlatformFileType::Disk)])->IsDirectory(path);
++		bool ret;
++		for (TUINT8 i = HLVM_ENUM_VALUE(EPlatformFileType::Unspecified) + 1; i < EPlatformFileType_NUM; i++)
++		{
++			ret = sPlatformFileRedirector[i]->IsDirectory(path);
++			if (ret)
++			{
++				return true;
++			}
++		}
++		return false;
+ 	}
+ }
+ 
+@@ -64,7 +73,18 @@ bool FGenericPlatformFile::Exists(const FPath& path)
+ 	}
+ 	else
+ 	{
+-		return S_C(FBoostPlatformFile*, sPlatformFileRedirector[HLVM_ENUM_VALUE(EPlatformFileType::Disk)])->Exists(path);
++		bool ret;
++		for (TUINT8 i = HLVM_ENUM_VALUE(EPlatformFileType::Unspecified) + 1; i < EPlatformFileType_NUM; i++)
++		{
++
++			ret = sPlatformFileRedirector[i]->Exists(path);
++			if (ret)
++			{
++				return true;
++			}
++		}
++
++		return false;
+ 	}
+ }
+ 
+@@ -80,7 +100,13 @@ TSmallVector32<FPath> FGenericPlatformFile::Glob(const FPath& path, const FStrin
+ 	}
+ 	else
+ 	{
+-		return S_C(FBoostPlatformFile*, sPlatformFileRedirector[HLVM_ENUM_VALUE(EPlatformFileType::Disk)])->Glob(path, regex, recursive);
++		TSmallVector32<FPath> ret;
++		for (TUINT8 i = HLVM_ENUM_VALUE(EPlatformFileType::Unspecified) + 1; i < EPlatformFileType_NUM; i++)
++		{
++			TSmallVector32<FPath> ret1 = (sPlatformFileRedirector[i]->Glob(path, regex, recursive));
++			ret.insert(ret.end(), ret1.begin(), ret1.end());
++		}
++		return ret;
+ 	}
+ }
+ 
+@@ -115,4 +141,3 @@ TVector<TBYTE> FGenericPlatformFile::ReadContent(const FPath& path)
+ 		return S_C(FBoostPlatformFile*, sPlatformFileRedirector[HLVM_ENUM_VALUE(EPlatformFileType::Disk)])->ReadContent(path);
+ 	}
+ }
+-
+diff --git a/Engine/Source/Common/Public/Core/Container/ContainerDefinition.h b/Engine/Source/Common/Public/Core/Container/ContainerDefinition.h
+index 7daa210..6ce3ea5 100644
+--- a/Engine/Source/Common/Public/Core/Container/ContainerDefinition.h
++++ b/Engine/Source/Common/Public/Core/Container/ContainerDefinition.h
+@@ -28,7 +28,10 @@
+ #include <parallel_hashmap/phmap.h>
+ #pragma clang diagnostic pop
+ 
+-#define HLVM_CONTAINER_SHRINK false
++// Auto shrink
++#define HLVM_CONTAINER_SHRINK 0
++// Num() shoue return uint64
++#define HLVM_CONTAINER_NUM_64 1
+ 
+ // TODO : set all container growth factor to 1
+ template <typename T, size_t N, typename Allocator = boost::container::new_allocator<T>>
+@@ -46,11 +49,22 @@ class TVectorView : public std::span<T>
+ public:
+ 	using std::span<T>::span;
+ 
+-	TUINT32 Num() const
++	TUINT32 Num32() const
+ 	{
+ 		HLVM_ASSERT(this->size() <= S_C(size_t, TUINT32_MAX));
+ 		return S_C(TUINT32, this->size());
+ 	}
++#if HLVM_CONTAINER_NUM_64
++	TUINT64 Num() const
++	{
++		return this->size();
++	}
++#else
++	TUINT32 Num() const
++	{
++		return this->Num32();
++	}
++#endif
+ 
+ 	T* GetData() const
+ 	{
+@@ -71,11 +85,22 @@ public:
+ 	// https://stackoverflow.com/a/434784
+ 	using boost::container::vector<T, Allocator>::vector;
+ 
+-	TUINT32 Num() const
++	TUINT32 Num32() const
+ 	{
+ 		HLVM_ASSERT(this->size() <= S_C(size_t, TUINT32_MAX));
+ 		return S_C(TUINT32, this->size());
+ 	}
++#if HLVM_CONTAINER_NUM_64
++	TUINT64 Num() const
++	{
++		return this->size();
++	}
++#else
++	TUINT32 Num() const
++	{
++		return this->Num32();
++	}
++#endif
+ 
+ 	TUINT32 SetNum(TUINT32 Num)
+ 	{
+@@ -211,11 +236,22 @@ class TStaticVector : public boost::container::static_vector<T, N>
+ public:
+ 	using boost::container::static_vector<T, N>::static_vector;
+ 
+-	TUINT32 Num() const
++	TUINT32 Num32() const
+ 	{
+ 		HLVM_ASSERT(this->size() <= S_C(size_t, TUINT32_MAX));
+ 		return S_C(TUINT32, this->size());
+ 	}
++#if HLVM_CONTAINER_NUM_64
++	TUINT64 Num() const
++	{
++		return this->size();
++	}
++#else
++	TUINT32 Num() const
++	{
++		return this->Num32();
++	}
++#endif
+ 
+ 	TSIZE Size() const
+ 	{
+@@ -291,12 +327,22 @@ class TMapSmall : public phmap::flat_hash_map<Key, Value, std::hash<Key>, std::e
+ public:
+ 	using phmap::flat_hash_map<Key, Value, std::hash<Key>, std::equal_to<Key>, Allocator>::flat_hash_map;
+ 
+-	// Num
+-	TUINT32 Num() const
++	TUINT32 Num32() const
+ 	{
+ 		HLVM_ASSERT(this->size() <= S_C(size_t, TUINT32_MAX));
+ 		return S_C(TUINT32, this->size());
+ 	}
++#if HLVM_CONTAINER_NUM_64
++	TUINT64 Num() const
++	{
++		return this->size();
++	}
++#else
++	TUINT32 Num() const
++	{
++		return this->Num32();
++	}
++#endif
+ 
+ 	// Size
+ 	TSIZE Size() const
+@@ -389,12 +435,22 @@ class TMap : public phmap::node_hash_map<Key, Value, std::hash<Key>, std::equal_
+ public:
+ 	using phmap::node_hash_map<Key, Value, std::hash<Key>, std::equal_to<Key>, Allocator>::node_hash_map;
+ 
+-	// Num
+-	TUINT32 Num() const
++	TUINT32 Num32() const
+ 	{
+ 		HLVM_ASSERT(this->size() <= S_C(size_t, TUINT32_MAX));
+ 		return S_C(TUINT32, this->size());
+ 	}
++#if HLVM_CONTAINER_NUM_64
++	TUINT64 Num() const
++	{
++		return this->size();
++	}
++#else
++	TUINT32 Num() const
++	{
++		return this->Num32();
++	}
++#endif
+ 
+ 	// Size
+ 	TSIZE Size() const
+diff --git a/Engine/Source/Common/Public/Platform/GenericPlatformFile.h b/Engine/Source/Common/Public/Platform/GenericPlatformFile.h
+index 49f2b49..4ed12ac 100644
+--- a/Engine/Source/Common/Public/Platform/GenericPlatformFile.h
++++ b/Engine/Source/Common/Public/Platform/GenericPlatformFile.h
+@@ -15,6 +15,7 @@ public:
+ 	FGenericPlatformFile() = default;
+ 	virtual ~FGenericPlatformFile() = default;
+ 
++	// TODO : Return value should contain processed file type (e.g. disk, packed)
+ 	virtual bool				  IsDirectory(const FPath& path);
+ 	virtual bool				  Exists(const FPath& path);
+ 	virtual TSmallVector32<FPath> Glob(const FPath& root_dir, const FString& regex, bool recursive = false);
+diff --git a/Engine/Source/Common/Public/Template/PointerTemplate.tpp b/Engine/Source/Common/Public/Template/PointerTemplate.tpp
+index 651fc2d..ee24167 100644
+--- a/Engine/Source/Common/Public/Template/PointerTemplate.tpp
++++ b/Engine/Source/Common/Public/Template/PointerTemplate.tpp
+@@ -184,6 +184,9 @@ private:
+ 	T* m_ptr{ nullptr };
+ };
+ 
++template <typename T>
++using TNNPtr = TNoNullablePtr<T>;
++
+ /**
+  * Template for nullable pointers
+  * @tparam T class type
+@@ -258,3 +261,5 @@ struct TNullablePtr
+ private:
+ 	T* m_ptr{ nullptr };
+ };
++template <typename T>
++using TNPtr = TNullablePtr<T>;
+diff --git a/Engine/Source/Common/Test/TestFileSystem.cpp b/Engine/Source/Common/Test/TestFileSystem.cpp
+index c88870c..4da9456 100644
+--- a/Engine/Source/Common/Test/TestFileSystem.cpp
++++ b/Engine/Source/Common/Test/TestFileSystem.cpp
+@@ -9,10 +9,6 @@
+ #include "Platform/FileSystem/Packed/PackedPlatformFile.h"
+ #include "Core/Parallel/Async/Async.h"
+ 
+-// #include <ylt/struct_pack.hpp>
+-// #include <ylt/struct_json/json_reader.h>
+-// #include <ylt/struct_json/json_writer.h>
+-
+ DECLARE_LOG_CATEGORY(LogTest)
+ 
+ #define TEST_STACK_ALLOCATOR 0
+diff --git a/Engine/Source/Runtime/Private/Renderer/DeviceManagerVk.cpp b/Engine/Source/Runtime/Private/Renderer/DeviceManagerVk.cpp
+index 2eea421..de89c67 100644
+--- a/Engine/Source/Runtime/Private/Renderer/DeviceManagerVk.cpp
++++ b/Engine/Source/Runtime/Private/Renderer/DeviceManagerVk.cpp
+@@ -1069,16 +1069,17 @@ bool FDeviceManagerVk::CreateDeviceAndSwapChain()
+ 	DeviceParams.bEnableNVRHIValidationLayer = g_UseValidationLayers;
+ 	DeviceParams.bEnableDebugRuntime = g_UseDebugRuntime;
+ 
+-	// Initialize dynamic loader
+-	#if VK_HEADER_VERSION >= 301
+-	using VulkanDynamicLoader = vk::detail::DynamicLoader;
+-	#else
+-	using VulkanDynamicLoader = vk::DynamicLoader;
+-	#endif
+-
+-	static const VulkanDynamicLoader dl;
+-	auto							 vkGetInstanceProcAddr = dl.getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr");
+-	VULKAN_HPP_DEFAULT_DISPATCHER.init(vkGetInstanceProcAddr);
++	// VULKAN_HPP_DEFAULT_DISPATCHER loaded in VulkanWindow
++//	// Initialize dynamic loader
++//	#if VK_HEADER_VERSION >= 301
++//	using VulkanDynamicLoader = vk::detail::DynamicLoader;
++//	#else
++//	using VulkanDynamicLoader = vk::DynamicLoader;
++//	#endif
++//
++//	static const VulkanDynamicLoader dl;
++//	auto							 vkGetInstanceProcAddr = dl.getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr");
++//	VULKAN_HPP_DEFAULT_DISPATCHER.init(vkGetInstanceProcAddr);
+ 
+ 	HLVM_ENSURE(CreateInstance());
+ 
+diff --git a/Engine/Source/Runtime/Private/Renderer/RHI/Object/Buffer.cpp b/Engine/Source/Runtime/Private/Renderer/RHI/Object/Buffer.cpp
+index 9fb727b..a51aa33 100644
+--- a/Engine/Source/Runtime/Private/Renderer/RHI/Object/Buffer.cpp
++++ b/Engine/Source/Runtime/Private/Renderer/RHI/Object/Buffer.cpp
+@@ -7,24 +7,23 @@
+ #include "Renderer/RHI/Object/Buffer.h"
+ 
+ bool FVertexBuffer::Initialize(
+-	nvrhi::IDevice*		Device,
+-	const void*			VertexData,
+-	size_t				VertexDataSize,
+-	nvrhi::ResourceStates InitialState)
++	nvrhi::ICommandList* CommandList,
++	nvrhi::IDevice*		 InDevice,
++	const void*			 VertexData,
++	size_t				 VertexDataSize)
+ {
+ 	HLVM_ENSURE_F(!BufferHandle, TXT("Buffer already initialized"));
+-	HLVM_ENSURE_F(Device, TXT("Device is null"));
++	HLVM_ENSURE_F(InDevice, TXT("Device is null"));
+ 	HLVM_ENSURE_F(VertexData, TXT("Vertex data is null"));
+ 	HLVM_ENSURE_F(VertexDataSize > 0, TXT("Vertex data size is zero"));
+ 
+-	this->Device = Device;
++	Device = InDevice;
+ 	BufferSize = VertexDataSize;
+ 
+ 	// Create buffer descriptor
+ 	nvrhi::BufferDesc Desc;
+ 	Desc.setByteSize(VertexDataSize);
+-	Desc.setInitialState(InitialState);
+-	Desc.setKeepInitialState(VertexData == nullptr);
++	Desc.setInitialState(nvrhi::ResourceStates::CopyDest);
+ 	Desc.setCanHaveUAVs(false);
+ 	Desc.setIsVertexBuffer(true);
+ 
+@@ -35,25 +34,41 @@ bool FVertexBuffer::Initialize(
+ 	// Upload initial data if provided
+ 	if (VertexData)
+ 	{
+-		Device->writeBuffer(BufferHandle, VertexData, VertexDataSize);
++		if (CommandList)
++		{
++			CommandList->beginTrackingBufferState(BufferHandle, nvrhi::ResourceStates::CopyDest);
++			CommandList->writeBuffer(BufferHandle, VertexData, VertexDataSize);
++			CommandList->setPermanentBufferState(BufferHandle, nvrhi::ResourceStates::VertexBuffer);
++		}
++//		else if (Device)
++//		{
++//			// TODO : Mmap is for dynamic buffer, static buffer should just write
++//			void* MappedData = Device->mapBuffer(BufferHandle, nvrhi::CpuAccessMode::Write);
++//			if (MappedData)
++//			{
++//				memcpy(MappedData, VertexData, VertexDataSize);
++//				Device->unmapBuffer(BufferHandle);
++//			}
++//		}
+ 	}
+ 
+ 	return true;
+ }
+ 
+-bool FVertexBuffer::InitializeEmpty(
+-	nvrhi::IDevice*		Device,
+-	size_t				BufferSize,
+-	nvrhi::ResourceStates InitialState)
+-{
+-	return Initialize(Device, nullptr, BufferSize, InitialState);
+-}
++// TODO Implement Dynamic buffer in a separate class
++// bool FVertexBuffer::InitializeEmpty(
++//	nvrhi::IDevice*		InDevice,
++//	size_t				InBufferSize
++//	)
++//{
++//	return Initialize(InDevice, nullptr, InBufferSize);
++//}
+ 
+ void FVertexBuffer::Update(
+ 	nvrhi::ICommandList* CommandList,
+-	const void*			Data,
+-	size_t				DataSize,
+-	size_t				DstOffset)
++	const void*			 Data,
++	size_t				 DataSize,
++	size_t				 DstOffset)
+ {
+ 	HLVM_ENSURE_F(BufferHandle, TXT("Buffer not initialized"));
+ 	HLVM_ENSURE_F(Data, TXT("Data is null"));
+@@ -63,10 +78,16 @@ void FVertexBuffer::Update(
+ 	{
+ 		CommandList->writeBuffer(BufferHandle, Data, DataSize, DstOffset);
+ 	}
+-	else
+-	{
+-		Device->writeBuffer(BufferHandle, Data, DataSize, DstOffset);
+-	}
++//	else if (Device)
++//	{
++//		// Fallback to map/unmap if no command list available
++//		void* MappedData = Device->mapBuffer(BufferHandle, nvrhi::CpuAccessMode::Write);
++//		if (MappedData)
++//		{
++//			memcpy(static_cast<char*>(MappedData) + DstOffset, Data, DataSize);
++//			Device->unmapBuffer(BufferHandle);
++//		}
++//	}
+ }
+ 
+ void FVertexBuffer::SetDebugName(const TCHAR* Name)
+@@ -75,30 +96,30 @@ void FVertexBuffer::SetDebugName(const TCHAR* Name)
+ }
+ 
+ bool FIndexBuffer::Initialize(
+-	nvrhi::IDevice*		Device,
+-	const void*			IndexData,
+-	size_t				IndexDataSize,
+-	nvrhi::Format			IndexFormat,
+-	nvrhi::ResourceStates InitialState)
++	nvrhi::ICommandList* CommandList,
++	nvrhi::IDevice*		 InDevice,
++	const void*			 IndexData,
++	size_t				 IndexDataSize,
++	nvrhi::Format		 InIndexFormat)
+ {
+ 	HLVM_ENSURE_F(!BufferHandle, TXT("Buffer already initialized"));
+-	HLVM_ENSURE_F(Device, TXT("Device is null"));
++	HLVM_ENSURE_F(InDevice, TXT("Device is null"));
+ 	HLVM_ENSURE_F(IndexData, TXT("Index data is null"));
+ 	HLVM_ENSURE_F(IndexDataSize > 0, TXT("Index data size is zero"));
+-	HLVM_ENSURE_F(IndexFormat == nvrhi::Format::R16_UINT || IndexFormat == nvrhi::Format::R32_UINT, 
++	HLVM_ENSURE_F(InIndexFormat == nvrhi::Format::R16_UINT || InIndexFormat == nvrhi::Format::R32_UINT,
+ 		TXT("Invalid index format, must be R16_UINT or R32_UINT"));
+ 
+-	this->Device = Device;
++	Device = InDevice;
+ 	BufferSize = IndexDataSize;
+-	this->IndexFormat = IndexFormat;
++	IndexFormat = InIndexFormat;
+ 
+ 	// Create buffer descriptor
+ 	nvrhi::BufferDesc Desc;
+ 	Desc.setByteSize(IndexDataSize);
+-	Desc.setInitialState(InitialState);
+-	Desc.setKeepInitialState(IndexData == nullptr);
++	Desc.setInitialState(nvrhi::ResourceStates::CopyDest);
+ 	Desc.setCanHaveUAVs(false);
+ 	Desc.setIsIndexBuffer(true);
++	Desc.setFormat(InIndexFormat);
+ 
+ 	// Create buffer
+ 	BufferHandle = Device->createBuffer(Desc);
+@@ -107,26 +128,39 @@ bool FIndexBuffer::Initialize(
+ 	// Upload initial data if provided
+ 	if (IndexData)
+ 	{
+-		Device->writeBuffer(BufferHandle, IndexData, IndexDataSize);
++		if (CommandList)
++		{
++			CommandList->beginTrackingBufferState(BufferHandle, nvrhi::ResourceStates::CopyDest);
++			CommandList->writeBuffer(BufferHandle, IndexData, IndexDataSize);
++			CommandList->setPermanentBufferState(BufferHandle, nvrhi::ResourceStates::IndexBuffer);
++		}
++//		else if (Device)
++//		{
++//			void* MappedData = Device->mapBuffer(BufferHandle, nvrhi::CpuAccessMode::Write);
++//			if (MappedData)
++//			{
++//				memcpy(MappedData, IndexData, IndexDataSize);
++//				Device->unmapBuffer(BufferHandle);
++//			}
++//		}
+ 	}
+ 
+ 	return true;
+ }
+ 
+-bool FIndexBuffer::InitializeEmpty(
+-	nvrhi::IDevice*		Device,
+-	size_t				BufferSize,
+-	nvrhi::Format			IndexFormat,
+-	nvrhi::ResourceStates InitialState)
+-{
+-	return Initialize(Device, nullptr, BufferSize, IndexFormat, InitialState);
+-}
++//bool FIndexBuffer::InitializeEmpty(
++//	nvrhi::IDevice* InDevice,
++//	size_t			InBufferSize,
++//	nvrhi::Format	InIndexFormat)
++//{
++//	return Initialize(InDevice, nullptr, InBufferSize, InIndexFormat);
++//}
+ 
+ void FIndexBuffer::Update(
+ 	nvrhi::ICommandList* CommandList,
+-	const void*			Data,
+-	size_t				DataSize,
+-	size_t				DstOffset)
++	const void*			 Data,
++	size_t				 DataSize,
++	size_t				 DstOffset)
+ {
+ 	HLVM_ENSURE_F(BufferHandle, TXT("Buffer not initialized"));
+ 	HLVM_ENSURE_F(Data, TXT("Data is null"));
+@@ -136,10 +170,16 @@ void FIndexBuffer::Update(
+ 	{
+ 		CommandList->writeBuffer(BufferHandle, Data, DataSize, DstOffset);
+ 	}
+-	else
+-	{
+-		Device->writeBuffer(BufferHandle, Data, DataSize, DstOffset);
+-	}
++//	else if (Device)
++//	{
++//		// Fallback to map/unmap if no command list available
++//		void* MappedData = Device->mapBuffer(BufferHandle, nvrhi::CpuAccessMode::Write);
++//		if (MappedData)
++//		{
++//			memcpy(static_cast<char*>(MappedData) + DstOffset, Data, DataSize);
++//			Device->unmapBuffer(BufferHandle);
++//		}
++//	}
+ }
+ 
+ void FIndexBuffer::SetDebugName(const TCHAR* Name)
+@@ -148,21 +188,21 @@ void FIndexBuffer::SetDebugName(const TCHAR* Name)
+ }
+ 
+ bool FUniformBuffer::Initialize(
+-	nvrhi::IDevice* Device,
+-	size_t		  BufferSize,
+-	bool		  Dynamic)
++	nvrhi::IDevice* InDevice,
++	size_t			InBufferSize,
++	bool			InDynamic)
+ {
+ 	HLVM_ENSURE_F(!BufferHandle, TXT("Buffer already initialized"));
+-	HLVM_ENSURE_F(Device, TXT("Device is null"));
+-	HLVM_ENSURE_F(BufferSize > 0, TXT("Buffer size is zero"));
++	HLVM_ENSURE_F(InDevice, TXT("Device is null"));
++	HLVM_ENSURE_F(InBufferSize > 0, TXT("Buffer size is zero"));
+ 
+-	this->Device = Device;
+-	this->BufferSize = BufferSize;
+-	this->Dynamic = Dynamic;
++	Device = InDevice;
++	BufferSize = InBufferSize;
++	Dynamic = InDynamic;
+ 
+ 	// Create buffer descriptor
+ 	nvrhi::BufferDesc Desc;
+-	Desc.setByteSize(BufferSize);
++	Desc.setByteSize(InBufferSize);
+ 	Desc.setInitialState(nvrhi::ResourceStates::ConstantBuffer);
+ 	Desc.setKeepInitialState(true);
+ 	Desc.setCanHaveUAVs(false);
+@@ -178,9 +218,9 @@ bool FUniformBuffer::Initialize(
+ 
+ void FUniformBuffer::Update(
+ 	nvrhi::ICommandList* CommandList,
+-	const void*			Data,
+-	size_t				DataSize,
+-	size_t				DstOffset)
++	const void*			 Data,
++	size_t				 DataSize,
++	size_t				 DstOffset)
+ {
+ 	HLVM_ENSURE_F(BufferHandle, TXT("Buffer not initialized"));
+ 	HLVM_ENSURE_F(Data, TXT("Data is null"));
+@@ -190,8 +230,14 @@ void FUniformBuffer::Update(
+ 	{
+ 		CommandList->writeBuffer(BufferHandle, Data, DataSize, DstOffset);
+ 	}
+-	else
+-	{
+-		Device->writeBuffer(BufferHandle, Data, DataSize, DstOffset);
+-	}
++//	else if (Device)
++//	{
++//		// Fallback to map/unmap if no command list available
++//		void* MappedData = Device->mapBuffer(BufferHandle, nvrhi::CpuAccessMode::Write);
++//		if (MappedData)
++//		{
++//			memcpy(static_cast<char*>(MappedData) + DstOffset, Data, DataSize);
++//			Device->unmapBuffer(BufferHandle);
++//		}
++//	}
+ }
+diff --git a/Engine/Source/Runtime/Private/Renderer/RHI/Object/PipelineState.cpp b/Engine/Source/Runtime/Private/Renderer/RHI/Object/PipelineState.cpp
+deleted file mode 100644
+index eba3d23..0000000
+--- a/Engine/Source/Runtime/Private/Renderer/RHI/Object/PipelineState.cpp
++++ /dev/null
+@@ -1,129 +0,0 @@
+-/**
+- * Copyright (c) 2026. MIT License. All rights reserved.
+- *
+- *  Pipeline State Implementation
+- */
+-
+-#include "Renderer/RHI/Object/PipelineState.h"
+-
+-bool FGraphicsPipelineState::CreatePipeline(
+-	nvrhi::IDevice*				   Device,
+-	nvrhi::IRenderPass*			   RenderPass,
+-	const FShaderModule&		   VertexShader,
+-	const FShaderModule&		   FragmentShader,
+-	const nvrhi::VertexAttributeDesc* VertexAttributes,
+-	TUINT32						   NumVertexAttributes,
+-	TUINT32						   VertexStride)
+-{
+-	HLVM_ENSURE_F(!PipelineHandle, TXT("Pipeline already created"));
+-	HLVM_ENSURE_F(Device, TXT("Device is null"));
+-	HLVM_ENSURE_F(RenderPass, TXT("Render pass is null"));
+-	HLVM_ENSURE_F(VertexShader.GetShaderModuleHandle(), TXT("Vertex shader not initialized"));
+-	HLVM_ENSURE_F(FragmentShader.GetShaderModuleHandle(), TXT("Fragment shader not initialized"));
+-
+-	this->Device = Device;
+-
+-	// Create pipeline layout (empty for now - can be extended with descriptor sets)
+-	nvrhi::PipelineLayoutDesc LayoutDesc;
+-	PipelineLayoutHandle = Device->createPipelineLayout(LayoutDesc);
+-	HLVM_ENSURE_F(PipelineLayoutHandle, TXT("Failed to create pipeline layout"));
+-
+-	// Build shader stage descriptions
+-	TArray<nvrhi::ShaderModuleHandle> ShaderModules;
+-	ShaderModules.Add(VertexShader.GetShaderModuleHandle());
+-	ShaderModules.Add(FragmentShader.GetShaderModuleHandle());
+-
+-	TArray<nvrhi::ShaderDesc> ShaderDescs;
+-	
+-	nvrhi::ShaderDesc VSDesc;
+-	VSDesc.setShaderStage(nvrhi::ShaderStage::Vertex);
+-	VSDesc.setShaderModule(VertexShader.GetShaderModuleHandle().Get());
+-	VSDesc.setEntryPoint(VertexShader.GetEntryPointName());
+-	ShaderDescs.Add(VSDesc);
+-
+-	nvrhi::ShaderDesc PSDesc;
+-	PSDesc.setShaderStage(nvrhi::ShaderStage::Pixel);
+-	PSDesc.setShaderModule(FragmentShader.GetShaderModuleHandle().Get());
+-	PSDesc.setEntryPoint(FragmentShader.GetEntryPointName());
+-	ShaderDescs.Add(PSDesc);
+-
+-	// Create vertex layout
+-	nvrhi::VertexLayoutDesc VertexLayout;
+-	VertexLayout.addInputBinding(0, VertexStride);
+-	
+-	for (TUINT32 i = 0; i < NumVertexAttributes; i++)
+-	{
+-		VertexLayout.addInputAttribute(VertexAttributes[i]);
+-	}
+-
+-	// Graphics pipeline description
+-	nvrhi::GraphicsPipelineDesc PipelineDesc;
+-	PipelineDesc.setPipelineLayout(PipelineLayoutHandle.Get());
+-	PipelineDesc.setRenderPass(RenderPass);
+-	PipelineDesc.setSubpassIndex(0);
+-	
+-	// Set shaders
+-	PipelineDesc.setVS(ShaderDescs[0]);
+-	PipelineDesc.setPS(ShaderDescs[1]);
+-
+-	// Vertex input layout
+-	PipelineDesc.setInputLayout(VertexLayout);
+-
+-	// Rasterizer state
+-	nvrhi::RasterStateDesc RasterState;
+-	RasterState.setCullMode(nvrhi::CullMode::Back);
+-	RasterState.setFrontCounterClockwise(true);
+-	PipelineDesc.setRasterState(RasterState);
+-
+-	// Depth/stencil state (disabled by default)
+-	nvrhi::DepthStateDesc DepthState;
+-	DepthState.setDepthEnable(false);
+-	PipelineDesc.setDepthState(DepthState);
+-
+-	// Color blending state (disabled by default)
+-	nvrhi::BlendStateDesc BlendState;
+-	PipelineDesc.setBlendState(BlendState);
+-
+-	// Viewport state
+-	nvrhi::ViewportDesc ViewportState;
+-	PipelineDesc.setViewportState(ViewportState);
+-
+-	// Create pipeline
+-	PipelineHandle = Device->createGraphicsPipeline(PipelineDesc);
+-	HLVM_ENSURE_F(PipelineHandle, TXT("Failed to create graphics pipeline"));
+-
+-	return true;
+-}
+-
+-void FGraphicsPipelineState::SetDebugName(const TCHAR* Name)
+-{
+-	DebugName = Name;
+-}
+-
+-bool FComputePipelineState::CreatePipeline(
+-	nvrhi::IDevice*		Device,
+-	const FShaderModule& ComputeShader)
+-{
+-	HLVM_ENSURE_F(!PipelineHandle, TXT("Pipeline already created"));
+-	HLVM_ENSURE_F(Device, TXT("Device is null"));
+-	HLVM_ENSURE_F(ComputeShader.GetShaderModuleHandle(), TXT("Compute shader not initialized"));
+-
+-	this->Device = Device;
+-
+-	// Create pipeline layout (empty for now)
+-	nvrhi::PipelineLayoutDesc LayoutDesc;
+-	PipelineLayoutHandle = Device->createPipelineLayout(LayoutDesc);
+-	HLVM_ENSURE_F(PipelineLayoutHandle, TXT("Failed to create pipeline layout"));
+-
+-	// Compute pipeline description
+-	nvrhi::ComputePipelineDesc PipelineDesc;
+-	PipelineDesc.setPipelineLayout(PipelineLayoutHandle.Get());
+-	PipelineDesc.setCS(ComputeShader.GetShaderModuleHandle().Get());
+-	PipelineDesc.setCSEntryPoint(ComputeShader.GetEntryPointName());
+-
+-	// Create pipeline
+-	PipelineHandle = Device->createComputePipeline(PipelineDesc);
+-	HLVM_ENSURE_F(PipelineHandle, TXT("Failed to create compute pipeline"));
+-
+-	return true;
+-}
+diff --git a/Engine/Source/Runtime/Private/Renderer/RHI/Object/ShaderModule.cpp b/Engine/Source/Runtime/Private/Renderer/RHI/Object/ShaderModule.cpp
+index b15eedb..d6ccc5c 100644
+--- a/Engine/Source/Runtime/Private/Renderer/RHI/Object/ShaderModule.cpp
++++ b/Engine/Source/Runtime/Private/Renderer/RHI/Object/ShaderModule.cpp
+@@ -5,62 +5,76 @@
+  */
+ 
+ #include "Renderer/RHI/Object/ShaderModule.h"
+-#include "Platform/FileSystem/FileSystem.h"
++#include "Platform/GenericPlatformFile.h"
++
++// TODO : temp method to load file for shader
++static bool LoadFileToArray(TArray<TBYTE>& buffer, const FPath& filename)
++{
++	auto PlatformFile = FGenericPlatformFile::Get(EPlatformFileType::Disk);
++	if (PlatformFile)
++	{
++		auto Buffer = PlatformFile->ReadContent(filename);
++		if (Buffer.Num())
++		{
++			buffer = MoveTemp(Buffer);
++			// Log
++			HLVM_LOG(LogRHI, info, TXT("Loaded shader file: {0}"), *FString(filename));
++			return true;
++		}
++	}
++	return false;
++}
+ 
+ bool FShaderModule::InitializeFromFile(
+-	const FPath&	 FilePath,
+-	nvrhi::ShaderType ShaderType,
+-	nvrhi::IDevice* Device)
++	const FPath&	 InFilePath,
++	nvrhi::ShaderType InShaderType,
++	nvrhi::IDevice* InDevice)
+ {
+-	HLVM_ENSURE_F(!ShaderModuleHandle, TXT("Shader module already initialized"));
+-	HLVM_ENSURE_F(Device, TXT("Device is null"));
+-	HLVM_ENSURE_F(FGenericPlatformFile::Get(EPlatformFileType::Disk)->Exists(FilePath), TXT("Shader file not found: {0}"), *FString(FilePath));
++	HLVM_ENSURE_F(!ShaderHandle, TXT("Shader already initialized"));
++	HLVM_ENSURE_F(InDevice, TXT("Device is null"));
++	HLVM_ENSURE_F(FGenericPlatformFile::Get(EPlatformFileType::Disk)->Exists(InFilePath), TXT("Shader file not found: {0}"), *FString(InFilePath));
+ 
+-	this->ShaderType = ShaderType;
+-	this->Device = Device;
++	ShaderType = InShaderType;
++	Device = InDevice;
+ 
+ 	// Read shader bytecode
+-	TArray<TCHAR> FileContent;
+-	if (!FFileHelper::LoadFileToArray(FileContent, *FilePath))
++	TArray<TBYTE> FileContent;
++	if (!::LoadFileToArray(FileContent, *InFilePath))
+ 	{
+-		HLVM_LOG(LogRHI, err, TXT("Failed to load shader file: {0}"), *FString(FilePath));
++		HLVM_LOG(LogRHI, err, TXT("Failed to load shader file: {0}"), *FString(InFilePath));
+ 		return false;
+ 	}
+ 
+-	// Create shader module from bytecode
+-	nvrhi::ShaderModuleDesc Desc;
++	// Create shader from bytecode
++	nvrhi::ShaderDesc Desc;
+ 	Desc.setShaderType(ShaderType);
+-	Desc.setBytecode(FileContent.GetData(), FileContent.Num() * sizeof(TCHAR));
+-	Desc.setEntryPoint(EntryPointName);
+-
+-	ShaderModuleHandle = Device->createShaderModule(Desc);
+-	HLVM_ENSURE_F(ShaderModuleHandle, TXT("Failed to create shader module"));
++	Desc.entryName = EntryPointName;
++	ShaderHandle = Device->createShader(Desc, FileContent.GetData(), FileContent.Num() * sizeof(TCHAR));
++	HLVM_ENSURE_F(ShaderHandle, TXT("Failed to create shader"));
+ 
+ 	return true;
+ }
+ 
+ bool FShaderModule::InitializeFromMemory(
+-	const void*		 Code,
+-	size_t			 CodeSize,
+-	nvrhi::ShaderType ShaderType,
+-	nvrhi::IDevice*	 Device)
++	const void*		Code,
++	size_t			CodeSize,
++	nvrhi::ShaderType InShaderType,
++	nvrhi::IDevice* InDevice)
+ {
+-	HLVM_ENSURE_F(!ShaderModuleHandle, TXT("Shader module already initialized"));
++	HLVM_ENSURE_F(!ShaderHandle, TXT("Shader already initialized"));
+ 	HLVM_ENSURE_F(Code, TXT("Code is null"));
+ 	HLVM_ENSURE_F(CodeSize > 0, TXT("Code size is zero"));
+-	HLVM_ENSURE_F(Device, TXT("Device is null"));
++	HLVM_ENSURE_F(InDevice, TXT("Device is null"));
+ 
+-	this->ShaderType = ShaderType;
+-	this->Device = Device;
++	ShaderType = InShaderType;
++	Device = InDevice;
+ 
+-	// Create shader module from memory
+-	nvrhi::ShaderModuleDesc Desc;
++	// Create shader from memory
++	nvrhi::ShaderDesc Desc;
+ 	Desc.setShaderType(ShaderType);
+-	Desc.setBytecode(Code, CodeSize);
+-	Desc.setEntryPoint(EntryPointName);
+-
+-	ShaderModuleHandle = Device->createShaderModule(Desc);
+-	HLVM_ENSURE_F(ShaderModuleHandle, TXT("Failed to create shader module"));
++	Desc.entryName = EntryPointName;
++	ShaderHandle = Device->createShader(Desc, Code, CodeSize);
++	HLVM_ENSURE_F(ShaderHandle, TXT("Failed to create shader"));
+ 
+ 	return true;
+ }
+diff --git a/Engine/Source/Runtime/Private/Renderer/RHI/Object/TextureLoading.cpp b/Engine/Source/Runtime/Private/Renderer/RHI/Object/TextureLoading.cpp
+index 1f5ca19..f919a50 100644
+--- a/Engine/Source/Runtime/Private/Renderer/RHI/Object/TextureLoading.cpp
++++ b/Engine/Source/Runtime/Private/Renderer/RHI/Object/TextureLoading.cpp
+@@ -9,7 +9,7 @@
+ BitsForFormat
+ ================
+ */
+-TUINT32 BitsForFormat(ETextureFormat format)
++HLVM_STATIC_FUNC TUINT32 BitsForFormat(ETextureFormat format)
+ {
+ 	switch (format)
+ 	{
+@@ -60,7 +60,7 @@ TUINT32 BitsForFormat(ETextureFormat format)
+ 	}
+ }
+ 
+-TUINT32 BlockSizeForFormat(const ETextureFormat& format)
++HLVM_STATIC_FUNC TUINT32 BlockSizeForFormat(const ETextureFormat& format)
+ {
+ #pragma clang diagnostic push
+ #pragma clang diagnostic ignored "-Wswitch-enum"
+@@ -84,7 +84,7 @@ GetRowBytes
+ Returns the row bytes for the given image.
+ =========================
+ */
+-TUINT32 GetRowPitch(const ETextureFormat& format, TUINT32 width)
++HLVM_STATIC_FUNC TUINT32 GetRowPitch(const ETextureFormat& format, TUINT32 width)
+ {
+ 	bool bc = (format == ETextureFormat::BC1
+ 		|| format == ETextureFormat::BC4
+diff --git a/Engine/Source/Runtime/Private/Renderer/Window/GLFW3/Vulkan/VulkanWindow.cpp b/Engine/Source/Runtime/Private/Renderer/Window/GLFW3/Vulkan/VulkanWindow.cpp
+index 7fb0ead..dad2735 100644
+--- a/Engine/Source/Runtime/Private/Renderer/Window/GLFW3/Vulkan/VulkanWindow.cpp
++++ b/Engine/Source/Runtime/Private/Renderer/Window/GLFW3/Vulkan/VulkanWindow.cpp
+@@ -13,6 +13,7 @@ FGLFW3VulkanWindow::FGLFW3VulkanWindow(const IWindow::Properties& InProperties)
+ 	Type = EWindowType::GLFW3Vulkan;
+ 
+ 	// 初始化Vulkan加载器
++	// VULKAN_HPP_DEFAULT_DISPATCHER loaded in VulkanLoader.cpp
+ 	InitVulkanLoaderOnce();
+ 
+ 	glfwInit(); // 初始化图形库框架：Graphics Libraries Framework
+diff --git a/Engine/Source/Runtime/Public/Renderer/RHI/Common.h b/Engine/Source/Runtime/Public/Renderer/RHI/Common.h
+index b9b3aef..035882a 100644
+--- a/Engine/Source/Runtime/Public/Renderer/RHI/Common.h
++++ b/Engine/Source/Runtime/Public/Renderer/RHI/Common.h
+@@ -22,104 +22,101 @@ DECLARE_LOG_CATEGORY(LogRHI)
+ 
+ class FDeviceManager;
+ 
+-namespace
++/*-----------------------------------------------------------------------------
++   Texture Dimension Types
++-----------------------------------------------------------------------------*/
++
++enum class ETextureDimension : TUINT8
+ {
+-	/*-----------------------------------------------------------------------------
+-	   Texture Dimension Types
+-	-----------------------------------------------------------------------------*/
++	Texture2D,
++	Texture2DArray,
++	Texture3D,
++	TextureCube,
++	TextureCubeArray,
++};
+ 
+-	enum class ETextureDimension : TUINT8
+-	{
+-		Texture2D,
+-		Texture2DArray,
+-		Texture3D,
+-		TextureCube,
+-		TextureCubeArray,
+-	};
+-
+-	/*-----------------------------------------------------------------------------
+-	   Texture Format
+-	-----------------------------------------------------------------------------*/
+-
+-	enum class ETextureFormat : TUINT8
+-	{
+-		// Color formats
+-		R8,
+-		RG8,
+-		RGBA8,
+-		SRGBA8,
+-
+-		// Depth formats
+-		D16,
+-		D24S8,
+-		D32,
+-		D32S8,
+-
+-		// Compressed formats
+-		BC1,
+-		BC4,
+-		BC6H,
+-		BC7,
+-
+-		// Float formats
+-		R16F,
+-		RG16F,
+-		RGBA16F,
+-		R32F,
+-		RGBA32F,
+-	};
+-
+-	/*-----------------------------------------------------------------------------
+-	   Texture Filter Modes
+-	-----------------------------------------------------------------------------*/
+-
+-	enum class ETextureFilter : TUINT8
+-	{
+-		Nearest,
+-		Linear,
+-		NearestMipmapNearest,
+-		NearestMipmapLinear,
+-		LinearMipmapNearest,
+-		LinearMipmapLinear,
+-		Anisotropic,
+-	};
+-
+-	/*-----------------------------------------------------------------------------
+-	   Texture Address Modes
+-	-----------------------------------------------------------------------------*/
+-
+-	enum class ETextureAddress : TUINT8
+-	{
+-		Wrap,
+-		Mirror,
+-		Clamp,
+-		Border,
+-		MirrorOnce,
+-	};
+-
+-	enum class EGpuVendorID : TUINT32
+-	{
+-		Unknown = 0xffffffff,
+-		NotQueried = 0,
+-
+-		Amd = 0x1002,
+-		ImgTec = 0x1010,
+-		Nvidia = 0x10DE,
+-		Arm = 0x13B5,
+-		Broadcom = 0x14E4,
+-		Qualcomm = 0x5143,
+-		Intel = 0x8086,
+-		Apple = 0x106B,
+-		Vivante = 0x7a05,
+-		VeriSilicon = 0x1EB1,
+-		SamsungAMD = 0x144D,
+-		Microsoft = 0x1414,
+-
+-		Kazan = 0x10003,	// VkVendorId
+-		Codeplay = 0x10004, // VkVendorId
+-		Mesa = 0x10005,		// VkVendorId
+-	};
+-} // namespace
++/*-----------------------------------------------------------------------------
++   Texture Format
++-----------------------------------------------------------------------------*/
++
++enum class ETextureFormat : TUINT8
++{
++	// Color formats
++	R8,
++	RG8,
++	RGBA8,
++	SRGBA8,
++
++	// Depth formats
++	D16,
++	D24S8,
++	D32,
++	D32S8,
++
++	// Compressed formats
++	BC1,
++	BC4,
++	BC6H,
++	BC7,
++
++	// Float formats
++	R16F,
++	RG16F,
++	RGBA16F,
++	R32F,
++	RGBA32F,
++};
++
++/*-----------------------------------------------------------------------------
++   Texture Filter Modes
++-----------------------------------------------------------------------------*/
++
++enum class ETextureFilter : TUINT8
++{
++	Nearest,
++	Linear,
++	NearestMipmapNearest,
++	NearestMipmapLinear,
++	LinearMipmapNearest,
++	LinearMipmapLinear,
++	Anisotropic,
++};
++
++/*-----------------------------------------------------------------------------
++   Texture Address Modes
++-----------------------------------------------------------------------------*/
++
++enum class ETextureAddress : TUINT8
++{
++	Wrap,
++	Mirror,
++	Clamp,
++	Border,
++	MirrorOnce,
++};
++
++enum class EGpuVendorID : TUINT32
++{
++	Unknown = 0xffffffff,
++	NotQueried = 0,
++
++	Amd = 0x1002,
++	ImgTec = 0x1010,
++	Nvidia = 0x10DE,
++	Arm = 0x13B5,
++	Broadcom = 0x14E4,
++	Qualcomm = 0x5143,
++	Intel = 0x8086,
++	Apple = 0x106B,
++	Vivante = 0x7a05,
++	VeriSilicon = 0x1EB1,
++	SamsungAMD = 0x144D,
++	Microsoft = 0x1414,
++
++	Kazan = 0x10003,	// VkVendorId
++	Codeplay = 0x10004, // VkVendorId
++	Mesa = 0x10005,		// VkVendorId
++};
+ 
+ namespace RHI
+ {
+diff --git a/Engine/Source/Runtime/Public/Renderer/RHI/Object/Buffer.h b/Engine/Source/Runtime/Public/Renderer/RHI/Object/Buffer.h
+index 90a309c..2dfa33b 100644
+--- a/Engine/Source/Runtime/Public/Renderer/RHI/Object/Buffer.h
++++ b/Engine/Source/Runtime/Public/Renderer/RHI/Object/Buffer.h
+@@ -11,7 +11,7 @@
+ #include "Renderer/RHI/Common.h"
+ 
+ /*-----------------------------------------------------------------------------
+-    FVertexBuffer - Vertex Buffer Class
++	FVertexBuffer - Vertex Buffer Class
+ -----------------------------------------------------------------------------*/
+ 
+ /**
+@@ -32,23 +32,23 @@ public:
+ 
+ 	// Initialize with vertex data
+ 	bool Initialize(
+-		nvrhi::IDevice*		Device,
+-		const void*			VertexData,
+-		size_t				VertexDataSize,
+-		nvrhi::ResourceStates InitialState = nvrhi::ResourceStates::VertexBuffer);
++		nvrhi::ICommandList* CommandList,
++		nvrhi::IDevice* Device,
++		const void*		VertexData,
++		size_t			VertexDataSize);
+ 
+-	// Initialize as empty buffer (for dynamic updates)
+-	bool InitializeEmpty(
+-		nvrhi::IDevice*		Device,
+-		size_t				BufferSize,
+-		nvrhi::ResourceStates InitialState = nvrhi::ResourceStates::VertexBuffer);
++	// TODO Implement Dynamic buffer in a separate class
++//	// Initialize as empty buffer (for dynamic updates)
++//	bool InitializeEmpty(
++//		nvrhi::IDevice* Device,
++//		size_t			BufferSize);
+ 
+ 	// Update buffer content
+ 	void Update(
+ 		nvrhi::ICommandList* CommandList,
+-		const void*			Data,
+-		size_t				DataSize,
+-		size_t				DstOffset = 0);
++		const void*			 Data,
++		size_t				 DataSize,
++		size_t				 DstOffset = 0);
+ 
+ 	// Access
+ 	[[nodiscard]] nvrhi::BufferHandle GetBufferHandle() const { return BufferHandle; }
+@@ -59,13 +59,13 @@ public:
+ 
+ protected:
+ 	nvrhi::BufferHandle BufferHandle;
+-	size_t			  BufferSize;
+-	nvrhi::IDevice*	  Device;
+-	TCharArray<64>	  DebugName;
++	size_t				BufferSize;
++	nvrhi::IDevice*		Device;
++	TCharArray<64>		DebugName;
+ };
+ 
+ /*-----------------------------------------------------------------------------
+-    FIndexBuffer - Index Buffer Class
++	FIndexBuffer - Index Buffer Class
+ -----------------------------------------------------------------------------*/
+ 
+ /**
+@@ -86,25 +86,24 @@ public:
+ 
+ 	// Initialize with index data (16-bit or 32-bit indices)
+ 	bool Initialize(
+-		nvrhi::IDevice*		Device,
+-		const void*			IndexData,
+-		size_t				IndexDataSize,
+-		nvrhi::Format			IndexFormat,
+-		nvrhi::ResourceStates InitialState = nvrhi::ResourceStates::IndexBuffer);
+-
+-	// Initialize as empty buffer (for dynamic updates)
+-	bool InitializeEmpty(
+-		nvrhi::IDevice*		Device,
+-		size_t				BufferSize,
+-		nvrhi::Format			IndexFormat,
+-		nvrhi::ResourceStates InitialState = nvrhi::ResourceStates::IndexBuffer);
++		nvrhi::ICommandList* CommandList,
++		nvrhi::IDevice* Device,
++		const void*		IndexData,
++		size_t			IndexDataSize,
++		nvrhi::Format	IndexFormat);
++
++//	// Initialize as empty buffer (for dynamic updates)
++//	bool InitializeEmpty(
++//		nvrhi::IDevice* Device,
++//		size_t			BufferSize,
++//		nvrhi::Format	IndexFormat);
+ 
+ 	// Update buffer content
+ 	void Update(
+ 		nvrhi::ICommandList* CommandList,
+-		const void*			Data,
+-		size_t				DataSize,
+-		size_t				DstOffset = 0);
++		const void*			 Data,
++		size_t				 DataSize,
++		size_t				 DstOffset = 0);
+ 
+ 	// Access
+ 	[[nodiscard]] nvrhi::BufferHandle GetBufferHandle() const { return BufferHandle; }
+@@ -116,14 +115,14 @@ public:
+ 
+ protected:
+ 	nvrhi::BufferHandle BufferHandle;
+-	size_t			  BufferSize;
+-	nvrhi::Format		  IndexFormat;
+-	nvrhi::IDevice*	  Device;
+-	TCharArray<64>	  DebugName;
++	size_t				BufferSize;
++	nvrhi::Format		IndexFormat;
++	nvrhi::IDevice*		Device;
++	TCharArray<64>		DebugName;
+ };
+ 
+ /*-----------------------------------------------------------------------------
+-    FUniformBuffer - Uniform Buffer Class
++	FUniformBuffer - Uniform Buffer Class
+ -----------------------------------------------------------------------------*/
+ 
+ /**
+@@ -146,15 +145,15 @@ public:
+ 	// Initialize uniform buffer
+ 	bool Initialize(
+ 		nvrhi::IDevice* Device,
+-		size_t		  BufferSize,
+-		bool		  Dynamic = false);
++		size_t			BufferSize,
++		bool			Dynamic = false);
+ 
+ 	// Update buffer content
+ 	void Update(
+ 		nvrhi::ICommandList* CommandList,
+-		const void*			Data,
+-		size_t				DataSize,
+-		size_t				DstOffset = 0);
++		const void*			 Data,
++		size_t				 DataSize,
++		size_t				 DstOffset = 0);
+ 
+ 	// Access
+ 	[[nodiscard]] nvrhi::BufferHandle GetBufferHandle() const { return BufferHandle; }
+@@ -162,13 +161,13 @@ public:
+ 
+ protected:
+ 	nvrhi::BufferHandle BufferHandle;
+-	size_t			  BufferSize;
+-	nvrhi::IDevice*	  Device;
+-	bool				  Dynamic;
++	size_t				BufferSize;
++	nvrhi::IDevice*		Device;
++	bool				Dynamic;
+ };
+ 
+ /*-----------------------------------------------------------------------------
+-    Inline Implementations
++	Inline Implementations
+ -----------------------------------------------------------------------------*/
+ 
+ HLVM_INLINE_FUNC FVertexBuffer::FVertexBuffer()
+@@ -184,7 +183,7 @@ HLVM_INLINE_FUNC FVertexBuffer::~FVertexBuffer()
+ 
+ HLVM_INLINE_FUNC FIndexBuffer::FIndexBuffer()
+ 	: BufferSize(0)
+-	, IndexFormat(nvrhi::Format::UNKNOWN)
++	, IndexFormat(nvrhi::Format::R32_UINT)
+ 	, Device(nullptr)
+ {
+ }
+diff --git a/Engine/Source/Runtime/Public/Renderer/RHI/Object/Frambuffer.h b/Engine/Source/Runtime/Public/Renderer/RHI/Object/Frambuffer.h
+index d4b19e0..c9546e5 100644
+--- a/Engine/Source/Runtime/Public/Renderer/RHI/Object/Frambuffer.h
++++ b/Engine/Source/Runtime/Public/Renderer/RHI/Object/Frambuffer.h
+@@ -100,7 +100,7 @@ public:
+ 	[[nodiscard]] nvrhi::FramebufferHandle GetFramebufferHandle() const { return FramebufferHandle; }
+ 	[[nodiscard]] TUINT32				   GetWidth() const { return Width; }
+ 	[[nodiscard]] TUINT32				   GetHeight() const { return Height; }
+-	[[nodiscard]] TUINT32				   GetColorAttachmentCount() const { return ColorAttachments.Num(); }
++	[[nodiscard]] TUINT32				   GetColorAttachmentCount() const { return ColorAttachments.Num32(); }
+ 
+ 	// Viewport
+ 	void						  SetViewport(TFLOAT X, TFLOAT Y, TFLOAT Width, TFLOAT Height, TFLOAT MinDepth = 0.0f, TFLOAT MaxDepth = 1.0f);
+diff --git a/Engine/Source/Runtime/Public/Renderer/RHI/Object/PipelineState.h b/Engine/Source/Runtime/Public/Renderer/RHI/Object/PipelineState.h
+deleted file mode 100644
+index 6d454f0..0000000
+--- a/Engine/Source/Runtime/Public/Renderer/RHI/Object/PipelineState.h
++++ /dev/null
+@@ -1,125 +0,0 @@
+-/**
+- * Copyright (c) 2026. MIT License. All rights reserved.
+- *
+- *  Pipeline State Objects
+- *
+- *  Graphics pipeline state management using NVRHI.
+- */
+-
+-#pragma once
+-
+-#include "Renderer/RHI/Common.h"
+-#include "Renderer/RHI/Object/ShaderModule.h"
+-
+-/*-----------------------------------------------------------------------------
+-    FGraphicsPipelineState - Graphics Pipeline State Object
+------------------------------------------------------------------------------*/
+-
+-/**
+- * Graphics pipeline state object (PSO)
+- *
+- * Manages:
+- * - Shader stages (vertex, fragment, geometry, etc.)
+- * - Vertex input layout
+- * - Rasterization state
+- * - Color blending state
+- * - Depth/stencil state
+- *
+- * Usage:
+- * 1. Create instance
+- * 2. Configure pipeline description
+- * 3. Call CreatePipeline()
+- * 4. Bind with CommandList->bindPipeline()
+- */
+-class FGraphicsPipelineState
+-{
+-public:
+-	NOCOPYMOVE(FGraphicsPipelineState)
+-
+-	FGraphicsPipelineState();
+-	virtual ~FGraphicsPipelineState();
+-
+-	// Pipeline creation
+-	bool CreatePipeline(
+-		nvrhi::IDevice*				  Device,
+-		nvrhi::IRenderPass*			  RenderPass,
+-		const FShaderModule&		  VertexShader,
+-		const FShaderModule&		  FragmentShader,
+-		const nvrhi::VertexAttributeDesc* VertexAttributes,
+-		TUINT32						  NumVertexAttributes,
+-		TUINT32						  VertexStride);
+-
+-	// Access
+-	[[nodiscard]] nvrhi::PipelineHandle GetPipelineHandle() const { return PipelineHandle; }
+-	[[nodiscard]] nvrhi::PipelineLayoutHandle GetPipelineLayoutHandle() const { return PipelineLayoutHandle; }
+-
+-	// Debug name
+-	void SetDebugName(const TCHAR* Name);
+-
+-protected:
+-	nvrhi::PipelineHandle		PipelineHandle;
+-	nvrhi::PipelineLayoutHandle PipelineLayoutHandle;
+-	nvrhi::IDevice*				Device;
+-	TCharArray<64>				DebugName;
+-};
+-
+-/*-----------------------------------------------------------------------------
+-    FComputePipelineState - Compute Pipeline State Object
+------------------------------------------------------------------------------*/
+-
+-/**
+- * Compute pipeline state object
+- *
+- * Usage:
+- * 1. Create instance
+- * 2. Call CreatePipeline() with compute shader
+- * 3. Bind with CommandList->bindPipeline()
+- */
+-class FComputePipelineState
+-{
+-public:
+-	NOCOPYMOVE(FComputePipelineState)
+-
+-	FComputePipelineState();
+-	virtual ~FComputePipelineState();
+-
+-	// Pipeline creation
+-	bool CreatePipeline(
+-		nvrhi::IDevice*		 Device,
+-		const FShaderModule& ComputeShader);
+-
+-	// Access
+-	[[nodiscard]] nvrhi::PipelineHandle GetPipelineHandle() const { return PipelineHandle; }
+-	[[nodiscard]] nvrhi::PipelineLayoutHandle GetPipelineLayoutHandle() const { return PipelineLayoutHandle; }
+-
+-protected:
+-	nvrhi::PipelineHandle		PipelineHandle;
+-	nvrhi::PipelineLayoutHandle PipelineLayoutHandle;
+-	nvrhi::IDevice*				Device;
+-};
+-
+-/*-----------------------------------------------------------------------------
+-    Inline Implementations
+------------------------------------------------------------------------------*/
+-
+-HLVM_INLINE_FUNC FGraphicsPipelineState::FGraphicsPipelineState()
+-	: Device(nullptr)
+-{
+-}
+-
+-HLVM_INLINE_FUNC FGraphicsPipelineState::~FGraphicsPipelineState()
+-{
+-	PipelineHandle.Reset();
+-	PipelineLayoutHandle.Reset();
+-}
+-
+-HLVM_INLINE_FUNC FComputePipelineState::FComputePipelineState()
+-	: Device(nullptr)
+-{
+-}
+-
+-HLVM_INLINE_FUNC FComputePipelineState::~FComputePipelineState()
+-{
+-	PipelineHandle.Reset();
+-	PipelineLayoutHandle.Reset();
+-}
+diff --git a/Engine/Source/Runtime/Public/Renderer/RHI/Object/ShaderModule.h b/Engine/Source/Runtime/Public/Renderer/RHI/Object/ShaderModule.h
+index e4eab8a..fdc8828 100644
+--- a/Engine/Source/Runtime/Public/Renderer/RHI/Object/ShaderModule.h
++++ b/Engine/Source/Runtime/Public/Renderer/RHI/Object/ShaderModule.h
+@@ -11,7 +11,7 @@
+ #include "Renderer/RHI/Common.h"
+ 
+ /*-----------------------------------------------------------------------------
+-    FShaderModule - Shader Module Class
++	FShaderModule - Shader Module Class
+ -----------------------------------------------------------------------------*/
+ 
+ /**
+@@ -37,35 +37,35 @@ public:
+ 
+ 	// Initialize from file (SPIR-V binary)
+ 	bool InitializeFromFile(
+-		const FPath&	 FilePath,
++		const FPath&	  FilePath,
+ 		nvrhi::ShaderType ShaderType,
+-		nvrhi::IDevice*  Device);
++		nvrhi::IDevice*	  Device);
+ 
+ 	// Initialize from memory buffer
+ 	bool InitializeFromMemory(
+-		const void*		 Code,
+-		size_t			 CodeSize,
++		const void*		  Code,
++		size_t			  CodeSize,
+ 		nvrhi::ShaderType ShaderType,
+-		nvrhi::IDevice*	 Device);
++		nvrhi::IDevice*	  Device);
+ 
+ 	// Access
+-	[[nodiscard]] nvrhi::ShaderModuleHandle GetShaderModuleHandle() const { return ShaderModuleHandle; }
+-	[[nodiscard]] nvrhi::ShaderType		  GetShaderType() const { return ShaderType; }
+-	[[nodiscard]] const char* GetEntryPointName() const { return EntryPointName; }
++	[[nodiscard]] nvrhi::ShaderHandle GetShaderHandle() const { return ShaderHandle; }
++	[[nodiscard]] nvrhi::ShaderType	  GetShaderType() const { return ShaderType; }
++	[[nodiscard]] const char*		  GetEntryPointName() const { return EntryPointName; }
+ 
+ 	// Debug name
+ 	void SetDebugName(const TCHAR* Name);
+ 
+ protected:
+-	nvrhi::ShaderModuleHandle ShaderModuleHandle;
+-	nvrhi::ShaderType			ShaderType;
+-	nvrhi::IDevice*				Device;
+-	TCharArray<128>				DebugName;
+-	const char*					EntryPointName;
++	nvrhi::ShaderHandle ShaderHandle;
++	nvrhi::ShaderType	ShaderType;
++	nvrhi::IDevice*		Device;
++	TCharArray<128>		DebugName;
++	const char*			EntryPointName;
+ };
+ 
+ /*-----------------------------------------------------------------------------
+-    Inline Implementations
++	Inline Implementations
+ -----------------------------------------------------------------------------*/
+ 
+ HLVM_INLINE_FUNC FShaderModule::FShaderModule()
+@@ -77,5 +77,5 @@ HLVM_INLINE_FUNC FShaderModule::FShaderModule()
+ 
+ HLVM_INLINE_FUNC FShaderModule::~FShaderModule()
+ {
+-	ShaderModuleHandle.Reset();
++	ShaderHandle.Reset();
+ }
+diff --git a/Engine/Source/Runtime/Test/TestRHIObjects.cpp b/Engine/Source/Runtime/Test/TestRHIObjects.cpp
+index cd5e36e..419e9bb 100644
+--- a/Engine/Source/Runtime/Test/TestRHIObjects.cpp
++++ b/Engine/Source/Runtime/Test/TestRHIObjects.cpp
+@@ -4,8 +4,7 @@
+  * RHI Objects Test
+  *
+  * This test demonstrates using the new RHI object abstractions (FTexture, FFramebuffer,
+- * FShaderModule, FGraphicsPipelineState, FVertexBuffer, FIndexBuffer) to render a triangle
+- * using NVRHI Vulkan backend.
++ * FVertexBuffer, FIndexBuffer) with NVRHI Vulkan backend.
+  *
+  * Unlike TestNVRHIVulkanWindow.cpp which uses raw Vulkan-HPP, this test uses our
+  * higher-level RHI abstractions for cleaner, more maintainable code.
+@@ -21,8 +20,6 @@ DECLARE_LOG_CATEGORY(LogTest)
+ 	#include "Renderer/RHI/Common.h"
+ 	#include "Renderer/RHI/Object/Texture.h"
+ 	#include "Renderer/RHI/Object/Frambuffer.h"
+-	#include "Renderer/RHI/Object/ShaderModule.h"
+-	#include "Renderer/RHI/Object/PipelineState.h"
+ 	#include "Renderer/RHI/Object/Buffer.h"
+ 
+ 	#if 1 // Test RHI Objects with NVRHI
+@@ -37,6 +34,7 @@ DECLARE_LOG_CATEGORY(LogTest)
+ 		#pragma clang diagnostic ignored "-Wshadow"
+ 		#pragma clang diagnostic ignored "-Wmissing-braces"
+ 		#pragma clang diagnostic ignored "-Wsign-conversion"
++		#pragma clang diagnostic ignored "-Wunreachable-code"
+ 
+ using namespace std;
+ 
+@@ -76,19 +74,23 @@ struct FRHITestContext
+ 
+ 	// NVRHI device
+ 	nvrhi::DeviceHandle NvrhiDevice;
++	// Command list
++	nvrhi::CommandListHandle NvrhiCommandList;
+ 
+ 	// RHI Objects
+-	TUniquePtr<FTexture>			   ColorTexture;
+-	TUniquePtr<FTexture>			   DepthTexture;
+-	TUniquePtr<FFramebuffer>		   Framebuffer;
+-	TUniquePtr<FShaderModule>		   VertexShader;
+-	TUniquePtr<FShaderModule>		   FragmentShader;
+-	TUniquePtr<FGraphicsPipelineState> PipelineState;
+-	TUniquePtr<FVertexBuffer>		   VertexBuffer;
+-	TUniquePtr<FIndexBuffer>		   IndexBuffer;
++	TUniquePtr<FTexture>	  ColorTexture;
++	TUniquePtr<FTexture>	  DepthTexture;
++	TUniquePtr<FFramebuffer>  Framebuffer;
++	TUniquePtr<FVertexBuffer> VertexBuffer;
++	TUniquePtr<FIndexBuffer>  IndexBuffer;
+ 
+ 	// Swapchain resources
+-	vector<vk::Image>			SwapchainImages;
++	vector<vk::Image> SwapchainImages;
++
++	// Note YuHang, we use a mix of vk handle and vk unique handle
++	// to show how to manage their life time
++	// vk unique handle needs to release pointer and
++	// vk handle needs to call device destroy
+ 	vector<vk::UniqueImageView> SwapchainImageViews;
+ 
+ 	// Synchronization
+@@ -110,12 +112,15 @@ static FRHITestContext GTestContext;
+ static void CreateVulkanInstance(FRHITestContext& Context)
+ {
+ 	// Application info
++	// CommandList->writeBuffer requires sync2 which is a vk 1.3 feature
++	// (otherwise throw error on dynamic api not loaded)
++	// https://docs.vulkan.org/guide/latest/extensions/VK_KHR_synchronization2.html
+ 	vk::ApplicationInfo AppInfo(
+ 		"RHI Objects Test",
+ 		VK_MAKE_VERSION(1, 0, 0),
+ 		"HLVM Engine",
+ 		VK_MAKE_VERSION(1, 0, 0),
+-		VK_API_VERSION_1_2);
++		VK_API_VERSION_1_3);
+ 
+ 	// Extensions
+ 	vector<const char*> Extensions = {
+@@ -321,6 +326,21 @@ static void CreateRHIResources(FRHITestContext& Context)
+ 		throw runtime_error("Failed to create NVRHI device");
+ 	}
+ 
++	nvrhi::CommandListParameters params = {};
++	params.enableImmediateExecution = false;
++	{
++		// SRS - set upload buffer size to avoid Vulkan staging buffer fragmentation
++		size_t maxBufferSize = (size_t)(1 * 1024 * 1024);
++		params.setUploadChunkSize(maxBufferSize);
++	}
++	Context.NvrhiCommandList = Context.NvrhiDevice->createCommandList(params);
++	if (!Context.NvrhiCommandList)
++	{
++		throw runtime_error("Failed to create NVRHI command list");
++	}
++
++	Context.NvrhiCommandList->open();
++
+ 	// Create color texture (render target)
+ 	Context.ColorTexture = TUniquePtr<FTexture>(new FTexture());
+ 	Context.ColorTexture->InitializeRenderTarget(
+@@ -355,7 +375,7 @@ static void CreateRHIResources(FRHITestContext& Context)
+ 	};
+ 
+ 	Context.VertexBuffer = TUniquePtr<FVertexBuffer>(new FVertexBuffer());
+-	Context.VertexBuffer->Initialize(
++	Context.VertexBuffer->Initialize(Context.NvrhiCommandList,
+ 		Context.NvrhiDevice.Get(), Vertices, sizeof(Vertices));
+ 	Context.VertexBuffer->SetDebugName(TXT("TriangleVertexBuffer"));
+ 
+@@ -363,55 +383,42 @@ static void CreateRHIResources(FRHITestContext& Context)
+ 	uint32_t Indices[] = { 0, 1, 2 };
+ 
+ 	Context.IndexBuffer = TUniquePtr<FIndexBuffer>(new FIndexBuffer());
+-	Context.IndexBuffer->Initialize(
+-		Context.NvrhiDevice.Get(), Indices, sizeof(Indices), nvrhi::Format::R32_UINT);
++	Context.IndexBuffer->Initialize(Context.NvrhiCommandList,
++		Context.NvrhiDevice.Get(), Indices, sizeof(Indices), nvrhi::Format::R16_UINT);
+ 	Context.IndexBuffer->SetDebugName(TXT("TriangleIndexBuffer"));
+ 
+-	// Create shaders (SPIR-V bytecode would be loaded from files in real usage)
+-	// For this test, we'll create minimal passthrough shaders
+-	const uint32_t VertShaderCode[] = {
+-		0x07230203, 0x00010000, 0x000d000b,
+-		// ... minimal vertex shader SPIR-V (truncated for brevity)
+-		// In production, load from .spv files
+-	};
+-
+-	const uint32_t FragShaderCode[] = {
+-		0x07230203, 0x00010000, 0x000d000b,
+-		// ... minimal fragment shader SPIR-V (truncated for brevity)
+-		// In production, load from .spv files
+-	};
+-
+-	// Note: For a complete test, you would need actual SPIR-V shader bytecode
+-	// This is a placeholder showing the API usage
+-	HLVM_LOG(LogTest, info, TXT("Shader module creation would go here (requires SPIR-V bytecode)"));
++	Context.NvrhiCommandList->close();
++	Context.NvrhiDevice->executeCommandList(Context.NvrhiCommandList);
+ 
+-	// Create pipeline state (placeholder - requires valid shader modules)
+-	HLVM_LOG(LogTest, info, TXT("Pipeline state creation would go here (requires valid shaders)"));
+-
+-	// For now, just log that RHI resources are created
+-	HLVM_LOG(LogTest, info, TXT("RHI resources created successfully"));
++	HLVM_LOG(LogTest, info, TXT("RHI resources (textures, framebuffer, buffers) created successfully"));
++	HLVM_LOG(LogTest, info, TXT("Note: Shader and pipeline creation omitted - NVRHI API requires further adaptation"));
+ }
+ 
+ static void CleanupRHIResources(FRHITestContext& Context)
+ {
+ 	Context.IndexBuffer.reset();
+ 	Context.VertexBuffer.reset();
+-	Context.PipelineState.reset();
+-	Context.FragmentShader.reset();
+-	Context.VertexShader.reset();
+ 	Context.Framebuffer.reset();
+ 	Context.DepthTexture.reset();
+ 	Context.ColorTexture.reset();
+ 
++	if (Context.NvrhiCommandList)
++	{
++		Context.NvrhiCommandList.Reset();
++	}
++
+ 	if (Context.NvrhiDevice)
+ 	{
+ 		Context.NvrhiDevice.Reset();
+ 	}
+ }
+ 
+-// =============================================================================
+-// TEST ENTRY POINT
+-// =============================================================================
++	// =============================================================================
++	// TEST ENTRY POINT
++	// =============================================================================
++
++	// deliberately use a wrong wayto handle unique handles lifetime
++		#define DELIBERATE_UNIQUE_HANDLE_WRONG 0
+ 
+ RECORD_BOOL(test_RHI_Objects_Triangle)
+ {
+@@ -435,14 +442,15 @@ RECORD_BOOL(test_RHI_Objects_Triangle)
+ 			throw runtime_error("Failed to create window");
+ 		}
+ 
++		// Initialize Vulkan
++		CreateVulkanInstance(Ctx);
++
+ 		// Create Vulkan surface
+-		if (glfwCreateWindowSurface(vk::Instance(), Ctx.Window, nullptr, reinterpret_cast<VkSurfaceKHR*>(&Ctx.Surface)) != VK_SUCCESS)
++		if (glfwCreateWindowSurface(Ctx.Instance, Ctx.Window, nullptr, reinterpret_cast<VkSurfaceKHR*>(&Ctx.Surface)) != VK_SUCCESS)
+ 		{
+ 			throw runtime_error("Failed to create surface");
+ 		}
+ 
+-		// Initialize Vulkan
+-		CreateVulkanInstance(Ctx);
+ 		PickPhysicalDevice(Ctx);
+ 		CreateLogicalDevice(Ctx);
+ 		CreateSwapchain(Ctx);
+@@ -465,22 +473,75 @@ RECORD_BOOL(test_RHI_Objects_Triangle)
+ 			}
+ 		}
+ 
++		HLVM_LOG(LogTest, warn, TXT("0"));
++
+ 		// Wait for GPU to finish
+ 		Ctx.Device.waitIdle();
++		HLVM_LOG(LogTest, warn, TXT("1"));
+ 
+ 		// Cleanup
+ 		CleanupRHIResources(Ctx);
+ 
++		HLVM_LOG(LogTest, warn, TXT("2"));
++
++			// Cleanup semaphores
++		#if DELIBERATE_UNIQUE_HANDLE_WRONG
++		for (auto& Fence : Ctx.InFlightFences)
++		{
++			Ctx.Device.destroyFence(Fence.get());
++		}
++		HLVM_LOG(LogTest, warn, TXT("2.1"));
++		for (auto& Semaphore : Ctx.RenderFinishedSemaphores)
++		{
++			Ctx.Device.destroySemaphore(Semaphore.get());
++		}
++		HLVM_LOG(LogTest, warn, TXT("2.2"));
++		for (auto& Semaphore : Ctx.ImageAvailableSemaphores)
++		{
++			Ctx.Device.destroySemaphore(Semaphore.get());
++		}
++		#else
++		// UniqueHandle auto destory on pointer release, no need to call device destroy
++		Ctx.InFlightFences.clear();
++		Ctx.ImageAvailableSemaphores.clear();
++		Ctx.RenderFinishedSemaphores.clear();
++		#endif
++		HLVM_LOG(LogTest, warn, TXT("2.3"));
++
++		HLVM_LOG(LogTest, warn, TXT("3"));
++
++			// Cleanup swapchain and images
++		#if DELIBERATE_UNIQUE_HANDLE_WRONG
+ 		for (auto& View : Ctx.SwapchainImageViews)
+ 		{
+ 			Ctx.Device.destroyImageView(View.get());
+ 		}
++		#else
++		HLVM_LOG(LogTest, warn, TXT("3.1"));
++		Ctx.SwapchainImageViews.clear();
++		#endif
++			// Note, we don't destroy images here because they are owned by the swapchain
++			// Just destroy the swapchain image view before destroying the swapchain
++			//		for (auto& Image : Ctx.SwapchainImages)
++			//		{
++			//			Ctx.Device.destroyImage(Image);
++			//		}
++			//		Ctx.SwapchainImages.clear();
++
++			HLVM_LOG(LogTest, warn, TXT("4"));
++
+ 		Ctx.Device.destroySwapchainKHR(Ctx.Swapchain);
++		Ctx.SwapchainImages.clear();
++
++		HLVM_LOG(LogTest, warn, TXT("5"));
+ 		Ctx.Device.destroy(nullptr);
++		HLVM_LOG(LogTest, warn, TXT("6"));
+ 		Ctx.Instance.destroy(nullptr);
+-
++		HLVM_LOG(LogTest, warn, TXT("7"));
+ 		glfwDestroyWindow(Ctx.Window);
++		HLVM_LOG(LogTest, warn, TXT("8"));
+ 		glfwTerminate();
++		HLVM_LOG(LogTest, warn, TXT("9"));
+ 
+ 		cout << "RHI Objects test completed successfully!" << endl;
+ 		return true;
+@@ -501,6 +562,6 @@ RECORD_BOOL(test_RHI_Objects_Triangle)
+ 	}
+ }
+ 
+-		#pragma clang diagnostic pop
+-	#endif // Test RHI Objects
+-#endif	   // HLVM_WINDOW_USE_VULKAN
++			#pragma clang diagnostic pop
++		#endif // Test RHI Objects
++	#endif	   // HLVM_WINDOW_USE_VULKAN

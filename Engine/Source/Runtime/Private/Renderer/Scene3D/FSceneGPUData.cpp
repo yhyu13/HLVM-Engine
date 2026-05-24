@@ -2,6 +2,7 @@
 #include "Renderer/Scene3D/Scene3DLoader.h"
 #include "Renderer/Scene3D/Scene3DNode.h"
 #include "Renderer/Mesh/StaticMesh.h"
+#include "Renderer/Mesh/MeshCache.h"
 #include "Renderer/Material/PBRMaterial.h"
 #include "Renderer/RHI/Object/Buffer.h"
 #include "Renderer/Texture/AsyncTextureLoader.h"
@@ -11,7 +12,7 @@
 
 DECLARE_LOG_CATEGORY(LogRenderer)
 
-bool FSceneGPUData::Initialize(nvrhi::IDevice* InDevice, const FPath& ScenePath)
+bool FSceneGPUData::Initialize(nvrhi::IDevice* InDevice, const FPath& ScenePath, FMeshCache* InMeshCache)
 {
     if (bIsInitialized)
     {
@@ -19,6 +20,8 @@ bool FSceneGPUData::Initialize(nvrhi::IDevice* InDevice, const FPath& ScenePath)
     }
 
     Device = InDevice;
+    MeshCache = InMeshCache;
+    CachedScenePath = ScenePath;
 
     // =====================================================================
     // Load scene
@@ -117,42 +120,73 @@ bool FSceneGPUData::Initialize(nvrhi::IDevice* InDevice, const FPath& ScenePath)
         DrawData.Mesh = Mesh;
         DrawData.IndexCount = static_cast<uint32_t>(Indices.size());
 
-        // Create vertex buffer
+        // Check mesh cache first
+        bool bCacheHit = false;
+        if (MeshCache)
         {
-            nvrhi::BufferDesc VBDesc;
-            VBDesc.byteSize = Vertices.size() * sizeof(FVertex);
-            VBDesc.isVertexBuffer = true;
-            VBDesc.isVolatile = false;
-            VBDesc.initialState = nvrhi::ResourceStates::CopyDest;
-            VBDesc.keepInitialState = true;
-            VBDesc.debugName = "MeshVertexBuffer";
-            DrawData.VertexBuffer = Device->createBuffer(VBDesc);
-
-            GeomCmdList->beginTrackingBufferState(DrawData.VertexBuffer, nvrhi::ResourceStates::CopyDest);
-            GeomCmdList->writeBuffer(DrawData.VertexBuffer, Vertices.data(), VBDesc.byteSize);
-            GeomCmdList->setPermanentBufferState(DrawData.VertexBuffer, nvrhi::ResourceStates::VertexBuffer);
+            FMeshCache::FMeshKey Key{CachedScenePath, static_cast<uint32_t>(i)};
+            if (const FMeshCache::FMeshEntry* Entry = MeshCache->Find(Key))
+            {
+                DrawData.VertexBuffer = Entry->VertexBuffer;
+                DrawData.IndexBuffer = Entry->IndexBuffer;
+                DrawData.IndexCount = Entry->IndexCount;
+                bCacheHit = true;
+                HLVM_LOG(LogRenderer, info, TXT("FSceneGPUData: Mesh[{}]: CACHE HIT ({} vertices, {} indices)"),
+                    i, Entry->VertexCount, Entry->IndexCount);
+            }
         }
 
-        // Create index buffer
+        if (!bCacheHit)
         {
-            nvrhi::BufferDesc IBDesc;
-            IBDesc.byteSize = Indices.size() * sizeof(uint32_t);
-            IBDesc.isIndexBuffer = true;
-            IBDesc.isVolatile = false;
-            IBDesc.initialState = nvrhi::ResourceStates::CopyDest;
-            IBDesc.keepInitialState = true;
-            IBDesc.debugName = "MeshIndexBuffer";
-            DrawData.IndexBuffer = Device->createBuffer(IBDesc);
+            // Create vertex buffer
+            {
+                nvrhi::BufferDesc VBDesc;
+                VBDesc.byteSize = Vertices.size() * sizeof(FVertex);
+                VBDesc.isVertexBuffer = true;
+                VBDesc.isVolatile = false;
+                VBDesc.initialState = nvrhi::ResourceStates::CopyDest;
+                VBDesc.keepInitialState = true;
+                VBDesc.debugName = "MeshVertexBuffer";
+                DrawData.VertexBuffer = Device->createBuffer(VBDesc);
 
-            GeomCmdList->beginTrackingBufferState(DrawData.IndexBuffer, nvrhi::ResourceStates::CopyDest);
-            GeomCmdList->writeBuffer(DrawData.IndexBuffer, Indices.data(), IBDesc.byteSize);
-            GeomCmdList->setPermanentBufferState(DrawData.IndexBuffer, nvrhi::ResourceStates::IndexBuffer);
+                GeomCmdList->beginTrackingBufferState(DrawData.VertexBuffer, nvrhi::ResourceStates::CopyDest);
+                GeomCmdList->writeBuffer(DrawData.VertexBuffer, Vertices.data(), VBDesc.byteSize);
+                GeomCmdList->setPermanentBufferState(DrawData.VertexBuffer, nvrhi::ResourceStates::VertexBuffer);
+            }
+
+            // Create index buffer
+            {
+                nvrhi::BufferDesc IBDesc;
+                IBDesc.byteSize = Indices.size() * sizeof(uint32_t);
+                IBDesc.isIndexBuffer = true;
+                IBDesc.isVolatile = false;
+                IBDesc.initialState = nvrhi::ResourceStates::CopyDest;
+                IBDesc.keepInitialState = true;
+                IBDesc.debugName = "MeshIndexBuffer";
+                DrawData.IndexBuffer = Device->createBuffer(IBDesc);
+
+                GeomCmdList->beginTrackingBufferState(DrawData.IndexBuffer, nvrhi::ResourceStates::CopyDest);
+                GeomCmdList->writeBuffer(DrawData.IndexBuffer, Indices.data(), IBDesc.byteSize);
+                GeomCmdList->setPermanentBufferState(DrawData.IndexBuffer, nvrhi::ResourceStates::IndexBuffer);
+            }
+
+            // Insert into cache
+            if (MeshCache)
+            {
+                FMeshCache::FMeshKey Key{CachedScenePath, static_cast<uint32_t>(i)};
+                FMeshCache::FMeshEntry Entry;
+                Entry.VertexBuffer = DrawData.VertexBuffer;
+                Entry.IndexBuffer = DrawData.IndexBuffer;
+                Entry.IndexCount = DrawData.IndexCount;
+                Entry.VertexCount = static_cast<uint32_t>(Vertices.size());
+                MeshCache->Insert(Key, Entry);
+            }
+
+            HLVM_LOG(LogRenderer, info, TXT("FSceneGPUData: Mesh[{}]: {} vertices, {} indices"),
+                i, Vertices.size(), Indices.size());
         }
 
         MeshGPUData.push_back(DrawData);
-
-        HLVM_LOG(LogRenderer, info, TXT("FSceneGPUData: Mesh[{}]: {} vertices, {} indices"),
-            i, Vertices.size(), Indices.size());
     }
 
     GeomCmdList->close();
@@ -171,9 +205,6 @@ void FSceneGPUData::Shutdown()
 
     PlaceholderTexture = nullptr;
     NormalPlaceholderTexture = nullptr;
-
-    // Clear texture cache to release NVRHI handles before device destruction
-    FTextureCache::Get().Clear();
 
     Device = nullptr;
     CachedSceneCenter = glm::vec3(0.f);

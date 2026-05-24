@@ -164,6 +164,9 @@ void FGPUProfiler::BeginPass(nvrhi::ICommandList* CmdList, const FString& Name)
     if (!Query)
     {
         HLVM_LOG(LogProfiler, warn, TXT("FGPUProfiler: Failed to acquire timer query"));
+        // Push a dummy entry so EndPass() pairs correctly
+        // and doesn't end the previous pass's query again
+        CurrentFrameQueries.push_back({nullptr, Name, false});
         return;
     }
 

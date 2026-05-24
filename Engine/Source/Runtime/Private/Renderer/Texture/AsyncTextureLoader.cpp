@@ -35,6 +35,7 @@ struct FPendingTextureLoad
 
 static TVector<FPendingTextureLoad> GPendingLoads;
 static std::mutex GPendingLoadsMutex;
+static FTextureCache* GTextureCache = nullptr;
 
 // Vulkan format values
 #ifndef VK_FORMAT_R8G8B8A8_UNORM
@@ -305,7 +306,7 @@ uint32_t FAsyncTextureLoader::LoadMaterialTexturesAsync(
                 FPath AbsolutePath = FPath::Absolute(TexturePath);
 
                 // Check texture cache first
-                nvrhi::TextureHandle CachedTexture = FTextureCache::Get().GetTexture(AbsolutePath);
+                nvrhi::TextureHandle CachedTexture = GTextureCache ? GTextureCache->GetTexture(AbsolutePath) : nullptr;
                 if (CachedTexture)
                 {
                     FTexture& OutTexture = PBRMat->GetGPUTexture(Type);
@@ -385,7 +386,7 @@ uint32_t FAsyncTextureLoader::LoadMaterialTexturesAsync(
         }
 
         nvrhi::TextureHandle Handle = TempTexture.GetTextureHandle();
-        FTextureCache::Get().Insert(Task.TexturePath, Handle);
+        if (GTextureCache) { GTextureCache->Insert(Task.TexturePath, Handle); }
         ++UniqueSuccessCount;
 
         // Share the handle with all materials that reference this path
@@ -438,7 +439,7 @@ void FAsyncTextureLoader::BeginAsyncLoad(
                 FPath AbsolutePath = FPath::Absolute(TexturePath);
 
                 // Check texture cache first
-                nvrhi::TextureHandle CachedTexture = FTextureCache::Get().GetTexture(AbsolutePath);
+                nvrhi::TextureHandle CachedTexture = GTextureCache ? GTextureCache->GetTexture(AbsolutePath) : nullptr;
                 if (CachedTexture)
                 {
                     FTexture& OutTexture = PBRMat->GetGPUTexture(Type);
@@ -574,7 +575,7 @@ uint32_t FAsyncTextureLoader::Poll(nvrhi::IDevice* Device)
         }
 
         nvrhi::TextureHandle Handle = TempTexture.GetTextureHandle();
-        FTextureCache::Get().Insert(Task.TexturePath, Handle);
+        if (GTextureCache) { GTextureCache->Insert(Task.TexturePath, Handle); }
         ++UploadCount;
 
         for (FTexture* OutTexture : Task.TargetTextures)
@@ -606,4 +607,15 @@ bool FAsyncTextureLoader::HasPendingLoads()
 {
     std::lock_guard<std::mutex> Lock(GPendingLoadsMutex);
     return !GPendingLoads.empty();
+}
+
+
+void FAsyncTextureLoader::SetTextureCache(FTextureCache* InCache)
+{
+    GTextureCache = InCache;
+}
+
+FTextureCache* FAsyncTextureLoader::GetTextureCache()
+{
+    return GTextureCache;
 }

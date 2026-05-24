@@ -8,6 +8,7 @@
 
 class FScene3DNode;
 class FStaticMesh;
+class FMeshCache;
 
 class FSceneGPUData
 {
@@ -22,7 +23,7 @@ public:
         float SceneRadius = 0.0f;
     };
 
-    bool Initialize(nvrhi::IDevice* InDevice, const FPath& ScenePath);
+    bool Initialize(nvrhi::IDevice* InDevice, const FPath& ScenePath, FMeshCache* InMeshCache = nullptr);
     void Shutdown();
 
     // Build per-frame draw items (resolves current material bindings)
@@ -58,6 +59,8 @@ private:
     nvrhi::IDevice* Device = nullptr;
     std::shared_ptr<FScene3DNode> Scene;
     TVector<FMeshGPUData> MeshGPUData;
+    FMeshCache* MeshCache = nullptr;
+    FPath CachedScenePath;
 
     nvrhi::TextureHandle PlaceholderTexture;
     nvrhi::TextureHandle NormalPlaceholderTexture;

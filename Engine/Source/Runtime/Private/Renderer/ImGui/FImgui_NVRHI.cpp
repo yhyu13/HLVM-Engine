@@ -43,7 +43,7 @@ bool FImgui_NVRHI::Initialize(nvrhi::IDevice* device, std::shared_ptr<FShaderFac
 		return false;
 	}
 
-	const FString shaderDir = FString::Format(TXT("{}/../../ThirdParty/Imgui/Shader"), *GExecutablePath);
+	const FString shaderDir = FString::Format(TXT("{}/Engine/Source/Runtime/ThirdParty/Imgui/Shader"), *GProjectRoot);
 	const FPath	  vertPath(shaderDir + TXT("/imgui_vertex_mvp.spv"), EPlatformFileType::Disk);
 	const FPath	  fragPath(shaderDir + TXT("/imgui_fragment_mvp.spv"), EPlatformFileType::Disk);
 

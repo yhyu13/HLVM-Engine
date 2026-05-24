@@ -298,7 +298,6 @@ protected:
             Profiler->DrawUI();
         }
         CVarBrowser.DrawUI();
-        FTextureCache::Get().DrawUI();
     }
 
 private:

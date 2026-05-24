@@ -108,4 +108,13 @@ public:
      * @return true if any texture loads are still pending
      */
     static bool HasPendingLoads();
+
+    /**
+     * @brief Set the active texture cache for all subsequent operations.
+     *
+     * FAsyncTextureLoader is a static utility; this sets which cache
+     * to use for deduplication. Called by FSceneResourceManager on init.
+     */
+    static void SetTextureCache(class FTextureCache* InCache);
+    static FTextureCache* GetTextureCache();
 };

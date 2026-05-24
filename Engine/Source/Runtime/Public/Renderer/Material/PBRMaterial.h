@@ -223,7 +223,7 @@ public:
 
 	//! Load GPU texture from path using KTX loader
 	//! Returns true on success
-	bool LoadTexture(ETextureType Type, nvrhi::IDevice* Device, nvrhi::ICommandList* CommandList);
+	bool LoadTexture(ETextureType Type, nvrhi::IDevice* Device, nvrhi::ICommandList* CommandList, class FTextureCache* TextureCache = nullptr);
 
 public:
 	//! Albedo/Diffuse color (RGB)

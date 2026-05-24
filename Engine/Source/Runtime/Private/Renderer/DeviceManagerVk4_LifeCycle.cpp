@@ -65,6 +65,7 @@ bool FDeviceManagerVk::CreateDeviceAndSwapChain()
 	deviceDesc.numInstanceExtensions = vecInstanceExt.size();
 	deviceDesc.deviceExtensions = vecDeviceExt.data();
 	deviceDesc.numDeviceExtensions = vecDeviceExt.size();
+	deviceDesc.maxTimerQueries = DeviceParams.MaxTimerQueries;
 
 	m_NvrhiDevice = nvrhi::vulkan::createDevice(deviceDesc);
 

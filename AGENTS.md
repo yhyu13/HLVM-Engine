@@ -119,6 +119,13 @@ boost::filesystem::current_path()  // This IS GExecutablePath
 FString::Format(TXT("{}/../../Test/{}_Data"), *GExecutablePath, *GExecutableName);
 ```
 
+### GProjectRoot
+```cpp
+// Use GProjectRoot for paths that must work regardless of CWD
+// GProjectRoot is set from compile-time HLVM_ROOT (absolute project root)
+FString::Format(TXT("{}/Engine/Source/Runtime/ThirdParty/Imgui/Shader"), *GProjectRoot);
+```
+
 ### MiMalloc2 Thread Cleanup
 ```cpp
 mi::Mallocator::thread_done();  // MUST call on thread exit
@@ -145,6 +152,13 @@ n->shared_from_this(); // CRASH!
 // CORRECT: Use shared_ptr ownership
 auto sp = std::make_shared<Node>();
 sp->shared_from_this(); // OK
+```
+
+### TMap / phmap
+```cpp
+// TMap<Key, Value, Allocator> — third param is ALLOCATOR, not hash!
+// For custom hash, use phmap::node_hash_map directly:
+phmap::node_hash_map<FMeshCache::FMeshKey, FMeshCache::FMeshEntry, FMeshCache::FMeshKeyHash> Cache;
 ```
 
 ---
@@ -212,11 +226,127 @@ ShaderMake::FindPermutationInBlob(blob, "vsMain", &outEntry, &outSize);
 
 ---
 
+### FShaderLibrary (Shader Permutations)
+
+```cpp
+#include "Renderer/Shader/ShaderLibrary.h"
+
+// Load default permutation (no macros)
+nvrhi::ShaderHandle Shader = FShaderLibrary::Get().LoadShader(
+    Device, ShaderDataDir, TXT("MyShader.sblob"), nvrhi::ShaderType::Compute);
+
+// Load with macros — permutations sorted alphabetically before lookup
+TVector<FShaderMacro> Macros;
+Macros.push_back({TXT("ENABLE_SSAO"), TXT("1")});
+Macros.push_back({TXT("ENABLE_CONTACT_SHADOWS"), TXT("0")});
+nvrhi::ShaderHandle Shader = FShaderLibrary::Get().LoadShader(
+    Device, ShaderDataDir, TXT("MyShader.sblob"), nvrhi::ShaderType::Compute, Macros);
+
+// Macro order independence: {SSAO=1,CS=0} ≡ {CS=0,SSAO=1}
+// Cache key format: "ENABLE_CONTACT_SHADOWS=0 ENABLE_SSAO=1"
+
+// Poll all cached files for modifications
+TVector<FPath> Modified = FShaderLibrary::Get().PollAllCachedFiles();
+```
+
+---
+
+### FTextureCache (GPU Texture Deduplication)
+
+**NO LONGER a singleton** — owned by `FSceneResourceManager`.
+
+```cpp
+// Automatic (preferred): FSceneResourceManager handles lifetime
+FSceneResourceManager ResourceManager;
+ResourceManager.Initialize(Device, ScenePath);
+// ... use ...
+ResourceManager.Shutdown(); // Clears texture cache automatically
+
+// Manual (tests only): create local instance
+FTextureCache Cache;
+Cache.Insert(Path, Handle);
+Cache.Clear();
+```
+
+**Key rule**: `FTextureCache` is a regular constructable class. `FAsyncTextureLoader` uses an active cache pointer set by `FSceneResourceManager::Initialize()`.
+
+---
+
+### FAsyncTextureLoader (Non-Blocking Async Textures)
+
+```cpp
+#include "Renderer/Texture/AsyncTextureLoader.h"
+
+// Begin loading (non-blocking, spawns worker threads)
+FAsyncTextureLoader::BeginAsyncLoad(Device, Materials,
+    {IMaterial::ETextureType::Albedo,
+     IMaterial::ETextureType::Normal,
+     IMaterial::ETextureType::Metallic,
+     IMaterial::ETextureType::Roughness,
+     IMaterial::ETextureType::AmbientOcclusion});
+
+// Poll once per frame — returns number of textures uploaded
+uint32_t Uploaded = FAsyncTextureLoader::Poll(Device);
+
+// Check if loads are still in flight
+if (FAsyncTextureLoader::HasPendingLoads()) { /* ... */ }
+```
+
+---
+
+### FSceneResourceManager (Unified Scene Lifetime)
+
+Replaces manual `FSceneGPUData` + `FTextureCache::Clear()` + `FAsyncTextureLoader::Poll()`.
+
+```cpp
+#include "Renderer/FSceneResourceManager.h"
+
+FSceneResourceManager ResourceManager;
+ResourceManager.Initialize(Device, ScenePath);
+
+// Each frame:
+auto DrawData = ResourceManager.BuildDrawData();
+uint32_t Uploaded = ResourceManager.PollAsyncLoads();
+
+// Cleanup (guaranteed order: scene → texture cache → device)
+ResourceManager.Shutdown();
+```
+
+**Scene bounds accessors** (no need to BuildDrawData just for camera placement):
+```cpp
+glm::vec3 Center = ResourceManager.GetSceneCenter();
+float Radius = ResourceManager.GetSceneRadius();
+```
+
+---
+
+### GPU Profiler
+
+```cpp
+FGPUProfiler Profiler;
+Profiler.Initialize(Device);
+
+// Each frame:
+Profiler.BeginFrame();
+Profiler.BeginPass(CmdList, TXT("GBuffer"));
+// ... render ...
+Profiler.EndPass(CmdList);
+Profiler.EndFrame();
+```
+
+**Timer query budget**: Default `FDeviceCreationParameters::MaxTimerQueries = 1024`. Increase if tests with many passes crash.
+
+---
+
 ## Key Files
 
 | File | Purpose |
 |------|---------|
 | `Engine/Source/Runtime/Public/Renderer/SceneGraph/FNode.h` | Scene graph transform hierarchy |
+| `Engine/Source/Runtime/Public/Renderer/FSceneResourceManager.h` | Unified scene + texture lifetime |
+| `Engine/Source/Runtime/Public/Renderer/Texture/TextureCache.h` | GPU texture deduplication cache |
+| `Engine/Source/Runtime/Public/Renderer/Texture/AsyncTextureLoader.h` | Non-blocking async texture loading |
+| `Engine/Source/Runtime/Public/Renderer/Shader/ShaderLibrary.h` | Shader blob cache with permutations |
 | `Engine/Source/Runtime/Private/Renderer/DeviceManagerVk*.cpp` | NVRHI Vulkan device |
 | `Engine/Source/Runtime/Test/TestSceneGraphNode.cpp` | 12 FNode/camera tests |
 | `Engine/Source/Runtime/Test/TestCubeOnPlane.cpp` | NVRHI rendering example |
