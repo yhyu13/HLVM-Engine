@@ -22,6 +22,7 @@
 #include "Renderer/Mesh/StaticMesh.h"
 #include "Renderer/Material/PBRMaterial.h"
 #include "Renderer/Texture/AsyncTextureLoader.h"
+#include "Renderer/Texture/TextureCache.h"
 #include "Renderer/RayTracing/BLASBuilder.h"
 #include "Renderer/RayTracing/TLASBuilder.h"
 #include "Renderer/ShaderMake/ShaderBlob.h"
@@ -711,6 +712,9 @@ public:
         HLVM_LOG(LogTest, info, TXT("FRTShadowsGBufferPass::Shutdown"));
 
         BindingCache.Clear();
+
+        // Clear texture cache to prevent VUID-vkDestroyDevice-device-05137
+        FTextureCache::Get().Clear();
 
         CommandList = nullptr;
         RTBindingLayout = nullptr;

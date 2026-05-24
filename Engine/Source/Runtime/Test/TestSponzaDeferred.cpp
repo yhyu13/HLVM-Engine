@@ -22,6 +22,7 @@
 #include "Renderer/Deferred/FDeferredFrameRenderer.h"
 #include "Renderer/Deferred/FLightData.h"
 #include "Renderer/Scene3D/FSceneGPUData.h"
+#include "Renderer/FSceneResourceManager.h"
 #include "Renderer/ImGui/FImgui_Renderer.h"
 #include "Renderer/ImGui/FCVarBrowser.h"
 #include "Renderer/Texture/TextureCache.h"
@@ -82,12 +83,12 @@ public:
 		const FPath ScenePath = FPath(FString::Format(
 			TXT("{}/Samples/Assets/Sponza/glTF/Sponza.gltf"), *GitRoot));
 
-		if (!SceneGPUData.Initialize(NvrhiDevice, ScenePath))
+		if (!ResourceManager.Initialize(NvrhiDevice, ScenePath))
 		{
-			HLVM_LOG(LogTest, err, TXT("Failed to initialize scene GPU data"));
+			HLVM_LOG(LogTest, err, TXT("Failed to initialize resource manager"));
 			return false;
 		}
-		HLVM_LOG(LogTest, info, TXT("Scene GPU data initialized successfully"));
+		HLVM_LOG(LogTest, info, TXT("Resource manager initialized successfully"));
 
 		// Initialize frame dumper - use RGBA8_UNORM to match SDRTexture format
 		HLVM_LOG(LogTest, info, TXT("Initializing FrameDumper..."));
@@ -104,10 +105,7 @@ public:
 		HLVM_LOG(LogTest, info, TXT("FSponzaDeferredPass::Shutdown"));
 
 		DeferredRenderer.Shutdown();
-		SceneGPUData.Shutdown();
-
-		// Clear texture cache to release NVRHI handles before device destruction
-		FTextureCache::Get().Clear();
+		ResourceManager.Shutdown();
 	}
 
 	virtual void Animate(float fElapsedTimeSeconds) override
@@ -130,7 +128,7 @@ public:
 		DeferredRenderer.UpdateShaderHotReload();
 
 		// Poll for completed async texture uploads
-		FAsyncTextureLoader::Poll(NvrhiDevice);
+		ResourceManager.PollAsyncLoads();
 	}
 
 	virtual void Render(nvrhi::IFramebuffer* Framebuffer) override
@@ -140,7 +138,7 @@ public:
 
 		const auto& CurrentFBInfo = Framebuffer->getFramebufferInfo();
 
-		auto DrawData = SceneGPUData.BuildDrawData();
+		auto DrawData = ResourceManager.BuildDrawData();
 
 		// =====================================================================
 		// Camera orbit around scene center - low angle for visible SSR
@@ -268,7 +266,7 @@ private:
 	nvrhi::FramebufferInfoEx FBInfo;
 	FString				   WindowTitle;
 
-	FSceneGPUData SceneGPUData;
+	FSceneResourceManager ResourceManager;
 	FDeferredFrameRenderer DeferredRenderer;
 	FRenderPassDumper FrameDumper;
 

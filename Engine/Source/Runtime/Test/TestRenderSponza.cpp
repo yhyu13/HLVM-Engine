@@ -18,6 +18,7 @@
 #include "Renderer/Mesh/StaticMesh.h"
 #include "Renderer/Material/PBRMaterial.h"
 #include "Renderer/Texture/AsyncTextureLoader.h"
+#include "Renderer/Texture/TextureCache.h"
 #include "Renderer/ShaderMake/ShaderBlob.h"
 #include "Image/FImageDump.h"
 #include "Core/Parallel/Async/WorkStealThreadPool.h"
@@ -367,6 +368,9 @@ public:
         HLVM_LOG(LogTest, info, TXT("FRenderSponzaPass::Shutdown"));
 
         BindingCache.Clear();
+
+        // Clear texture cache to prevent VUID-vkDestroyDevice-device-05137
+        FTextureCache::Get().Clear();
 
         VS = nullptr;
         PS = nullptr;

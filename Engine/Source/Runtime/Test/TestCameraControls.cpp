@@ -18,6 +18,7 @@
 #include "Renderer/Common/FCommonRenderPasses.h"
 #include "Renderer/Deferred/FDeferredFrameRenderer.h"
 #include "Renderer/Scene3D/FSceneGPUData.h"
+#include "Renderer/FSceneResourceManager.h"
 #include "Renderer/SceneGraph/PerspectiveCameraNode.h"
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
@@ -68,12 +69,12 @@ public:
         const FPath ScenePath = FPath(FString::Format(
             TXT("{}/Samples/Assets/Sponza/glTF/Sponza.gltf"), *GitRoot));
 
-        if (!SceneGPUData.Initialize(NvrhiDevice, ScenePath))
+        if (!ResourceManager.Initialize(NvrhiDevice, ScenePath))
         {
-            HLVM_LOG(LogTest, err, TXT("Failed to initialize scene GPU data"));
+            HLVM_LOG(LogTest, err, TXT("Failed to initialize resource manager"));
             return false;
         }
-        HLVM_LOG(LogTest, info, TXT("Sponza scene loaded successfully"));
+        HLVM_LOG(LogTest, info, TXT("Resource manager initialized successfully"));
 
         // Create camera
         Camera = TUniquePtr<FPerspectiveCameraNode>(new FPerspectiveCameraNode());
@@ -85,7 +86,7 @@ public:
         Camera->UpdateWorldTransform();
 
         // Start in center of Sponza, looking at the floor/walls
-        auto DrawData = SceneGPUData.BuildDrawData();
+        auto DrawData = ResourceManager.BuildDrawData();
         Camera->SetPosition(FVec3(DrawData.SceneCenter.x, 2.0f, DrawData.SceneCenter.z));
         Camera->UpdateWorldTransform();
 
@@ -95,7 +96,7 @@ public:
     void Shutdown()
     {
         DeferredRenderer.Shutdown();
-        SceneGPUData.Shutdown();
+        ResourceManager.Shutdown();
         Camera = nullptr;
         NvrhiDevice = nullptr;
     }
@@ -265,6 +266,9 @@ public:
         Camera->UpdateWorldTransform();
 
         // Update FPS counter
+        // Poll async texture uploads
+        ResourceManager.PollAsyncLoads();
+
         FrameCount++;
         FPSUpdateTimer += deltaTime;
         if (FPSUpdateTimer >= 1.0f)
@@ -288,7 +292,7 @@ public:
         if (!NvrhiDevice || !Framebuffer || !Camera)
             return;
 
-        auto DrawData = SceneGPUData.BuildDrawData();
+        auto DrawData = ResourceManager.BuildDrawData();
 
         // Build view data from camera
         FDeferredFrameRenderer::FViewData ViewData;
@@ -354,7 +358,7 @@ private:
     nvrhi::IDevice* NvrhiDevice = nullptr;
 
     // Scene & Renderer
-    FSceneGPUData SceneGPUData;
+    FSceneResourceManager ResourceManager;
     FDeferredFrameRenderer DeferredRenderer;
 
     // Camera
