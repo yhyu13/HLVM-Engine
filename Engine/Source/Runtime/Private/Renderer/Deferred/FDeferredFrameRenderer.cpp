@@ -677,327 +677,460 @@ void FDeferredFrameRenderer::Render(nvrhi::ICommandList* CmdList, const FRenderP
         Profiler.EndPass(CmdList);
     }
 
-    // Transition HDR to SRV for SSR
-    CmdList->setTextureState(HDRTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
-    // Transition SSR texture to UAV
-    CmdList->setTextureState(SSRTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
+    // =====================================================================
+    // Post-Process Render Graph
+    // =====================================================================
+    PostProcessGraph.Clear();
 
-    // =====================================================================
-    // SSR Pass
-    // =====================================================================
+    // Import external resources (produced by passes outside the graph)
+    PostProcessGraph.ImportTexture(TXT("GBufferDiffuse"),    GBufferPass.GetDiffuseTexture());
+    PostProcessGraph.ImportTexture(TXT("GBufferMaterial"),   GBufferPass.GetSpecularTexture());
+    PostProcessGraph.ImportTexture(TXT("GBufferNormals"),    GBufferPass.GetNormalsTexture());
+    PostProcessGraph.ImportTexture(TXT("GBufferEmissive"),   GBufferPass.GetEmissiveTexture());
+    PostProcessGraph.ImportTexture(TXT("GBufferDepth"),      GBufferPass.GetDepthTexture());
+    PostProcessGraph.ImportTexture(TXT("ShadowMap"),         ShadowPass.GetShadowMapTexture());
+    PostProcessGraph.ImportTexture(TXT("SSAOBlur"),          SSAOBlurTexture);
+    PostProcessGraph.ImportTexture(TXT("ContactShadow"),     ContactShadowTexture);
+    PostProcessGraph.ImportTexture(TXT("TAAHistory"),        TAAHistoryTexture);
+    PostProcessGraph.ImportTexture(TXT("HDR"),               HDRTexture);
+    PostProcessGraph.ImportTexture(TXT("SSR"),               SSRTexture);
+    PostProcessGraph.ImportTexture(TXT("Bloom"),             BloomTexture);
+    PostProcessGraph.ImportTexture(TXT("AdaptedLuminance"),  AdaptedLuminanceTexture);
+
+    // Lighting pass — always runs
+    PostProcessGraph.AddPass({
+        TXT("Lighting"),
+        {TXT("GBufferDiffuse"), TXT("GBufferMaterial"), TXT("GBufferNormals"), TXT("GBufferEmissive"),
+         TXT("GBufferDepth"), TXT("ShadowMap"), TXT("SSAOBlur"), TXT("ContactShadow")},
+        {TXT("PostProcessInput")},
+        [&](nvrhi::ICommandList* GraphCmdList)
+        {
+            Profiler.BeginPass(GraphCmdList, TXT("Lighting"));
+            glm::mat4 invViewProj = glm::inverse(Params.View->ProjMatrix * Params.View->ViewMatrix);
+
+            GraphCmdList->setTextureState(HDRTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
+
+            FDeferredLightingPass::FDesc LightingDesc;
+            LightingDesc.GBufferDiffuse = GBufferPass.GetDiffuseTexture();
+            LightingDesc.GBufferMaterial = GBufferPass.GetSpecularTexture();
+            LightingDesc.GBufferNormals = GBufferPass.GetNormalsTexture();
+            LightingDesc.GBufferEmissive = GBufferPass.GetEmissiveTexture();
+            LightingDesc.GBufferDepth = GBufferPass.GetDepthTexture();
+            LightingDesc.ShadowMap = ShadowPass.GetShadowMapTexture();
+            LightingDesc.SSAOTexture = SSAOBlurTexture;
+            LightingDesc.ContactShadowTexture = ContactShadowTexture;
+            LightingDesc.HDROutputTexture = HDRTexture;
+            LightingDesc.ShadowSampler = ShadowPass.GetShadowSampler();
+            LightingDesc.Width = CurrentWidth;
+            LightingDesc.Height = CurrentHeight;
+            LightingDesc.bEnableSSAO = CVar_r_SSAO.GetValue();
+            LightingDesc.bEnableContactShadows = CVar_r_ContactShadows.GetValue();
+
+            FDeferredLightingPass::FConstants LightingConstants;
+            memset(&LightingConstants, 0, sizeof(LightingConstants));
+            memcpy(LightingConstants.InvViewProj, glm::value_ptr(invViewProj), 64);
+            static const glm::vec3 DefaultLightDir = glm::vec3(0.577f, 0.577f, 0.577f);
+            static const float DefaultLightIntensity = 0.8f;
+            static const glm::vec3 DefaultAmbientColor = glm::vec3(0.03f, 0.03f, 0.03f);
+
+            glm::vec3 LightDir = (Params.Lights && Params.LightCount > 0)
+                ? Params.Lights[0].Direction
+                : DefaultLightDir;
+            float LightIntensity = (Params.Lights && Params.LightCount > 0)
+                ? Params.Lights[0].Intensity
+                : DefaultLightIntensity;
+            glm::vec3 AmbientColor = (Params.Lights && Params.LightCount > 0)
+                ? DefaultAmbientColor
+                : DefaultAmbientColor;
+
+            LightingConstants.LightDir[0] = LightDir.x;
+            LightingConstants.LightDir[1] = LightDir.y;
+            LightingConstants.LightDir[2] = LightDir.z;
+            LightingConstants.LightIntensity = LightIntensity;
+            LightingConstants.CameraPos[0] = Params.View->CameraPos.x;
+            LightingConstants.CameraPos[1] = Params.View->CameraPos.y;
+            LightingConstants.CameraPos[2] = Params.View->CameraPos.z;
+            LightingConstants.ShadowHardness = 16.0f;
+            LightingConstants.AmbientColor[0] = AmbientColor.x;
+            LightingConstants.AmbientColor[1] = AmbientColor.y;
+            LightingConstants.AmbientColor[2] = AmbientColor.z;
+            LightingConstants.MinAO = 0.3f;
+            LightingConstants.ScreenSize[0] = float(CurrentWidth);
+            LightingConstants.ScreenSize[1] = float(CurrentHeight);
+            memcpy(LightingConstants.LightViewProj, glm::value_ptr(Params.View->LightViewProj), 64);
+            LightingConstants.ShadowMapSize = 2048.0f;
+            LightingConstants.ShadowBias = 0.005f;
+
+            LightingPass.Dispatch(GraphCmdList, LightingDesc, LightingConstants);
+            Profiler.EndPass(GraphCmdList);
+
+            // Transition HDR to SRV for downstream passes
+            GraphCmdList->setTextureState(HDRTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+        }
+    });
+
+    // SSR pass (optional)
     if (CVar_r_SSR)
     {
-        Profiler.BeginPass(CmdList, TXT("SSR"));
-        SSr::FSSRConstants SSRConstants;
-        memset(&SSRConstants, 0, sizeof(SSRConstants));
+        PostProcessGraph.AddPass({
+            TXT("SSR"),
+            {TXT("PostProcessInput"), TXT("GBufferDepth"), TXT("GBufferNormals"), TXT("GBufferMaterial")},
+            {TXT("SSR")},
+            [&](nvrhi::ICommandList* GraphCmdList)
+            {
+                Profiler.BeginPass(GraphCmdList, TXT("SSR"));
 
-        glm::mat4 invProj = glm::inverse(jitteredProj);
-        memcpy(SSRConstants.ProjMatrix, glm::value_ptr(jitteredProj), 64);
-        memcpy(SSRConstants.InvProjMatrix, glm::value_ptr(invProj), 64);
-        memcpy(SSRConstants.ViewMatrix, glm::value_ptr(Params.View->ViewMatrix), 64);
+                GraphCmdList->setTextureState(SSRTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
 
-        SSRConstants.FullScreenSize[0] = float(CurrentWidth);
-        SSRConstants.FullScreenSize[1] = float(CurrentHeight);
-        SSRConstants.InvFullScreenSize[0] = 1.0f / float(CurrentWidth);
-        SSRConstants.InvFullScreenSize[1] = 1.0f / float(CurrentHeight);
+                SSr::FSSRConstants SSRConstants;
+                memset(&SSRConstants, 0, sizeof(SSRConstants));
 
-        uint32_t halfW = std::max(1u, CurrentWidth / 2);
-        uint32_t halfH = std::max(1u, CurrentHeight / 2);
-        SSRConstants.HalfScreenSize[0] = float(halfW);
-        SSRConstants.HalfScreenSize[1] = float(halfH);
-        SSRConstants.InvHalfScreenSize[0] = 1.0f / float(halfW);
-        SSRConstants.InvHalfScreenSize[1] = 1.0f / float(halfH);
+                glm::mat4 invProj = glm::inverse(jitteredProj);
+                memcpy(SSRConstants.ProjMatrix, glm::value_ptr(jitteredProj), 64);
+                memcpy(SSRConstants.InvProjMatrix, glm::value_ptr(invProj), 64);
+                memcpy(SSRConstants.ViewMatrix, glm::value_ptr(Params.View->ViewMatrix), 64);
 
-        SSRConstants.MaxSteps = CVar_r_SSR_MaxSteps;
-        SSRConstants.StepSize = CVar_r_SSR_StepSize;
-        SSRConstants.MaxDistance = CVar_r_SSR_MaxDistance;
-        SSRConstants.Thickness = CVar_r_SSR_Thickness;
+                SSRConstants.FullScreenSize[0] = float(CurrentWidth);
+                SSRConstants.FullScreenSize[1] = float(CurrentHeight);
+                SSRConstants.InvFullScreenSize[0] = 1.0f / float(CurrentWidth);
+                SSRConstants.InvFullScreenSize[1] = 1.0f / float(CurrentHeight);
 
-        SSr::FSSRPass::FDesc SSRDesc;
-        SSRDesc.DepthTexture = GBufferPass.GetDepthTexture();
-        SSRDesc.NormalTexture = GBufferPass.GetNormalsTexture();
-        SSRDesc.MaterialTexture = GBufferPass.GetSpecularTexture();
-        SSRDesc.HDRTexture = HDRTexture;
-        SSRDesc.OutputTexture = SSRTexture;
-        SSRDesc.OutputWidth = halfW;
-        SSRDesc.OutputHeight = halfH;
+                uint32_t halfW = std::max(1u, CurrentWidth / 2);
+                uint32_t halfH = std::max(1u, CurrentHeight / 2);
+                SSRConstants.HalfScreenSize[0] = float(halfW);
+                SSRConstants.HalfScreenSize[1] = float(halfH);
+                SSRConstants.InvHalfScreenSize[0] = 1.0f / float(halfW);
+                SSRConstants.InvHalfScreenSize[1] = 1.0f / float(halfH);
 
-        SSRPass.Dispatch(CmdList, SSRDesc, SSRConstants);
-        Profiler.EndPass(CmdList);
+                SSRConstants.MaxSteps = CVar_r_SSR_MaxSteps;
+                SSRConstants.StepSize = CVar_r_SSR_StepSize;
+                SSRConstants.MaxDistance = CVar_r_SSR_MaxDistance;
+                SSRConstants.Thickness = CVar_r_SSR_Thickness;
+
+                SSr::FSSRPass::FDesc SSRDesc;
+                SSRDesc.DepthTexture = GBufferPass.GetDepthTexture();
+                SSRDesc.NormalTexture = GBufferPass.GetNormalsTexture();
+                SSRDesc.MaterialTexture = GBufferPass.GetSpecularTexture();
+                SSRDesc.HDRTexture = HDRTexture;
+                SSRDesc.OutputTexture = SSRTexture;
+                SSRDesc.OutputWidth = halfW;
+                SSRDesc.OutputHeight = halfH;
+
+                SSRPass.Dispatch(GraphCmdList, SSRDesc, SSRConstants);
+                Profiler.EndPass(GraphCmdList);
+
+                GraphCmdList->setTextureState(SSRTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+            }
+        });
     }
 
-    // Transition SSR to SRV for tone mapping
-    CmdList->setTextureState(SSRTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
-
-    // =====================================================================
-    // TAA Pass
-    // =====================================================================
+    // Track the current input texture for tone mapping through the chain
     nvrhi::TextureHandle ToneMapInputTexture = HDRTexture;
+
+    // TAA pass (optional)
     if (CVar_r_TAA && bTAAInitialized)
     {
-        Profiler.BeginPass(CmdList, TXT("TAA"));
-        // Initialize history on first frame by copying current HDR to history
-        bool bIsFirstFrame = bTAANeedsHistoryInit;
-        if (bTAANeedsHistoryInit)
-        {
-            CmdList->setTextureState(HDRTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::CopySource);
-            CmdList->setTextureState(TAAHistoryTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::CopyDest);
-            CmdList->copyTexture(TAAHistoryTexture.Get(), nvrhi::TextureSlice(), HDRTexture.Get(), nvrhi::TextureSlice());
-            bTAANeedsHistoryInit = false;
-        }
+        PostProcessGraph.AddPass({
+            TXT("TAA"),
+            {TXT("PostProcessInput"), TXT("GBufferDepth"), TXT("TAAHistory")},
+            {TXT("PostProcessInput")},
+            [&](nvrhi::ICommandList* GraphCmdList)
+            {
+                Profiler.BeginPass(GraphCmdList, TXT("TAA"));
+                bool bIsFirstFrame = bTAANeedsHistoryInit;
+                if (bTAANeedsHistoryInit)
+                {
+                    GraphCmdList->setTextureState(HDRTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::CopySource);
+                    GraphCmdList->setTextureState(TAAHistoryTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::CopyDest);
+                    GraphCmdList->copyTexture(TAAHistoryTexture.Get(), nvrhi::TextureSlice(), HDRTexture.Get(), nvrhi::TextureSlice());
+                    bTAANeedsHistoryInit = false;
+                }
 
-        // Ensure resources are in correct states
-        CmdList->setTextureState(HDRTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
-        CmdList->setTextureState(TAAHistoryTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
-        CmdList->setTextureState(GBufferPass.GetDepthTexture(), nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
-        CmdList->setTextureState(TAAOutputTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
+                GraphCmdList->setTextureState(HDRTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+                GraphCmdList->setTextureState(TAAHistoryTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+                GraphCmdList->setTextureState(GBufferPass.GetDepthTexture(), nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+                GraphCmdList->setTextureState(TAAOutputTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
 
-        TAA::FTAAConstants TAAConstants;
-        memset(&TAAConstants, 0, sizeof(TAAConstants));
+                TAA::FTAAConstants TAAConstants;
+                memset(&TAAConstants, 0, sizeof(TAAConstants));
 
-        glm::mat4 currViewProj = jitteredProj * Params.View->ViewMatrix;
-        glm::mat4 invCurrViewProj = glm::inverse(currViewProj);
-        glm::mat4 prevViewProj = Params.View->PrevProjMatrix * Params.View->PrevViewMatrix;
+                glm::mat4 currViewProj = jitteredProj * Params.View->ViewMatrix;
+                glm::mat4 invCurrViewProj = glm::inverse(currViewProj);
+                glm::mat4 prevViewProj = Params.View->PrevProjMatrix * Params.View->PrevViewMatrix;
 
-        memcpy(TAAConstants.InverseCurrViewProj, glm::value_ptr(invCurrViewProj), 64);
-        memcpy(TAAConstants.PrevViewProj, glm::value_ptr(prevViewProj), 64);
-        TAAConstants.OutputSize[0] = float(CurrentWidth);
-        TAAConstants.OutputSize[1] = float(CurrentHeight);
-        TAAConstants.RcpOutputSize[0] = 1.0f / float(CurrentWidth);
-        TAAConstants.RcpOutputSize[1] = 1.0f / float(CurrentHeight);
-        TAAConstants.BlendFactor = bIsFirstFrame ? 1.0f : CVar_r_TAA_BlendFactor;
-        TAAConstants.DepthThreshold = CVar_r_TAA_DepthThreshold;
+                memcpy(TAAConstants.InverseCurrViewProj, glm::value_ptr(invCurrViewProj), 64);
+                memcpy(TAAConstants.PrevViewProj, glm::value_ptr(prevViewProj), 64);
+                TAAConstants.OutputSize[0] = float(CurrentWidth);
+                TAAConstants.OutputSize[1] = float(CurrentHeight);
+                TAAConstants.RcpOutputSize[0] = 1.0f / float(CurrentWidth);
+                TAAConstants.RcpOutputSize[1] = 1.0f / float(CurrentHeight);
+                TAAConstants.BlendFactor = bIsFirstFrame ? 1.0f : CVar_r_TAA_BlendFactor;
+                TAAConstants.DepthThreshold = CVar_r_TAA_DepthThreshold;
 
-        TAA::FTAAPass::FDesc TAADesc;
-        TAADesc.CurrentFrameTexture = HDRTexture;
-        TAADesc.HistoryFrameTexture = TAAHistoryTexture;
-        TAADesc.DepthTexture = GBufferPass.GetDepthTexture();
-        TAADesc.OutputTexture = TAAOutputTexture;
-        TAADesc.OutputWidth = CurrentWidth;
-        TAADesc.OutputHeight = CurrentHeight;
+                TAA::FTAAPass::FDesc TAADesc;
+                TAADesc.CurrentFrameTexture = HDRTexture;
+                TAADesc.HistoryFrameTexture = TAAHistoryTexture;
+                TAADesc.DepthTexture = GBufferPass.GetDepthTexture();
+                TAADesc.OutputTexture = TAAOutputTexture;
+                TAADesc.OutputWidth = CurrentWidth;
+                TAADesc.OutputHeight = CurrentHeight;
 
-        TAAPass.Dispatch(CmdList, TAADesc, TAAConstants);
+                TAAPass.Dispatch(GraphCmdList, TAADesc, TAAConstants);
 
-        // Transition TAA output to SRV for motion blur / bloom
-        CmdList->setTextureState(TAAOutputTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+                GraphCmdList->setTextureState(TAAOutputTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
 
-        ToneMapInputTexture = TAAOutputTexture;
-        Profiler.EndPass(CmdList);
+                ToneMapInputTexture = TAAOutputTexture;
+                Profiler.EndPass(GraphCmdList);
 
-        // =====================================================================
-        // TAA History Copy — must happen BEFORE motion blur so history
-        // matches TAA output for correct temporal reprojection next frame.
-        // =====================================================================
-        CmdList->setTextureState(TAAOutputTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::CopySource);
-        CmdList->setTextureState(TAAHistoryTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::CopyDest);
-        CmdList->copyTexture(TAAHistoryTexture.Get(), nvrhi::TextureSlice(), TAAOutputTexture.Get(), nvrhi::TextureSlice());
+                GraphCmdList->setTextureState(TAAOutputTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::CopySource);
+                GraphCmdList->setTextureState(TAAHistoryTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::CopyDest);
+                GraphCmdList->copyTexture(TAAHistoryTexture.Get(), nvrhi::TextureSlice(), TAAOutputTexture.Get(), nvrhi::TextureSlice());
+            }
+        });
     }
 
-    // =====================================================================
-    // Motion Blur Pass
-    // =====================================================================
+    // Motion Blur pass (optional)
     if (CVar_r_MotionBlur && bMotionBlurInitialized)
     {
-        Profiler.BeginPass(CmdList, TXT("MotionBlur"));
-        nvrhi::TextureHandle MotionBlurInput = ToneMapInputTexture;
+        PostProcessGraph.AddPass({
+            TXT("MotionBlur"),
+            {TXT("PostProcessInput"), TXT("GBufferDepth")},
+            {TXT("PostProcessInput")},
+            [&](nvrhi::ICommandList* GraphCmdList)
+            {
+                Profiler.BeginPass(GraphCmdList, TXT("MotionBlur"));
+                nvrhi::TextureHandle MotionBlurInput = ToneMapInputTexture;
 
-        CmdList->setTextureState(MotionBlurInput, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
-        CmdList->setTextureState(GBufferPass.GetDepthTexture(), nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
-        CmdList->setTextureState(MotionBlurTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
+                GraphCmdList->setTextureState(MotionBlurInput, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+                GraphCmdList->setTextureState(GBufferPass.GetDepthTexture(), nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+                GraphCmdList->setTextureState(MotionBlurTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
 
-        MotionBlur::FMotionBlurConstants MBConstants;
-        memset(&MBConstants, 0, sizeof(MBConstants));
+                MotionBlur::FMotionBlurConstants MBConstants;
+                memset(&MBConstants, 0, sizeof(MBConstants));
 
-        glm::mat4 currViewProj = jitteredProj * Params.View->ViewMatrix;
-        glm::mat4 invCurrViewProj = glm::inverse(currViewProj);
-        glm::mat4 prevViewProj = Params.View->PrevProjMatrix * Params.View->PrevViewMatrix;
+                glm::mat4 currViewProj = jitteredProj * Params.View->ViewMatrix;
+                glm::mat4 invCurrViewProj = glm::inverse(currViewProj);
+                glm::mat4 prevViewProj = Params.View->PrevProjMatrix * Params.View->PrevViewMatrix;
 
-        memcpy(MBConstants.InverseCurrViewProj, glm::value_ptr(invCurrViewProj), 64);
-        memcpy(MBConstants.PrevViewProj, glm::value_ptr(prevViewProj), 64);
-        MBConstants.OutputSize[0] = float(CurrentWidth);
-        MBConstants.OutputSize[1] = float(CurrentHeight);
-        MBConstants.RcpOutputSize[0] = 1.0f / float(CurrentWidth);
-        MBConstants.RcpOutputSize[1] = 1.0f / float(CurrentHeight);
-        MBConstants.VelocityScale = CVar_r_MotionBlur_VelocityScale;
-        MBConstants.MinVelocity = CVar_r_MotionBlur_MinVelocity;
+                memcpy(MBConstants.InverseCurrViewProj, glm::value_ptr(invCurrViewProj), 64);
+                memcpy(MBConstants.PrevViewProj, glm::value_ptr(prevViewProj), 64);
+                MBConstants.OutputSize[0] = float(CurrentWidth);
+                MBConstants.OutputSize[1] = float(CurrentHeight);
+                MBConstants.RcpOutputSize[0] = 1.0f / float(CurrentWidth);
+                MBConstants.RcpOutputSize[1] = 1.0f / float(CurrentHeight);
+                MBConstants.VelocityScale = CVar_r_MotionBlur_VelocityScale;
+                MBConstants.MinVelocity = CVar_r_MotionBlur_MinVelocity;
 
-        MotionBlur::FMotionBlurPass::FDesc MBDesc;
-        MBDesc.ColorTexture = MotionBlurInput;
-        MBDesc.DepthTexture = GBufferPass.GetDepthTexture();
-        MBDesc.OutputTexture = MotionBlurTexture;
-        MBDesc.OutputWidth = CurrentWidth;
-        MBDesc.OutputHeight = CurrentHeight;
+                MotionBlur::FMotionBlurPass::FDesc MBDesc;
+                MBDesc.ColorTexture = MotionBlurInput;
+                MBDesc.DepthTexture = GBufferPass.GetDepthTexture();
+                MBDesc.OutputTexture = MotionBlurTexture;
+                MBDesc.OutputWidth = CurrentWidth;
+                MBDesc.OutputHeight = CurrentHeight;
 
-        MotionBlurPass.Dispatch(CmdList, MBDesc, MBConstants);
+                MotionBlurPass.Dispatch(GraphCmdList, MBDesc, MBConstants);
 
-        // Transition motion blur output to SRV for DOF / bloom
-        CmdList->setTextureState(MotionBlurTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+                GraphCmdList->setTextureState(MotionBlurTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
 
-        ToneMapInputTexture = MotionBlurTexture;
-        Profiler.EndPass(CmdList);
+                ToneMapInputTexture = MotionBlurTexture;
+                Profiler.EndPass(GraphCmdList);
+            }
+        });
     }
 
-    // =====================================================================
-    // DOF Pass
-    // =====================================================================
+    // DOF pass (optional)
     if (CVar_r_DOF && bDOFInitialized)
     {
-        Profiler.BeginPass(CmdList, TXT("DOF"));
-        nvrhi::TextureHandle DOFInput = ToneMapInputTexture;
+        PostProcessGraph.AddPass({
+            TXT("DOF"),
+            {TXT("PostProcessInput"), TXT("GBufferDepth")},
+            {TXT("PostProcessInput")},
+            [&](nvrhi::ICommandList* GraphCmdList)
+            {
+                Profiler.BeginPass(GraphCmdList, TXT("DOF"));
+                nvrhi::TextureHandle DOFInput = ToneMapInputTexture;
 
-        CmdList->setTextureState(DOFInput, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
-        CmdList->setTextureState(GBufferPass.GetDepthTexture(), nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
-        CmdList->setTextureState(DOFTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
+                GraphCmdList->setTextureState(DOFInput, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+                GraphCmdList->setTextureState(GBufferPass.GetDepthTexture(), nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+                GraphCmdList->setTextureState(DOFTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
 
-        DOF::FDOFConstants DOFConstants;
-        memset(&DOFConstants, 0, sizeof(DOFConstants));
-        DOFConstants.FocalDepth = CVar_r_DOF_FocalDepth;
-        DOFConstants.Aperture = CVar_r_DOF_Aperture;
-        DOFConstants.DepthScale = CVar_r_DOF_DepthScale;
-        DOFConstants.MaxBlurRadius = CVar_r_DOF_MaxBlurRadius;
-        DOFConstants.OutputSize[0] = float(CurrentWidth);
-        DOFConstants.OutputSize[1] = float(CurrentHeight);
-        DOFConstants.RcpOutputSize[0] = 1.0f / float(CurrentWidth);
-        DOFConstants.RcpOutputSize[1] = 1.0f / float(CurrentHeight);
+                DOF::FDOFConstants DOFConstants;
+                memset(&DOFConstants, 0, sizeof(DOFConstants));
+                DOFConstants.FocalDepth = CVar_r_DOF_FocalDepth;
+                DOFConstants.Aperture = CVar_r_DOF_Aperture;
+                DOFConstants.DepthScale = CVar_r_DOF_DepthScale;
+                DOFConstants.MaxBlurRadius = CVar_r_DOF_MaxBlurRadius;
+                DOFConstants.OutputSize[0] = float(CurrentWidth);
+                DOFConstants.OutputSize[1] = float(CurrentHeight);
+                DOFConstants.RcpOutputSize[0] = 1.0f / float(CurrentWidth);
+                DOFConstants.RcpOutputSize[1] = 1.0f / float(CurrentHeight);
 
-        DOF::FDOFPass::FDesc DOFDesc;
-        DOFDesc.ColorTexture = DOFInput;
-        DOFDesc.DepthTexture = GBufferPass.GetDepthTexture();
-        DOFDesc.OutputTexture = DOFTexture;
-        DOFDesc.OutputWidth = CurrentWidth;
-        DOFDesc.OutputHeight = CurrentHeight;
+                DOF::FDOFPass::FDesc DOFDesc;
+                DOFDesc.ColorTexture = DOFInput;
+                DOFDesc.DepthTexture = GBufferPass.GetDepthTexture();
+                DOFDesc.OutputTexture = DOFTexture;
+                DOFDesc.OutputWidth = CurrentWidth;
+                DOFDesc.OutputHeight = CurrentHeight;
 
-        DOFPass.Dispatch(CmdList, DOFDesc, DOFConstants);
+                DOFPass.Dispatch(GraphCmdList, DOFDesc, DOFConstants);
 
-        // Transition DOF output to SRV for bloom/tone mapping
-        CmdList->setTextureState(DOFTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+                GraphCmdList->setTextureState(DOFTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
 
-        ToneMapInputTexture = DOFTexture;
-        Profiler.EndPass(CmdList);
+                ToneMapInputTexture = DOFTexture;
+                Profiler.EndPass(GraphCmdList);
+            }
+        });
     }
 
-    // =====================================================================
-    // Bloom Pass
-    // =====================================================================
+    // Bloom pass (optional)
     if (CVar_r_Bloom)
     {
-        Profiler.BeginPass(CmdList, TXT("Bloom"));
-        FBloomPass::FDesc BloomDesc;
-        BloomDesc.HDRTexture = ToneMapInputTexture;
-        BloomDesc.OutputTexture = BloomTexture;
-        BloomDesc.HalfResTexture = BloomHalfResTexture;
-        BloomDesc.BlurTempTexture = BloomBlurTempTexture;
-        BloomDesc.LinearSampler = GBufferPass.GetLinearSampler();
-        BloomDesc.FullResWidth = CurrentWidth;
-        BloomDesc.FullResHeight = CurrentHeight;
-        BloomDesc.Threshold = 0.8f;
-        BloomDesc.Intensity = 0.4f;
-        BloomDesc.Sigma = 2.0f;
-        BloomDesc.BlurIterations = 2;
+        PostProcessGraph.AddPass({
+            TXT("Bloom"),
+            {TXT("PostProcessInput")},
+            {TXT("Bloom")},
+            [&](nvrhi::ICommandList* GraphCmdList)
+            {
+                Profiler.BeginPass(GraphCmdList, TXT("Bloom"));
+                FBloomPass::FDesc BloomDesc;
+                BloomDesc.HDRTexture = ToneMapInputTexture;
+                BloomDesc.OutputTexture = BloomTexture;
+                BloomDesc.HalfResTexture = BloomHalfResTexture;
+                BloomDesc.BlurTempTexture = BloomBlurTempTexture;
+                BloomDesc.LinearSampler = GBufferPass.GetLinearSampler();
+                BloomDesc.FullResWidth = CurrentWidth;
+                BloomDesc.FullResHeight = CurrentHeight;
+                BloomDesc.Threshold = 0.8f;
+                BloomDesc.Intensity = 0.4f;
+                BloomDesc.Sigma = 2.0f;
+                BloomDesc.BlurIterations = 2;
 
-        CmdList->setTextureState(ToneMapInputTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
-        CmdList->setTextureState(BloomTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
+                GraphCmdList->setTextureState(ToneMapInputTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+                GraphCmdList->setTextureState(BloomTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
 
-        BloomPass.Dispatch(CmdList, BloomDesc);
+                BloomPass.Dispatch(GraphCmdList, BloomDesc);
 
-        CmdList->setTextureState(BloomTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
-        Profiler.EndPass(CmdList);
+                GraphCmdList->setTextureState(BloomTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+                Profiler.EndPass(GraphCmdList);
+            }
+        });
     }
 
-    // =====================================================================
-    // Exposure Adaptation Pass
-    // =====================================================================
+    // Exposure Adaptation pass (optional)
     if (CVar_r_ExposureAdaptation && bExposureAdaptationInitialized)
     {
-        Profiler.BeginPass(CmdList, TXT("Exposure"));
-        CmdList->setTextureState(ToneMapInputTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
-        CmdList->setTextureState(AdaptedLuminanceTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
+        PostProcessGraph.AddPass({
+            TXT("ExposureAdaptation"),
+            {TXT("PostProcessInput")},
+            {TXT("AdaptedLuminance")},
+            [&](nvrhi::ICommandList* GraphCmdList)
+            {
+                Profiler.BeginPass(GraphCmdList, TXT("Exposure"));
+                GraphCmdList->setTextureState(ToneMapInputTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+                GraphCmdList->setTextureState(AdaptedLuminanceTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
 
-        Exposure::FExposureConstants ExposureConstants;
-        memset(&ExposureConstants, 0, sizeof(ExposureConstants));
-        ExposureConstants.AdaptationSpeed = CVar_r_Exposure_AdaptationSpeed;
-        ExposureConstants.KeyValue = CVar_r_Exposure_KeyValue;
+                Exposure::FExposureConstants ExposureConstants;
+                memset(&ExposureConstants, 0, sizeof(ExposureConstants));
+                ExposureConstants.AdaptationSpeed = CVar_r_Exposure_AdaptationSpeed;
+                ExposureConstants.KeyValue = CVar_r_Exposure_KeyValue;
 
-        Exposure::FExposureAdaptationPass::FDesc ExposureDesc;
-        ExposureDesc.SceneColorTexture = ToneMapInputTexture;
-        ExposureDesc.AdaptedLuminanceTexture = AdaptedLuminanceTexture;
+                Exposure::FExposureAdaptationPass::FDesc ExposureDesc;
+                ExposureDesc.SceneColorTexture = ToneMapInputTexture;
+                ExposureDesc.AdaptedLuminanceTexture = AdaptedLuminanceTexture;
 
-        ExposurePass.Dispatch(CmdList, ExposureDesc, ExposureConstants);
+                ExposurePass.Dispatch(GraphCmdList, ExposureDesc, ExposureConstants);
 
-        // Transition adapted luminance to SRV for tone mapping
-        CmdList->setTextureState(AdaptedLuminanceTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
-        Profiler.EndPass(CmdList);
+                GraphCmdList->setTextureState(AdaptedLuminanceTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+                Profiler.EndPass(GraphCmdList);
+            }
+        });
     }
 
-    // =====================================================================
-    // Tone Mapping Pass
-    // =====================================================================
-    {
-        Profiler.BeginPass(CmdList, TXT("ToneMap"));
-        CmdList->setTextureState(ToneMapInputTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
-        CmdList->setTextureState(BloomTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
-        CmdList->setTextureState(SDRTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
+    // Tone Mapping pass — always runs
+    PostProcessGraph.AddPass({
+        TXT("ToneMap"),
+        {TXT("PostProcessInput"), TXT("SSR"), TXT("Bloom"), TXT("AdaptedLuminance")},
+        {TXT("SDR")},
+        [&](nvrhi::ICommandList* GraphCmdList)
+        {
+            Profiler.BeginPass(GraphCmdList, TXT("ToneMap"));
+            GraphCmdList->setTextureState(ToneMapInputTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+            GraphCmdList->setTextureState(BloomTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+            GraphCmdList->setTextureState(SDRTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
 
-        FToneMappingPass::FDesc ToneMapDesc;
-        ToneMapDesc.HDRInputTexture = ToneMapInputTexture;
-        ToneMapDesc.BloomTexture = BloomTexture;
-        ToneMapDesc.SSRTexture = SSRTexture;
-        ToneMapDesc.SDROutputTexture = SDRTexture;
-        ToneMapDesc.AdaptedLuminanceTexture = AdaptedLuminanceTexture;
-        ToneMapDesc.Width = CurrentWidth;
-        ToneMapDesc.Height = CurrentHeight;
+            FToneMappingPass::FDesc ToneMapDesc;
+            ToneMapDesc.HDRInputTexture = ToneMapInputTexture;
+            ToneMapDesc.BloomTexture = BloomTexture;
+            ToneMapDesc.SSRTexture = SSRTexture;
+            ToneMapDesc.SDROutputTexture = SDRTexture;
+            ToneMapDesc.AdaptedLuminanceTexture = AdaptedLuminanceTexture;
+            ToneMapDesc.Width = CurrentWidth;
+            ToneMapDesc.Height = CurrentHeight;
 
-        FToneMappingPass::FConstants ToneMapConstants;
-        memset(&ToneMapConstants, 0, sizeof(ToneMapConstants));
-        ToneMapConstants.Exposure = 1.0f;
-        ToneMapConstants.Gamma = 2.2f;
-        ToneMapConstants.TonemapMode = 0; // ACES
-        ToneMapConstants.BloomIntensity = 0.4f;
-        ToneMapConstants.TextureSize[0] = float(CurrentWidth);
-        ToneMapConstants.TextureSize[1] = float(CurrentHeight);
-        ToneMapConstants.KeyValue = CVar_r_Exposure_KeyValue;
-        ToneMapConstants.UseExposureAdaptation = CVar_r_ExposureAdaptation ? 1 : 0;
+            FToneMappingPass::FConstants ToneMapConstants;
+            memset(&ToneMapConstants, 0, sizeof(ToneMapConstants));
+            ToneMapConstants.Exposure = 1.0f;
+            ToneMapConstants.Gamma = 2.2f;
+            ToneMapConstants.TonemapMode = 0; // ACES
+            ToneMapConstants.BloomIntensity = 0.4f;
+            ToneMapConstants.TextureSize[0] = float(CurrentWidth);
+            ToneMapConstants.TextureSize[1] = float(CurrentHeight);
+            ToneMapConstants.KeyValue = CVar_r_Exposure_KeyValue;
+            ToneMapConstants.UseExposureAdaptation = CVar_r_ExposureAdaptation ? 1 : 0;
 
-        ToneMapPass.Dispatch(CmdList, ToneMapDesc, ToneMapConstants);
-        Profiler.EndPass(CmdList);
-    }
+            ToneMapPass.Dispatch(GraphCmdList, ToneMapDesc, ToneMapConstants);
+            Profiler.EndPass(GraphCmdList);
+        }
+    });
 
-    // =====================================================================
-    // Lens Effects Pass
-    // =====================================================================
+    // Lens Effects pass (optional)
     nvrhi::TextureHandle BlitSourceTexture = SDRTexture;
     if (CVar_r_LensEffects && bLensEffectsInitialized)
     {
-        Profiler.BeginPass(CmdList, TXT("LensEffects"));
-        // Transition SDR to SRV for lens effects read
-        CmdList->setTextureState(SDRTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
-        CmdList->setTextureState(LensEffectsTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
+        PostProcessGraph.AddPass({
+            TXT("LensEffects"),
+            {TXT("SDR")},
+            {TXT("LensEffectsOutput")},
+            [&](nvrhi::ICommandList* GraphCmdList)
+            {
+                Profiler.BeginPass(GraphCmdList, TXT("LensEffects"));
+                GraphCmdList->setTextureState(SDRTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+                GraphCmdList->setTextureState(LensEffectsTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
 
-        LensEffects::FLensEffectsConstants LEConstants;
-        memset(&LEConstants, 0, sizeof(LEConstants));
-        LEConstants.ChromaticAmount = CVar_r_CA_Amount;
-        LEConstants.VignetteIntensity = CVar_r_Vignette_Intensity;
-        LEConstants.GrainIntensity = CVar_r_Grain_Intensity;
-        LEConstants.FrameIndex = static_cast<TINT32>(FrameIndex);
-        LEConstants.OutputSize[0] = float(CurrentWidth);
-        LEConstants.OutputSize[1] = float(CurrentHeight);
-        LEConstants.RcpOutputSize[0] = 1.0f / float(CurrentWidth);
-        LEConstants.RcpOutputSize[1] = 1.0f / float(CurrentHeight);
+                LensEffects::FLensEffectsConstants LEConstants;
+                memset(&LEConstants, 0, sizeof(LEConstants));
+                LEConstants.ChromaticAmount = CVar_r_CA_Amount;
+                LEConstants.VignetteIntensity = CVar_r_Vignette_Intensity;
+                LEConstants.GrainIntensity = CVar_r_Grain_Intensity;
+                LEConstants.FrameIndex = static_cast<TINT32>(FrameIndex);
+                LEConstants.OutputSize[0] = float(CurrentWidth);
+                LEConstants.OutputSize[1] = float(CurrentHeight);
+                LEConstants.RcpOutputSize[0] = 1.0f / float(CurrentWidth);
+                LEConstants.RcpOutputSize[1] = 1.0f / float(CurrentHeight);
 
-        LensEffects::FLensEffectsPass::FDesc LEDesc;
-        LEDesc.SDRTexture = SDRTexture;
-        LEDesc.OutputTexture = LensEffectsTexture;
-        LEDesc.OutputWidth = CurrentWidth;
-        LEDesc.OutputHeight = CurrentHeight;
+                LensEffects::FLensEffectsPass::FDesc LEDesc;
+                LEDesc.SDRTexture = SDRTexture;
+                LEDesc.OutputTexture = LensEffectsTexture;
+                LEDesc.OutputWidth = CurrentWidth;
+                LEDesc.OutputHeight = CurrentHeight;
 
-        LensEffectsPass.Dispatch(CmdList, LEDesc, LEConstants);
+                LensEffectsPass.Dispatch(GraphCmdList, LEDesc, LEConstants);
 
-        // Transition lens effects output to SRV for blit
-        CmdList->setTextureState(LensEffectsTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+                GraphCmdList->setTextureState(LensEffectsTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
 
-        BlitSourceTexture = LensEffectsTexture;
-        Profiler.EndPass(CmdList);
+                BlitSourceTexture = LensEffectsTexture;
+                Profiler.EndPass(GraphCmdList);
+            }
+        });
     }
+
+    // Compile and execute the post-process graph
+    if (!PostProcessGraph.Compile())
+    {
+        HLVM_LOG(LogRenderer, err, TXT("FDeferredFrameRenderer: Post-process graph compilation failed"));
+        return;
+    }
+    PostProcessGraph.Execute(CmdList);
 
     // =====================================================================
     // Frame Dump (optional)

@@ -113,8 +113,7 @@ glm::vec3 FSceneResourceManager::GetSceneCenter() const
 {
     if (SceneGPUData)
     {
-        auto DrawData = SceneGPUData->BuildDrawData();
-        return DrawData.SceneCenter;
+        return SceneGPUData->GetSceneCenter();
     }
     return glm::vec3(0.f);
 }
@@ -123,8 +122,7 @@ glm::vec3 FSceneResourceManager::GetSceneBBoxMin() const
 {
     if (SceneGPUData)
     {
-        auto DrawData = SceneGPUData->BuildDrawData();
-        return DrawData.BBoxMin;
+        return SceneGPUData->GetSceneBBoxMin();
     }
     return glm::vec3(0.f);
 }
@@ -133,8 +131,7 @@ glm::vec3 FSceneResourceManager::GetSceneBBoxMax() const
 {
     if (SceneGPUData)
     {
-        auto DrawData = SceneGPUData->BuildDrawData();
-        return DrawData.BBoxMax;
+        return SceneGPUData->GetSceneBBoxMax();
     }
     return glm::vec3(0.f);
 }
@@ -143,8 +140,7 @@ float FSceneResourceManager::GetSceneRadius() const
 {
     if (SceneGPUData)
     {
-        auto DrawData = SceneGPUData->BuildDrawData();
-        return DrawData.SceneRadius;
+        return SceneGPUData->GetSceneRadius();
     }
     return 0.f;
 }

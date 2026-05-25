@@ -19,6 +19,7 @@
 #include "Renderer/Shadow/FShadowMapPass.h"
 #include "Renderer/Utility/FGPUProfiler.h"
 #include "Renderer/Shader/ShaderHotReloader.h"
+#include "Renderer/RenderGraph/FRenderGraph.h"
 #include <nvrhi/nvrhi.h>
 #include <glm/glm.hpp>
 
@@ -141,6 +142,7 @@ private:
     uint32_t CurrentWidth = 0;
     uint32_t CurrentHeight = 0;
     FBindingCache BindingCache;
+    FRenderGraph PostProcessGraph;
     bool bIsInitialized = false;
     bool bTAAInitialized = false;
     bool bMotionBlurInitialized = false;

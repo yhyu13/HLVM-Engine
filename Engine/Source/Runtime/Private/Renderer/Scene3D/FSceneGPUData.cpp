@@ -10,7 +10,11 @@
 #include "Core/Parallel/Async/WorkStealThreadPool.h"
 #include "Core/Log.h"
 
+#include <chrono>
+
 DECLARE_LOG_CATEGORY(LogRenderer)
+
+using FHighResClock = std::chrono::high_resolution_clock;
 
 bool FSceneGPUData::Initialize(nvrhi::IDevice* InDevice, const FPath& ScenePath, FMeshCache* InMeshCache)
 {
@@ -19,6 +23,8 @@ bool FSceneGPUData::Initialize(nvrhi::IDevice* InDevice, const FPath& ScenePath,
         Shutdown();
     }
 
+    const auto InitStartTime = FHighResClock::now();
+
     Device = InDevice;
     MeshCache = InMeshCache;
     CachedScenePath = ScenePath;
@@ -26,6 +32,7 @@ bool FSceneGPUData::Initialize(nvrhi::IDevice* InDevice, const FPath& ScenePath,
     // =====================================================================
     // Load scene
     // =====================================================================
+    const auto SceneLoadStart = FHighResClock::now();
     HLVM_LOG(LogRenderer, info, TXT("FSceneGPUData: Loading scene from {}"), *ScenePath);
     Scene = FScene3DLoader::LoadFromFile(ScenePath);
     if (!Scene || Scene->IsEmpty())
@@ -33,15 +40,18 @@ bool FSceneGPUData::Initialize(nvrhi::IDevice* InDevice, const FPath& ScenePath,
         HLVM_LOG(LogRenderer, err, TXT("FSceneGPUData: Failed to load scene"));
         return false;
     }
+    const auto SceneLoadEnd = FHighResClock::now();
+    const float SceneLoadMs = std::chrono::duration<float, std::milli>(SceneLoadEnd - SceneLoadStart).count();
 
     auto StaticMeshes = Scene->GetAllStaticMesh();
     auto Materials = Scene->GetAllMaterial();
-    HLVM_LOG(LogRenderer, info, TXT("FSceneGPUData: Loaded scene with {} meshes, {} materials"),
-        StaticMeshes.size(), Materials.size());
+    HLVM_LOG(LogRenderer, info, TXT("FSceneGPUData: Loaded scene with {} meshes, {} materials ({} ms)"),
+        StaticMeshes.size(), Materials.size(), SceneLoadMs);
 
     // =====================================================================
     // Calculate bounding box
     // =====================================================================
+    const auto BoundsStart = FHighResClock::now();
     CachedBBoxMin = glm::vec3(FLT_MAX, FLT_MAX, FLT_MAX);
     CachedBBoxMax = glm::vec3(-FLT_MAX, -FLT_MAX, -FLT_MAX);
     for (const auto& Mesh : StaticMeshes)
@@ -55,13 +65,16 @@ bool FSceneGPUData::Initialize(nvrhi::IDevice* InDevice, const FPath& ScenePath,
     }
     CachedSceneCenter = (CachedBBoxMin + CachedBBoxMax) * 0.5f;
     CachedSceneRadius = glm::length(CachedBBoxMax - CachedBBoxMin) * 0.5f;
-    HLVM_LOG(LogRenderer, info, TXT("FSceneGPUData: Scene center: ({:.2f}, {:.2f}, {:.2f}), radius: {:.2f}"),
-        CachedSceneCenter.x, CachedSceneCenter.y, CachedSceneCenter.z, CachedSceneRadius);
+    const auto BoundsEnd = FHighResClock::now();
+    const float BoundsMs = std::chrono::duration<float, std::milli>(BoundsEnd - BoundsStart).count();
+    HLVM_LOG(LogRenderer, info, TXT("FSceneGPUData: Scene center: ({:.2f}, {:.2f}, {:.2f}), radius: {:.2f} ({} ms)"),
+        CachedSceneCenter.x, CachedSceneCenter.y, CachedSceneCenter.z, CachedSceneRadius, BoundsMs);
 
     // =====================================================================
     // Create placeholder textures (1x1 white albedo + flat normal)
     // These are used while real textures are loading asynchronously.
     // =====================================================================
+    const auto PlaceholderStart = FHighResClock::now();
     {
         nvrhi::TextureDesc Desc;
         Desc.dimension = nvrhi::TextureDimension::Texture2D;
@@ -100,10 +113,14 @@ bool FSceneGPUData::Initialize(nvrhi::IDevice* InDevice, const FPath& ScenePath,
         {IMaterial::ETextureType::Albedo, IMaterial::ETextureType::Normal,
          IMaterial::ETextureType::Metallic, IMaterial::ETextureType::Roughness,
          IMaterial::ETextureType::AmbientOcclusion});
+    const auto AsyncLoadStartEnd = FHighResClock::now();
+    const float AsyncLoadStartMs = std::chrono::duration<float, std::milli>(AsyncLoadStartEnd - PlaceholderStart).count();
+    HLVM_LOG(LogRenderer, info, TXT("FSceneGPUData: Placeholder + async load enqueue took {} ms"), AsyncLoadStartMs);
 
     // =====================================================================
     // Create geometry buffers (batched per-mesh)
     // =====================================================================
+    const auto GeomStart = FHighResClock::now();
     HLVM_LOG(LogRenderer, info, TXT("FSceneGPUData: Creating geometry buffers for {} meshes..."), StaticMeshes.size());
 
     nvrhi::CommandListHandle GeomCmdList = Device->createCommandList();
@@ -192,8 +209,14 @@ bool FSceneGPUData::Initialize(nvrhi::IDevice* InDevice, const FPath& ScenePath,
     GeomCmdList->close();
     Device->executeCommandList(GeomCmdList);
     Device->waitForIdle();
+    const auto GeomEnd = FHighResClock::now();
+    const float GeomMs = std::chrono::duration<float, std::milli>(GeomEnd - GeomStart).count();
 
-    HLVM_LOG(LogRenderer, info, TXT("FSceneGPUData: Initialized successfully"));
+    const auto InitEndTime = FHighResClock::now();
+    const float TotalInitMs = std::chrono::duration<float, std::milli>(InitEndTime - InitStartTime).count();
+
+    HLVM_LOG(LogRenderer, info, TXT("FSceneGPUData: Geometry buffers created ({} ms)"), GeomMs);
+    HLVM_LOG(LogRenderer, info, TXT("FSceneGPUData: Initialized successfully (total: {} ms)"), TotalInitMs);
     bIsInitialized = true;
     return true;
 }

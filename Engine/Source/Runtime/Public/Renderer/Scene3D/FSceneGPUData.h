@@ -39,6 +39,12 @@ public:
         return NormalPlaceholderTexture;
     }
 
+    // O(1) cached scene bounds accessors — do NOT trigger BuildDrawData()
+    glm::vec3 GetSceneCenter() const { return CachedSceneCenter; }
+    glm::vec3 GetSceneBBoxMin() const { return CachedBBoxMin; }
+    glm::vec3 GetSceneBBoxMax() const { return CachedBBoxMax; }
+    float GetSceneRadius() const { return CachedSceneRadius; }
+
     FSceneGPUData() = default;
     ~FSceneGPUData()
     {

@@ -340,11 +340,64 @@ Profiler.EndFrame();
 
 ---
 
+### GPU Instancing
+
+Both `FGBufferFillPass` and `FShadowMapPass` support instanced drawing via structured buffer instance matrices + `SV_InstanceID`.
+
+```cpp
+// Build instance data (one float4x4 per instance)
+nvrhi::BufferDesc InstanceBufferDesc;
+InstanceBufferDesc.setByteSize(InstanceCount * sizeof(glm::mat4))
+    .setStructStride(sizeof(glm::mat4))
+    .setInitialState(nvrhi::ResourceStates::ShaderResource)
+    .setKeepInitialState(true);
+nvrhi::BufferHandle InstanceBuffer = Device->createBuffer(InstanceBufferDesc);
+CmdList->writeBuffer(InstanceBuffer, Matrices.data(), InstanceCount * sizeof(glm::mat4));
+
+// GBuffer instanced draw
+FGBufferFillPass::FInstancedMeshDrawItem Item;
+Item.VertexBuffer = VB;
+Item.IndexBuffer = IB;
+Item.InstanceBuffer = InstanceBuffer;
+Item.IndexCount = 36;
+Item.InstanceCount = 100;
+Item.Material = /* ... */;
+
+FGBufferFillPass::FInstancedRenderDesc Desc;
+Desc.ViewConstants = /* ... */;
+Desc.InstancedItems = &Item;
+Desc.InstancedItemCount = 1;
+GBufferPass.RenderInstanced(CmdList, Desc);
+
+// Shadow instanced draw (same instance buffer)
+FShadowMapPass::FInstancedMeshDrawItem ShadowItem;
+ShadowItem.VertexBuffer = VB;
+ShadowItem.IndexBuffer = IB;
+ShadowItem.InstanceBuffer = InstanceBuffer;  // Reuse!
+ShadowItem.IndexCount = 36;
+ShadowItem.InstanceCount = 100;
+
+FShadowMapPass::FInstancedRenderDesc ShadowDesc;
+ShadowDesc.LightViewProj = /* ... */;
+ShadowDesc.InstancedItems = &ShadowItem;
+ShadowDesc.InstancedItemCount = 1;
+ShadowPass.RenderInstanced(CmdList, ShadowDesc);
+```
+
+**Key rules**:
+- Instanced shaders (`*InstancedVS.sblob`) are **optional** — if missing, the pass logs a warning and disables instancing
+- The instance buffer is a `StructuredBuffer<float4>` in HLSL, indexed by `SV_InstanceID * 4` for matrix rows
+- Both passes can coexist with non-instanced draws in the same frame
+
+---
+
 ## Key Files
 
 | File | Purpose |
 |------|---------|
 | `Engine/Source/Runtime/Public/Renderer/SceneGraph/FNode.h` | Scene graph transform hierarchy |
+| `Engine/Source/Runtime/Public/Renderer/Deferred/FGBufferFillPass.h` | GBuffer fill pass (instancing supported) |
+| `Engine/Source/Runtime/Public/Renderer/Shadow/FShadowMapPass.h` | Shadow map pass (instancing supported) |
 | `Engine/Source/Runtime/Public/Renderer/FSceneResourceManager.h` | Unified scene + texture lifetime |
 | `Engine/Source/Runtime/Public/Renderer/Texture/TextureCache.h` | GPU texture deduplication cache |
 | `Engine/Source/Runtime/Public/Renderer/Texture/AsyncTextureLoader.h` | Non-blocking async texture loading |

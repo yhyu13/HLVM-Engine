@@ -169,6 +169,47 @@ bool FShadowMapPass::Initialize(nvrhi::IDevice* InDevice, const FString& InShade
         return false;
     }
 
+    // Load instanced vertex shader (optional — if not present, instancing is unavailable)
+    ShadowInstancedVS = FShaderLibrary::Get().LoadShader(
+        Device, InShaderDataDir, TXT("ShadowInstancedVS.sblob"), nvrhi::ShaderType::Vertex);
+    if (ShadowInstancedVS)
+    {
+        // Create instanced binding layout (adds StructuredBuffer_SRV at slot 10)
+        nvrhi::BindingLayoutDesc InstancedLayoutDesc;
+        InstancedLayoutDesc.setVisibility(nvrhi::ShaderType::Vertex);
+
+        nvrhi::VulkanBindingOffsets instancedOffsets;
+        instancedOffsets.setConstantBufferOffset(0)
+                        .setShaderResourceOffset(0)
+                        .setSamplerOffset(0)
+                        .setUnorderedAccessViewOffset(0);
+        InstancedLayoutDesc.setBindingOffsets(instancedOffsets);
+
+        InstancedLayoutDesc.addItem(nvrhi::BindingLayoutItem::ConstantBuffer(256));
+        InstancedLayoutDesc.addItem(nvrhi::BindingLayoutItem::StructuredBuffer_SRV(10));
+
+        ShadowInstancedBindingLayout = Device->createBindingLayout(InstancedLayoutDesc);
+        if (ShadowInstancedBindingLayout)
+        {
+            // Create instanced shadow pipeline
+            nvrhi::GraphicsPipelineDesc InstancedPipelineDesc;
+            InstancedPipelineDesc.setVertexShader(ShadowInstancedVS)
+                .setInputLayout(ShadowInputLayout)
+                .addBindingLayout(ShadowInstancedBindingLayout)
+                .setPrimType(nvrhi::PrimitiveType::TriangleList);
+            InstancedPipelineDesc.renderState.depthStencilState
+                .setDepthTestEnable(true)
+                .setDepthWriteEnable(true)
+                .setDepthFunc(nvrhi::ComparisonFunc::Less);
+
+            ShadowInstancedPipeline = Device->createGraphicsPipeline(InstancedPipelineDesc, ShadowMapFramebuffer->getFramebufferInfo());
+        }
+    }
+    else
+    {
+        HLVM_LOG(LogRenderer, warn, TXT("FShadowMapPass: Instanced vertex shader not found — instancing disabled"));
+    }
+
     bIsInitialized = true;
     HLVM_LOG(LogRenderer, info, TXT("FShadowMapPass initialized successfully"));
     return true;
@@ -230,12 +271,80 @@ void FShadowMapPass::Render(nvrhi::ICommandList* CmdList, const FRenderDesc& Des
     CmdList->setTextureState(ShadowMapTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
 }
 
+void FShadowMapPass::RenderInstanced(nvrhi::ICommandList* CmdList, const FInstancedRenderDesc& Desc)
+{
+    if (!bIsInitialized || !CmdList)
+    {
+        return;
+    }
+
+    if (!ShadowInstancedPipeline)
+    {
+        HLVM_LOG(LogRenderer, err, TXT("FShadowMapPass::RenderInstanced: Instanced pipeline not available"));
+        return;
+    }
+
+    // Clear shadow map
+    CmdList->clearDepthStencilTexture(ShadowMapTexture, nvrhi::AllSubresources, true, 1.0f, false, 0);
+
+    // Upload shadow constants (LightViewProj only, ModelMatrix unused by instanced VS)
+    FShadowConstants Constants;
+    memset(&Constants, 0, sizeof(Constants));
+    memcpy(Constants.LightViewProj, glm::value_ptr(Desc.LightViewProj), 64);
+    CmdList->writeBuffer(ShadowConstantsBuffer, &Constants, sizeof(Constants));
+
+    // Draw all instanced items
+    for (uint32_t i = 0; i < Desc.InstancedItemCount; ++i)
+    {
+        const auto& Item = Desc.InstancedItems[i];
+
+        nvrhi::BindingSetDesc SetDesc;
+        SetDesc.addItem(nvrhi::BindingSetItem::ConstantBuffer(256, ShadowConstantsBuffer));
+        SetDesc.addItem(nvrhi::BindingSetItem::StructuredBuffer_SRV(10, Item.InstanceBuffer));
+        nvrhi::BindingSetHandle BindingSet = Device->createBindingSet(SetDesc, ShadowInstancedBindingLayout);
+
+        nvrhi::GraphicsState State;
+        State.setPipeline(ShadowInstancedPipeline)
+            .setFramebuffer(ShadowMapFramebuffer)
+            .addBindingSet(BindingSet);
+
+        nvrhi::VertexBufferBinding VBBinding;
+        VBBinding.setBuffer(Item.VertexBuffer)
+            .setSlot(0)
+            .setOffset(0);
+        State.addVertexBuffer(VBBinding);
+
+        nvrhi::IndexBufferBinding IBBinding;
+        IBBinding.setBuffer(Item.IndexBuffer)
+            .setOffset(0)
+            .setFormat(nvrhi::Format::R32_UINT);
+        State.setIndexBuffer(IBBinding);
+
+        nvrhi::Viewport shadowViewport(0.f, float(ShadowMapSize), 0.f, float(ShadowMapSize), 0.0f, 1.0f);
+        State.viewport.addViewportAndScissorRect(shadowViewport);
+
+        CmdList->setGraphicsState(State);
+
+        nvrhi::DrawArguments DrawArgs;
+        DrawArgs.vertexCount = Item.IndexCount;
+        DrawArgs.instanceCount = Item.InstanceCount;
+        DrawArgs.startInstanceLocation = 0;
+        CmdList->drawIndexed(DrawArgs);
+    }
+
+    // Transition shadow map to ShaderResource for lighting pass
+    CmdList->setTextureState(ShadowMapTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+}
+
 void FShadowMapPass::Shutdown()
 {
     ShadowVS = nullptr;
     ShadowInputLayout = nullptr;
     ShadowBindingLayout = nullptr;
     ShadowPipeline = nullptr;
+    ShadowInstancedVS = nullptr;
+    ShadowInstancedBindingLayout = nullptr;
+    ShadowInstancedPipeline = nullptr;
     ShadowMapTexture = nullptr;
     ShadowMapFramebuffer = nullptr;
     ShadowConstantsBuffer = nullptr;

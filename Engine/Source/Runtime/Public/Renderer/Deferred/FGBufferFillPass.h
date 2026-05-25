@@ -56,8 +56,26 @@ public:
         uint32_t MeshDrawItemCount;
     };
 
+    struct FInstancedMeshDrawItem
+    {
+        nvrhi::BufferHandle VertexBuffer;
+        nvrhi::BufferHandle IndexBuffer;
+        nvrhi::BufferHandle InstanceBuffer;
+        uint32_t IndexCount = 0;
+        uint32_t InstanceCount = 0;
+        FMaterialBinding Material;
+    };
+
+    struct FInstancedRenderDesc
+    {
+        FViewConstants ViewConstants;
+        const FInstancedMeshDrawItem* InstancedItems = nullptr;
+        uint32_t InstancedItemCount = 0;
+    };
+
     bool Initialize(nvrhi::IDevice* InDevice, const FString& InShaderDataDir, const FDesc& Desc);
     void Render(nvrhi::ICommandList* CmdList, const FRenderDesc& Desc);
+    void RenderInstanced(nvrhi::ICommandList* CmdList, const FInstancedRenderDesc& Desc);
     void Resize(uint32_t Width, uint32_t Height);
     void Shutdown();
 
@@ -105,6 +123,9 @@ private:
     nvrhi::InputLayoutHandle GBufferInputLayout;
     nvrhi::BindingLayoutHandle GBufferBindingLayout;
     nvrhi::GraphicsPipelineHandle GBufferPipeline;
+    nvrhi::ShaderHandle GBufferInstancedVS;
+    nvrhi::BindingLayoutHandle GBufferInstancedBindingLayout;
+    nvrhi::GraphicsPipelineHandle GBufferInstancedPipeline;
     nvrhi::BufferHandle ViewConstantsBuffer;
     nvrhi::BufferHandle MaterialConstantBuffer;
     nvrhi::SamplerHandle GBufferLinearSampler;

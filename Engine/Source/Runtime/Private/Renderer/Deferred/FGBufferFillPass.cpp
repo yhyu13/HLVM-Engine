@@ -206,6 +206,55 @@ bool FGBufferFillPass::Initialize(nvrhi::IDevice* InDevice, const FString& InSha
         return false;
     }
 
+    // Load instanced vertex shader (optional — if not present, instancing is unavailable)
+    GBufferInstancedVS = FShaderLibrary::Get().LoadShader(
+        Device, InShaderDataDir, TXT("GBufferInstancedVS.sblob"), nvrhi::ShaderType::Vertex);
+    if (GBufferInstancedVS)
+    {
+        // Create instanced binding layout (adds StructuredBuffer_SRV at slot 10)
+        nvrhi::BindingLayoutDesc InstancedLayoutDesc;
+        InstancedLayoutDesc.setVisibility(nvrhi::ShaderType::Vertex | nvrhi::ShaderType::Pixel);
+        nvrhi::VulkanBindingOffsets instancedOffsets;
+        instancedOffsets.setConstantBufferOffset(0)
+                        .setShaderResourceOffset(0)
+                        .setSamplerOffset(0)
+                        .setUnorderedAccessViewOffset(0);
+        InstancedLayoutDesc.setBindingOffsets(instancedOffsets);
+
+        InstancedLayoutDesc.addItem(nvrhi::BindingLayoutItem::ConstantBuffer(256));
+        InstancedLayoutDesc.addItem(nvrhi::BindingLayoutItem::ConstantBuffer(257));
+        InstancedLayoutDesc.addItem(nvrhi::BindingLayoutItem::Texture_SRV(0));
+        InstancedLayoutDesc.addItem(nvrhi::BindingLayoutItem::Texture_SRV(1));
+        InstancedLayoutDesc.addItem(nvrhi::BindingLayoutItem::Texture_SRV(2));
+        InstancedLayoutDesc.addItem(nvrhi::BindingLayoutItem::Texture_SRV(3));
+        InstancedLayoutDesc.addItem(nvrhi::BindingLayoutItem::Texture_SRV(4));
+        InstancedLayoutDesc.addItem(nvrhi::BindingLayoutItem::Sampler(128));
+        InstancedLayoutDesc.addItem(nvrhi::BindingLayoutItem::StructuredBuffer_SRV(10));
+
+        GBufferInstancedBindingLayout = Device->createBindingLayout(InstancedLayoutDesc);
+        if (GBufferInstancedBindingLayout)
+        {
+            // Create instanced pipeline (same PS, instanced VS, same input layout)
+            nvrhi::GraphicsPipelineDesc InstancedPipelineDesc;
+            InstancedPipelineDesc.setVertexShader(GBufferInstancedVS)
+                .setPixelShader(GBufferPS)
+                .setInputLayout(GBufferInputLayout)
+                .addBindingLayout(GBufferInstancedBindingLayout)
+                .setPrimType(nvrhi::PrimitiveType::TriangleList);
+            InstancedPipelineDesc.renderState.setRasterState(nvrhi::RasterState().setCullNone());
+            InstancedPipelineDesc.renderState.depthStencilState
+                .setDepthTestEnable(true)
+                .setDepthWriteEnable(true)
+                .setDepthFunc(nvrhi::ComparisonFunc::Less);
+
+            GBufferInstancedPipeline = Device->createGraphicsPipeline(InstancedPipelineDesc, GBufferFramebuffer->getFramebufferInfo());
+        }
+    }
+    else
+    {
+        HLVM_LOG(LogRenderer, warn, TXT("FGBufferFillPass: Instanced vertex shader not found — instancing disabled"));
+    }
+
     bIsInitialized = true;
     HLVM_LOG(LogRenderer, info, TXT("FGBufferFillPass initialized successfully"));
     return true;
@@ -287,6 +336,91 @@ void FGBufferFillPass::Render(nvrhi::ICommandList* CmdList, const FRenderDesc& D
     CmdList->setTextureState(GBufferDepthTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
 }
 
+void FGBufferFillPass::RenderInstanced(nvrhi::ICommandList* CmdList, const FInstancedRenderDesc& Desc)
+{
+    if (!bIsInitialized || !CmdList)
+    {
+        return;
+    }
+
+    if (!GBufferInstancedPipeline)
+    {
+        HLVM_LOG(LogRenderer, err, TXT("FGBufferFillPass::RenderInstanced: Instanced pipeline not available"));
+        return;
+    }
+
+    // Upload view constants
+    CmdList->writeBuffer(ViewConstantsBuffer, &Desc.ViewConstants, sizeof(FViewConstants));
+
+    // Clear MRTs
+    nvrhi::Color clearBlack(0.f, 0.f, 0.f, 0.f);
+    nvrhi::Color clearBlue(0.f, 0.f, 1.f, 1.f);
+    nvrhi::Color clearNormalUp(0.5f, 1.0f, 0.5f, 1.f);
+    nvrhi::utils::ClearColorAttachment(CmdList, GBufferFramebuffer, 0, clearBlue);
+    nvrhi::utils::ClearColorAttachment(CmdList, GBufferFramebuffer, 1, clearBlack);
+    nvrhi::utils::ClearColorAttachment(CmdList, GBufferFramebuffer, 2, clearNormalUp);
+    nvrhi::utils::ClearColorAttachment(CmdList, GBufferFramebuffer, 3, clearBlack);
+    nvrhi::utils::ClearDepthStencilAttachment(CmdList, GBufferFramebuffer, 1.0f, 0u);
+
+    // Draw all instanced items
+    for (uint32_t i = 0; i < Desc.InstancedItemCount; ++i)
+    {
+        const auto& Item = Desc.InstancedItems[i];
+
+        // Upload material constants
+        CmdList->writeBuffer(MaterialConstantBuffer, &Item.Material.Constants, sizeof(FMaterialConstants));
+
+        // Create binding set with instance buffer SRV
+        nvrhi::BindingSetDesc SetDesc;
+        SetDesc.addItem(nvrhi::BindingSetItem::ConstantBuffer(256, ViewConstantsBuffer));
+        SetDesc.addItem(nvrhi::BindingSetItem::ConstantBuffer(257, MaterialConstantBuffer));
+        SetDesc.addItem(nvrhi::BindingSetItem::Texture_SRV(0, Item.Material.DiffuseTexture));
+        SetDesc.addItem(nvrhi::BindingSetItem::Texture_SRV(1, Item.Material.NormalTexture));
+        SetDesc.addItem(nvrhi::BindingSetItem::Texture_SRV(2, Item.Material.MetallicTexture));
+        SetDesc.addItem(nvrhi::BindingSetItem::Texture_SRV(3, Item.Material.RoughnessTexture));
+        SetDesc.addItem(nvrhi::BindingSetItem::Texture_SRV(4, Item.Material.AOTexture));
+        SetDesc.addItem(nvrhi::BindingSetItem::Sampler(128, GBufferLinearSampler));
+        SetDesc.addItem(nvrhi::BindingSetItem::StructuredBuffer_SRV(10, Item.InstanceBuffer));
+        nvrhi::BindingSetHandle BindingSet = Device->createBindingSet(SetDesc, GBufferInstancedBindingLayout);
+
+        // Build graphics state
+        nvrhi::GraphicsState State;
+        State.setPipeline(GBufferInstancedPipeline)
+            .setFramebuffer(GBufferFramebuffer)
+            .addBindingSet(BindingSet);
+
+        nvrhi::VertexBufferBinding VBBinding;
+        VBBinding.setBuffer(Item.VertexBuffer)
+            .setSlot(0)
+            .setOffset(0);
+        State.addVertexBuffer(VBBinding);
+
+        nvrhi::IndexBufferBinding IBBinding;
+        IBBinding.setBuffer(Item.IndexBuffer)
+            .setOffset(0)
+            .setFormat(nvrhi::Format::R32_UINT);
+        State.setIndexBuffer(IBBinding);
+
+        nvrhi::Viewport viewport(0.f, float(GBufferDiffuseTexture->getDesc().width), 0.f, float(GBufferDiffuseTexture->getDesc().height), 0.0f, 1.0f);
+        State.viewport.addViewportAndScissorRect(viewport);
+
+        CmdList->setGraphicsState(State);
+
+        nvrhi::DrawArguments DrawArgs;
+        DrawArgs.vertexCount = Item.IndexCount;
+        DrawArgs.instanceCount = Item.InstanceCount;
+        DrawArgs.startInstanceLocation = 0;
+        CmdList->drawIndexed(DrawArgs);
+    }
+
+    // Transition GBuffer color textures to ShaderResource
+    CmdList->setTextureState(GBufferDiffuseTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+    CmdList->setTextureState(GBufferSpecularTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+    CmdList->setTextureState(GBufferNormalsTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+    CmdList->setTextureState(GBufferEmissiveTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+    CmdList->setTextureState(GBufferDepthTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+}
+
 void FGBufferFillPass::Resize(uint32_t Width, uint32_t Height)
 {
     if (!bIsInitialized || !Device)
@@ -302,6 +436,7 @@ void FGBufferFillPass::Resize(uint32_t Width, uint32_t Height)
     GBufferDepthTexture = nullptr;
     GBufferFramebuffer = nullptr;
     GBufferPipeline = nullptr;
+    GBufferInstancedPipeline = nullptr;
 
     // Recreate GBuffer textures
     nvrhi::TextureDesc TexDesc;
@@ -352,6 +487,21 @@ void FGBufferFillPass::Resize(uint32_t Width, uint32_t Height)
         .setDepthFunc(nvrhi::ComparisonFunc::Less);
 
     GBufferPipeline = Device->createGraphicsPipeline(PipelineDesc, GBufferFramebuffer->getFramebufferInfo());
+
+    // Recreate instanced pipeline with new framebuffer info
+    nvrhi::GraphicsPipelineDesc InstancedPipelineDesc;
+    InstancedPipelineDesc.setVertexShader(GBufferInstancedVS)
+        .setPixelShader(GBufferPS)
+        .setInputLayout(GBufferInputLayout)
+        .addBindingLayout(GBufferInstancedBindingLayout)
+        .setPrimType(nvrhi::PrimitiveType::TriangleList);
+    InstancedPipelineDesc.renderState.setRasterState(nvrhi::RasterState().setCullNone());
+    InstancedPipelineDesc.renderState.depthStencilState
+        .setDepthTestEnable(true)
+        .setDepthWriteEnable(true)
+        .setDepthFunc(nvrhi::ComparisonFunc::Less);
+
+    GBufferInstancedPipeline = Device->createGraphicsPipeline(InstancedPipelineDesc, GBufferFramebuffer->getFramebufferInfo());
 }
 
 void FGBufferFillPass::Shutdown()
@@ -361,6 +511,9 @@ void FGBufferFillPass::Shutdown()
     GBufferInputLayout = nullptr;
     GBufferBindingLayout = nullptr;
     GBufferPipeline = nullptr;
+    GBufferInstancedVS = nullptr;
+    GBufferInstancedBindingLayout = nullptr;
+    GBufferInstancedPipeline = nullptr;
     ViewConstantsBuffer = nullptr;
     MaterialConstantBuffer = nullptr;
     GBufferLinearSampler = nullptr;
