@@ -11,7 +11,10 @@
 #include "Renderer/Material/PBRMaterial.h"
 #include "Core/Parallel/Async/WorkStealThreadPool.h"
 
-// stb_image is already implemented in STBTextureLoader.cpp; just get declarations here
+// Use private STB implementation to avoid ODR violation with Assimp's stbi_load
+// (Assimp's copy may be compiled without JPEG support)
+#define STB_IMAGE_STATIC
+#define STB_IMAGE_IMPLEMENTATION
 #include "stb_image_wrapper.h"
 
 // KTX2 decode

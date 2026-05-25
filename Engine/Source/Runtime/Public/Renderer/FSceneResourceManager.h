@@ -65,6 +65,10 @@ public:
         return SceneGPUData.get();
     }
 
+    // Test accessors
+    const FTextureCache& GetTextureCache() const { return TextureCache; }
+    const FMeshCache* GetMeshCache() const { return MeshCache.get(); }
+
     FSceneResourceManager() = default;
     ~FSceneResourceManager()
     {
@@ -74,6 +78,7 @@ public:
             MeshCache->Clear();
             MeshCache.reset();
         }
+        TextureCache.Clear();
     }
     FSceneResourceManager(const FSceneResourceManager&) = delete;
     FSceneResourceManager& operator=(const FSceneResourceManager&) = delete;

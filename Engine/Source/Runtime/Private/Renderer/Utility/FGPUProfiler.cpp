@@ -151,6 +151,18 @@ void FGPUProfiler::BeginFrame()
             ++It;
         }
     }
+
+    // Release any remaining unresolved queries — they had 3 frames to resolve.
+    // Keeping them would cause the slot to grow unbounded in EndFrame().
+    for (auto& Timer : OldestSlot)
+    {
+        if (Timer.Query)
+        {
+            ReleaseQuery(Timer.Query);
+            Timer.Query = nullptr;
+        }
+    }
+    OldestSlot.clear();
 }
 
 void FGPUProfiler::BeginPass(nvrhi::ICommandList* CmdList, const FString& Name)

@@ -78,9 +78,7 @@ void FSceneResourceManager::Shutdown()
         TextureCache.GetTotalMemoryBytes(),
         MemoryBudget.GetUtilization() * 100.0f);
 
-    // Clear owned caches to release NVRHI handles before device destruction
-    // This prevents VUID-vkDestroyDevice-device-05137 validation errors
-    TextureCache.Clear();
+    // TextureCache persists across scene reloads — only release active pointer
     FAsyncTextureLoader::SetTextureCache(nullptr);
 
     Device = nullptr;

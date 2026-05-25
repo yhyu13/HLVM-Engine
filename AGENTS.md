@@ -253,22 +253,24 @@ TVector<FPath> Modified = FShaderLibrary::Get().PollAllCachedFiles();
 
 ### FTextureCache (GPU Texture Deduplication)
 
-**NO LONGER a singleton** — owned by `FSceneResourceManager`.
+**NO LONGER a singleton** — owned by `FSceneResourceManager`, persists across scene reloads.
 
 ```cpp
 // Automatic (preferred): FSceneResourceManager handles lifetime
 FSceneResourceManager ResourceManager;
 ResourceManager.Initialize(Device, ScenePath);
 // ... use ...
-ResourceManager.Shutdown(); // Clears texture cache automatically
+ResourceManager.Shutdown(); // Scene released, CACHE PERSISTS for next Initialize()
+// ... reload scene ...
+ResourceManager.Initialize(Device, ScenePath); // Textures hit cache
 
-// Manual (tests only): create local instance
-FTextureCache Cache;
-Cache.Insert(Path, Handle);
-Cache.Clear();
+// Destructor clears cache (true destruction only)
 ```
 
-**Key rule**: `FTextureCache` is a regular constructable class. `FAsyncTextureLoader` uses an active cache pointer set by `FSceneResourceManager::Initialize()`.
+**Key rules**:
+- `FTextureCache` is a regular constructable class
+- `FAsyncTextureLoader` uses an active cache pointer set by `FSceneResourceManager::Initialize()`
+- Cache survives `Shutdown()` — only cleared in destructor
 
 ---
 

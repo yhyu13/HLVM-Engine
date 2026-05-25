@@ -108,6 +108,11 @@ RECORD_BOOL(test_MeshCache)
         HLVM_ENSURE(MeshCount1 == MeshCount2);
         HLVM_ENSURE(MeshCount1 > 0);
 
+        // Verify texture cache persisted across reload
+        uint32_t TextureCacheEntries = ResourceManager.GetTextureCache().GetNumEntries();
+        HLVM_LOG(LogTest, info, TXT("Texture cache entries after second load: {}"), TextureCacheEntries);
+        HLVM_ENSURE(TextureCacheEntries > 0);
+
         HLVM_LOG(LogTest, info, TXT("Test completed successfully!"));
         return true;
     }

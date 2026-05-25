@@ -338,6 +338,7 @@ public:
         CmdList->open();
 
         DeferredRenderer.Render(CmdList, Params);
+        DeferredRenderer.EndProfilingFrame();
 
         CmdList->close();
         NvrhiDevice->executeCommandList(CmdList);
