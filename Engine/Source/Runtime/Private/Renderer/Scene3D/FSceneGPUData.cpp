@@ -118,45 +118,75 @@ bool FSceneGPUData::Initialize(nvrhi::IDevice* InDevice, const FPath& ScenePath,
     HLVM_LOG(LogRenderer, info, TXT("FSceneGPUData: Placeholder + async load enqueue took {} ms"), AsyncLoadStartMs);
 
     // =====================================================================
-    // Create geometry buffers (batched per-mesh)
+    // Build geometry deduplication and instance data from scene
     // =====================================================================
     const auto GeomStart = FHighResClock::now();
-    HLVM_LOG(LogRenderer, info, TXT("FSceneGPUData: Creating geometry buffers for {} meshes..."), StaticMeshes.size());
+    HLVM_LOG(LogRenderer, info, TXT("FSceneGPUData: Building geometry and instance data from {} mesh occurrences..."), Scene->NumMeshes());
 
-    nvrhi::CommandListHandle GeomCmdList = Device->createCommandList();
-    GeomCmdList->open();
+    // Clear previous data
+    Geometries.clear();
+    Instances.clear();
 
-    MeshGPUData.reserve(StaticMeshes.size());
-    for (size_t i = 0; i < StaticMeshes.size(); ++i)
+    // Map from (mesh pointer) to geometry index - for deduplication
+    // Note: We deduplicate by mesh pointer identity since Assimp shares aiMesh objects
+    std::unordered_map<std::shared_ptr<FStaticMesh>, uint32_t> MeshToGeometryIndex;
+
+    // Process each mesh occurrence in the scene
+    for (const auto& [Level, Mesh] : *Scene)
     {
-        const auto& Mesh = StaticMeshes[i];
-        const auto& Vertices = Mesh->GetVertices();
-        const auto& Indices = Mesh->GetIndices();
-
-        FMeshGPUData DrawData;
-        DrawData.Mesh = Mesh;
-        DrawData.IndexCount = static_cast<uint32_t>(Indices.size());
-
-        // Check mesh cache first
-        bool bCacheHit = false;
-        if (MeshCache)
+        std::shared_ptr<FStaticMesh> StaticMesh = std::dynamic_pointer_cast<FStaticMesh>(Mesh);
+        if (!StaticMesh)
         {
-            FMeshCache::FMeshKey Key{CachedScenePath, static_cast<uint32_t>(i)};
-            if (const FMeshCache::FMeshEntry* Entry = MeshCache->Find(Key))
-            {
-                DrawData.VertexBuffer = Entry->VertexBuffer;
-                DrawData.IndexBuffer = Entry->IndexBuffer;
-                DrawData.IndexCount = Entry->IndexCount;
-                bCacheHit = true;
-                HLVM_LOG(LogRenderer, info, TXT("FSceneGPUData: Mesh[{}]: CACHE HIT ({} vertices, {} indices)"),
-                    i, Entry->VertexCount, Entry->IndexCount);
-            }
+            continue;
         }
 
-        if (!bCacheHit)
+        // Get or create deduplicated geometry entry
+        uint32_t GeometryIndex;
+        auto it = MeshToGeometryIndex.find(StaticMesh);
+        if (it != MeshToGeometryIndex.end())
         {
-            // Create vertex buffer
+            // Reuse existing geometry
+            GeometryIndex = it->second;
+        }
+        else
+        {
+            // Create new geometry entry
+            FMeshGeometry Geometry;
+            Geometry.Mesh = StaticMesh;
+            Geometry.IndexCount = static_cast<uint32_t>(StaticMesh->GetIndices().size());
+
+            // Check mesh cache first
+            bool bCacheHit = false;
+            if (MeshCache)
             {
+                // Find mesh index in static meshes list for cache key
+                uint32_t MeshIndex = 0;
+                for (size_t i = 0; i < StaticMeshes.size(); ++i)
+                {
+                    if (StaticMeshes[i] == StaticMesh)
+                    {
+                        MeshIndex = static_cast<uint32_t>(i);
+                        break;
+                    }
+                }
+
+                FMeshCache::FMeshKey Key{CachedScenePath, MeshIndex};
+                if (const FMeshCache::FMeshEntry* Entry = MeshCache->Find(Key))
+                {
+                    Geometry.VertexBuffer = Entry->VertexBuffer;
+                    Geometry.IndexBuffer = Entry->IndexBuffer;
+                    bCacheHit = true;
+                    HLVM_LOG(LogRenderer, info, TXT("FSceneGPUData: Geometry[{}]: CACHE HIT ({} vertices, {} indices)"),
+                        Geometries.size(), Entry->VertexCount, Entry->IndexCount);
+                }
+            }
+
+            if (!bCacheHit)
+            {
+                const auto& Vertices = StaticMesh->GetVertices();
+                const auto& Indices = StaticMesh->GetIndices();
+
+                // Create vertex buffer
                 nvrhi::BufferDesc VBDesc;
                 VBDesc.byteSize = Vertices.size() * sizeof(FVertex);
                 VBDesc.isVertexBuffer = true;
@@ -164,15 +194,9 @@ bool FSceneGPUData::Initialize(nvrhi::IDevice* InDevice, const FPath& ScenePath,
                 VBDesc.initialState = nvrhi::ResourceStates::CopyDest;
                 VBDesc.keepInitialState = true;
                 VBDesc.debugName = "MeshVertexBuffer";
-                DrawData.VertexBuffer = Device->createBuffer(VBDesc);
+                Geometry.VertexBuffer = Device->createBuffer(VBDesc);
 
-                GeomCmdList->beginTrackingBufferState(DrawData.VertexBuffer, nvrhi::ResourceStates::CopyDest);
-                GeomCmdList->writeBuffer(DrawData.VertexBuffer, Vertices.data(), VBDesc.byteSize);
-                GeomCmdList->setPermanentBufferState(DrawData.VertexBuffer, nvrhi::ResourceStates::VertexBuffer);
-            }
-
-            // Create index buffer
-            {
+                // Create index buffer
                 nvrhi::BufferDesc IBDesc;
                 IBDesc.byteSize = Indices.size() * sizeof(uint32_t);
                 IBDesc.isIndexBuffer = true;
@@ -180,42 +204,56 @@ bool FSceneGPUData::Initialize(nvrhi::IDevice* InDevice, const FPath& ScenePath,
                 IBDesc.initialState = nvrhi::ResourceStates::CopyDest;
                 IBDesc.keepInitialState = true;
                 IBDesc.debugName = "MeshIndexBuffer";
-                DrawData.IndexBuffer = Device->createBuffer(IBDesc);
+                Geometry.IndexBuffer = Device->createBuffer(IBDesc);
 
-                GeomCmdList->beginTrackingBufferState(DrawData.IndexBuffer, nvrhi::ResourceStates::CopyDest);
-                GeomCmdList->writeBuffer(DrawData.IndexBuffer, Indices.data(), IBDesc.byteSize);
-                GeomCmdList->setPermanentBufferState(DrawData.IndexBuffer, nvrhi::ResourceStates::IndexBuffer);
+                // Insert into cache
+                if (MeshCache)
+                {
+                    uint32_t MeshIndex = 0;
+                    for (size_t i = 0; i < StaticMeshes.size(); ++i)
+                    {
+                        if (StaticMeshes[i] == StaticMesh)
+                        {
+                            MeshIndex = static_cast<uint32_t>(i);
+                            break;
+                        }
+                    }
+
+                    FMeshCache::FMeshKey Key{CachedScenePath, MeshIndex};
+                    FMeshCache::FMeshEntry Entry;
+                    Entry.VertexBuffer = Geometry.VertexBuffer;
+                    Entry.IndexBuffer = Geometry.IndexBuffer;
+                    Entry.IndexCount = Geometry.IndexCount;
+                    Entry.VertexCount = static_cast<uint32_t>(Vertices.size());
+                    MeshCache->Insert(Key, Entry);
+                }
+
+                HLVM_LOG(LogRenderer, info, TXT("FSceneGPUData: Geometry[{}]: {} vertices, {} indices"),
+                    Geometries.size(), Vertices.size(), Indices.size());
             }
 
-            // Insert into cache
-            if (MeshCache)
-            {
-                FMeshCache::FMeshKey Key{CachedScenePath, static_cast<uint32_t>(i)};
-                FMeshCache::FMeshEntry Entry;
-                Entry.VertexBuffer = DrawData.VertexBuffer;
-                Entry.IndexBuffer = DrawData.IndexBuffer;
-                Entry.IndexCount = DrawData.IndexCount;
-                Entry.VertexCount = static_cast<uint32_t>(Vertices.size());
-                MeshCache->Insert(Key, Entry);
-            }
-
-            HLVM_LOG(LogRenderer, info, TXT("FSceneGPUData: Mesh[{}]: {} vertices, {} indices"),
-                i, Vertices.size(), Indices.size());
+            GeometryIndex = static_cast<uint32_t>(Geometries.size());
+            Geometries.push_back(Geometry);
+            MeshToGeometryIndex[StaticMesh] = GeometryIndex;
         }
 
-        MeshGPUData.push_back(DrawData);
+        // Create instance entry with transform from this mesh occurrence
+        FMeshInstance Instance;
+        Instance.GeometryIndex = GeometryIndex;
+        Instance.Transform = StaticMesh->WorldTransform;  // Transform stored by loader
+        Instance.Mesh = StaticMesh;
+        Instances.push_back(Instance);
     }
 
-    GeomCmdList->close();
-    Device->executeCommandList(GeomCmdList);
-    Device->waitForIdle();
     const auto GeomEnd = FHighResClock::now();
     const float GeomMs = std::chrono::duration<float, std::milli>(GeomEnd - GeomStart).count();
+
+    HLVM_LOG(LogRenderer, info, TXT("FSceneGPUData: {} unique geometries, {} total instances ({} ms)"),
+        Geometries.size(), Instances.size(), GeomMs);
 
     const auto InitEndTime = FHighResClock::now();
     const float TotalInitMs = std::chrono::duration<float, std::milli>(InitEndTime - InitStartTime).count();
 
-    HLVM_LOG(LogRenderer, info, TXT("FSceneGPUData: Geometry buffers created ({} ms)"), GeomMs);
     HLVM_LOG(LogRenderer, info, TXT("FSceneGPUData: Initialized successfully (total: {} ms)"), TotalInitMs);
     bIsInitialized = true;
     return true;
@@ -223,7 +261,8 @@ bool FSceneGPUData::Initialize(nvrhi::IDevice* InDevice, const FPath& ScenePath,
 
 void FSceneGPUData::Shutdown()
 {
-    MeshGPUData.clear();
+    Geometries.clear();
+    Instances.clear();
     Scene.reset();
 
     PlaceholderTexture = nullptr;
@@ -244,23 +283,26 @@ FSceneGPUData::FDrawData FSceneGPUData::BuildDrawData()
     Result.BBoxMax = CachedBBoxMax;
     Result.SceneRadius = CachedSceneRadius;
 
-    Result.ShadowItems.reserve(MeshGPUData.size());
-    Result.GBufferItems.reserve(MeshGPUData.size());
+    Result.ShadowItems.reserve(Instances.size());
+    Result.GBufferItems.reserve(Instances.size());
 
-    for (const auto& MeshData : MeshGPUData)
+    for (const auto& Instance : Instances)
     {
+        const auto& Geometry = Geometries[Instance.GeometryIndex];
+
         // Shadow item
         FShadowMapPass::FMeshDrawItem ShadowItem;
-        ShadowItem.VertexBuffer = MeshData.VertexBuffer;
-        ShadowItem.IndexBuffer = MeshData.IndexBuffer;
-        ShadowItem.IndexCount = MeshData.IndexCount;
+        ShadowItem.VertexBuffer = Geometry.VertexBuffer;
+        ShadowItem.IndexBuffer = Geometry.IndexBuffer;
+        ShadowItem.IndexCount = Geometry.IndexCount;
         Result.ShadowItems.push_back(ShadowItem);
 
         // GBuffer item with material lookup
         FDeferredFrameRenderer::FGBufferMeshItem GBufferItem;
-        GBufferItem.VertexBuffer = MeshData.VertexBuffer;
-        GBufferItem.IndexBuffer = MeshData.IndexBuffer;
-        GBufferItem.IndexCount = MeshData.IndexCount;
+        GBufferItem.VertexBuffer = Geometry.VertexBuffer;
+        GBufferItem.IndexBuffer = Geometry.IndexBuffer;
+        GBufferItem.IndexCount = Geometry.IndexCount;
+        GBufferItem.ModelMatrix = Instance.Transform;  // Per-mesh world transform
 
         nvrhi::TextureHandle DiffuseTex = PlaceholderTexture;
         nvrhi::TextureHandle NormalTex = NormalPlaceholderTexture;
@@ -276,9 +318,9 @@ FSceneGPUData::FDrawData FSceneGPUData::BuildDrawData()
         MatConst.Metallic = 0.0f;
         MatConst.Roughness = 1.0f;
 
-        if (MeshData.Mesh && Scene)
+        if (Scene && Instance.Mesh)
         {
-            auto it = Scene->MeshMultiMaterialMap.find(MeshData.Mesh);
+            auto it = Scene->MeshMultiMaterialMap.find(Instance.Mesh);
             if (it != Scene->MeshMultiMaterialMap.end() && !it->second.empty())
             {
                 if (auto PBRMat = std::dynamic_pointer_cast<FPBRMaterial>(it->second[0]))

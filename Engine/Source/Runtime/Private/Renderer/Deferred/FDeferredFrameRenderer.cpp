@@ -79,6 +79,11 @@ AUTO_CVAR_FLOAT(r_ContactShadows_Thickness, 0.05f,
 AUTO_CVAR_BOOL(r_ShaderHotReload, false,
     "Enable automatic shader hot-reload polling", EConsoleVariableFlag::Saved)
 
+AUTO_CVAR_BOOL(r_UseInstancing, false,
+    "Enable GPU instancing for duplicate meshes (requires scene with per-mesh transforms)", EConsoleVariableFlag::Saved)
+AUTO_CVAR_INT(r_InstancingThreshold, 4,
+    "Minimum mesh group size to use instancing", EConsoleVariableFlag::Saved)
+
 bool FDeferredFrameRenderer::Initialize(nvrhi::IDevice* InDevice, const FString& InShaderDataDir)
 {
     if (bIsInitialized)
@@ -207,6 +212,109 @@ void FDeferredFrameRenderer::Shutdown()
     bMotionBlurInitialized = false;
     bDOFInitialized = false;
     bLensEffectsInitialized = false;
+}
+
+TVector<FDeferredFrameRenderer::FInstancedMeshGroup> FDeferredFrameRenderer::GroupMeshesByGeometry(
+    const FGBufferMeshItem* Meshes, uint32_t Count)
+{
+    // Group meshes by (VertexBuffer, IndexBuffer, Material)
+    // Returns groups with at least threshold instances
+    // Note: Current scene format lacks per-mesh transforms, so InstanceMatrices will be empty
+    // until scene data provides real instance data
+
+    TVector<FInstancedMeshGroup> Groups;
+
+    for (uint32_t i = 0; i < Count; ++i)
+    {
+        const auto& Mesh = Meshes[i];
+
+        // Try to find existing group with same key
+        FInstancedMeshGroup* FoundGroup = nullptr;
+        for (auto& Group : Groups)
+        {
+            if (Group.VertexBuffer == Mesh.VertexBuffer &&
+                Group.IndexBuffer == Mesh.IndexBuffer &&
+                Group.Material.DiffuseTexture == Mesh.DiffuseTexture &&
+                Group.Material.NormalTexture == Mesh.NormalTexture &&
+                Group.Material.MetallicTexture == Mesh.MetallicTexture &&
+                Group.Material.RoughnessTexture == Mesh.RoughnessTexture &&
+                Group.Material.AOTexture == Mesh.AOTexture &&
+                Group.Material.Constants.Metallic == Mesh.MaterialConstants.Metallic &&
+                Group.Material.Constants.Roughness == Mesh.MaterialConstants.Roughness)
+            {
+                FoundGroup = &Group;
+                break;
+            }
+        }
+
+        if (FoundGroup)
+        {
+            // Add to existing group with actual transform
+            FoundGroup->InstanceMatrices.push_back(Mesh.ModelMatrix);
+        }
+        else
+        {
+            // Create new group
+            FInstancedMeshGroup NewGroup;
+            NewGroup.VertexBuffer = Mesh.VertexBuffer;
+            NewGroup.IndexBuffer = Mesh.IndexBuffer;
+            NewGroup.IndexCount = Mesh.IndexCount;
+            NewGroup.Material.DiffuseTexture = Mesh.DiffuseTexture;
+            NewGroup.Material.NormalTexture = Mesh.NormalTexture;
+            NewGroup.Material.MetallicTexture = Mesh.MetallicTexture;
+            NewGroup.Material.RoughnessTexture = Mesh.RoughnessTexture;
+            NewGroup.Material.AOTexture = Mesh.AOTexture;
+            NewGroup.Material.Constants = Mesh.MaterialConstants;
+            NewGroup.InstanceMatrices.push_back(Mesh.ModelMatrix);
+            Groups.push_back(NewGroup);
+        }
+    }
+
+    return Groups;
+}
+
+TVector<FDeferredFrameRenderer::FInstancedShadowGroup> FDeferredFrameRenderer::GroupShadowMeshesByGeometry(
+    const FShadowMapPass::FMeshDrawItem* Meshes, uint32_t Count)
+{
+    // Group shadow meshes by (VertexBuffer, IndexBuffer)
+    // Returns groups with at least threshold instances
+
+    TVector<FInstancedShadowGroup> Groups;
+
+    for (uint32_t i = 0; i < Count; ++i)
+    {
+        const auto& Mesh = Meshes[i];
+
+        // Try to find existing group with same key
+        FInstancedShadowGroup* FoundGroup = nullptr;
+        for (auto& Group : Groups)
+        {
+            if (Group.VertexBuffer == Mesh.VertexBuffer &&
+                Group.IndexBuffer == Mesh.IndexBuffer)
+            {
+                FoundGroup = &Group;
+                break;
+            }
+        }
+
+        if (FoundGroup)
+        {
+            // Add to existing group
+            FoundGroup->InstanceMatrices.push_back(glm::mat4(1.0f));  // Identity for now
+        }
+        else
+        {
+            // Create new group
+            FInstancedShadowGroup NewGroup;
+            NewGroup.VertexBuffer = Mesh.VertexBuffer;
+            NewGroup.IndexBuffer = Mesh.IndexBuffer;
+            NewGroup.IndexCount = Mesh.IndexCount;
+            NewGroup.InstanceMatrices.push_back(glm::mat4(1.0f));  // Identity for now
+            Groups.push_back(NewGroup);
+        }
+    }
+
+    return Groups;
 }
 
 void FDeferredFrameRenderer::ReloadShaders()
@@ -438,13 +546,83 @@ void FDeferredFrameRenderer::Render(nvrhi::ICommandList* CmdList, const FRenderP
     // =====================================================================
     {
         Profiler.BeginPass(CmdList, TXT("Shadow"));
-        FShadowMapPass::FRenderDesc ShadowDesc;
-        ShadowDesc.LightViewProj = Params.View->LightViewProj;
-        ShadowDesc.ModelMatrix = Params.View->ModelMatrix;
-        ShadowDesc.MeshDrawItems = Params.ShadowMeshes;
-        ShadowDesc.MeshDrawItemCount = Params.ShadowMeshCount;
 
-        ShadowPass.Render(CmdList, ShadowDesc);
+        if (CVar_r_UseInstancing && Params.ShadowMeshCount > 0)
+        {
+            auto ShadowGroups = GroupShadowMeshesByGeometry(Params.ShadowMeshes, Params.ShadowMeshCount);
+            if (!ShadowGroups.empty())
+            {
+                // Build instanced items with per-group instance buffers
+                TVector<FShadowMapPass::FInstancedMeshDrawItem> ShadowInstItems;
+                TVector<nvrhi::BufferHandle> ShadowInstanceBuffers;  // Keep buffers alive
+
+                for (auto& Group : ShadowGroups)
+                {
+                    if (Group.InstanceMatrices.size() < static_cast<size_t>(CVar_r_InstancingThreshold))
+                    {
+                        continue;  // Skip groups below threshold
+                    }
+
+                    // Create instance buffer for this group
+                    nvrhi::BufferDesc InstBuffDesc;
+                    InstBuffDesc.setByteSize(Group.InstanceMatrices.size() * sizeof(glm::mat4))
+                        .setStructStride(sizeof(glm::mat4))
+                        .setInitialState(nvrhi::ResourceStates::ShaderResource)
+                        .setKeepInitialState(true)
+                        .debugName = "ShadowInstanceBuffer";
+                    nvrhi::BufferHandle InstBuffer = Device->createBuffer(InstBuffDesc);
+                    CmdList->writeBuffer(InstBuffer, Group.InstanceMatrices.data(), Group.InstanceMatrices.size() * sizeof(glm::mat4));
+                    ShadowInstanceBuffers.push_back(InstBuffer);
+
+                    FShadowMapPass::FInstancedMeshDrawItem InstItem;
+                    InstItem.VertexBuffer = Group.VertexBuffer;
+                    InstItem.IndexBuffer = Group.IndexBuffer;
+                    InstItem.IndexCount = Group.IndexCount;
+                    InstItem.InstanceBuffer = InstBuffer;
+                    InstItem.InstanceCount = static_cast<uint32_t>(Group.InstanceMatrices.size());
+                    ShadowInstItems.push_back(InstItem);
+                }
+
+                if (!ShadowInstItems.empty())
+                {
+                    FShadowMapPass::FInstancedRenderDesc ShadowInstDesc;
+                    ShadowInstDesc.LightViewProj = Params.View->LightViewProj;
+                    ShadowInstDesc.InstancedItems = ShadowInstItems.data();
+                    ShadowInstDesc.InstancedItemCount = static_cast<uint32_t>(ShadowInstItems.size());
+                    ShadowPass.RenderInstanced(CmdList, ShadowInstDesc);
+                }
+                else
+                {
+                    // Fall back to non-instanced
+                    FShadowMapPass::FRenderDesc ShadowDesc;
+                    ShadowDesc.LightViewProj = Params.View->LightViewProj;
+                    ShadowDesc.ModelMatrix = Params.View->ModelMatrix;
+                    ShadowDesc.MeshDrawItems = Params.ShadowMeshes;
+                    ShadowDesc.MeshDrawItemCount = Params.ShadowMeshCount;
+                    ShadowPass.Render(CmdList, ShadowDesc);
+                }
+            }
+            else
+            {
+                // Fall back to non-instanced
+                FShadowMapPass::FRenderDesc ShadowDesc;
+                ShadowDesc.LightViewProj = Params.View->LightViewProj;
+                ShadowDesc.ModelMatrix = Params.View->ModelMatrix;
+                ShadowDesc.MeshDrawItems = Params.ShadowMeshes;
+                ShadowDesc.MeshDrawItemCount = Params.ShadowMeshCount;
+                ShadowPass.Render(CmdList, ShadowDesc);
+            }
+        }
+        else
+        {
+            FShadowMapPass::FRenderDesc ShadowDesc;
+            ShadowDesc.LightViewProj = Params.View->LightViewProj;
+            ShadowDesc.ModelMatrix = Params.View->ModelMatrix;
+            ShadowDesc.MeshDrawItems = Params.ShadowMeshes;
+            ShadowDesc.MeshDrawItemCount = Params.ShadowMeshCount;
+            ShadowPass.Render(CmdList, ShadowDesc);
+        }
+
         Profiler.EndPass(CmdList);
     }
 
@@ -484,31 +662,135 @@ void FDeferredFrameRenderer::Render(nvrhi::ICommandList* CmdList, const FRenderP
         ViewConstants.CameraPos[2] = Params.View->CameraPos.z;
         ViewConstants.CameraPos[3] = 1.0f;
 
-        // Build mesh draw items
-        TVector<FGBufferFillPass::FMeshDrawItem> GBufferItems;
-        GBufferItems.reserve(Params.GBufferMeshCount);
-        for (uint32_t i = 0; i < Params.GBufferMeshCount; ++i)
+        if (CVar_r_UseInstancing && Params.GBufferMeshCount > 0)
         {
-            const auto& Src = Params.GBufferMeshes[i];
-            FGBufferFillPass::FMeshDrawItem Item;
-            Item.VertexBuffer = Src.VertexBuffer;
-            Item.IndexBuffer = Src.IndexBuffer;
-            Item.IndexCount = Src.IndexCount;
-            Item.Material.DiffuseTexture = Src.DiffuseTexture;
-            Item.Material.NormalTexture = Src.NormalTexture;
-            Item.Material.MetallicTexture = Src.MetallicTexture;
-            Item.Material.RoughnessTexture = Src.RoughnessTexture;
-            Item.Material.AOTexture = Src.AOTexture;
-            Item.Material.Constants = Src.MaterialConstants;
-            GBufferItems.push_back(Item);
+            auto GBufferGroups = GroupMeshesByGeometry(Params.GBufferMeshes, Params.GBufferMeshCount);
+            if (!GBufferGroups.empty())
+            {
+                // Build instanced items with per-group instance buffers
+                TVector<FGBufferFillPass::FInstancedMeshDrawItem> GBufferInstItems;
+                TVector<nvrhi::BufferHandle> GBufferInstanceBuffers;  // Keep buffers alive
+
+                for (auto& Group : GBufferGroups)
+                {
+                    if (Group.InstanceMatrices.size() < static_cast<size_t>(CVar_r_InstancingThreshold))
+                    {
+                        continue;  // Skip groups below threshold
+                    }
+
+                    // Create instance buffer for this group
+                    nvrhi::BufferDesc InstBuffDesc;
+                    InstBuffDesc.setByteSize(Group.InstanceMatrices.size() * sizeof(glm::mat4))
+                        .setStructStride(sizeof(glm::mat4))
+                        .setInitialState(nvrhi::ResourceStates::ShaderResource)
+                        .setKeepInitialState(true)
+                        .debugName = "GBufferInstanceBuffer";
+                    nvrhi::BufferHandle InstBuffer = Device->createBuffer(InstBuffDesc);
+                    CmdList->writeBuffer(InstBuffer, Group.InstanceMatrices.data(), Group.InstanceMatrices.size() * sizeof(glm::mat4));
+                    GBufferInstanceBuffers.push_back(InstBuffer);
+
+                    FGBufferFillPass::FInstancedMeshDrawItem InstItem;
+                    InstItem.VertexBuffer = Group.VertexBuffer;
+                    InstItem.IndexBuffer = Group.IndexBuffer;
+                    InstItem.IndexCount = Group.IndexCount;
+                    InstItem.InstanceBuffer = InstBuffer;
+                    InstItem.InstanceCount = static_cast<uint32_t>(Group.InstanceMatrices.size());
+                    InstItem.Material = Group.Material;
+                    GBufferInstItems.push_back(InstItem);
+                }
+
+                if (!GBufferInstItems.empty())
+                {
+                    FGBufferFillPass::FInstancedRenderDesc GBufferInstDesc;
+                    GBufferInstDesc.ViewConstants = ViewConstants;
+                    GBufferInstDesc.InstancedItems = GBufferInstItems.data();
+                    GBufferInstDesc.InstancedItemCount = static_cast<uint32_t>(GBufferInstItems.size());
+                    GBufferPass.RenderInstanced(CmdList, GBufferInstDesc);
+                }
+                else
+                {
+                    // Fall back to non-instanced
+                    TVector<FGBufferFillPass::FMeshDrawItem> GBufferItems;
+                    GBufferItems.reserve(Params.GBufferMeshCount);
+                    for (uint32_t i = 0; i < Params.GBufferMeshCount; ++i)
+                    {
+                        const auto& Src = Params.GBufferMeshes[i];
+                        FGBufferFillPass::FMeshDrawItem Item;
+                        Item.VertexBuffer = Src.VertexBuffer;
+                        Item.IndexBuffer = Src.IndexBuffer;
+                        Item.IndexCount = Src.IndexCount;
+                        Item.Material.DiffuseTexture = Src.DiffuseTexture;
+                        Item.Material.NormalTexture = Src.NormalTexture;
+                        Item.Material.MetallicTexture = Src.MetallicTexture;
+                        Item.Material.RoughnessTexture = Src.RoughnessTexture;
+                        Item.Material.AOTexture = Src.AOTexture;
+                        Item.Material.Constants = Src.MaterialConstants;
+                        GBufferItems.push_back(Item);
+                    }
+
+                    FGBufferFillPass::FRenderDesc GBufferDesc;
+                    GBufferDesc.ViewConstants = ViewConstants;
+                    GBufferDesc.MeshDrawItems = GBufferItems.data();
+                    GBufferDesc.MeshDrawItemCount = static_cast<uint32_t>(GBufferItems.size());
+                    GBufferPass.Render(CmdList, GBufferDesc);
+                }
+            }
+            else
+            {
+                // Fall back to non-instanced
+                TVector<FGBufferFillPass::FMeshDrawItem> GBufferItems;
+                GBufferItems.reserve(Params.GBufferMeshCount);
+                for (uint32_t i = 0; i < Params.GBufferMeshCount; ++i)
+                {
+                    const auto& Src = Params.GBufferMeshes[i];
+                    FGBufferFillPass::FMeshDrawItem Item;
+                    Item.VertexBuffer = Src.VertexBuffer;
+                    Item.IndexBuffer = Src.IndexBuffer;
+                    Item.IndexCount = Src.IndexCount;
+                    Item.Material.DiffuseTexture = Src.DiffuseTexture;
+                    Item.Material.NormalTexture = Src.NormalTexture;
+                    Item.Material.MetallicTexture = Src.MetallicTexture;
+                    Item.Material.RoughnessTexture = Src.RoughnessTexture;
+                    Item.Material.AOTexture = Src.AOTexture;
+                    Item.Material.Constants = Src.MaterialConstants;
+                    GBufferItems.push_back(Item);
+                }
+
+                FGBufferFillPass::FRenderDesc GBufferDesc;
+                GBufferDesc.ViewConstants = ViewConstants;
+                GBufferDesc.MeshDrawItems = GBufferItems.data();
+                GBufferDesc.MeshDrawItemCount = static_cast<uint32_t>(GBufferItems.size());
+                GBufferPass.Render(CmdList, GBufferDesc);
+            }
+        }
+        else
+        {
+            // Non-instanced path
+            TVector<FGBufferFillPass::FMeshDrawItem> GBufferItems;
+            GBufferItems.reserve(Params.GBufferMeshCount);
+            for (uint32_t i = 0; i < Params.GBufferMeshCount; ++i)
+            {
+                const auto& Src = Params.GBufferMeshes[i];
+                FGBufferFillPass::FMeshDrawItem Item;
+                Item.VertexBuffer = Src.VertexBuffer;
+                Item.IndexBuffer = Src.IndexBuffer;
+                Item.IndexCount = Src.IndexCount;
+                Item.Material.DiffuseTexture = Src.DiffuseTexture;
+                Item.Material.NormalTexture = Src.NormalTexture;
+                Item.Material.MetallicTexture = Src.MetallicTexture;
+                Item.Material.RoughnessTexture = Src.RoughnessTexture;
+                Item.Material.AOTexture = Src.AOTexture;
+                Item.Material.Constants = Src.MaterialConstants;
+                GBufferItems.push_back(Item);
+            }
+
+            FGBufferFillPass::FRenderDesc GBufferDesc;
+            GBufferDesc.ViewConstants = ViewConstants;
+            GBufferDesc.MeshDrawItems = GBufferItems.data();
+            GBufferDesc.MeshDrawItemCount = static_cast<uint32_t>(GBufferItems.size());
+            GBufferPass.Render(CmdList, GBufferDesc);
         }
 
-        FGBufferFillPass::FRenderDesc GBufferDesc;
-        GBufferDesc.ViewConstants = ViewConstants;
-        GBufferDesc.MeshDrawItems = GBufferItems.data();
-        GBufferDesc.MeshDrawItemCount = static_cast<uint32_t>(GBufferItems.size());
-
-        GBufferPass.Render(CmdList, GBufferDesc);
         Profiler.EndPass(CmdList);
     }
 

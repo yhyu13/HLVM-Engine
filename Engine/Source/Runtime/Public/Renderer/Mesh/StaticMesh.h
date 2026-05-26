@@ -99,4 +99,8 @@ public:
 private:
 	VertexContainer Vertices;
 	IndexContainer	Indices;
+
+public:
+	// World transform for instancing support (set during scene loading)
+	glm::mat4 WorldTransform{ 1.0f };
 };

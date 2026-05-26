@@ -51,6 +51,7 @@ public:
         nvrhi::TextureHandle RoughnessTexture;
         nvrhi::TextureHandle AOTexture;
         FGBufferFillPass::FMaterialConstants MaterialConstants;
+        glm::mat4 ModelMatrix{1.0f};  // Per-mesh world transform
     };
 
     struct FRenderParams
@@ -99,6 +100,27 @@ public:
 private:
     void ResizeIfNeeded(uint32_t Width, uint32_t Height);
     void CreateIntermediateTextures(uint32_t Width, uint32_t Height);
+
+    // GPU Instancing helpers
+    struct FInstancedMeshGroup
+    {
+        nvrhi::BufferHandle VertexBuffer;
+        nvrhi::BufferHandle IndexBuffer;
+        uint32_t IndexCount = 0;
+        TVector<glm::mat4> InstanceMatrices;
+        FGBufferFillPass::FMaterialBinding Material;
+    };
+
+    struct FInstancedShadowGroup
+    {
+        nvrhi::BufferHandle VertexBuffer;
+        nvrhi::BufferHandle IndexBuffer;
+        uint32_t IndexCount = 0;
+        TVector<glm::mat4> InstanceMatrices;
+    };
+
+    TVector<FInstancedMeshGroup> GroupMeshesByGeometry(const FGBufferMeshItem* Meshes, uint32_t Count);
+    TVector<FInstancedShadowGroup> GroupShadowMeshesByGeometry(const FShadowMapPass::FMeshDrawItem* Meshes, uint32_t Count);
 
     // Sub-passes
     FGBufferFillPass GBufferPass;
