@@ -24,6 +24,7 @@
 #include "Renderer/Shader/ShaderLibrary.h"
 #include "Core/Log.h"
 #include "Renderer/Mesh/StaticMesh.h"
+#include <glm/gtc/type_ptr.hpp>
 #include <nvrhi/utils.h>
 
 DECLARE_LOG_CATEGORY(LogRenderer)
@@ -98,6 +99,7 @@ bool FGBufferFillPass::Initialize(nvrhi::IDevice* InDevice, const FString& InSha
     LayoutDesc.addItem(nvrhi::BindingLayoutItem::Texture_SRV(3));
     LayoutDesc.addItem(nvrhi::BindingLayoutItem::Texture_SRV(4));
     LayoutDesc.addItem(nvrhi::BindingLayoutItem::Sampler(128));
+    LayoutDesc.addItem(nvrhi::BindingLayoutItem::StructuredBuffer_SRV(10));  // Per-mesh ModelMatrix
 
     GBufferBindingLayout = Device->createBindingLayout(LayoutDesc);
     if (!GBufferBindingLayout)
@@ -288,7 +290,22 @@ void FGBufferFillPass::Render(nvrhi::ICommandList* CmdList, const FRenderDesc& D
         // Upload material constants
         CmdList->writeBuffer(MaterialConstantBuffer, &DrawData.Material.Constants, sizeof(FMaterialConstants));
 
-        // Create binding set for this mesh's textures
+        // Create per-mesh ModelMatrix buffer
+        nvrhi::BufferDesc MBDesc;
+        MBDesc.setByteSize(4 * sizeof(glm::vec4))  // 4 rows of vec4
+            .setStructStride(sizeof(glm::vec4))
+            .setIsConstantBuffer(false)
+            .setInitialState(nvrhi::ResourceStates::ShaderResource)
+            .setKeepInitialState(true)
+            .debugName = "MeshMatrixBuffer";
+        nvrhi::BufferHandle MeshMatrixBuffer = Device->createBuffer(MBDesc);
+
+        // Upload per-mesh transform (4 vec4 rows)
+        glm::mat4 meshMatrix = DrawData.ModelMatrix;
+        glm::mat4 transposed = glm::transpose(meshMatrix);  // Column-major for GPU
+        CmdList->writeBuffer(MeshMatrixBuffer, glm::value_ptr(transposed), 4 * sizeof(glm::vec4));
+
+        // Create binding set for this mesh's textures and per-mesh transform
         nvrhi::BindingSetDesc SetDesc;
         SetDesc.addItem(nvrhi::BindingSetItem::ConstantBuffer(256, ViewConstantsBuffer));
         SetDesc.addItem(nvrhi::BindingSetItem::ConstantBuffer(257, MaterialConstantBuffer));
@@ -298,6 +315,7 @@ void FGBufferFillPass::Render(nvrhi::ICommandList* CmdList, const FRenderDesc& D
         SetDesc.addItem(nvrhi::BindingSetItem::Texture_SRV(3, DrawData.Material.RoughnessTexture));
         SetDesc.addItem(nvrhi::BindingSetItem::Texture_SRV(4, DrawData.Material.AOTexture));
         SetDesc.addItem(nvrhi::BindingSetItem::Sampler(128, GBufferLinearSampler));
+        SetDesc.addItem(nvrhi::BindingSetItem::StructuredBuffer_SRV(10, MeshMatrixBuffer));
         nvrhi::BindingSetHandle BindingSet = Device->createBindingSet(SetDesc, GBufferBindingLayout);
 
         // Build graphics state

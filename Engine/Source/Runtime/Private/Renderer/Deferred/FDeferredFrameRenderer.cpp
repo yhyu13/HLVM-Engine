@@ -774,6 +774,7 @@ void FDeferredFrameRenderer::Render(nvrhi::ICommandList* CmdList, const FRenderP
                     Item.Material.RoughnessTexture = Src.RoughnessTexture;
                     Item.Material.AOTexture = Src.AOTexture;
                     Item.Material.Constants = Src.MaterialConstants;
+                    Item.ModelMatrix = Src.ModelMatrix;  // Per-mesh world transform
                     GBufferItems.push_back(Item);
                 }
 
@@ -802,6 +803,7 @@ void FDeferredFrameRenderer::Render(nvrhi::ICommandList* CmdList, const FRenderP
                 Item.Material.RoughnessTexture = Src.RoughnessTexture;
                 Item.Material.AOTexture = Src.AOTexture;
                 Item.Material.Constants = Src.MaterialConstants;
+                Item.ModelMatrix = Src.ModelMatrix;  // Per-mesh world transform
                 GBufferItems.push_back(Item);
             }
 

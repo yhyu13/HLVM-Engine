@@ -47,6 +47,7 @@ public:
         nvrhi::BufferHandle IndexBuffer;
         uint32_t IndexCount;
         FMaterialBinding Material;
+        glm::mat4 ModelMatrix{1.0f};  // Per-mesh world transform (for LOCAL-space geometry)
     };
 
     struct FRenderDesc
