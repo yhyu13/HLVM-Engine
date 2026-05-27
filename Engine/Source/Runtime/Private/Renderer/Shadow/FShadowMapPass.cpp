@@ -230,9 +230,9 @@ void FShadowMapPass::Render(nvrhi::ICommandList* CmdList, const FRenderDesc& Des
     {
         const auto& DrawData = Desc.MeshDrawItems[MeshIdx];
 
-        // Upload shadow constants
+        // Upload shadow constants (ModelMatrix per-mesh, LightViewProj global)
         FShadowConstants Constants;
-        memcpy(Constants.ModelMatrix, glm::value_ptr(Desc.ModelMatrix), 64);
+        memcpy(Constants.ModelMatrix, glm::value_ptr(DrawData.ModelMatrix), 64);
         memcpy(Constants.LightViewProj, glm::value_ptr(Desc.LightViewProj), 64);
         CmdList->writeBuffer(ShadowConstantsBuffer, &Constants, sizeof(Constants));
 

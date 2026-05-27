@@ -15,7 +15,7 @@ public:
 
     struct FShadowConstants
     {
-        float ModelMatrix[16];
+        float ModelMatrix[16];  // Used by non-instanced path
         float LightViewProj[16];
     };
 
@@ -24,6 +24,7 @@ public:
         nvrhi::BufferHandle VertexBuffer;
         nvrhi::BufferHandle IndexBuffer;
         uint32_t IndexCount;
+        glm::mat4 ModelMatrix{1.0f};  // Per-mesh world transform (for LOCAL-space geometry)
     };
 
     struct FRenderDesc
