@@ -60,6 +60,7 @@ private:
         nvrhi::BufferHandle IndexBuffer;
         uint32_t IndexCount;
         std::shared_ptr<FStaticMesh> Mesh;
+        glm::mat4 WorldTransform{1.0f};  // World transform from scene graph
     };
 
     nvrhi::IDevice* Device = nullptr;

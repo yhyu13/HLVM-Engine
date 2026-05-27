@@ -254,6 +254,7 @@ FSceneGPUData::FDrawData FSceneGPUData::BuildDrawData()
         ShadowItem.VertexBuffer = MeshData.VertexBuffer;
         ShadowItem.IndexBuffer = MeshData.IndexBuffer;
         ShadowItem.IndexCount = MeshData.IndexCount;
+        ShadowItem.ModelMatrix = MeshData.WorldTransform;  // Per-mesh world transform
         Result.ShadowItems.push_back(ShadowItem);
 
         // GBuffer item with material lookup
@@ -261,6 +262,7 @@ FSceneGPUData::FDrawData FSceneGPUData::BuildDrawData()
         GBufferItem.VertexBuffer = MeshData.VertexBuffer;
         GBufferItem.IndexBuffer = MeshData.IndexBuffer;
         GBufferItem.IndexCount = MeshData.IndexCount;
+        GBufferItem.ModelMatrix = MeshData.WorldTransform;  // Per-mesh world transform
 
         nvrhi::TextureHandle DiffuseTex = PlaceholderTexture;
         nvrhi::TextureHandle NormalTex = NormalPlaceholderTexture;

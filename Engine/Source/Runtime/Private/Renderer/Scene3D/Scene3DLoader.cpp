@@ -118,25 +118,34 @@ void FScene3DLoader::RecurseLoad(
 			MeshData->ReserveVertices(AIMesh->mNumVertices);
 			MeshData->ReserveIndices(AIMesh->mNumFaces * 3);
 
-			// Process vertices
+			// Store world transform for LOCAL-space geometry support
+			// Note: aiMatrix4x4 is row-major, glm::mat4 is column-major, need transpose
+			MeshData->WorldTransform = glm::mat4(
+				ChildTr[0][0], ChildTr[0][1], ChildTr[0][2], ChildTr[0][3],
+				ChildTr[1][0], ChildTr[1][1], ChildTr[1][2], ChildTr[1][3],
+				ChildTr[2][0], ChildTr[2][1], ChildTr[2][2], ChildTr[2][3],
+				ChildTr[3][0], ChildTr[3][1], ChildTr[3][2], ChildTr[3][3]
+			);
+
+			// Process vertices (LOCAL space - no transform applied)
 			for (uint32_t t = 0; t < AIMesh->mNumVertices; ++t)
 			{
-				// Transform position by accumulated hierarchy transform
-				const aiVector3D AIPosition = ChildTr * AIMesh->mVertices[t];
+				// Position in LOCAL space (world transform applied by shader)
+				const aiVector3D AIPosition = AIMesh->mVertices[t];
 
-				// Transform normal (using inverse transpose matrix)
+				// Normal in LOCAL space
 				const aiVector3D AINormal = AIMesh->HasNormals()
-					? NormalTr * AIMesh->mNormals[t]
-					: aiVector3D(0, 0, 1);
+					? AIMesh->mNormals[t]
+					: aiVector3D(0, 1, 0);
 
 				// Get texture coordinates
 				const aiVector3D AITexCoord = AIMesh->HasTextureCoords(0)
 					? AIMesh->mTextureCoords[0][t]
 					: aiVector3D(0, 0, 0);
 
-				// Get tangent
+				// Tangent in LOCAL space
 				const aiVector3D AITangent = AIMesh->HasTangentsAndBitangents()
-					? NormalTr * AIMesh->mTangents[t]
+					? AIMesh->mTangents[t]
 					: aiVector3D(1, 0, 0);
 
 				// Add vertex (simple FP32 format)
