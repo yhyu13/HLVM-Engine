@@ -665,6 +665,27 @@ void FDeferredFrameRenderer::Render(nvrhi::ICommandList* CmdList, const FRenderP
         if (CVar_r_UseInstancing && Params.GBufferMeshCount > 0)
         {
             auto GBufferGroups = GroupMeshesByGeometry(Params.GBufferMeshes, Params.GBufferMeshCount);
+
+            // Log instancing summary
+            if (!GBufferGroups.empty())
+            {
+                uint32_t TotalInstances = 0;
+                uint32_t MaxGroupSize = 0;
+                for (const auto& Group : GBufferGroups)
+                {
+                    TotalInstances += static_cast<uint32_t>(Group.InstanceMatrices.size());
+                    MaxGroupSize = glm::max(MaxGroupSize, static_cast<uint32_t>(Group.InstanceMatrices.size()));
+                }
+                HLVM_LOG(LogRenderer, info,
+                    TXT("Instancing: {} unique geometries, {} total instances, largest group={} instances"),
+                    GBufferGroups.size(), TotalInstances, MaxGroupSize);
+            }
+            else
+            {
+                HLVM_LOG(LogRenderer, info, TXT("Instancing: no geometry groups found ({} meshes, threshold={})"),
+                    Params.GBufferMeshCount, CVar_r_InstancingThreshold.GetValue());
+            }
+
             if (!GBufferGroups.empty())
             {
                 // Build instanced items with per-group instance buffers

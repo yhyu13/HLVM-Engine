@@ -21,10 +21,6 @@ public:
         glm::vec3 BBoxMin;
         glm::vec3 BBoxMax;
         float SceneRadius = 0.0f;
-
-        // Instancing support
-        nvrhi::BufferHandle InstanceBuffer;  // StructuredBuffer<float4x4>
-        uint32_t InstanceCount = 0;
     };
 
     bool Initialize(nvrhi::IDevice* InDevice, const FPath& ScenePath, FMeshCache* InMeshCache = nullptr);
@@ -58,8 +54,7 @@ public:
     FSceneGPUData& operator=(const FSceneGPUData&) = delete;
 
 private:
-    // Deduplicated geometry entry (one per unique geometry)
-    struct FMeshGeometry
+    struct FMeshGPUData
     {
         nvrhi::BufferHandle VertexBuffer;
         nvrhi::BufferHandle IndexBuffer;
@@ -67,18 +62,9 @@ private:
         std::shared_ptr<FStaticMesh> Mesh;
     };
 
-    // Per-instance data (one per mesh occurrence)
-    struct FMeshInstance
-    {
-        uint32_t GeometryIndex;     // Index into Geometries[]
-        glm::mat4 Transform;       // World transform from scene graph
-        std::shared_ptr<FStaticMesh> Mesh;  // For material lookup
-    };
-
     nvrhi::IDevice* Device = nullptr;
     std::shared_ptr<FScene3DNode> Scene;
-    TVector<FMeshGeometry> Geometries;   // Deduplicated geometries
-    TVector<FMeshInstance> Instances;     // Per-instance data
+    TVector<FMeshGPUData> MeshGPUData;
     FMeshCache* MeshCache = nullptr;
     FPath CachedScenePath;
 
