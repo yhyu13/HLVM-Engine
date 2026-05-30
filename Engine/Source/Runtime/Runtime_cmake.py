@@ -254,6 +254,10 @@ class RuntimeTestModule(BaseModule):
                 shader_cmake = ShaderMakeBuild.create_full_deferred_shading2_shadermake(self.target_name)
             elif "RTShadowsGBuffer" in self.target_name:
                 shader_cmake = ShaderMakeBuild.create_rt_shadows_gbuffer_shadermake(self.target_name)
+            elif "RTReflections" in self.target_name:
+                shader_cmake = ShaderMakeBuild.create_rt_reflections_shadermake(self.target_name)
+            elif "FewBounceGI" in self.target_name:
+                shader_cmake = ShaderMakeBuild.create_few_bounce_gi_shadermake(self.target_name)
             elif "SponzaDeferred" in self.target_name:
                 shader_cmake = ShaderMakeBuild.create_sponza_deferred_shadermake(self.target_name)
             elif "RenderSponza" in self.target_name:

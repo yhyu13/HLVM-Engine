@@ -5,6 +5,7 @@
 #include "Renderer/Texture/TextureCache.h"
 #include "Core/Log.h"
 #include "Platform/FileSystem/FileSystem.h"
+#include "Renderer/DescriptorTableManager.h"
 
 #include <boost/filesystem.hpp>
 
@@ -106,6 +107,16 @@ void FTextureCache::Insert(const FPath& FilePath, nvrhi::TextureHandle Texture)
     FEntry Entry;
     Entry.Texture = Texture;
     Entry.MemoryBytes = EstimateTextureMemory(Texture->getDesc());
+    Entry.BindlessIndex = -1;  // Default: no bindless slot
+
+    // Allocate bindless slot if manager is set
+    if (DescriptorTableManager)
+    {
+        nvrhi::BindingSetItem Item = nvrhi::BindingSetItem::Texture_SRV(0, Texture);
+        Entry.BindlessIndex = DescriptorTableManager->CreateDescriptor(Item);
+        HLVM_LOG(LogTextureCache, info, TXT("FTextureCache: Allocated bindless slot {} for {}"),
+            Entry.BindlessIndex, AbsolutePath.ToTCharCStr());
+    }
 
     try
     {
@@ -176,6 +187,26 @@ size_t FTextureCache::GetTotalMemoryBytes() const
     return Total;
 }
 
+void FTextureCache::SetDescriptorTableManager(FDescriptorTableManager* Manager)
+{
+    LOCK_GUARD_NC();
+    DescriptorTableManager = Manager;
+}
+
+FTextureCache::FBindlessIndex FTextureCache::GetBindlessIndex(const FPath& FilePath) const
+{
+    FPath AbsolutePath = FPath::Absolute(FilePath);
+
+    LOCK_GUARD_NC();
+    auto It = Cache.find(AbsolutePath);
+    if (It != Cache.end())
+    {
+        return It->second.BindlessIndex;
+    }
+
+    return -1;
+}
+
 void FTextureCache::DrawUI()
 {
 #ifndef HLVM_BUILD_RELEASE
@@ -185,14 +216,16 @@ void FTextureCache::DrawUI()
 
         ImGui::Text("Entries: %u", static_cast<uint32_t>(Cache.size()));
         ImGui::Text("Estimated Memory: %.2f MB", GetTotalMemoryBytes() / (1024.0f * 1024.0f));
+        ImGui::Text("Bindless Mode: %s", IsBindlessEnabled() ? "Enabled" : "Disabled");
         ImGui::Separator();
 
-        if (ImGui::BeginTable("TextureCacheTable", 4, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg))
+        if (ImGui::BeginTable("TextureCacheTable", 5, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg))
         {
             ImGui::TableSetupColumn("Path");
             ImGui::TableSetupColumn("Size");
             ImGui::TableSetupColumn("Format");
             ImGui::TableSetupColumn("Memory");
+            ImGui::TableSetupColumn("Bindless");
             ImGui::TableHeadersRow();
 
             for (const auto& Pair : Cache)
@@ -225,6 +258,16 @@ void FTextureCache::DrawUI()
 
                 ImGui::TableNextColumn();
                 ImGui::Text("%.2f KB", Pair.second.MemoryBytes / 1024.0f);
+
+                ImGui::TableNextColumn();
+                if (Pair.second.BindlessIndex >= 0)
+                {
+                    ImGui::Text("%d", Pair.second.BindlessIndex);
+                }
+                else
+                {
+                    ImGui::Text("-");
+                }
             }
 
             ImGui::EndTable();

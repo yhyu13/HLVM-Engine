@@ -13,6 +13,9 @@
 
 #include <ctime>
 
+// Forward declaration
+class FDescriptorTableManager;
+
 /**
  * @brief Centralized texture cache for GPU texture deduplication
  *
@@ -21,6 +24,7 @@
  * - NVRHI handle storage: ref-counted handles automatically manage GPU memory
  * - Memory tracking: estimated VRAM usage per entry and total
  * - File modification tracking: for future hot-reload support
+ * - Optional bindless texture support via FDescriptorTableManager
  *
  * Thread-safe for concurrent reads. All texture loads happen on main thread
  * in practice; lock protects against future async usage.
@@ -28,6 +32,8 @@
 class FTextureCache : private FAtomicFlagNC
 {
 public:
+    using FBindlessIndex = int;
+
     FTextureCache() = default;
 
     /**
@@ -71,16 +77,39 @@ public:
     // Memory budget integration
     void SetMemoryBudget(FMemoryBudget* InBudget) { MemoryBudget = InBudget; }
 
+    /**
+     * @brief Set the descriptor table manager for bindless texture support
+     * @param Manager Pointer to the descriptor table manager (can be nullptr)
+     *
+     * Must be called before any textures are inserted if bindless is desired.
+     * If bindless mode is enabled, textures will be allocated bindless slots.
+     */
+    void SetDescriptorTableManager(FDescriptorTableManager* Manager);
+
+    /**
+     * @brief Get the bindless index for a texture
+     * @param FilePath Path to the texture
+     * @return Bindless index, or -1 if not found or bindless is disabled
+     */
+    FBindlessIndex GetBindlessIndex(const FPath& FilePath) const;
+
+    /**
+     * @brief Check if bindless mode is enabled
+     */
+    bool IsBindlessEnabled() const { return DescriptorTableManager != nullptr; }
+
 private:
     struct FEntry
     {
         nvrhi::TextureHandle Texture;
         std::time_t LastWriteTime = 0;
         size_t MemoryBytes = 0;
+        FBindlessIndex BindlessIndex = -1;  // -1 means not allocated
     };
 
     static size_t EstimateTextureMemory(const nvrhi::TextureDesc& Desc);
 
     mutable TMap<FPath, FEntry> Cache;
     FMemoryBudget* MemoryBudget = nullptr;
+    FDescriptorTableManager* DescriptorTableManager = nullptr;  // Not owned
 };

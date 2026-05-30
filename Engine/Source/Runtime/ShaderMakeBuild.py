@@ -235,6 +235,72 @@ def create_rt_shadows_gbuffer_shadermake(test_target_name: str) -> ShaderMakeMod
     )
 
 
+def create_rt_reflections_shadermake(test_target_name: str) -> ShaderMakeModule:
+    """Factory function to create ShaderMake module for TestRTReflections shaders."""
+    shader_target_name = test_target_name + "_ShaderMake"
+
+    # CMAKE_SOURCE_DIR for Runtime = Engine/Source/Runtime
+    test_data_dir = "${CMAKE_SOURCE_DIR}/Test/TestRTReflections_Data"
+
+    # Config file is in TestRTReflections_Data directory
+    config_file = "${CMAKE_SOURCE_DIR}/Test/TestRTReflections_Data/ShaderMake.cfg"
+
+    # Shader source files for TestRTReflections
+    shader_sources = [
+        test_data_dir + "/RTReflections.hlsl",
+        test_data_dir + "/GBufferSponzaVS.hlsl",
+        test_data_dir + "/GBufferSponzaPS.hlsl",
+    ]
+
+    # Include directories
+    include_dirs = [
+        test_data_dir,
+    ]
+
+    return ShaderMakeModule(
+        target_name=shader_target_name,
+        config_file_cmake=config_file,
+        shader_sources_cmake=shader_sources,
+        output_dir_cmake=test_data_dir,
+        include_dirs_cmake=include_dirs,
+        project_name="HLVM_RTReflections",
+        slang_options=""
+    )
+
+
+def create_few_bounce_gi_shadermake(test_target_name: str) -> ShaderMakeModule:
+    """Factory function to create ShaderMake module for TestFewBounceGI shaders."""
+    shader_target_name = test_target_name + "_ShaderMake"
+
+    # CMAKE_SOURCE_DIR for Runtime = Engine/Source/Runtime
+    test_data_dir = "${CMAKE_SOURCE_DIR}/Test/TestFewBounceGI_Data"
+
+    # Config file is in TestFewBounceGI_Data directory
+    config_file = "${CMAKE_SOURCE_DIR}/Test/TestFewBounceGI_Data/ShaderMake.cfg"
+
+    # Shader source files for TestFewBounceGI
+    shader_sources = [
+        test_data_dir + "/FewBounceGI.hlsl",
+        test_data_dir + "/GBufferSponzaVS.hlsl",
+        test_data_dir + "/GBufferSponzaPS.hlsl",
+    ]
+
+    # Include directories
+    include_dirs = [
+        test_data_dir,
+    ]
+
+    return ShaderMakeModule(
+        target_name=shader_target_name,
+        config_file_cmake=config_file,
+        shader_sources_cmake=shader_sources,
+        output_dir_cmake=test_data_dir,
+        include_dirs_cmake=include_dirs,
+        project_name="HLVM_FewBounceGI",
+        slang_options=""
+    )
+
+
 def create_sponza_deferred_shadermake(test_target_name: str) -> ShaderMakeModule:
     """Factory function to create ShaderMake module for TestSponzaDeferred shaders."""
     shader_target_name = test_target_name + "_ShaderMake"
@@ -400,6 +466,7 @@ def create_common_shadermake() -> ShaderMakeModule:
         shader_dir + "/BlitPS.hlsl",
         shader_dir + "/JointBilateralUpsample_cs.hlsl",
         shader_dir + "/HBAO_cs.hlsl",
+        shader_dir + "/BilateralDenoise_cs.hlsl",
     ]
 
     # Include directories
