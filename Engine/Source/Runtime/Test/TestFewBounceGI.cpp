@@ -121,8 +121,9 @@ public:
         RayGenShader = ShaderLibrary->getShader("RayGen", nvrhi::ShaderType::RayGeneration);
         ClosestHitShader = ShaderLibrary->getShader("ClosestHit", nvrhi::ShaderType::ClosestHit);
         MissShader = ShaderLibrary->getShader("Miss", nvrhi::ShaderType::Miss);
+        ShadowMissShader = ShaderLibrary->getShader("ShadowMiss", nvrhi::ShaderType::Miss);
 
-        if (!RayGenShader || !ClosestHitShader || !MissShader)
+        if (!RayGenShader || !ClosestHitShader || !MissShader || !ShadowMissShader)
         {
             HLVM_LOG(LogTest, err, TXT("Failed to get GI shaders"));
             return false;
@@ -753,7 +754,8 @@ public:
             PipelineDesc.globalBindingLayouts = { RTBindingLayout };
             PipelineDesc.shaders = {
                 { "", RayGenShader, nullptr },
-                { "", MissShader, nullptr }
+                { "", MissShader, nullptr },
+                { "", ShadowMissShader, nullptr }
             };
             PipelineDesc.hitGroups = { { "HitGroup",
                 ClosestHitShader,
@@ -779,6 +781,7 @@ public:
         ShaderTable->setRayGenerationShader("RayGen");
         ShaderTable->addHitGroup("HitGroup");
         ShaderTable->addMissShader("Miss");
+        ShaderTable->addMissShader("ShadowMiss");
 
         // =====================================================================
         // Create HDR output texture
@@ -959,6 +962,7 @@ public:
         RayGenShader = nullptr;
         ClosestHitShader = nullptr;
         MissShader = nullptr;
+        ShadowMissShader = nullptr;
         HDRTexture = nullptr;
         DenoisedHDRTexture = nullptr;
         DenoisePass.Shutdown();
@@ -1570,6 +1574,7 @@ private:
     nvrhi::ShaderHandle        RayGenShader;
     nvrhi::ShaderHandle        ClosestHitShader;
     nvrhi::ShaderHandle        MissShader;
+    nvrhi::ShaderHandle        ShadowMissShader;
 
     // Acceleration structures
     nvrhi::rt::AccelStructHandle          TopLevelAS;

@@ -29,6 +29,10 @@ struct GIPayload {
     uint flags;
 };
 
+struct ShadowPayload {
+    bool occluded;
+};
+
 struct GIConstants {
     float4 LightDir;
     float4 AmbientColor;
@@ -138,9 +142,30 @@ void RayGen() {
 
     float3 lightDir = normalize(g_GI.LightDir.xyz);
 
-    // Primary visible surface direct lighting
+    // Primary visible surface direct lighting with shadow ray
     float NdotL0 = max(dot(normal, lightDir), 0.0);
     float3 primaryDirect = diffuse * NdotL0 * g_GI.LightDir.w;
+
+    // Shadow ray for primary visible surface
+    ShadowPayload shadowPayload;
+    shadowPayload.occluded = true;
+    RayDesc shadowRay;
+    shadowRay.Origin = worldPos + normal * 0.01;
+    shadowRay.Direction = lightDir;
+    shadowRay.TMin = 0.001;
+    shadowRay.TMax = 1000.0;
+    TraceRay(
+        SceneBVH,
+        RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER | RAY_FLAG_FORCE_OPAQUE,
+        0xFF,
+        0,
+        0,
+        1,
+        shadowRay,
+        shadowPayload);
+    float primaryVisibility = shadowPayload.occluded ? 0.0 : 1.0;
+    primaryDirect *= primaryVisibility;
+
     float3 primaryAmbient = diffuse * g_GI.AmbientColor.rgb * 0.3;
     float3 result = primaryDirect + primaryAmbient;
 
@@ -234,8 +259,27 @@ void ClosestHit(inout GIPayload payload : SV_RayPayload, in Attributes attr : SV
     float3 lightDir = normalize(g_GI.LightDir.xyz);
     float NdotL = max(dot(hitNormal, lightDir), 0.0);
 
-    payload.radiance += payload.throughput * albedo * NdotL * g_GI.LightDir.w;
-    payload.radiance += payload.throughput * albedo * g_GI.AmbientColor.rgb * 0.5;
+    // Shadow ray for bounce surface
+    ShadowPayload shadowPayload;
+    shadowPayload.occluded = true;
+    RayDesc shadowRay;
+    shadowRay.Origin = hitPosition + hitNormal * 0.01;
+    shadowRay.Direction = lightDir;
+    shadowRay.TMin = 0.001;
+    shadowRay.TMax = 1000.0;
+    TraceRay(
+        SceneBVH,
+        RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER | RAY_FLAG_FORCE_OPAQUE,
+        0xFF,
+        0,
+        0,
+        1,
+        shadowRay,
+        shadowPayload);
+    float visibility = shadowPayload.occluded ? 0.0 : 1.0;
+
+    payload.radiance += payload.throughput * albedo * NdotL * g_GI.LightDir.w * visibility;
+    payload.radiance += payload.throughput * albedo * g_GI.AmbientColor.rgb * 0.3;
 
     payload.throughput *= albedo;
 
@@ -289,4 +333,9 @@ void Miss(inout GIPayload payload : SV_RayPayload) {
     float3 skyRadiance = SampleSky(WorldRayDirection());
     payload.radiance += payload.throughput * skyRadiance;
     payload.flags &= ~0x01;
+}
+
+[shader("miss")]
+void ShadowMiss(inout ShadowPayload payload : SV_RayPayload) {
+    payload.occluded = false;
 }
