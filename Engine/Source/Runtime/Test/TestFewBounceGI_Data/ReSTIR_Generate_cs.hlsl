@@ -1,126 +1,109 @@
-// ReSTIR GI — Reservoir Generation Compute Pass (Phase 7a)
-//
-// Reads denoised GI radiance and GBuffer data to build per-pixel reservoirs.
-// Each pixel generates exactly 1 sample (itself).
-// Reservoir stores: world position, unbiased weight, weight sum, sample count.
-//
-// Phase 7b will add temporal reuse by merging with history reservoirs.
-
-// =============================================================================
-// Constants Buffer (b0 -> 256)
-// =============================================================================
+// ReSTIR Generation Pass - Streaming RIS with M candidates per pixel
 
 struct FReSTIRConstants
 {
     float2 OutputSize;
     float2 RcpOutputSize;
     float FrameIndex;
-    float DebugVis;       // 1.0 = output debug grayscale, 0.0 = normal
+    float NumCandidates;
+    float DepthThreshold;
+    float NormalThreshold;
+    float DebugVis;
     float2 Pad;
 };
 
 cbuffer Constants : register(b0)
 {
     FReSTIRConstants gConstants;
-};
+}
 
-// =============================================================================
-// Texture Bindings
-// =============================================================================
-
-// t0: Denoised HDR radiance (RGB = radiance, A = hit distance)
 Texture2D<float4> gRadiance : register(t0);
-// t1: GBuffer world position
 Texture2D<float4> gWorldPos : register(t1);
-// t2: GBuffer normals (RGB packed [0,1])
 Texture2D<float4> gNormals : register(t2);
-// t3: Linear depth
 Texture2D<float> gDepth : register(t3);
 
-// u0: Reservoir0 (RGB = world position, A = unbiased weight W)
 RWTexture2D<float4> gReservoir0 : register(u0);
-// u1: Reservoir1 (R = w_sum, G = M, B = pdf, A = unused)
 RWTexture2D<float4> gReservoir1 : register(u1);
-// u2: Debug visualization (grayscale reservoir weight)
-RWTexture2D<float4> gDebugOutput : register(u2);
 
-// =============================================================================
-// Utility Functions
-// =============================================================================
+// PCG hash (better quality than simple LCG)
+uint pcg_hash(uint v)
+{
+    uint state = v * 747796405u + 2891336453u;
+    uint word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
+    return (word >> 22u) ^ word;
+}
+
+float2 hash22(float2 p)
+{
+    uint3 q = uint3(int2(p * 4194304.0), uint(gConstants.FrameIndex));
+    uint n = pcg_hash(q.x + pcg_hash(q.y + pcg_hash(q.z)));
+    return float2(n & 0xFFFFu, n >> 16u) / 65535.0;
+}
 
 float Luminance(float3 rgb)
 {
     return dot(rgb, float3(0.2126, 0.7152, 0.0722));
 }
 
-// =============================================================================
-// Reservoir Generation
-// =============================================================================
+// Sample tent distribution: maps uniform [0,1] to tent-shaped PDF
+// Returns value in [-1, 1] with peak at 0
+float2 SampleTent(float2 u)
+{
+    float2 v = 2.0 * u - 1.0;
+    float2 s = sign(v);
+    float2 tent = s * (1.0 - sqrt(1.0 - abs(v)));
+    return tent;
+}
 
 [numthreads(8, 8, 1)]
 void main(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
-    float2 outputSize;
-    outputSize.x = gConstants.OutputSize[0];
-    outputSize.y = gConstants.OutputSize[1];
-
-    // Early out if thread is outside output bounds
+    float2 outputSize = gConstants.OutputSize;
     if (dispatchThreadID.x >= (uint)outputSize.x || dispatchThreadID.y >= (uint)outputSize.y)
-    {
         return;
-    }
 
     int2 pixel = int2(dispatchThreadID.xy);
 
-    // Read inputs
-    float4 radianceHitDist = gRadiance.Load(int3(pixel, 0));
-    float3 radiance = radianceHitDist.rgb;
-    float hitDist = radianceHitDist.a;
+    // Streaming RIS: accumulate M candidates
+    float w_sum = 0.0;
+    float2 y = float2(pixel); // selected sample position
+    int M = int(gConstants.NumCandidates);
+    float radius = 2.0; // candidate search radius in pixels
 
-    float4 worldPosPacked = gWorldPos.Load(int3(pixel, 0));
-    float3 worldPos = worldPosPacked.rgb;
-
-    float4 normalPacked = gNormals.Load(int3(pixel, 0));
-    float3 normal = normalPacked.rgb * 2.0 - 1.0;
-
-    float depth = gDepth.Load(int3(pixel, 0)).r;
-
-    // Handle sky / invalid pixels
-    if (depth == 0.0 || all(radiance == float3(0.0, 0.0, 0.0)))
+    for (int i = 0; i < M; ++i)
     {
-        // Zero reservoir for sky/background
-        gReservoir0[pixel] = float4(0.0, 0.0, 0.0, 0.0);
-        gReservoir1[pixel] = float4(0.0, 0.0, 0.0, 0.0);
-        gDebugOutput[pixel] = float4(0.0, 0.0, 0.0, 1.0);
-        return;
+        // Hash-based random for deterministic but varied sampling
+        // Deterministic candidates for static-scene stability (no FrameIndex in offset)
+        float2 h = hash22(float2(pixel) + float2(i, i * 13.0));
+        float2 offset = SampleTent(h) * radius;
+        int2 q = clamp(pixel + int2(offset + float2(0.5, 0.5)), int2(0, 0), int2(outputSize) - int2(1, 1));
+
+        // Evaluate target function p_hat = luminance of radiance at candidate q
+        float3 radiance = gRadiance.Load(int3(q, 0)).rgb;
+        float p_hat = Luminance(radiance);
+
+        // Streaming RIS update
+        // q(y) = 1 / (4 * radius^2) for uniform tent, so w = p_hat / q(y) = p_hat * 4 * radius^2
+        // But since q(y) is constant for all candidates, it cancels in the selection probability
+        float w = p_hat;
+        w_sum += w;
+
+        // Select candidate with probability w / w_sum
+        // Deterministic selection threshold for static-scene stability
+        float2 h2 = hash22(float2(pixel) + float2(i + 100, i * 31.0));
+        if (h2.x * w_sum < w)
+        {
+            y = float2(q);
+        }
     }
 
-    // Target function p_hat(y) = luminance of radiance
-    // This is the quantity we want to importance-sample over the pixel grid.
-    float p_hat = Luminance(radiance);
-    p_hat = max(p_hat, 1e-6); // Prevent zero weights
+    // Reservoir storage:
+    // Reservoir0: xy = selected pixel y, z = w_sum, w = M
+    // Reservoir1: x = W ( unbiased weight = w_sum / (M * p_hat(y)) ), y = pdf (p_hat(y)), zw = unused
+    float3 selectedRadiance = gRadiance.Load(int3(int2(y), 0)).rgb;
+    float selectedPhat = Luminance(selectedRadiance);
+    float W = (selectedPhat > 0.0) ? (w_sum / (float(M) * selectedPhat)) : 0.0;
 
-    // For Phase 7a, each pixel generates exactly 1 sample (itself).
-    // Sampling PDF p(y) = 1.0 (uniform over pixel grid).
-    // Therefore: w_sum = p_hat / p(y) = p_hat
-    float w_sum = p_hat;
-    float M = 1.0;
-    float pdf = 1.0;
-
-    // Unbiased contribution weight: W = w_sum / (M * p(y))
-    // Since p(y) = 1.0: W = w_sum / M = p_hat
-    float W = w_sum / max(M, 1e-6);
-
-    // Pack and write reservoir data
-    gReservoir0[pixel] = float4(worldPos, W);
-    gReservoir1[pixel] = float4(w_sum, M, pdf, hitDist);
-
-    // Debug visualization: grayscale based on W (log-scaled for visibility)
-    if (gConstants.DebugVis > 0.5)
-    {
-        float logW = log10(1.0 + W);
-        float debugGray = saturate(logW / 2.0); // Normalize roughly
-        gDebugOutput[pixel] = float4(debugGray, debugGray, debugGray, 1.0);
-    }
-
+    gReservoir0[pixel] = float4(y, w_sum, float(M));
+    gReservoir1[pixel] = float4(W, selectedPhat, 0.0, 0.0);
 }

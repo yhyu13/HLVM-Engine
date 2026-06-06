@@ -1,15 +1,16 @@
 /**
  * Copyright (c) 2026. MIT License. All rights reserved.
  *
- * Few-bounce GI Test - Sequential Bounce Tracing for RESTIR GI
+ * Few-bounce GI Test - Clean Baseline (Phase 0)
  *
  * Pipeline:
  * 1. Load Sponza scene (27 meshes) with glTF textures
- * 2. GBuffer Pass: Render all meshes to 5 MRTs (Diffuse, Specular, Normal, Emissive, WorldPos)
- * 3. GI Pass: Sequential bounce tracing (2-4 bounces), cosine-weighted sampling, miss=black
- * 4. Blit Pass: Copy GI output to swapchain
+ * 2. GBuffer Pass: Render all meshes to 5 MRTs
+ * 3. GI Pass: Sequential bounce tracing (3 bounces), cosine-weighted sampling
+ * 4. Bilateral Denoise: Edge-preserving filter on GI output
+ * 5. Blit Pass: Copy denoised output to swapchain
  *
- * Purpose: Provide few-bounce GI infrastructure for RESTIR.
+ * Purpose: Clean baseline before ReSTIR implementation.
  */
 
 #include "Test.h"
@@ -26,9 +27,8 @@
 #include "Renderer/RayTracing/BLASBuilder.h"
 #include "Renderer/RayTracing/TLASBuilder.h"
 #include "Renderer/ShaderMake/ShaderBlob.h"
-#include "Renderer/PostProcess/FBilateralDenoisePass.h"
-#include "Renderer/PostProcess/FReBLURPass.h"
 #include "Renderer/PostProcess/FReSTIRPass.h"
+#include "Renderer/PostProcess/FBilateralDenoisePass.h"
 #include "Image/FImageDump.h"
 #include "Core/Parallel/Async/WorkStealThreadPool.h"
 #include <nvrhi/utils.h>
@@ -39,8 +39,6 @@
 #include <glm/gtc/type_ptr.hpp>
 
 DECLARE_LOG_CATEGORY(LogTest)
-
-static bool g_ReSTIRDebugVis = false;
 
 #if HLVM_VULKAN_RENDERER
 
@@ -264,6 +262,123 @@ public:
         }
         TopLevelAS = TLASBuilder.GetTLAS();
         HLVM_LOG(LogTest, info, TXT("TLAS built with {} instances"), TLASBuilder.GetInstanceCount());
+
+        // =====================================================================
+        // Create unified vertex/index buffers for ray tracing hit shaders
+        // =====================================================================
+        {
+            struct FRTVertex { glm::vec3 Position; glm::vec3 Normal; };
+            struct FInstanceInfo {
+                uint32_t VertexOffset;
+                uint32_t IndexOffset;
+                uint32_t VertexCount;
+                uint32_t IndexCount;
+                float AlbedoColor[3];
+                float Padding;
+            };
+
+            TVector<FRTVertex> AllVertices;
+            TVector<uint32_t> AllIndices;
+            TVector<FInstanceInfo> InstanceInfos;
+            AllVertices.reserve(1024 * 1024);
+            AllIndices.reserve(1024 * 1024);
+
+            uint32_t vertexOffset = 0;
+            uint32_t indexOffset = 0;
+
+            for (const auto& Mesh : StaticMeshes)
+            {
+                const auto& Vertices = Mesh->GetVertices();
+                const auto& Indices = Mesh->GetIndices();
+
+                FInstanceInfo Info;
+                Info.VertexOffset = vertexOffset;
+                Info.IndexOffset = indexOffset;
+                Info.VertexCount = static_cast<uint32_t>(Vertices.size());
+                Info.IndexCount = static_cast<uint32_t>(Indices.size());
+                Info.AlbedoColor[0] = 0.7f;
+                Info.AlbedoColor[1] = 0.7f;
+                Info.AlbedoColor[2] = 0.7f;
+                Info.Padding = 0.0f;
+
+                // Look up material albedo color for this mesh
+                if (Mesh && Scene)
+                {
+                    auto it = Scene->MeshMultiMaterialMap.find(Mesh);
+                    if (it != Scene->MeshMultiMaterialMap.end())
+                    {
+                        auto& materials = it->second;
+                        if (!materials.empty())
+                        {
+                            if (auto PBRMat = std::dynamic_pointer_cast<FPBRMaterial>(materials[0]))
+                            {
+                                FVec3 albedo = PBRMat->GetAlbedoColor();
+                                Info.AlbedoColor[0] = albedo.x;
+                                Info.AlbedoColor[1] = albedo.y;
+                                Info.AlbedoColor[2] = albedo.z;
+                            }
+                        }
+                    }
+                }
+
+                InstanceInfos.push_back(Info);
+
+                for (const auto& V : Vertices)
+                {
+                    FRTVertex RTV;
+                    RTV.Position = V.Position;
+                    RTV.Normal = V.Normal;
+                    AllVertices.push_back(RTV);
+                }
+
+                for (uint32_t Idx : Indices)
+                {
+                    AllIndices.push_back(Idx + vertexOffset);
+                }
+
+                vertexOffset += Info.VertexCount;
+                indexOffset += Info.IndexCount;
+            }
+
+            if (!AllVertices.empty())
+            {
+                nvrhi::BufferDesc VBDesc;
+                VBDesc.byteSize = AllVertices.size() * sizeof(FRTVertex);
+                VBDesc.isVolatile = false;
+                VBDesc.keepInitialState = true;
+                VBDesc.initialState = nvrhi::ResourceStates::ShaderResource;
+                VBDesc.debugName = "RTVertexBuffer";
+                VBDesc.structStride = sizeof(FRTVertex);
+                RTVertexBuffer = NvrhiDevice->createBuffer(VBDesc);
+                InitCmdList->writeBuffer(RTVertexBuffer, AllVertices.data(), VBDesc.byteSize);
+            }
+
+            if (!AllIndices.empty())
+            {
+                nvrhi::BufferDesc IBDesc;
+                IBDesc.byteSize = AllIndices.size() * sizeof(uint32_t);
+                IBDesc.isVolatile = false;
+                IBDesc.keepInitialState = true;
+                IBDesc.initialState = nvrhi::ResourceStates::ShaderResource;
+                IBDesc.debugName = "RTIndexBuffer";
+                IBDesc.structStride = sizeof(uint32_t);
+                RTIndexBuffer = NvrhiDevice->createBuffer(IBDesc);
+                InitCmdList->writeBuffer(RTIndexBuffer, AllIndices.data(), IBDesc.byteSize);
+            }
+
+            if (!InstanceInfos.empty())
+            {
+                nvrhi::BufferDesc InfoDesc;
+                InfoDesc.byteSize = InstanceInfos.size() * sizeof(FInstanceInfo);
+                InfoDesc.isVolatile = false;
+                InfoDesc.keepInitialState = true;
+                InfoDesc.initialState = nvrhi::ResourceStates::ShaderResource;
+                InfoDesc.debugName = "RTInstanceInfoBuffer";
+                InfoDesc.structStride = sizeof(FInstanceInfo);
+                RTInstanceInfoBuffer = NvrhiDevice->createBuffer(InfoDesc);
+                InitCmdList->writeBuffer(RTInstanceInfoBuffer, InstanceInfos.data(), InfoDesc.byteSize);
+            }
+        }
 
         InitCmdList->close();
         NvrhiDevice->executeCommandList(InitCmdList);
@@ -605,6 +720,9 @@ public:
             // t1: GBufferWorldPos -> 1
             // t2: GBufferNormals -> 2
             // t3: GBufferDiffuse -> 3
+            // t5: RTVertices -> 5
+            // t6: RTIndices -> 6
+            // t7: RTInstanceInfo -> 7
             // u0: Output -> 384 (uRegShift=384)
             LayoutDesc.bindings = {
                 nvrhi::BindingLayoutItem::ConstantBuffer(256),
@@ -613,6 +731,9 @@ public:
                 nvrhi::BindingLayoutItem::Texture_SRV(1),
                 nvrhi::BindingLayoutItem::Texture_SRV(2),
                 nvrhi::BindingLayoutItem::Texture_SRV(3),
+                nvrhi::BindingLayoutItem::StructuredBuffer_SRV(5),
+                nvrhi::BindingLayoutItem::StructuredBuffer_SRV(6),
+                nvrhi::BindingLayoutItem::StructuredBuffer_SRV(7),
                 nvrhi::BindingLayoutItem::Texture_UAV(384)
             };
 
@@ -705,50 +826,11 @@ public:
             return false;
         }
 
-        // =====================================================================
-        // Create ReBLUR textures and initialize ReBLUR pass
-        // =====================================================================
-        HLVM_LOG(LogTest, info, TXT("Creating ReBLUR textures..."));
-        {
-            nvrhi::TextureDesc Desc;
-            Desc.dimension = nvrhi::TextureDimension::Texture2D;
-            Desc.width = GBufferWidth;
-            Desc.height = GBufferHeight;
-            Desc.format = nvrhi::Format::RGBA32_FLOAT;
-            Desc.isRenderTarget = false;
-            Desc.isUAV = true;
-            Desc.isTypeless = false;
-            Desc.initialState = nvrhi::ResourceStates::UnorderedAccess;
-            Desc.keepInitialState = true;
-            Desc.debugName = "ReBLURHistoryTexture";
-            ReBLURHistoryTexture = NvrhiDevice->createTexture(Desc);
 
-            Desc.debugName = "ReBLUROutputTexture";
-            ReBLUROutputTexture = NvrhiDevice->createTexture(Desc);
-        }
 
-        // Clear ReBLUR history texture to zero (uninitialized memory may contain NaN,
-        // which would propagate through SpatialBlur and produce black output)
-        {
-            nvrhi::CommandListHandle ClearCmd = NvrhiDevice->createCommandList();
-            ClearCmd->open();
-            nvrhi::Color ClearColor(0.0f, 0.0f, 0.0f, 0.0f);
-            ClearCmd->clearTextureFloat(ReBLURHistoryTexture, nvrhi::AllSubresources, ClearColor);
-            ClearCmd->close();
-            NvrhiDevice->executeCommandList(ClearCmd);
-        }
-
-        // Initialize ReBLUR pass
-        if (!ReBLURPass.Initialize(NvrhiDevice, DataDir))
-        {
-            HLVM_LOG(LogTest, err, TXT("Failed to initialize ReBLURPass"));
-            return false;
-        }
-        bReBLURInitialized = true;
-        HLVM_LOG(LogTest, info, TXT("ReBLUR pass initialized successfully"));
 
         // =====================================================================
-        // Create ReSTIR reservoir textures and initialize ReSTIR pass
+        // Create ReSTIR textures and initialize ReSTIR pass
         // =====================================================================
         HLVM_LOG(LogTest, info, TXT("Creating ReSTIR textures..."));
         {
@@ -756,49 +838,68 @@ public:
             Desc.dimension = nvrhi::TextureDimension::Texture2D;
             Desc.width = GBufferWidth;
             Desc.height = GBufferHeight;
-            Desc.format = nvrhi::Format::RGBA32_FLOAT;
+            Desc.format = nvrhi::Format::RGBA16_FLOAT;
             Desc.isRenderTarget = false;
             Desc.isUAV = true;
             Desc.isTypeless = false;
             Desc.initialState = nvrhi::ResourceStates::UnorderedAccess;
             Desc.keepInitialState = true;
+
             Desc.debugName = "Reservoir0";
             Reservoir0Texture = NvrhiDevice->createTexture(Desc);
-
             Desc.debugName = "Reservoir1";
             Reservoir1Texture = NvrhiDevice->createTexture(Desc);
-
             Desc.debugName = "Reservoir0History";
             Reservoir0HistoryTexture = NvrhiDevice->createTexture(Desc);
-
             Desc.debugName = "Reservoir1History";
             Reservoir1HistoryTexture = NvrhiDevice->createTexture(Desc);
-
             Desc.debugName = "Reservoir0Merged";
             Reservoir0MergedTexture = NvrhiDevice->createTexture(Desc);
-
             Desc.debugName = "Reservoir1Merged";
             Reservoir1MergedTexture = NvrhiDevice->createTexture(Desc);
 
-            Desc.debugName = "SpatialRadiance";
-            SpatialRadianceTexture = NvrhiDevice->createTexture(Desc);
-
-            Desc.debugName = "ReSTIRDebug";
-            ReSTIRDebugTexture = NvrhiDevice->createTexture(Desc);
+            Desc.format = nvrhi::Format::RGBA32_FLOAT;
+            Desc.debugName = "ReSTIROutput";
+            ReSTIROutputTexture = NvrhiDevice->createTexture(Desc);
+            Desc.debugName = "TemporalRadiance";
+            TemporalRadianceTexture = NvrhiDevice->createTexture(Desc);
+            Desc.debugName = "RadianceHistory";
+            RadianceHistoryTexture = NvrhiDevice->createTexture(Desc);
         }
 
-        // Clear ReSTIR history textures to zero (avoid garbage M values on first frame)
+        // Previous frame depth and normal for temporal validation
+        {
+            nvrhi::TextureDesc Desc;
+            Desc.dimension = nvrhi::TextureDimension::Texture2D;
+            Desc.width = GBufferWidth;
+            Desc.height = GBufferHeight;
+            // Use same depth format as GBufferDepthTexture so copyTexture is valid
+            Desc.format = nvrhi::Format::D32;
+            Desc.isRenderTarget = false;
+            Desc.isUAV = false;
+            Desc.isTypeless = true;
+            Desc.initialState = nvrhi::ResourceStates::ShaderResource;
+            Desc.keepInitialState = true;
+            Desc.debugName = "PrevDepth";
+            PrevDepthTexture = NvrhiDevice->createTexture(Desc);
+
+            Desc.format = nvrhi::Format::RGBA16_FLOAT;
+            Desc.debugName = "PrevNormal";
+            PrevNormalTexture = NvrhiDevice->createTexture(Desc);
+        }
+
+        // Clear history textures
         {
             nvrhi::CommandListHandle ClearCmd = NvrhiDevice->createCommandList();
             ClearCmd->open();
             nvrhi::Color ClearColor(0.0f, 0.0f, 0.0f, 0.0f);
             ClearCmd->clearTextureFloat(Reservoir0HistoryTexture, nvrhi::AllSubresources, ClearColor);
             ClearCmd->clearTextureFloat(Reservoir1HistoryTexture, nvrhi::AllSubresources, ClearColor);
+            ClearCmd->clearTextureFloat(RadianceHistoryTexture, nvrhi::AllSubresources, ClearColor);
             ClearCmd->close();
             NvrhiDevice->executeCommandList(ClearCmd);
         }
 
-        // Initialize ReSTIR pass
         if (!ReSTIRPass.Initialize(NvrhiDevice, DataDir))
         {
             HLVM_LOG(LogTest, err, TXT("Failed to initialize ReSTIRPass"));
@@ -861,14 +962,7 @@ public:
         HDRTexture = nullptr;
         DenoisedHDRTexture = nullptr;
         DenoisePass.Shutdown();
-        if (bReBLURInitialized)
-        {
-            ReBLURPass.Shutdown();
-            bReBLURInitialized = false;
-        }
-        ReBLURHistoryTexture = nullptr;
-        ReBLUROutputTexture = nullptr;
-
+        RTBindingSet = nullptr;
         if (bReSTIRInitialized)
         {
             ReSTIRPass.Shutdown();
@@ -880,10 +974,15 @@ public:
         Reservoir1HistoryTexture = nullptr;
         Reservoir0MergedTexture = nullptr;
         Reservoir1MergedTexture = nullptr;
-        SpatialRadianceTexture = nullptr;
-        ReSTIRDebugTexture = nullptr;
-        RTBindingSet = nullptr;
+        ReSTIROutputTexture = nullptr;
+        TemporalRadianceTexture = nullptr;
+        RadianceHistoryTexture = nullptr;
+        PrevDepthTexture = nullptr;
+        PrevNormalTexture = nullptr;
         GIConstantBuffer = nullptr;
+        RTVertexBuffer = nullptr;
+        RTIndexBuffer = nullptr;
+        RTInstanceInfoBuffer = nullptr;
         StagingTexture = nullptr;
         MeshBLASHandles.clear();
         TLASBuilder.Reset();
@@ -1163,7 +1262,7 @@ public:
         glm::vec3 LightDir = glm::normalize(glm::vec3(sinf(LightAngle), 0.6f, cosf(LightAngle)));
         float GIConstantsData[16] = {
             LightDir.x, LightDir.y, LightDir.z, 1.0f,      // LightDir + intensity
-            0.3f, 0.3f, 0.35f, 0.0f,                       // Ambient color (slightly blue)
+            0.6f, 0.6f, 0.65f, 0.0f,                       // Ambient color (bright overcast)
             CameraPos.x, CameraPos.y, CameraPos.z, 1.0f,    // CameraPos (w=1.0)
             0.0f, 0.0f, 0.0f, 0.0f                         // padding
         };
@@ -1181,6 +1280,9 @@ public:
             nvrhi::BindingSetItem::Texture_SRV(1, GBufferWorldPosTexture),
             nvrhi::BindingSetItem::Texture_SRV(2, GBufferNormalsTexture),
             nvrhi::BindingSetItem::Texture_SRV(3, GBufferDiffuseTexture),
+            nvrhi::BindingSetItem::StructuredBuffer_SRV(5, RTVertexBuffer),
+            nvrhi::BindingSetItem::StructuredBuffer_SRV(6, RTIndexBuffer),
+            nvrhi::BindingSetItem::StructuredBuffer_SRV(7, RTInstanceInfoBuffer),
             nvrhi::BindingSetItem::Texture_UAV(384, HDRTexture)
         };
         RTBindingSet = BindingCache.GetOrCreateBindingSet(RTBindingSetDesc, RTBindingLayout);
@@ -1214,215 +1316,138 @@ public:
         DenoiseDesc.OutputHeight = CurrentFBInfo.height;
         DenoiseDesc.DepthSigma = 0.01f;      // Sharp depth edges
         DenoiseDesc.NormalSigma = 0.1f;      // Sharp normal edges
-        DenoiseDesc.SpatialSigma = 2.0f;    // 5x5 kernel effective radius
+        DenoiseDesc.SpatialSigma = 4.0f;    // Stronger smoothing for 1-SPP noise
         DenoisePass.Dispatch(CmdList, DenoiseDesc);
 
         // =====================================================================
-        // ReSTIR Generation Pass: Build per-pixel reservoirs
+        // ReSTIR Pass: Generation -> Temporal -> Spatial
         // =====================================================================
         if (bReSTIRInitialized)
         {
-            // Transition textures for ReSTIR
+            // Transition inputs to ShaderResource
             CmdList->setTextureState(DenoisedHDRTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
             CmdList->setTextureState(GBufferWorldPosTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
             CmdList->setTextureState(GBufferNormalsTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
             CmdList->setTextureState(GBufferDepthTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+
+            // Generation: write to Reservoir0/1
             CmdList->setTextureState(Reservoir0Texture, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
             CmdList->setTextureState(Reservoir1Texture, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
-            CmdList->setTextureState(ReSTIRDebugTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
 
-            ReSTIR::FReSTIRPass::FDesc ReSTIRDesc;
-            ReSTIRDesc.RadianceTexture = DenoisedHDRTexture;
-            ReSTIRDesc.WorldPosTexture = GBufferWorldPosTexture;
-            ReSTIRDesc.NormalTexture = GBufferNormalsTexture;
-            ReSTIRDesc.DepthTexture = GBufferDepthTexture;
-            ReSTIRDesc.OutReservoir0 = Reservoir0Texture;
-            ReSTIRDesc.OutReservoir1 = Reservoir1Texture;
-            ReSTIRDesc.OutDebugTexture = ReSTIRDebugTexture;
-            ReSTIRDesc.OutputWidth = CurrentFBInfo.width;
-            ReSTIRDesc.OutputHeight = CurrentFBInfo.height;
+            ReSTIR::FReSTIRConstants GenConstants;
+            GenConstants.OutputSize[0] = static_cast<float>(CurrentFBInfo.width);
+            GenConstants.OutputSize[1] = static_cast<float>(CurrentFBInfo.height);
+            GenConstants.RcpOutputSize[0] = 1.0f / static_cast<float>(CurrentFBInfo.width);
+            GenConstants.RcpOutputSize[1] = 1.0f / static_cast<float>(CurrentFBInfo.height);
+            GenConstants.FrameIndex = static_cast<float>(TemporalFrameCount);
+            GenConstants.NumCandidates = 8.0f;
+            GenConstants.DepthThreshold = 0.05f;
+            GenConstants.NormalThreshold = 0.5f;
+            GenConstants.DebugVis = 0.0f;
 
-            ReSTIR::FReSTIRConstants ReSTIRConstants;
-            ReSTIRConstants.OutputSize[0] = static_cast<float>(CurrentFBInfo.width);
-            ReSTIRConstants.OutputSize[1] = static_cast<float>(CurrentFBInfo.height);
-            ReSTIRConstants.RcpOutputSize[0] = 1.0f / static_cast<float>(CurrentFBInfo.width);
-            ReSTIRConstants.RcpOutputSize[1] = 1.0f / static_cast<float>(CurrentFBInfo.height);
-            ReSTIRConstants.FrameIndex = static_cast<float>(TemporalFrameCount);
-            ReSTIRConstants.DebugVis = g_ReSTIRDebugVis ? 1.0f : 0.0f;
+            ReSTIR::FReSTIRPass::FGenerationDesc GenDesc;
+            GenDesc.RadianceTexture = DenoisedHDRTexture;
+            GenDesc.WorldPosTexture = GBufferWorldPosTexture;
+            GenDesc.NormalTexture = GBufferNormalsTexture;
+            GenDesc.DepthTexture = GBufferDepthTexture;
+            GenDesc.OutReservoir0 = Reservoir0Texture;
+            GenDesc.OutReservoir1 = Reservoir1Texture;
+            GenDesc.OutputWidth = CurrentFBInfo.width;
+            GenDesc.OutputHeight = CurrentFBInfo.height;
+            ReSTIRPass.DispatchGeneration(CmdList, GenDesc, GenConstants);
 
-            ReSTIRPass.Dispatch(CmdList, ReSTIRDesc, ReSTIRConstants);
-
-            // =====================================================================
-            // ReSTIR Temporal Reuse Pass: Merge with history
-            // =====================================================================
+            // Transition generation outputs to ShaderResource for temporal
             CmdList->setTextureState(Reservoir0Texture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
             CmdList->setTextureState(Reservoir1Texture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
-            CmdList->setTextureState(Reservoir0HistoryTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
-            CmdList->setTextureState(Reservoir1HistoryTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
-            CmdList->setTextureState(GBufferDepthTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+
+            // Transition temporal outputs to UAV
             CmdList->setTextureState(Reservoir0MergedTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
             CmdList->setTextureState(Reservoir1MergedTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
-            CmdList->setTextureState(ReSTIRDebugTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
+            CmdList->setTextureState(TemporalRadianceTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
 
-            ReSTIR::FReSTIRPass::FTemporalDesc TemporalDesc;
-            TemporalDesc.CurrentReservoir0 = Reservoir0Texture;
-            TemporalDesc.CurrentReservoir1 = Reservoir1Texture;
-            TemporalDesc.HistoryReservoir0 = Reservoir0HistoryTexture;
-            TemporalDesc.HistoryReservoir1 = Reservoir1HistoryTexture;
-            TemporalDesc.DepthTexture = GBufferDepthTexture;
-            TemporalDesc.OutReservoir0 = Reservoir0MergedTexture;
-            TemporalDesc.OutReservoir1 = Reservoir1MergedTexture;
-            TemporalDesc.OutDebugTexture = ReSTIRDebugTexture;
-            TemporalDesc.OutputWidth = CurrentFBInfo.width;
-            TemporalDesc.OutputHeight = CurrentFBInfo.height;
-
-            ReSTIR::FReSTIRTemporalConstants TemporalConstants;
-            glm::mat4 currViewProj = proj * view;
-            glm::mat4 invCurrViewProj = glm::inverse(currViewProj);
-            memcpy(TemporalConstants.InverseCurrViewProj, glm::value_ptr(invCurrViewProj), sizeof(TemporalConstants.InverseCurrViewProj));
-            memcpy(TemporalConstants.PrevViewProj, glm::value_ptr(PrevViewProj), sizeof(TemporalConstants.PrevViewProj));
-            TemporalConstants.OutputSize[0] = static_cast<float>(CurrentFBInfo.width);
-            TemporalConstants.OutputSize[1] = static_cast<float>(CurrentFBInfo.height);
-            TemporalConstants.RcpOutputSize[0] = 1.0f / static_cast<float>(CurrentFBInfo.width);
-            TemporalConstants.RcpOutputSize[1] = 1.0f / static_cast<float>(CurrentFBInfo.height);
-            TemporalConstants.FrameIndex = static_cast<float>(TemporalFrameCount);
-            TemporalConstants.MaxM = 30.0f;
-            TemporalConstants.DebugVis = g_ReSTIRDebugVis ? 1.0f : 0.0f;
-
-            ReSTIRPass.DispatchTemporal(CmdList, TemporalDesc, TemporalConstants);
-
-            // Swap: merged output becomes next frame's history
-            std::swap(Reservoir0MergedTexture, Reservoir0HistoryTexture);
-            std::swap(Reservoir1MergedTexture, Reservoir1HistoryTexture);
-
-            // =====================================================================
-            // ReSTIR Spatial Reuse Pass: Merge with 3x3 neighbors
-            // =====================================================================
-            // After swap, Reservoir0/1HistoryTexture contains the merged result
+            // Transition history to ShaderResource for temporal reading
             CmdList->setTextureState(Reservoir0HistoryTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
             CmdList->setTextureState(Reservoir1HistoryTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
-            CmdList->setTextureState(GBufferNormalsTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
-            CmdList->setTextureState(GBufferDepthTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
-            CmdList->setTextureState(DenoisedHDRTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
-            CmdList->setTextureState(SpatialRadianceTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
-            CmdList->setTextureState(ReSTIRDebugTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
+            // ReSTIROutputTexture from previous frame serves as radiance history
+            CmdList->setTextureState(ReSTIROutputTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
 
-            ReSTIR::FReSTIRPass::FSpatialDesc SpatialDesc;
-            SpatialDesc.MergedReservoir0 = Reservoir0HistoryTexture;
-            SpatialDesc.MergedReservoir1 = Reservoir1HistoryTexture;
-            SpatialDesc.NormalTexture = GBufferNormalsTexture;
-            SpatialDesc.DepthTexture = GBufferDepthTexture;
-            SpatialDesc.RadianceTexture = DenoisedHDRTexture;
-            SpatialDesc.OutRadiance = SpatialRadianceTexture;
-            SpatialDesc.OutDebugTexture = ReSTIRDebugTexture;
-            SpatialDesc.OutputWidth = CurrentFBInfo.width;
-            SpatialDesc.OutputHeight = CurrentFBInfo.height;
-
-            ReSTIR::FReSTIRSpatialConstants SpatialConstants;
-            SpatialConstants.OutputSize[0] = static_cast<float>(CurrentFBInfo.width);
-            SpatialConstants.OutputSize[1] = static_cast<float>(CurrentFBInfo.height);
-            SpatialConstants.RcpOutputSize[0] = 1.0f / static_cast<float>(CurrentFBInfo.width);
-            SpatialConstants.RcpOutputSize[1] = 1.0f / static_cast<float>(CurrentFBInfo.height);
-            SpatialConstants.NormalSigma = 0.1f;
-            SpatialConstants.PlaneSigma = 100.0f;
-            SpatialConstants.DepthSigma = 0.01f;
-            SpatialConstants.MaxM = 30.0f;
-            SpatialConstants.SpatialRadius = 3.0f;
-            SpatialConstants.DebugVis = g_ReSTIRDebugVis ? 2.0f : 0.0f;
-
-            ReSTIRPass.DispatchSpatial(CmdList, SpatialDesc, SpatialConstants);
-
-            // Update PrevViewProj for next frame
-            PrevViewProj = currViewProj;
-        }
-
-        // =====================================================================
-        // ReBLUR Pass: Temporal denoiser with SH encoding
-        // =====================================================================
-        if (bReBLURInitialized)
-        {
-            // Compute current ViewProj and its inverse for ReBLUR
+            // Temporal constants
+            ReSTIR::FReSTIRTemporalConstants TempConstants;
             glm::mat4 currViewProj = proj * view;
             glm::mat4 invCurrViewProj = glm::inverse(currViewProj);
+            memcpy(TempConstants.InverseCurrViewProj, glm::value_ptr(invCurrViewProj), 64);
+            memcpy(TempConstants.PrevViewProj, glm::value_ptr(PrevViewProj), 64);
+            TempConstants.OutputSize[0] = static_cast<float>(CurrentFBInfo.width);
+            TempConstants.OutputSize[1] = static_cast<float>(CurrentFBInfo.height);
+            TempConstants.RcpOutputSize[0] = 1.0f / static_cast<float>(CurrentFBInfo.width);
+            TempConstants.RcpOutputSize[1] = 1.0f / static_cast<float>(CurrentFBInfo.height);
+            TempConstants.FrameIndex = static_cast<float>(TemporalFrameCount);
+            TempConstants.MaxM = 30.0f;
+            TempConstants.DepthThreshold = 0.05f;
+            TempConstants.NormalThreshold = 0.5f;
+            TempConstants.DebugVis = 0.0f;
 
-            // Transition textures for ReBLUR
-            nvrhi::TextureHandle ReBLURInputTexture = bReSTIRInitialized ? SpatialRadianceTexture : DenoisedHDRTexture;
-            CmdList->setTextureState(ReBLURInputTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
-            CmdList->setTextureState(ReBLURHistoryTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
-            CmdList->setTextureState(ReBLUROutputTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
-            CmdList->setTextureState(GBufferDepthTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
-            CmdList->setTextureState(GBufferNormalsTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+            ReSTIR::FReSTIRPass::FTemporalDesc TempDesc;
+            TempDesc.CurrentReservoir0 = Reservoir0Texture;
+            TempDesc.CurrentReservoir1 = Reservoir1Texture;
+            TempDesc.HistoryReservoir0 = Reservoir0HistoryTexture;
+            TempDesc.HistoryReservoir1 = Reservoir1HistoryTexture;
+            TempDesc.CurrentRadiance = DenoisedHDRTexture;
+            TempDesc.HistoryRadiance = ReSTIROutputTexture;
+            TempDesc.DepthTexture = GBufferDepthTexture;
+            TempDesc.NormalTexture = GBufferNormalsTexture;
+            TempDesc.PrevDepthTexture = PrevDepthTexture;
+            TempDesc.PrevNormalTexture = PrevNormalTexture;
+            TempDesc.OutReservoir0 = Reservoir0MergedTexture;
+            TempDesc.OutReservoir1 = Reservoir1MergedTexture;
+            TempDesc.OutRadiance = TemporalRadianceTexture;
+            TempDesc.OutputWidth = CurrentFBInfo.width;
+            TempDesc.OutputHeight = CurrentFBInfo.height;
+            ReSTIRPass.DispatchTemporal(CmdList, TempDesc, TempConstants);
 
-            ReBLUR::FReBLURPass::FDesc ReBLURDesc;
-            ReBLURDesc.CurrentRadianceTexture = ReBLURInputTexture; // RGB = radiance, A = confidence (from spatial reuse)
-            ReBLURDesc.HistoryTexture = ReBLURHistoryTexture;
-            ReBLURDesc.DepthTexture = GBufferDepthTexture;
-            ReBLURDesc.NormalRoughnessTexture = GBufferNormalsTexture; // Note: normals only, roughness from GBuffer
-            ReBLURDesc.OutputTexture = ReBLUROutputTexture;
-            ReBLURDesc.OutputWidth = CurrentFBInfo.width;
-            ReBLURDesc.OutputHeight = CurrentFBInfo.height;
+            // Swap history with merged for next frame
+            std::swap(Reservoir0HistoryTexture, Reservoir0MergedTexture);
+            std::swap(Reservoir1HistoryTexture, Reservoir1MergedTexture);
 
-            ReBLUR::FReBLURConstants ReBLURConstants;
-            memcpy(ReBLURConstants.InverseCurrViewProj, glm::value_ptr(invCurrViewProj), sizeof(ReBLURConstants.InverseCurrViewProj));
-            memcpy(ReBLURConstants.PrevViewProj, glm::value_ptr(PrevViewProj), sizeof(ReBLURConstants.PrevViewProj));
-            memcpy(ReBLURConstants.ViewMatrix, glm::value_ptr(view), sizeof(ReBLURConstants.ViewMatrix));
-            memcpy(ReBLURConstants.ProjMatrix, glm::value_ptr(proj), sizeof(ReBLURConstants.ProjMatrix));
-            ReBLURConstants.OutputSize[0] = static_cast<float>(CurrentFBInfo.width);
-            ReBLURConstants.OutputSize[1] = static_cast<float>(CurrentFBInfo.height);
-            ReBLURConstants.RcpOutputSize[0] = 1.0f / static_cast<float>(CurrentFBInfo.width);
-            ReBLURConstants.RcpOutputSize[1] = 1.0f / static_cast<float>(CurrentFBInfo.height);
-            // Hit distance normalization params (A, B, C, D)
-            ReBLURConstants.HitDistParams[0] = 3.0f;
-            ReBLURConstants.HitDistParams[1] = 0.1f;
-            ReBLURConstants.HitDistParams[2] = 20.0f;
-            ReBLURConstants.HitDistParams[3] = -25.0f;
-            ReBLURConstants.FrameIndex = static_cast<float>(TemporalFrameCount);
-            ReBLURConstants.HistoryFadeIn = 6.0f;
-            ReBLURConstants.ConfidenceScale = 1.0f;
+            // Spatial: evaluate merged reservoirs, write to ReSTIROutput
+            // DenoisedHDRTexture is already in ShaderResource state from generation pass
+            CmdList->setTextureState(ReSTIROutputTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
 
-            ReBLUR::FPooledBlurParams BlurParams;
-            BlurParams.BlurRadius = 0.0f;  // Spatial blur disabled for now
-            BlurParams.NormalWeight = 0.1f;
-            BlurParams.PlaneWeight = 2.0f;
-            BlurParams.RoughnessWeight = 0.3f;
-            BlurParams.AntiLagIntensity = 0.5f;
-            BlurParams.DarknessSensitivity = 0.01f;
+            ReSTIR::FReSTIRSpatialConstants SpatConstants;
+            SpatConstants.OutputSize[0] = static_cast<float>(CurrentFBInfo.width);
+            SpatConstants.OutputSize[1] = static_cast<float>(CurrentFBInfo.height);
+            SpatConstants.RcpOutputSize[0] = 1.0f / static_cast<float>(CurrentFBInfo.width);
+            SpatConstants.RcpOutputSize[1] = 1.0f / static_cast<float>(CurrentFBInfo.height);
+            SpatConstants.NormalThreshold = 0.5f;
+            SpatConstants.DepthThreshold = 0.05f;
+            SpatConstants.MaxM = 30.0f;
+            SpatConstants.SpatialRadius = 1.0f;
+            SpatConstants.DebugVis = 0.0f;
 
-            // Single dispatch: temporal accumulation only
-            ReBLURPass.Dispatch(CmdList, ReBLURDesc, ReBLURConstants, BlurParams);
+            ReSTIR::FReSTIRPass::FSpatialDesc SpatDesc;
+            SpatDesc.RadianceTexture = DenoisedHDRTexture;
+            SpatDesc.Reservoir0 = Reservoir0HistoryTexture;
+            SpatDesc.Reservoir1 = Reservoir1HistoryTexture;
+            SpatDesc.NormalTexture = GBufferNormalsTexture;
+            SpatDesc.DepthTexture = GBufferDepthTexture;
+            SpatDesc.OutRadiance = ReSTIROutputTexture;
+            SpatDesc.OutputWidth = CurrentFBInfo.width;
+            SpatDesc.OutputHeight = CurrentFBInfo.height;
+            ReSTIRPass.DispatchSpatial(CmdList, SpatDesc, SpatConstants);
 
-            // Ping-pong swap for next frame
-            std::swap(ReBLURHistoryTexture, ReBLUROutputTexture);
-
-            // Update PrevViewProj for next frame
+            // Copy current frame depth/normal for next frame's temporal reprojection
+            CmdList->copyTexture(PrevDepthTexture, nvrhi::TextureSlice(), GBufferDepthTexture, nvrhi::TextureSlice());
+            CmdList->copyTexture(PrevNormalTexture, nvrhi::TextureSlice(), GBufferNormalsTexture, nvrhi::TextureSlice());
             PrevViewProj = currViewProj;
         }
 
         // =====================================================================
-        // Frame dump: copy ReBLUR output to staging (before blit, on same command list)
+        // Frame dump: copy output to staging (before blit, on same command list)
         // =====================================================================
         static bool dumpRequested = !!getenv("HLVM_DUMP_GI");
         static int framesToDump = 0;
         bool doDumpThisFrame = dumpRequested && framesToDump < 4;
-        nvrhi::TextureHandle DumpTexture;
-        // Frame dump logic
-        static bool bDebugDumpSpatial = false;
-        if (bDebugDumpSpatial && bReSTIRInitialized)
-        {
-            DumpTexture = SpatialRadianceTexture;
-        }
-        else if (g_ReSTIRDebugVis && bReSTIRInitialized)
-        {
-            DumpTexture = ReSTIRDebugTexture;
-        }
-        else if (bReBLURInitialized)
-        {
-            DumpTexture = ReBLURHistoryTexture;
-        }
-        else
-        {
-            DumpTexture = bReSTIRInitialized ? SpatialRadianceTexture : DenoisedHDRTexture;
-        }
+        nvrhi::TextureHandle DumpTexture = bReSTIRInitialized ? ReSTIROutputTexture : DenoisedHDRTexture;
         if (doDumpThisFrame) {
             framesToDump++;
             CmdList->setTextureState(DumpTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::CopySource);
@@ -1434,7 +1459,7 @@ public:
         }
 
         // =====================================================================
-        // Always blit ReBLUR output to screen (or denoised HDR if ReBLUR disabled)
+        // Always blit denoised output to screen
         // =====================================================================
         CmdList->setTextureState(DumpTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
         FCommonRenderPasses::BlitParameters BlitParams;
@@ -1508,17 +1533,18 @@ public:
     {
         HDRTexture = nullptr;
         DenoisedHDRTexture = nullptr;
-        ReBLURHistoryTexture = nullptr;
-        ReBLUROutputTexture = nullptr;
+        StagingTexture = nullptr;
         Reservoir0Texture = nullptr;
         Reservoir1Texture = nullptr;
         Reservoir0HistoryTexture = nullptr;
         Reservoir1HistoryTexture = nullptr;
         Reservoir0MergedTexture = nullptr;
         Reservoir1MergedTexture = nullptr;
-        SpatialRadianceTexture = nullptr;
-        ReSTIRDebugTexture = nullptr;
-        StagingTexture = nullptr;
+        ReSTIROutputTexture = nullptr;
+        TemporalRadianceTexture = nullptr;
+        RadianceHistoryTexture = nullptr;
+        PrevDepthTexture = nullptr;
+        PrevNormalTexture = nullptr;
         RTBindingSet = nullptr;
         GBufferFramebuffer = nullptr;
         GBufferDiffuseTexture = nullptr;
@@ -1561,6 +1587,11 @@ private:
     // Constant buffer for GI
     nvrhi::BufferHandle GIConstantBuffer;
 
+    // Ray tracing mesh data buffers for hit shader normal lookup
+    nvrhi::BufferHandle RTVertexBuffer;
+    nvrhi::BufferHandle RTIndexBuffer;
+    nvrhi::BufferHandle RTInstanceInfoBuffer;
+
     // GBuffer shaders
     nvrhi::ShaderHandle GBufferVS;
     nvrhi::ShaderHandle GBufferPS;
@@ -1596,17 +1627,10 @@ private:
     FBindingCache            BindingCache;
     nvrhi::CommandListHandle CommandList;
 
-    // Denoise pass (pre-denoiser before ReBLUR)
+    // Denoise pass (bilateral filter on GI output)
     FBilateralDenoisePass DenoisePass;
 
-    // ReBLUR pass (temporal denoiser)
-    ReBLUR::FReBLURPass ReBLURPass;
-    nvrhi::TextureHandle ReBLURHistoryTexture;  // Ping-pong history (SH encoded)
-    nvrhi::TextureHandle ReBLUROutputTexture;  // Ping-pong output
-    bool bReBLURInitialized = false;
-    glm::mat4 PrevViewProj = glm::mat4(1.0f);  // Previous frame's view-projection for ReBLUR
-
-    // ReSTIR pass (reservoir generation + temporal + spatial reuse)
+    // ReSTIR pass
     ReSTIR::FReSTIRPass ReSTIRPass;
     nvrhi::TextureHandle Reservoir0Texture;
     nvrhi::TextureHandle Reservoir1Texture;
@@ -1614,9 +1638,14 @@ private:
     nvrhi::TextureHandle Reservoir1HistoryTexture;
     nvrhi::TextureHandle Reservoir0MergedTexture;
     nvrhi::TextureHandle Reservoir1MergedTexture;
-    nvrhi::TextureHandle SpatialRadianceTexture;  // Phase 8 output
-    nvrhi::TextureHandle ReSTIRDebugTexture;
+    nvrhi::TextureHandle ReSTIROutputTexture;
+    nvrhi::TextureHandle TemporalRadianceTexture;
+    nvrhi::TextureHandle RadianceHistoryTexture;
+    nvrhi::TextureHandle PrevDepthTexture;
+    nvrhi::TextureHandle PrevNormalTexture;
     bool bReSTIRInitialized = false;
+
+    glm::mat4 PrevViewProj = glm::mat4(1.0f);
 
     // Staging texture for frame dumps
     nvrhi::StagingTextureHandle StagingTexture;

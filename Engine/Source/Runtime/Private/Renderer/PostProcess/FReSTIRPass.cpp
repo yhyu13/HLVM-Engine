@@ -51,7 +51,7 @@ namespace ReSTIR
         ShaderDataDir = InShaderDataDir;
 
         // =====================================================================
-        // Load Generation compute shader from .sblob
+        // Load Generation compute shader
         // =====================================================================
         {
             auto ShaderBlob = ReadBinaryFile(
@@ -75,7 +75,7 @@ namespace ReSTIR
         }
 
         // =====================================================================
-        // Load Temporal compute shader from .sblob
+        // Load Temporal compute shader
         // =====================================================================
         {
             auto ShaderBlob = ReadBinaryFile(
@@ -99,7 +99,7 @@ namespace ReSTIR
         }
 
         // =====================================================================
-        // Load Spatial compute shader from .sblob
+        // Load Spatial compute shader
         // =====================================================================
         {
             auto ShaderBlob = ReadBinaryFile(
@@ -133,14 +133,6 @@ namespace ReSTIR
             offsets.setConstantBufferOffset(0).setShaderResourceOffset(0).setSamplerOffset(0).setUnorderedAccessViewOffset(0);
             LayoutDesc.setBindingOffsets(offsets);
 
-            // b0 -> 256 (Constants)
-            // t0 -> 0 (Radiance texture)
-            // t1 -> 1 (WorldPos texture)
-            // t2 -> 2 (Normal texture)
-            // t3 -> 3 (Depth texture)
-            // u0 -> 384 (Reservoir0)
-            // u1 -> 385 (Reservoir1)
-            // u2 -> 386 (Debug output)
             LayoutDesc.bindings = {
                 nvrhi::BindingLayoutItem::ConstantBuffer(256),
                 nvrhi::BindingLayoutItem::Texture_SRV(0),   // Radiance
@@ -148,8 +140,7 @@ namespace ReSTIR
                 nvrhi::BindingLayoutItem::Texture_SRV(2),   // Normal
                 nvrhi::BindingLayoutItem::Texture_SRV(3),   // Depth
                 nvrhi::BindingLayoutItem::Texture_UAV(384), // Reservoir0
-                nvrhi::BindingLayoutItem::Texture_UAV(385), // Reservoir1
-                nvrhi::BindingLayoutItem::Texture_UAV(386)  // Debug output
+                nvrhi::BindingLayoutItem::Texture_UAV(385)  // Reservoir1
             };
 
             GenerationLayout = Device->createBindingLayout(LayoutDesc);
@@ -166,15 +157,6 @@ namespace ReSTIR
             offsets.setConstantBufferOffset(0).setShaderResourceOffset(0).setSamplerOffset(0).setUnorderedAccessViewOffset(0);
             LayoutDesc.setBindingOffsets(offsets);
 
-            // b0 -> 256 (Constants)
-            // t0 -> 0 (Current Reservoir0)
-            // t1 -> 1 (Current Reservoir1)
-            // t2 -> 2 (History Reservoir0)
-            // t3 -> 3 (History Reservoir1)
-            // t4 -> 4 (Depth)
-            // u0 -> 384 (Merged Reservoir0)
-            // u1 -> 385 (Merged Reservoir1)
-            // u2 -> 386 (Debug output)
             LayoutDesc.bindings = {
                 nvrhi::BindingLayoutItem::ConstantBuffer(256),
                 nvrhi::BindingLayoutItem::Texture_SRV(0),   // Current R0
@@ -182,9 +164,14 @@ namespace ReSTIR
                 nvrhi::BindingLayoutItem::Texture_SRV(2),   // History R0
                 nvrhi::BindingLayoutItem::Texture_SRV(3),   // History R1
                 nvrhi::BindingLayoutItem::Texture_SRV(4),   // Depth
-                nvrhi::BindingLayoutItem::Texture_UAV(384), // Merged R0
-                nvrhi::BindingLayoutItem::Texture_UAV(385), // Merged R1
-                nvrhi::BindingLayoutItem::Texture_UAV(386)  // Debug output
+                nvrhi::BindingLayoutItem::Texture_SRV(5),   // Normal
+                nvrhi::BindingLayoutItem::Texture_SRV(6),   // PrevDepth
+                nvrhi::BindingLayoutItem::Texture_SRV(7),   // PrevNormal
+                nvrhi::BindingLayoutItem::Texture_SRV(8),   // Current Radiance
+                nvrhi::BindingLayoutItem::Texture_SRV(9),   // History Radiance
+                nvrhi::BindingLayoutItem::Texture_UAV(384), // Out R0
+                nvrhi::BindingLayoutItem::Texture_UAV(385), // Out R1
+                nvrhi::BindingLayoutItem::Texture_UAV(386)  // Out Radiance
             };
 
             TemporalLayout = Device->createBindingLayout(LayoutDesc);
@@ -201,23 +188,14 @@ namespace ReSTIR
             offsets.setConstantBufferOffset(0).setShaderResourceOffset(0).setSamplerOffset(0).setUnorderedAccessViewOffset(0);
             LayoutDesc.setBindingOffsets(offsets);
 
-            // b0 -> 256 (Constants)
-            // t0 -> 0 (Merged Reservoir0)
-            // t1 -> 1 (Merged Reservoir1)
-            // t2 -> 2 (Normal texture)
-            // t3 -> 3 (Depth texture)
-            // t4 -> 4 (Radiance texture)
-            // u0 -> 384 (Output radiance)
-            // u1 -> 385 (Debug output)
             LayoutDesc.bindings = {
                 nvrhi::BindingLayoutItem::ConstantBuffer(256),
-                nvrhi::BindingLayoutItem::Texture_SRV(0),   // Merged R0
-                nvrhi::BindingLayoutItem::Texture_SRV(1),   // Merged R1
-                nvrhi::BindingLayoutItem::Texture_SRV(2),   // Normal
-                nvrhi::BindingLayoutItem::Texture_SRV(3),   // Depth
-                nvrhi::BindingLayoutItem::Texture_SRV(4),   // Radiance
-                nvrhi::BindingLayoutItem::Texture_UAV(384), // Output radiance
-                nvrhi::BindingLayoutItem::Texture_UAV(385)  // Debug output
+                nvrhi::BindingLayoutItem::Texture_SRV(0),   // Radiance
+                nvrhi::BindingLayoutItem::Texture_SRV(1),   // Reservoir0
+                nvrhi::BindingLayoutItem::Texture_SRV(2),   // Reservoir1
+                nvrhi::BindingLayoutItem::Texture_SRV(3),   // Normal
+                nvrhi::BindingLayoutItem::Texture_SRV(4),   // Depth
+                nvrhi::BindingLayoutItem::Texture_UAV(384)  // Output radiance
             };
 
             SpatialLayout = Device->createBindingLayout(LayoutDesc);
@@ -263,7 +241,7 @@ namespace ReSTIR
         }
 
         // =====================================================================
-        // Create constant buffer (256 bytes for alignment)
+        // Create constant buffer
         // =====================================================================
         {
             nvrhi::BufferDesc BufferDesc;
@@ -281,7 +259,7 @@ namespace ReSTIR
         return true;
     }
 
-    void FReSTIRPass::Dispatch(nvrhi::ICommandList* CmdList, const FDesc& Desc, const FReSTIRConstants& Constants)
+    void FReSTIRPass::DispatchGeneration(nvrhi::ICommandList* CmdList, const FGenerationDesc& Desc, const FReSTIRConstants& Constants)
     {
         if (!CmdList || !GenerationPipeline || !ConstantBuffer)
             return;
@@ -297,11 +275,10 @@ namespace ReSTIR
 
         if (outputW == 0 || outputH == 0)
         {
-            HLVM_LOG(LogPostProcess, warn, TXT("FReSTIRPass::Dispatch: invalid output dimensions"));
+            HLVM_LOG(LogPostProcess, warn, TXT("FReSTIRPass::DispatchGeneration: invalid output dimensions"));
             return;
         }
 
-        // Build constants data (256 bytes)
         float ConstantsData[64];
         memset(ConstantsData, 0, sizeof(ConstantsData));
 
@@ -311,11 +288,13 @@ namespace ReSTIR
         ConstantsData[offset++] = Constants.RcpOutputSize[0];
         ConstantsData[offset++] = Constants.RcpOutputSize[1];
         ConstantsData[offset++] = Constants.FrameIndex;
+        ConstantsData[offset++] = Constants.NumCandidates;
+        ConstantsData[offset++] = Constants.DepthThreshold;
+        ConstantsData[offset++] = Constants.NormalThreshold;
         ConstantsData[offset++] = Constants.DebugVis;
 
         CmdList->writeBuffer(ConstantBuffer, ConstantsData, sizeof(ConstantsData));
 
-        // Create binding set
         nvrhi::BindingSetDesc BindingSetDesc;
         BindingSetDesc.bindings = {
             nvrhi::BindingSetItem::ConstantBuffer(256, ConstantBuffer),
@@ -324,12 +303,10 @@ namespace ReSTIR
             nvrhi::BindingSetItem::Texture_SRV(2, Desc.NormalTexture),
             nvrhi::BindingSetItem::Texture_SRV(3, Desc.DepthTexture),
             nvrhi::BindingSetItem::Texture_UAV(384, Desc.OutReservoir0),
-            nvrhi::BindingSetItem::Texture_UAV(385, Desc.OutReservoir1),
-            nvrhi::BindingSetItem::Texture_UAV(386, Desc.OutDebugTexture)
+            nvrhi::BindingSetItem::Texture_UAV(385, Desc.OutReservoir1)
         };
         nvrhi::BindingSetHandle BindingSet = Device->createBindingSet(BindingSetDesc, GenerationLayout);
 
-        // Dispatch (8x8 thread groups)
         uint32_t dispatchX = (outputW + 7) / 8;
         uint32_t dispatchY = (outputH + 7) / 8;
 
@@ -360,31 +337,26 @@ namespace ReSTIR
             return;
         }
 
-        // Build constants data (256 bytes)
         float ConstantsData[64];
         memset(ConstantsData, 0, sizeof(ConstantsData));
 
         size_t offset = 0;
-        // InverseCurrViewProj (16 floats)
         memcpy(&ConstantsData[offset], Constants.InverseCurrViewProj, 64);
         offset += 16;
-
-        // PrevViewProj (16 floats)
         memcpy(&ConstantsData[offset], Constants.PrevViewProj, 64);
         offset += 16;
-
         ConstantsData[offset++] = Constants.OutputSize[0];
         ConstantsData[offset++] = Constants.OutputSize[1];
         ConstantsData[offset++] = Constants.RcpOutputSize[0];
         ConstantsData[offset++] = Constants.RcpOutputSize[1];
         ConstantsData[offset++] = Constants.FrameIndex;
         ConstantsData[offset++] = Constants.MaxM;
+        ConstantsData[offset++] = Constants.DepthThreshold;
+        ConstantsData[offset++] = Constants.NormalThreshold;
         ConstantsData[offset++] = Constants.DebugVis;
-        ConstantsData[offset++] = Constants.Pad;
 
         CmdList->writeBuffer(ConstantBuffer, ConstantsData, sizeof(ConstantsData));
 
-        // Create binding set
         nvrhi::BindingSetDesc BindingSetDesc;
         BindingSetDesc.bindings = {
             nvrhi::BindingSetItem::ConstantBuffer(256, ConstantBuffer),
@@ -393,13 +365,17 @@ namespace ReSTIR
             nvrhi::BindingSetItem::Texture_SRV(2, Desc.HistoryReservoir0),
             nvrhi::BindingSetItem::Texture_SRV(3, Desc.HistoryReservoir1),
             nvrhi::BindingSetItem::Texture_SRV(4, Desc.DepthTexture),
+            nvrhi::BindingSetItem::Texture_SRV(5, Desc.NormalTexture),
+            nvrhi::BindingSetItem::Texture_SRV(6, Desc.PrevDepthTexture),
+            nvrhi::BindingSetItem::Texture_SRV(7, Desc.PrevNormalTexture),
+            nvrhi::BindingSetItem::Texture_SRV(8, Desc.CurrentRadiance),
+            nvrhi::BindingSetItem::Texture_SRV(9, Desc.HistoryRadiance),
             nvrhi::BindingSetItem::Texture_UAV(384, Desc.OutReservoir0),
             nvrhi::BindingSetItem::Texture_UAV(385, Desc.OutReservoir1),
-            nvrhi::BindingSetItem::Texture_UAV(386, Desc.OutDebugTexture)
+            nvrhi::BindingSetItem::Texture_UAV(386, Desc.OutRadiance)
         };
         nvrhi::BindingSetHandle BindingSet = Device->createBindingSet(BindingSetDesc, TemporalLayout);
 
-        // Dispatch (8x8 thread groups)
         uint32_t dispatchX = (outputW + 7) / 8;
         uint32_t dispatchY = (outputH + 7) / 8;
 
@@ -430,7 +406,6 @@ namespace ReSTIR
             return;
         }
 
-        // Build constants data (256 bytes)
         float ConstantsData[64];
         memset(ConstantsData, 0, sizeof(ConstantsData));
 
@@ -439,34 +414,29 @@ namespace ReSTIR
         ConstantsData[offset++] = Constants.OutputSize[1];
         ConstantsData[offset++] = Constants.RcpOutputSize[0];
         ConstantsData[offset++] = Constants.RcpOutputSize[1];
-        ConstantsData[offset++] = Constants.NormalSigma;
-        ConstantsData[offset++] = Constants.PlaneSigma;
-        ConstantsData[offset++] = Constants.DepthSigma;
+        ConstantsData[offset++] = Constants.NormalThreshold;
+        ConstantsData[offset++] = Constants.DepthThreshold;
         ConstantsData[offset++] = Constants.MaxM;
         ConstantsData[offset++] = Constants.SpatialRadius;
         ConstantsData[offset++] = Constants.DebugVis;
 
         CmdList->writeBuffer(ConstantBuffer, ConstantsData, sizeof(ConstantsData));
 
-        // Create binding set
         nvrhi::BindingSetDesc BindingSetDesc;
         BindingSetDesc.bindings = {
             nvrhi::BindingSetItem::ConstantBuffer(256, ConstantBuffer),
-            nvrhi::BindingSetItem::Texture_SRV(0, Desc.MergedReservoir0),
-            nvrhi::BindingSetItem::Texture_SRV(1, Desc.MergedReservoir1),
-            nvrhi::BindingSetItem::Texture_SRV(2, Desc.NormalTexture),
-            nvrhi::BindingSetItem::Texture_SRV(3, Desc.DepthTexture),
-            nvrhi::BindingSetItem::Texture_SRV(4, Desc.RadianceTexture),
-            nvrhi::BindingSetItem::Texture_UAV(384, Desc.OutRadiance),
-            nvrhi::BindingSetItem::Texture_UAV(385, Desc.OutDebugTexture)
+            nvrhi::BindingSetItem::Texture_SRV(0, Desc.RadianceTexture),
+            nvrhi::BindingSetItem::Texture_SRV(1, Desc.Reservoir0),
+            nvrhi::BindingSetItem::Texture_SRV(2, Desc.Reservoir1),
+            nvrhi::BindingSetItem::Texture_SRV(3, Desc.NormalTexture),
+            nvrhi::BindingSetItem::Texture_SRV(4, Desc.DepthTexture),
+            nvrhi::BindingSetItem::Texture_UAV(384, Desc.OutRadiance)
         };
         nvrhi::BindingSetHandle BindingSet = Device->createBindingSet(BindingSetDesc, SpatialLayout);
 
-        // Dispatch (8x8 thread groups)
         uint32_t dispatchX = (outputW + 7) / 8;
         uint32_t dispatchY = (outputH + 7) / 8;
 
-        HLVM_LOG(LogPostProcess, info, TXT("DispatchSpatial: dispatching {}x{}x1 to {}x{} texture"), dispatchX, dispatchY, outputW, outputH);
         nvrhi::ComputeState ComputeState;
         ComputeState.setPipeline(SpatialPipeline);
         ComputeState.addBindingSet(BindingSet);

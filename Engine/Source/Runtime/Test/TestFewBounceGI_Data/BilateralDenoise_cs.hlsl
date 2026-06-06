@@ -63,9 +63,9 @@ void main(uint2 dispatchThreadId : SV_DispatchThreadID)
         return;
 
     // Center pixel data
-    float centerDepth = t_Depth[pixelCoord];
-    float3 centerNormal = normalize(t_Normal[pixelCoord].rgb * 2.0 - 1.0);
-    float3 centerValue = t_Input[pixelCoord];
+    float centerDepth = t_Depth.Load(int3(pixelCoord, 0));
+    float3 centerNormal = normalize(t_Normal.Load(int3(pixelCoord, 0)).rgb * 2.0 - 1.0);
+    float3 centerValue = t_Input.Load(int3(pixelCoord, 0));
 
     float3 sum = centerValue;
     float weightSum = 1.0;
@@ -94,19 +94,19 @@ void main(uint2 dispatchThreadId : SV_DispatchThreadID)
             float wSpatial = spatialWeight(distSq, SpatialSigma);
 
             // Depth weight
-            float neighborDepth = t_Depth[uint2(neighborPixel)];
+            float neighborDepth = t_Depth.Load(int3(neighborPixel, 0));
             float depthDiff = abs(neighborDepth - centerDepth);
             float wDepth = depthWeight(depthDiff, DepthSigma);
 
             // Normal weight
-            float3 neighborNormal = normalize(t_Normal[uint2(neighborPixel)].rgb * 2.0 - 1.0);
+            float3 neighborNormal = normalize(t_Normal.Load(int3(neighborPixel, 0)).rgb * 2.0 - 1.0);
             float wNormal = normalWeight(centerNormal, neighborNormal, NormalSigma);
 
             // Combined weight
             float weight = wSpatial * wDepth * wNormal;
 
             // Accumulate
-            float3 neighborValue = t_Input[uint2(neighborPixel)];
+            float3 neighborValue = t_Input.Load(int3(neighborPixel, 0));
             sum += neighborValue * weight;
             weightSum += weight;
         }

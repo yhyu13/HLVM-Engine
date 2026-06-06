@@ -2,10 +2,12 @@
 //
 // MIT License
 //
-// FReSTIRPass — ReSTIR GI Reservoir Pass (Phase 7a + 7b)
+// FReSTIRPass — ReSTIR GI Reservoir Pass (Corrected Implementation)
 //
-// Phase 7a: Generation — converts GI output into per-pixel reservoirs
-// Phase 7b: Temporal  — merges reservoirs with reprojected history
+// Screen-space ReSTIR with:
+//   - Generation: M candidates via tent distribution, streaming RIS
+//   - Temporal: reprojection + prev-frame depth/normal validation
+//   - Spatial: 3x3 merge with geometric rejection, outputs selected radiance
 
 #pragma once
 
@@ -14,17 +16,18 @@
 
 namespace ReSTIR
 {
-    // Phase 7a constants
     struct FReSTIRConstants
     {
         TFP32 OutputSize[2];
         TFP32 RcpOutputSize[2];
         TFP32 FrameIndex;
+        TFP32 NumCandidates;
+        TFP32 DepthThreshold;
+        TFP32 NormalThreshold;
         TFP32 DebugVis;
         TFP32 Pad[2];
     };
 
-    // Phase 7b constants
     struct FReSTIRTemporalConstants
     {
         TFP32 InverseCurrViewProj[16];
@@ -33,28 +36,28 @@ namespace ReSTIR
         TFP32 RcpOutputSize[2];
         TFP32 FrameIndex;
         TFP32 MaxM;
+        TFP32 DepthThreshold;
+        TFP32 NormalThreshold;
         TFP32 DebugVis;
-        TFP32 Pad;
+        TFP32 Pad[3];
     };
 
-    // Phase 8 constants
     struct FReSTIRSpatialConstants
     {
         TFP32 OutputSize[2];
         TFP32 RcpOutputSize[2];
-        TFP32 NormalSigma;
-        TFP32 PlaneSigma;
-        TFP32 DepthSigma;
+        TFP32 NormalThreshold;
+        TFP32 DepthThreshold;
         TFP32 MaxM;
         TFP32 SpatialRadius;
         TFP32 DebugVis;
+        TFP32 Pad[2];
     };
 
     class FReSTIRPass
     {
     public:
-        // Phase 7a descriptor
-        struct FDesc
+        struct FGenerationDesc
         {
             nvrhi::TextureHandle RadianceTexture;
             nvrhi::TextureHandle WorldPosTexture;
@@ -62,36 +65,37 @@ namespace ReSTIR
             nvrhi::TextureHandle DepthTexture;
             nvrhi::TextureHandle OutReservoir0;
             nvrhi::TextureHandle OutReservoir1;
-            nvrhi::TextureHandle OutDebugTexture;
             uint32_t OutputWidth = 0;
             uint32_t OutputHeight = 0;
         };
 
-        // Phase 7b descriptor
         struct FTemporalDesc
         {
             nvrhi::TextureHandle CurrentReservoir0;
             nvrhi::TextureHandle CurrentReservoir1;
             nvrhi::TextureHandle HistoryReservoir0;
             nvrhi::TextureHandle HistoryReservoir1;
+            nvrhi::TextureHandle CurrentRadiance;
+            nvrhi::TextureHandle HistoryRadiance;
             nvrhi::TextureHandle DepthTexture;
+            nvrhi::TextureHandle NormalTexture;
+            nvrhi::TextureHandle PrevDepthTexture;
+            nvrhi::TextureHandle PrevNormalTexture;
             nvrhi::TextureHandle OutReservoir0;
             nvrhi::TextureHandle OutReservoir1;
-            nvrhi::TextureHandle OutDebugTexture;
+            nvrhi::TextureHandle OutRadiance;
             uint32_t OutputWidth = 0;
             uint32_t OutputHeight = 0;
         };
 
-        // Phase 8 descriptor
         struct FSpatialDesc
         {
-            nvrhi::TextureHandle MergedReservoir0;
-            nvrhi::TextureHandle MergedReservoir1;
+            nvrhi::TextureHandle RadianceTexture;
+            nvrhi::TextureHandle Reservoir0;
+            nvrhi::TextureHandle Reservoir1;
             nvrhi::TextureHandle NormalTexture;
             nvrhi::TextureHandle DepthTexture;
-            nvrhi::TextureHandle RadianceTexture;
             nvrhi::TextureHandle OutRadiance;
-            nvrhi::TextureHandle OutDebugTexture;
             uint32_t OutputWidth = 0;
             uint32_t OutputHeight = 0;
         };
@@ -105,7 +109,7 @@ namespace ReSTIR
         FReSTIRPass& operator=(FReSTIRPass&&) = delete;
 
         bool Initialize(nvrhi::IDevice* InDevice, const FString& InShaderDataDir);
-        void Dispatch(nvrhi::ICommandList* CmdList, const FDesc& Desc, const FReSTIRConstants& Constants);
+        void DispatchGeneration(nvrhi::ICommandList* CmdList, const FGenerationDesc& Desc, const FReSTIRConstants& Constants);
         void DispatchTemporal(nvrhi::ICommandList* CmdList, const FTemporalDesc& Desc, const FReSTIRTemporalConstants& Constants);
         void DispatchSpatial(nvrhi::ICommandList* CmdList, const FSpatialDesc& Desc, const FReSTIRSpatialConstants& Constants);
         void Shutdown();
