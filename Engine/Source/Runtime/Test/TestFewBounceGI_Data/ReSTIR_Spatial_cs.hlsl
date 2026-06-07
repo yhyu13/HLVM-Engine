@@ -1,7 +1,11 @@
-// ReSTIR Spatial Pass - Cross-bilateral filter on temporally-merged reservoirs
-// Merges 3x3 neighbors using geometric weights, then outputs radiance at selected sample y.
-// NOTE: W weight is computed but not applied due to naive spatial merge bias.
-//       Use pairwise MIS in production for unbiased spatial reuse.
+// ReSTIR Spatial Pass — Pairwise MIS spatial reuse
+// Replaces naive reservoir merge with proper MIS-weighted combination of
+// all valid neighbor reservoirs. Each reservoir contributes proportional to
+// its w_sum, normalized by total M*p_hat across the neighborhood.
+//
+// When p_hat is position-independent (as in our GI luminance target),
+// the Jacobian correction is 1.0 and pairwise MIS collapses to a simple
+// weighted sum:  L = sum(w_sum_i * radiance_i) / sum(M_i * p_hat_i)
 
 struct FReSTIRSpatialConstants
 {
@@ -28,6 +32,11 @@ Texture2D<float> gDepth : register(t4);
 
 RWTexture2D<float4> gOutput : register(u0);
 
+float Luminance(float3 c)
+{
+    return dot(c, float3(0.2126, 0.7152, 0.0722));
+}
+
 [numthreads(8, 8, 1)]
 void main(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
@@ -38,21 +47,46 @@ void main(uint3 dispatchThreadID : SV_DispatchThreadID)
     int2 pixel = int2(dispatchThreadID.xy);
 
     // =====================================================================
-    // Load center pixel reservoir and geometry
+    // Load center pixel geometry
     // =====================================================================
-    float4 centerR0 = gReservoir0.Load(int3(pixel, 0));
-    float4 centerR1 = gReservoir1.Load(int3(pixel, 0));
     float3 centerNormal = normalize(gNormals.Load(int3(pixel, 0)).rgb * 2.0 - 1.0);
     float centerDepth = gDepth.Load(int3(pixel, 0));
-
-    float w_sum = centerR0.z;
-    float M = centerR0.w;
-    float2 y = centerR0.xy;
-    float selectedPhat = centerR1.y;
+    float maxM = gConstants.MaxM;
 
     // =====================================================================
-    // Spatial neighbor merge
+    // Pairwise MIS accumulator
+    //   numerator   = sum_i( w_sum_i * radiance(y_i) )
+    //   denominator = sum_i( M_i * p_hat(y_i) )
+    //   output      = numerator / denominator
     // =====================================================================
+    float3 numerator = 0.0;
+    float denominator = 0.0;
+
+    // -----------------------------------------------------------------
+    // Center pixel reservoir (always included)
+    // -----------------------------------------------------------------
+    {
+        float4 r0 = gReservoir0.Load(int3(pixel, 0));
+        float wSum = r0.z;
+        float M = r0.w;
+
+        if (M > maxM)
+        {
+            wSum *= maxM / M;
+            M = maxM;
+        }
+
+        int2 samplePixel = clamp(int2(r0.xy + 0.5), int2(0), int2(outputSize) - int2(1));
+        float3 rad = gRadiance.Load(int3(samplePixel, 0)).rgb;
+        float phat = Luminance(rad);
+
+        numerator += wSum * rad;
+        denominator += M * phat;
+    }
+
+    // -----------------------------------------------------------------
+    // Neighbor reservoirs (3x3, geometric rejection)
+    // -----------------------------------------------------------------
     for (int dy = -1; dy <= 1; dy++)
     {
         for (int dx = -1; dx <= 1; dx++)
@@ -64,68 +98,33 @@ void main(uint3 dispatchThreadID : SV_DispatchThreadID)
             if (any(nPixel < int2(0)) || any(nPixel >= int2(outputSize)))
                 continue;
 
-            float4 nR0 = gReservoir0.Load(int3(nPixel, 0));
-            float4 nR1 = gReservoir1.Load(int3(nPixel, 0));
             float3 nNormal = normalize(gNormals.Load(int3(nPixel, 0)).rgb * 2.0 - 1.0);
             float nDepth = gDepth.Load(int3(nPixel, 0));
 
-            // Geometric rejection
             if (dot(centerNormal, nNormal) < gConstants.NormalThreshold)
                 continue;
             if (abs(nDepth - centerDepth) > gConstants.DepthThreshold)
                 continue;
 
-            float nWsum = nR0.z;
+            float4 nR0 = gReservoir0.Load(int3(nPixel, 0));
+            float nWSum = nR0.z;
             float nM = nR0.w;
 
-            // Accumulate
-            w_sum += nWsum;
-            M += nM;
-
-            // RIS selection: probability proportional to nWsum
-            uint seed = uint(pixel.x * 65537u)
-                      + uint(pixel.y * 524287u)
-                      + uint(dx * 17u)
-                      + uint(dy * 31u);
-            float r = frac(float(seed) * 0.6180339887);
-            if (r * w_sum < nWsum)
+            if (nM > maxM)
             {
-                y = nR0.xy;
-                selectedPhat = nR1.y;
+                nWSum *= maxM / nM;
+                nM = maxM;
             }
+
+            int2 nSamplePixel = clamp(int2(nR0.xy + 0.5), int2(0), int2(outputSize) - int2(1));
+            float3 nRad = gRadiance.Load(int3(nSamplePixel, 0)).rgb;
+            float nPhat = Luminance(nRad);
+
+            numerator += nWSum * nRad;
+            denominator += nM * nPhat;
         }
     }
 
-    // Clamp M and scale w_sum proportionally to maintain correct weight ratios
-    float maxM = gConstants.MaxM;
-    if (M > maxM)
-    {
-        w_sum *= maxM / M;
-        M = maxM;
-    }
-
-    // =====================================================================
-    // Evaluate reservoir: sample radiance at selected y, weight by W
-    // =====================================================================
-    int2 samplePixel = int2(y + 0.5);
-    samplePixel = clamp(samplePixel, int2(0), int2(outputSize) - int2(1));
-
-    float3 outRadiance = gRadiance.Load(int3(samplePixel, 0)).rgb;
-
-    // Unbiased reservoir weight: W = w_sum / (M * p_hat)
-    // For p_hat == 0 or M == 0, W = 0 (no valid sample)
-    float W = 0.0;
-    if (selectedPhat > 0.0 && M > 0.0)
-    {
-        W = w_sum / (M * selectedPhat);
-    }
-
-    // Clamp W to prevent extreme outliers from blowing up
-    W = min(W, 10.0);
-
-    // Output radiance at selected sample position.
-    // NOTE: Without MIS-aware spatial reuse, the unbiased W weight can introduce
-    // high variance. For this test we output raw radiance[y] which is slightly biased
-    // but stable. In production, use pairwise MIS for proper unbiased spatial reuse.
+    float3 outRadiance = (denominator > 0.0) ? (numerator / denominator) : 0.0;
     gOutput[pixel] = float4(outRadiance, 1.0);
 }

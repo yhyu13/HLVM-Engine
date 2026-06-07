@@ -716,7 +716,7 @@ public:
             LayoutDesc.setBindingOffsets(offsets);
 
             // b0: GIConstants -> 256 (bRegShift=256)
-            // b1: ViewConstants -> 512 (bRegShift=256, second buffer)
+            // b1: ViewConstants -> 257 (bRegShift=256, b0+1)
             // t0: SceneBVH -> 0
             // t1: GBufferWorldPos -> 1
             // t2: GBufferNormals -> 2
@@ -727,7 +727,7 @@ public:
             // u0: Output -> 384 (uRegShift=384)
             LayoutDesc.bindings = {
                 nvrhi::BindingLayoutItem::ConstantBuffer(256),
-                nvrhi::BindingLayoutItem::ConstantBuffer(512),
+                nvrhi::BindingLayoutItem::ConstantBuffer(257),
                 nvrhi::BindingLayoutItem::RayTracingAccelStruct(0),
                 nvrhi::BindingLayoutItem::Texture_SRV(1),
                 nvrhi::BindingLayoutItem::Texture_SRV(2),
@@ -1279,7 +1279,7 @@ public:
         nvrhi::BindingSetDesc RTBindingSetDesc;
         RTBindingSetDesc.bindings = {
             nvrhi::BindingSetItem::ConstantBuffer(256, GIConstantBuffer),
-            nvrhi::BindingSetItem::ConstantBuffer(512, ViewConstantsBuffer),
+            nvrhi::BindingSetItem::ConstantBuffer(257, ViewConstantsBuffer),
             nvrhi::BindingSetItem::RayTracingAccelStruct(0, TopLevelAS),
             nvrhi::BindingSetItem::Texture_SRV(1, GBufferWorldPosTexture),
             nvrhi::BindingSetItem::Texture_SRV(2, GBufferNormalsTexture),

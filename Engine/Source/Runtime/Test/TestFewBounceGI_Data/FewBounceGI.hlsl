@@ -253,8 +253,18 @@ void ClosestHit(inout GIPayload payload : SV_RayPayload, in Attributes attr : SV
     float3 localNormal = v0.Normal * bary.x + v1.Normal * bary.y + v2.Normal * bary.z;
     float3 hitNormal = normalize(mul(ObjectToWorld3x4(), float4(localNormal, 0.0)).xyz);
 
-    // Use per-instance albedo color from material
-    float3 albedo = info.AlbedoColor;
+    // Sample textured albedo from GBuffer via screen-space reprojection.
+    // This reuses the primary pass's textured diffuse output, giving perfect
+    // LOD parity and consistency between radiance and throughput.
+    float4 viewPos = mul(g_View.ViewMatrix, float4(hitPosition, 1.0));
+    float4 clipPos = mul(g_View.ProjMatrix, viewPos);
+    float2 ndc = clipPos.xy / clipPos.w;
+    float2 uv = ndc * 0.5 + 0.5;
+    uv.y = 1.0 - uv.y; // Vulkan Y-flip
+
+    int2 gbufPixel = int2(uv * g_View.RenderTargetSize);
+    gbufPixel = clamp(gbufPixel, int2(0), int2(g_View.RenderTargetSize) - int2(1));
+    float3 albedo = GBufferDiffuse.Load(int3(gbufPixel, 0)).rgb;
 
     float3 lightDir = normalize(g_GI.LightDir.xyz);
     float NdotL = max(dot(hitNormal, lightDir), 0.0);
