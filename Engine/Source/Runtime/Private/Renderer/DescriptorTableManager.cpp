@@ -232,9 +232,10 @@ nvrhi::BindingLayoutHandle FDescriptorTableManager::CreateTextureBindlessLayout(
     Desc.visibility = nvrhi::ShaderType::All;
     Desc.firstSlot = 0;
     Desc.maxCapacity = MaxCapacity;
+    // NOTE: NVRHI Vulkan backend does not support bindless samplers.
+    // Use a traditionally-bound sampler (register(sN)) alongside the bindless texture array.
     Desc.registerSpaces = {
-        nvrhi::BindingLayoutItem::Texture_SRV(0),    // t0, t1, ... tN
-        nvrhi::BindingLayoutItem::Sampler(1)          // s0, s1, ... sN (separate space)
+        nvrhi::BindingLayoutItem::Texture_SRV(0)    // t0, t1, ... tN
     };
 
     return Device->createBindlessLayout(Desc);

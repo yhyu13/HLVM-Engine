@@ -13,8 +13,9 @@
 // Configuration
 // =============================================================================
 
-static const uint MAX_BOUNCES = 3;
-static const uint SPP = 8;          // samples per pixel
+// Runtime-tunable parameters (set via CVar_r_GI_* from CPU)
+// MAX_BOUNCES = (uint)g_GI.Params.x
+// SPP         = (uint)g_GI.Params.y
 
 // =============================================================================
 // Structures
@@ -25,6 +26,7 @@ struct GIPayload {
     float3 radiance;
     float3 origin;
     float3 direction;
+    float hitDistance;
     uint bounceCount;
     uint flags;
 };
@@ -37,7 +39,8 @@ struct GIConstants {
     float4 LightDir;
     float4 AmbientColor;
     float4 CameraPos;
-    float4 Padding1;
+    float4 Params;   // x=MaxBounces, y=SPP, z=ShadowTMin, w=ShadowTMax
+    float4 Params2;  // x=AmbientScale, y=RayTMin, z=RayTMax, w=ShadowEnable
 };
 
 struct ViewConstants {
@@ -51,6 +54,7 @@ struct ViewConstants {
 struct FRTVertex {
     float3 Position;
     float3 Normal;
+    float2 UV;
 };
 
 struct FInstanceInfo {
@@ -59,7 +63,7 @@ struct FInstanceInfo {
     uint VertexCount;
     uint IndexCount;
     float3 AlbedoColor;
-    float Padding;
+    uint AlbedoTextureIndex;
 };
 
 // =============================================================================
@@ -81,6 +85,10 @@ Texture2D<float4> GBufferSpecular : register(t4);
 StructuredBuffer<FRTVertex>     RTVertices      : register(t5);
 StructuredBuffer<uint>          RTIndices       : register(t6);
 StructuredBuffer<FInstanceInfo> RTInstanceInfo  : register(t7);
+
+// Bindless texture array (set 1) + traditional linear sampler (set 0)
+Texture2D BindlessTextures[] : register(t0, space1);
+SamplerState LinearSampler : register(s2);
 
 // =============================================================================
 // Random Number Generation
@@ -142,6 +150,12 @@ void RayGen() {
 
     float3 lightDir = normalize(g_GI.LightDir.xyz);
 
+    // Read tunable parameters
+    uint spp = (uint)g_GI.Params.y;
+    uint maxBounces = (uint)g_GI.Params.x;
+    float ambientScale = g_GI.Params2.x;
+    float shadowEnable = g_GI.Params2.w;
+
     // Primary visible surface direct lighting with shadow ray
     float NdotL0 = max(dot(normal, lightDir), 0.0);
     float3 primaryDirect = diffuse * NdotL0 * g_GI.LightDir.w;
@@ -152,8 +166,8 @@ void RayGen() {
     RayDesc shadowRay;
     shadowRay.Origin = worldPos + normal * 0.01;
     shadowRay.Direction = lightDir;
-    shadowRay.TMin = 0.001;
-    shadowRay.TMax = 1000.0;
+    shadowRay.TMin = g_GI.Params.z;
+    shadowRay.TMax = g_GI.Params.w;
     TraceRay(
         SceneBVH,
         RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER | RAY_FLAG_FORCE_OPAQUE,
@@ -163,21 +177,23 @@ void RayGen() {
         1,
         shadowRay,
         shadowPayload);
-    float primaryVisibility = shadowPayload.occluded ? 0.0 : 1.0;
+    float primaryVisibility = lerp(1.0, shadowPayload.occluded ? 0.0 : 1.0, shadowEnable);
     primaryDirect *= primaryVisibility;
 
-    float3 primaryAmbient = diffuse * g_GI.AmbientColor.rgb * 0.3;
+    float3 primaryAmbient = diffuse * g_GI.AmbientColor.rgb * ambientScale;
     float3 result = primaryDirect + primaryAmbient;
 
     // Multi-sample indirect GI
     float3 indirect = float3(0.0);
+    float avgFirstHitDist = 0.0;
 
-    for (uint s = 0; s < SPP; ++s) {
+    for (uint s = 0; s < spp; ++s) {
         GIPayload payload;
         payload.radiance = float3(0.0);
         payload.throughput = float3(1.0);
         payload.bounceCount = 0;
         payload.flags = 0;
+        payload.hitDistance = 0.0;
 
         float3 rayOrigin = worldPos + normal * 0.01;
         float3 rayDir = sampleHemisphereCosine(
@@ -185,12 +201,13 @@ void RayGen() {
             random(pixelSeed + s * 7919u, 0, 0),
             random(pixelSeed + s * 7919u, 0, 1));
 
-        for (uint bounce = 0; bounce < MAX_BOUNCES; ++bounce) {
+        float firstHitDist = 0.0;
+        for (uint bounce = 0; bounce < maxBounces; ++bounce) {
             RayDesc ray;
             ray.Origin = rayOrigin;
             ray.Direction = rayDir;
-            ray.TMin = 0.001;
-            ray.TMax = 1000.0;
+            ray.TMin = g_GI.Params2.y;
+            ray.TMax = g_GI.Params2.z;
 
             TraceRay(
                 SceneBVH,
@@ -202,7 +219,10 @@ void RayGen() {
                 ray,
                 payload);
 
-            if (!(payload.flags & 0x01))
+            if (bounce == 0)
+                firstHitDist = payload.hitDistance;
+
+            if ((payload.flags & 0x01) == 0)
                 break;
 
             rayOrigin = payload.origin;
@@ -211,11 +231,13 @@ void RayGen() {
         }
 
         indirect += payload.radiance;
+        avgFirstHitDist += firstHitDist;
     }
 
-    result += indirect / float(SPP);
-    // Tonemap before output to keep values in sensible range
-    Output[pixel] = float4(aces(result), 1.0);
+    result += indirect / max(float(spp), 1.0);
+    avgFirstHitDist /= max(float(spp), 1.0);
+    // Tonemap before output; store average first-bounce hit distance in alpha for denoiser
+    Output[pixel] = float4(aces(result), avgFirstHitDist);
 }
 
 // =============================================================================
@@ -228,11 +250,16 @@ struct Attributes {
 
 [shader("closesthit")]
 void ClosestHit(inout GIPayload payload : SV_RayPayload, in Attributes attr : SV_IntersectionAttributes) {
+    // Read tunable parameters
+    float ambientScale = g_GI.Params2.x;
+    float shadowEnable = g_GI.Params2.w;
+
     float3 worldPos = WorldRayOrigin();
     float3 worldDir = WorldRayDirection();
     float hitT = RayTCurrent();
 
     float3 hitPosition = worldPos + worldDir * hitT;
+    payload.hitDistance = hitT;
 
     // Look up actual vertex normals from bound mesh data
     uint instanceIdx = InstanceIndex();
@@ -253,18 +280,16 @@ void ClosestHit(inout GIPayload payload : SV_RayPayload, in Attributes attr : SV
     float3 localNormal = v0.Normal * bary.x + v1.Normal * bary.y + v2.Normal * bary.z;
     float3 hitNormal = normalize(mul(ObjectToWorld3x4(), float4(localNormal, 0.0)).xyz);
 
-    // Sample textured albedo from GBuffer via screen-space reprojection.
-    // This reuses the primary pass's textured diffuse output, giving perfect
-    // LOD parity and consistency between radiance and throughput.
-    float4 viewPos = mul(g_View.ViewMatrix, float4(hitPosition, 1.0));
-    float4 clipPos = mul(g_View.ProjMatrix, viewPos);
-    float2 ndc = clipPos.xy / clipPos.w;
-    float2 uv = ndc * 0.5 + 0.5;
-    uv.y = 1.0 - uv.y; // Vulkan Y-flip
+    // Interpolate UVs from vertex data using barycentrics
+    float2 hitUV = v0.UV * bary.x + v1.UV * bary.y + v2.UV * bary.z;
 
-    int2 gbufPixel = int2(uv * g_View.RenderTargetSize);
-    gbufPixel = clamp(gbufPixel, int2(0), int2(g_View.RenderTargetSize) - int2(1));
-    float3 albedo = GBufferDiffuse.Load(int3(gbufPixel, 0)).rgb;
+    // Sample albedo from bindless texture array using instance's texture index
+    float3 albedo = info.AlbedoColor;
+    if (info.AlbedoTextureIndex > 0)
+    {
+        albedo = BindlessTextures[NonUniformResourceIndex(info.AlbedoTextureIndex)]
+            .SampleLevel(LinearSampler, hitUV, 0).rgb;
+    }
 
     float3 lightDir = normalize(g_GI.LightDir.xyz);
     float NdotL = max(dot(hitNormal, lightDir), 0.0);
@@ -275,8 +300,8 @@ void ClosestHit(inout GIPayload payload : SV_RayPayload, in Attributes attr : SV
     RayDesc shadowRay;
     shadowRay.Origin = hitPosition + hitNormal * 0.01;
     shadowRay.Direction = lightDir;
-    shadowRay.TMin = 0.001;
-    shadowRay.TMax = 1000.0;
+    shadowRay.TMin = g_GI.Params.z;
+    shadowRay.TMax = g_GI.Params.w;
     TraceRay(
         SceneBVH,
         RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER | RAY_FLAG_FORCE_OPAQUE,
@@ -286,10 +311,10 @@ void ClosestHit(inout GIPayload payload : SV_RayPayload, in Attributes attr : SV
         1,
         shadowRay,
         shadowPayload);
-    float visibility = shadowPayload.occluded ? 0.0 : 1.0;
+    float visibility = lerp(1.0, shadowPayload.occluded ? 0.0 : 1.0, shadowEnable);
 
     payload.radiance += payload.throughput * albedo * NdotL * g_GI.LightDir.w * visibility;
-    payload.radiance += payload.throughput * albedo * g_GI.AmbientColor.rgb * 0.3;
+    payload.radiance += payload.throughput * albedo * g_GI.AmbientColor.rgb * ambientScale;
 
     payload.throughput *= albedo;
 
