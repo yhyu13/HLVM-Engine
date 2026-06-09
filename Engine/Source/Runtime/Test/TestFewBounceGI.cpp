@@ -26,8 +26,12 @@
 #include "Renderer/Texture/TextureCache.h"
 #include "Renderer/RayTracing/BLASBuilder.h"
 #include "Renderer/RayTracing/TLASBuilder.h"
+#include "Renderer/RayTracing/FRayTracingPipeline.h"
+#include "Renderer/DescriptorTableManager.h"
 #include "Renderer/ShaderMake/ShaderBlob.h"
 #include "Renderer/PostProcess/FReSTIRPass.h"
+#include "Renderer/PostProcess/FReBLURPass.h"
+#include "Renderer/GI/GICVars.h"
 #include "Renderer/PostProcess/FBilateralDenoisePass.h"
 #include "Image/FImageDump.h"
 #include "Core/Parallel/Async/WorkStealThreadPool.h"
@@ -110,7 +114,7 @@ public:
             return false;
         }
 
-        ShaderLibrary = NvrhiDevice->createShaderLibrary(
+        nvrhi::ShaderLibraryHandle ShaderLibrary = NvrhiDevice->createShaderLibrary(
             GIShaderBinary, GIShaderBinarySize);
         if (!ShaderLibrary)
         {
@@ -118,17 +122,13 @@ public:
             return false;
         }
 
-        RayGenShader = ShaderLibrary->getShader("RayGen", nvrhi::ShaderType::RayGeneration);
-        ClosestHitShader = ShaderLibrary->getShader("ClosestHit", nvrhi::ShaderType::ClosestHit);
-        MissShader = ShaderLibrary->getShader("Miss", nvrhi::ShaderType::Miss);
-        ShadowMissShader = ShaderLibrary->getShader("ShadowMiss", nvrhi::ShaderType::Miss);
-
-        if (!RayGenShader || !ClosestHitShader || !MissShader || !ShadowMissShader)
+        if (!RTPipeline.InitializeFromLibrary(NvrhiDevice, ShaderLibrary,
+            TXT("RayGen"), TXT("ClosestHit"), TXT("Miss"), TXT("ShadowMiss")))
         {
-            HLVM_LOG(LogTest, err, TXT("Failed to get GI shaders"));
+            HLVM_LOG(LogTest, err, TXT("Failed to initialize GI ray tracing pipeline"));
             return false;
         }
-        HLVM_LOG(LogTest, info, TXT("GI shaders loaded successfully"));
+        HLVM_LOG(LogTest, info, TXT("GI ray tracing pipeline initialized"));
 
         // =====================================================================
         // Load GBuffer shaders
@@ -171,12 +171,6 @@ public:
         HLVM_LOG(LogTest, info, TXT("GBuffer shaders loaded successfully"));
 
         // =====================================================================
-        // Create command list for initialization
-        // =====================================================================
-        nvrhi::CommandListHandle InitCmdList = NvrhiDevice->createCommandList();
-        InitCmdList->open();
-
-        // =====================================================================
         // Load Sponza scene
         // =====================================================================
         HLVM_LOG(LogTest, info, TXT("Loading Sponza scene..."));
@@ -214,6 +208,67 @@ public:
         float SceneRadius = glm::length(BBoxMax - BBoxMin) * 0.5f;
         HLVM_LOG(LogTest, info, TXT("Scene center: ({:.2f}, {:.2f}, {:.2f}), radius: {:.2f}"),
             SceneCenter.x, SceneCenter.y, SceneCenter.z, SceneRadius);
+
+        // =====================================================================
+        // Set up bindless texture descriptor table
+        // =====================================================================
+        HLVM_LOG(LogTest, info, TXT("Setting up bindless texture descriptor table..."));
+
+        {
+            // Create bindless layout with ONLY Texture_SRV space
+            // (NVRHI Vulkan does not support bindless samplers — bind sampler traditionally)
+            nvrhi::BindlessLayoutDesc BindlessDesc;
+            BindlessDesc.visibility = nvrhi::ShaderType::All;
+            BindlessDesc.firstSlot = 0;
+            BindlessDesc.maxCapacity = 16384;
+            BindlessDesc.registerSpaces = {
+                nvrhi::BindingLayoutItem::Texture_SRV(0)    // t0, t1, ... tN
+            };
+            BindlessLayout = NvrhiDevice->createBindlessLayout(BindlessDesc);
+            DescTableMgr = std::make_shared<FDescriptorTableManager>(NvrhiDevice, BindlessLayout.Get());
+
+            // Create white fallback texture (1x1 RGBA8) for slot 0
+            nvrhi::TextureDesc WhiteDesc;
+            WhiteDesc.dimension = nvrhi::TextureDimension::Texture2D;
+            WhiteDesc.width = 1;
+            WhiteDesc.height = 1;
+            WhiteDesc.format = nvrhi::Format::RGBA8_UNORM;
+            WhiteDesc.isRenderTarget = false;
+            WhiteDesc.isUAV = false;
+            WhiteDesc.isTypeless = false;
+            WhiteDesc.initialState = nvrhi::ResourceStates::ShaderResource;
+            WhiteDesc.keepInitialState = true;
+            WhiteDesc.debugName = "BindlessWhiteFallback";
+            nvrhi::TextureHandle WhiteTexture = NvrhiDevice->createTexture(WhiteDesc);
+
+            nvrhi::CommandListHandle WhiteCmdList = NvrhiDevice->createCommandList();
+            WhiteCmdList->open();
+            uint32_t whitePixel = 0xFFFFFFFF;
+            WhiteCmdList->writeTexture(WhiteTexture, 0, 0, &whitePixel, 4);
+            WhiteCmdList->close();
+            NvrhiDevice->executeCommandList(WhiteCmdList);
+
+            // Register white texture as slot 0 in cache + descriptor table
+            TextureCache.SetDescriptorTableManager(DescTableMgr.get());
+            TextureCache.Insert(FPath(TXT("__BindlessWhiteFallback__")), WhiteTexture);
+
+            // Set cache for async loader so textures get bindless slots on insert
+            FAsyncTextureLoader::SetTextureCache(&TextureCache);
+
+            // Load material albedo textures (blocking, populates cache + descriptor table)
+            FAsyncTextureLoader::LoadMaterialTexturesAsync(
+                NvrhiDevice, Materials,
+                {IMaterial::ETextureType::Albedo});
+
+            HLVM_LOG(LogTest, info, TXT("Bindless descriptor table: {} textures registered"),
+                DescTableMgr->GetAllocatedCount());
+        }
+
+        // =====================================================================
+        // Create command list for initialization (BLAS, TLAS, RT buffers)
+        // =====================================================================
+        nvrhi::CommandListHandle InitCmdList = NvrhiDevice->createCommandList();
+        InitCmdList->open();
 
         // =====================================================================
         // Build BLAS for each mesh
@@ -268,14 +323,14 @@ public:
         // Create unified vertex/index buffers for ray tracing hit shaders
         // =====================================================================
         {
-            struct FRTVertex { glm::vec3 Position; glm::vec3 Normal; };
+            struct FRTVertex { glm::vec3 Position; glm::vec3 Normal; glm::vec2 UV; };
             struct FInstanceInfo {
                 uint32_t VertexOffset;
                 uint32_t IndexOffset;
                 uint32_t VertexCount;
                 uint32_t IndexCount;
                 float AlbedoColor[3];
-                float Padding;
+                uint32_t AlbedoTextureIndex;
             };
 
             TVector<FRTVertex> AllVertices;
@@ -300,9 +355,9 @@ public:
                 Info.AlbedoColor[0] = 0.7f;
                 Info.AlbedoColor[1] = 0.7f;
                 Info.AlbedoColor[2] = 0.7f;
-                Info.Padding = 0.0f;
+                Info.AlbedoTextureIndex = 0; // Default to white fallback (slot 0)
 
-                // Look up material albedo color for this mesh
+                // Look up material albedo color and texture index for this mesh
                 if (Mesh && Scene)
                 {
                     auto it = Scene->MeshMultiMaterialMap.find(Mesh);
@@ -317,6 +372,17 @@ public:
                                 Info.AlbedoColor[0] = albedo.x;
                                 Info.AlbedoColor[1] = albedo.y;
                                 Info.AlbedoColor[2] = albedo.z;
+
+                                // Look up bindless texture index for albedo
+                                FPath AlbedoPath = PBRMat->GetTexturePath(IMaterial::ETextureType::Albedo);
+                                if (!AlbedoPath.empty())
+                                {
+                                    int BindlessIdx = TextureCache.GetBindlessIndex(AlbedoPath);
+                                    if (BindlessIdx >= 0)
+                                    {
+                                        Info.AlbedoTextureIndex = static_cast<uint32_t>(BindlessIdx);
+                                    }
+                                }
                             }
                         }
                     }
@@ -329,6 +395,7 @@ public:
                     FRTVertex RTV;
                     RTV.Position = V.Position;
                     RTV.Normal = V.Normal;
+                    RTV.UV = glm::vec2(V.UV.x, V.UV.y);
                     AllVertices.push_back(RTV);
                 }
 
@@ -383,15 +450,6 @@ public:
 
         InitCmdList->close();
         NvrhiDevice->executeCommandList(InitCmdList);
-
-        // =====================================================================
-        // Load PBR textures for materials (async decode + batched GPU upload)
-        // =====================================================================
-        HLVM_LOG(LogTest, info, TXT("Loading PBR textures..."));
-
-        FAsyncTextureLoader::LoadMaterialTexturesAsync(
-            NvrhiDevice, Materials,
-            {IMaterial::ETextureType::Albedo});
 
         // =====================================================================
         // Create GBuffer textures and framebuffer
@@ -703,85 +761,40 @@ public:
         HLVM_LOG(LogTest, info, TXT("GBuffer pipeline created"));
 
         // =====================================================================
-        // Create RT binding layout (reads GBuffer textures)
+        // Create GI ray tracing pipeline (encapsulated in FRayTracingPipeline)
         // =====================================================================
-        HLVM_LOG(LogTest, info, TXT("Creating GI binding layout..."));
+        HLVM_LOG(LogTest, info, TXT("Creating GI ray tracing pipeline..."));
 
         {
-            nvrhi::BindingLayoutDesc LayoutDesc;
-            LayoutDesc.visibility = nvrhi::ShaderType::All;
+            RTPipeline.CreateBindingLayout(nvrhi::ShaderType::All)
+                .AddConstantBuffer(0)           // b0: GIConstants
+                .AddConstantBuffer(1)           // b1: ViewConstants
+                .AddRayTracingAccelStruct(0)    // t0: SceneBVH
+                .AddTextureSRV(1)               // t1: GBufferWorldPos
+                .AddTextureSRV(2)               // t2: GBufferNormals
+                .AddTextureSRV(3)               // t3: GBufferDiffuse
+                .AddStructuredBufferSRV(5)      // t5: RTVertices
+                .AddStructuredBufferSRV(6)      // t6: RTIndices
+                .AddStructuredBufferSRV(7)      // t7: RTInstanceInfo
+                .AddTextureUAV(0)               // u0: Output
+                .AddSampler(2);                 // s2: LinearSampler (traditional, non-bindless)
 
-            nvrhi::VulkanBindingOffsets offsets;
-            offsets.setConstantBufferOffset(0).setShaderResourceOffset(0).setSamplerOffset(0).setUnorderedAccessViewOffset(0);
-            LayoutDesc.setBindingOffsets(offsets);
+            RTPipeline.SetBindlessLayout(BindlessLayout);
 
-            // b0: GIConstants -> 256 (bRegShift=256)
-            // b1: ViewConstants -> 257 (bRegShift=256, b0+1)
-            // t0: SceneBVH -> 0
-            // t1: GBufferWorldPos -> 1
-            // t2: GBufferNormals -> 2
-            // t3: GBufferDiffuse -> 3
-            // t5: RTVertices -> 5
-            // t6: RTIndices -> 6
-            // t7: RTInstanceInfo -> 7
-            // u0: Output -> 384 (uRegShift=384)
-            LayoutDesc.bindings = {
-                nvrhi::BindingLayoutItem::ConstantBuffer(256),
-                nvrhi::BindingLayoutItem::ConstantBuffer(257),
-                nvrhi::BindingLayoutItem::RayTracingAccelStruct(0),
-                nvrhi::BindingLayoutItem::Texture_SRV(1),
-                nvrhi::BindingLayoutItem::Texture_SRV(2),
-                nvrhi::BindingLayoutItem::Texture_SRV(3),
-                nvrhi::BindingLayoutItem::StructuredBuffer_SRV(5),
-                nvrhi::BindingLayoutItem::StructuredBuffer_SRV(6),
-                nvrhi::BindingLayoutItem::StructuredBuffer_SRV(7),
-                nvrhi::BindingLayoutItem::Texture_UAV(384)
-            };
-
-            RTBindingLayout = NvrhiDevice->createBindingLayout(LayoutDesc);
-            if (!RTBindingLayout)
+            if (!RTPipeline.FinalizePipeline(sizeof(float) * 12))
             {
-                HLVM_LOG(LogTest, err, TXT("Failed to create GI binding layout"));
+                HLVM_LOG(LogTest, err, TXT("Failed to create GI ray tracing pipeline"));
                 return false;
             }
-        }
 
-        // =====================================================================
-        // Create GI pipeline
-        // =====================================================================
-        {
-            nvrhi::rt::PipelineDesc PipelineDesc;
-            PipelineDesc.globalBindingLayouts = { RTBindingLayout };
-            PipelineDesc.shaders = {
-                { "", RayGenShader, nullptr },
-                { "", MissShader, nullptr },
-                { "", ShadowMissShader, nullptr }
-            };
-            PipelineDesc.hitGroups = { { "HitGroup",
-                ClosestHitShader,
-                nullptr,
-                nullptr,
-                nullptr,
-                false } };
-            PipelineDesc.maxPayloadSize = sizeof(float) * 12; // throughput(3) + radiance(3) + origin(3) + direction(3) + bounceCount(1) + flags(1) ~= 14 floats
-
-            RTPipeline = NvrhiDevice->createRayTracingPipeline(PipelineDesc);
-            if (!RTPipeline)
+            if (!RTPipeline.BuildShaderTable())
             {
-                HLVM_LOG(LogTest, err, TXT("Failed to create GI pipeline"));
+                HLVM_LOG(LogTest, err, TXT("Failed to build GI shader table"));
                 return false;
             }
-            HLVM_LOG(LogTest, info, TXT("GI pipeline created"));
-        }
 
-        // =====================================================================
-        // Create shader table
-        // =====================================================================
-        ShaderTable = RTPipeline->createShaderTable();
-        ShaderTable->setRayGenerationShader("RayGen");
-        ShaderTable->addHitGroup("HitGroup");
-        ShaderTable->addMissShader("Miss");
-        ShaderTable->addMissShader("ShadowMiss");
+            HLVM_LOG(LogTest, info, TXT("GI ray tracing pipeline created"));
+        }
 
         // =====================================================================
         // Create HDR output texture
@@ -827,6 +840,47 @@ public:
         {
             HLVM_LOG(LogTest, err, TXT("Failed to initialize DenoisePass"));
             return false;
+        }
+
+        // =====================================================================
+        // Initialize ReBLUR pass
+        // =====================================================================
+        if (CVar_r_ReBLUR_Enable.GetValue())
+        {
+            HLVM_LOG(LogTest, info, TXT("Initializing ReBLUR denoise pass..."));
+            if (!ReBLURPass.Initialize(NvrhiDevice, DataDir))
+            {
+                HLVM_LOG(LogTest, err, TXT("Failed to initialize ReBLURPass"));
+                return false;
+            }
+            bReBLURInitialized = true;
+
+            nvrhi::TextureDesc Desc;
+            Desc.dimension = nvrhi::TextureDimension::Texture2D;
+            Desc.width = GBufferWidth;
+            Desc.height = GBufferHeight;
+            // History must match output format (RGBA32F) for legal Vulkan copyTexture
+            Desc.format = nvrhi::Format::RGBA32_FLOAT;
+            Desc.isRenderTarget = false;
+            Desc.isUAV = true;
+            Desc.isTypeless = false;
+            Desc.initialState = nvrhi::ResourceStates::UnorderedAccess;
+            Desc.keepInitialState = true;
+            Desc.debugName = "ReBLURHistory0";
+            ReBLURHistoryTexture[0] = NvrhiDevice->createTexture(Desc);
+            Desc.debugName = "ReBLURHistory1";
+            ReBLURHistoryTexture[1] = NvrhiDevice->createTexture(Desc);
+
+            // Clear history
+            nvrhi::CommandListHandle ClearCmd = NvrhiDevice->createCommandList();
+            ClearCmd->open();
+            nvrhi::Color ClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+            ClearCmd->clearTextureFloat(ReBLURHistoryTexture[0], nvrhi::AllSubresources, ClearColor);
+            ClearCmd->clearTextureFloat(ReBLURHistoryTexture[1], nvrhi::AllSubresources, ClearColor);
+            ClearCmd->close();
+            NvrhiDevice->executeCommandList(ClearCmd);
+
+            HLVM_LOG(LogTest, info, TXT("ReBLUR pass initialized successfully"));
         }
 
 
@@ -916,7 +970,7 @@ public:
         // =====================================================================
         {
             nvrhi::BufferDesc BufferDesc;
-            BufferDesc.byteSize = sizeof(float) * 16; // 4 float4s
+            BufferDesc.byteSize = sizeof(float) * 20; // 5 float4s
             BufferDesc.isConstantBuffer = true;
             BufferDesc.isVolatile = false;
             BufferDesc.keepInitialState = true;
@@ -954,19 +1008,19 @@ public:
         BindingCache.Clear();
 
         CommandList = nullptr;
-        RTBindingLayout = nullptr;
-        ShaderTable = nullptr;
-        RTPipeline = nullptr;
+        RTPipeline.Shutdown();
         TopLevelAS = nullptr;
-        ShaderLibrary = nullptr;
-        RayGenShader = nullptr;
-        ClosestHitShader = nullptr;
-        MissShader = nullptr;
-        ShadowMissShader = nullptr;
         HDRTexture = nullptr;
         DenoisedHDRTexture = nullptr;
         DenoisePass.Shutdown();
         RTBindingSet = nullptr;
+        if (bReBLURInitialized)
+        {
+            ReBLURPass.Shutdown();
+            bReBLURInitialized = false;
+        }
+        ReBLURHistoryTexture[0] = nullptr;
+        ReBLURHistoryTexture[1] = nullptr;
         if (bReSTIRInitialized)
         {
             ReSTIRPass.Shutdown();
@@ -1264,64 +1318,122 @@ public:
         // Static light direction (stable for temporal accumulation testing)
         static const float LightAngle = 0.0f;
         glm::vec3 LightDir = glm::normalize(glm::vec3(sinf(LightAngle), 0.6f, cosf(LightAngle)));
-        float GIConstantsData[16] = {
-            LightDir.x, LightDir.y, LightDir.z, 1.0f,      // LightDir + intensity
-            0.6f, 0.6f, 0.65f, 0.0f,                       // Ambient color (bright overcast)
-            CameraPos.x, CameraPos.y, CameraPos.z, 1.0f,    // CameraPos (w=1.0)
-            0.0f, 0.0f, 0.0f, 0.0f                         // padding
+        float GIConstantsData[20] = {
+            LightDir.x, LightDir.y, LightDir.z, 1.0f,                          // LightDir + intensity
+            0.6f, 0.6f, 0.65f, 0.0f,                                           // Ambient color
+            CameraPos.x, CameraPos.y, CameraPos.z, 1.0f,                        // CameraPos
+            static_cast<float>(CVar_r_GI_MaxBounces.GetValue()),
+            static_cast<float>(CVar_r_GI_SPP.GetValue()),
+            CVar_r_GI_ShadowTMin.GetValue(),
+            CVar_r_GI_ShadowTMax.GetValue(),                                    // Params
+            CVar_r_GI_AmbientScale.GetValue(),
+            CVar_r_GI_RayTMin.GetValue(),
+            CVar_r_GI_RayTMax.GetValue(),
+            CVar_r_GI_ShadowRays.GetValue() ? 1.0f : 0.0f                     // Params2
         };
         CmdList->writeBuffer(GIConstantBuffer, GIConstantsData, sizeof(GIConstantsData));
 
         // Transition HDR to UAV for GI write
         CmdList->setTextureState(HDRTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
 
-        // Create GI binding set
-        nvrhi::BindingSetDesc RTBindingSetDesc;
-        RTBindingSetDesc.bindings = {
-            nvrhi::BindingSetItem::ConstantBuffer(256, GIConstantBuffer),
-            nvrhi::BindingSetItem::ConstantBuffer(257, ViewConstantsBuffer),
-            nvrhi::BindingSetItem::RayTracingAccelStruct(0, TopLevelAS),
-            nvrhi::BindingSetItem::Texture_SRV(1, GBufferWorldPosTexture),
-            nvrhi::BindingSetItem::Texture_SRV(2, GBufferNormalsTexture),
-            nvrhi::BindingSetItem::Texture_SRV(3, GBufferDiffuseTexture),
-            nvrhi::BindingSetItem::StructuredBuffer_SRV(5, RTVertexBuffer),
-            nvrhi::BindingSetItem::StructuredBuffer_SRV(6, RTIndexBuffer),
-            nvrhi::BindingSetItem::StructuredBuffer_SRV(7, RTInstanceInfoBuffer),
-            nvrhi::BindingSetItem::Texture_UAV(384, HDRTexture)
-        };
-        RTBindingSet = BindingCache.GetOrCreateBindingSet(RTBindingSetDesc, RTBindingLayout);
+        // Create GI binding set using FBindingSetBuilder (shift-aware, matches layout)
+        FBindingSetBuilder RTSetBuilder;
+        RTSetBuilder.SetConstantBuffer(0, GIConstantBuffer)
+            .SetConstantBuffer(1, ViewConstantsBuffer)
+            .SetRayTracingAccelStruct(0, TopLevelAS)
+            .SetTextureSRV(1, GBufferWorldPosTexture)
+            .SetTextureSRV(2, GBufferNormalsTexture)
+            .SetTextureSRV(3, GBufferDiffuseTexture)
+            .SetStructuredBufferSRV(5, RTVertexBuffer)
+            .SetStructuredBufferSRV(6, RTIndexBuffer)
+            .SetStructuredBufferSRV(7, RTInstanceInfoBuffer)
+            .SetTextureUAV(0, HDRTexture)
+            .SetSampler(2, GBufferLinearSampler);
+        nvrhi::BindingSetDesc RTBindingSetDesc = RTSetBuilder.Build();
+        RTBindingSet = BindingCache.GetOrCreateBindingSet(RTBindingSetDesc, RTPipeline.GetBindingLayout());
 
-        nvrhi::rt::State RTState;
-        RTState.shaderTable = ShaderTable;
-        RTState.bindings = { RTBindingSet };
-        CmdList->setRayTracingState(RTState);
-
-        nvrhi::rt::DispatchRaysArguments args;
-        args.width = CurrentFBInfo.width;
-        args.height = CurrentFBInfo.height;
-        CmdList->dispatchRays(args);
+        RTPipeline.DispatchRays(CmdList, CurrentFBInfo.width, CurrentFBInfo.height, 1, RTBindingSet, DescTableMgr->GetDescriptorTable());
 
         // =====================================================================
-        // Denoise Pass: Bilateral filter on GI output
+        // Denoise Pass: Bilateral filter OR ReBLUR on GI output
         // =====================================================================
         // Transition HDR (noisy) to ShaderResource for reading
         CmdList->setTextureState(HDRTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
-        // Transition DenoisedHDR to UAV for writing
-        CmdList->setTextureState(DenoisedHDRTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
         // Transition depth to ShaderResource for reading
         CmdList->setTextureState(GBufferDepthTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
 
-        FBilateralDenoisePass::FDesc DenoiseDesc;
-        DenoiseDesc.InputTexture = HDRTexture;         // Noisy input
-        DenoiseDesc.DepthTexture = GBufferDepthTexture; // Depth guide
-        DenoiseDesc.NormalTexture = GBufferNormalsTexture; // Normal guide
-        DenoiseDesc.OutputTexture = DenoisedHDRTexture; // Denoised output
-        DenoiseDesc.OutputWidth = CurrentFBInfo.width;
-        DenoiseDesc.OutputHeight = CurrentFBInfo.height;
-        DenoiseDesc.DepthSigma = 0.01f;      // Sharp depth edges
-        DenoiseDesc.NormalSigma = 0.1f;      // Sharp normal edges
-        DenoiseDesc.SpatialSigma = 4.0f;    // Stronger smoothing for 1-SPP noise
-        DenoisePass.Dispatch(CmdList, DenoiseDesc);
+        if (bReBLURInitialized)
+        {
+            // ReBLUR temporal+spatial denoiser
+            CmdList->setTextureState(DenoisedHDRTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
+            CmdList->setTextureState(ReBLURHistoryTexture[0], nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+
+            ReBLUR::FReBLURConstants ReBLURConstants;
+            glm::mat4 currViewProj = proj * view;
+            glm::mat4 invCurrViewProj = glm::inverse(currViewProj);
+            memcpy(ReBLURConstants.InverseCurrViewProj, glm::value_ptr(invCurrViewProj), 64);
+            memcpy(ReBLURConstants.PrevViewProj, glm::value_ptr(PrevViewProj), 64);
+            memcpy(ReBLURConstants.ViewMatrix, glm::value_ptr(view), 64);
+            memcpy(ReBLURConstants.ProjMatrix, glm::value_ptr(proj), 64);
+            ReBLURConstants.OutputSize[0] = static_cast<float>(CurrentFBInfo.width);
+            ReBLURConstants.OutputSize[1] = static_cast<float>(CurrentFBInfo.height);
+            ReBLURConstants.RcpOutputSize[0] = 1.0f / static_cast<float>(CurrentFBInfo.width);
+            ReBLURConstants.RcpOutputSize[1] = 1.0f / static_cast<float>(CurrentFBInfo.height);
+            // HitDistParams: A=3.0, B=0.1, C=20.0, D=-25.0 (NRD defaults)
+            ReBLURConstants.HitDistParams[0] = 3.0f;
+            ReBLURConstants.HitDistParams[1] = 0.1f;
+            ReBLURConstants.HitDistParams[2] = 20.0f;
+            ReBLURConstants.HitDistParams[3] = -25.0f;
+            ReBLURConstants.FrameIndex = static_cast<float>(TemporalFrameCount);
+            ReBLURConstants.HistoryFadeIn = CVar_r_ReBLUR_HistoryFadeIn.GetValue();
+            ReBLURConstants.ConfidenceScale = 1.0f;
+            ReBLURConstants.PassIndex = 0.0f;
+
+            ReBLUR::FPooledBlurParams BlurParams;
+            BlurParams.BlurRadius = CVar_r_ReBLUR_BlurRadius.GetValue();
+            BlurParams.NormalWeight = CVar_r_ReBLUR_NormalWeight.GetValue();
+            BlurParams.PlaneWeight = CVar_r_ReBLUR_PlaneWeight.GetValue();
+            BlurParams.AntiLagIntensity = CVar_r_ReBLUR_AntiLag.GetValue();
+
+            ReBLUR::FReBLURPass::FDesc ReBLURDesc;
+            ReBLURDesc.CurrentRadianceTexture = HDRTexture;
+            ReBLURDesc.HistoryTexture = ReBLURHistoryTexture[0];
+            ReBLURDesc.DepthTexture = GBufferDepthTexture;
+            ReBLURDesc.NormalRoughnessTexture = GBufferNormalsTexture;
+            ReBLURDesc.OutputTexture = DenoisedHDRTexture;
+            ReBLURDesc.OutputWidth = CurrentFBInfo.width;
+            ReBLURDesc.OutputHeight = CurrentFBInfo.height;
+            ReBLURPass.Dispatch(CmdList, ReBLURDesc, ReBLURConstants, BlurParams);
+
+            // Copy denoised output to history for next frame
+            CmdList->setTextureState(DenoisedHDRTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::CopySource);
+            CmdList->setTextureState(ReBLURHistoryTexture[0], nvrhi::AllSubresources, nvrhi::ResourceStates::CopyDest);
+            CmdList->copyTexture(ReBLURHistoryTexture[0], nvrhi::TextureSlice(), DenoisedHDRTexture, nvrhi::TextureSlice());
+        }
+        else if (CVar_r_GI_Denoise.GetValue())
+        {
+            // Transition DenoisedHDR to UAV for writing
+            CmdList->setTextureState(DenoisedHDRTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
+
+            FBilateralDenoisePass::FDesc DenoiseDesc;
+            DenoiseDesc.InputTexture = HDRTexture;
+            DenoiseDesc.DepthTexture = GBufferDepthTexture;
+            DenoiseDesc.NormalTexture = GBufferNormalsTexture;
+            DenoiseDesc.OutputTexture = DenoisedHDRTexture;
+            DenoiseDesc.OutputWidth = CurrentFBInfo.width;
+            DenoiseDesc.OutputHeight = CurrentFBInfo.height;
+            DenoiseDesc.DepthSigma = 0.01f;
+            DenoiseDesc.NormalSigma = 0.1f;
+            DenoiseDesc.SpatialSigma = CVar_r_GI_DenoiseSigma.GetValue();
+            DenoisePass.Dispatch(CmdList, DenoiseDesc);
+        }
+        else
+        {
+            // No denoising: copy HDR directly to denoised
+            CmdList->setTextureState(HDRTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::CopySource);
+            CmdList->setTextureState(DenoisedHDRTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::CopyDest);
+            CmdList->copyTexture(DenoisedHDRTexture, nvrhi::TextureSlice(), HDRTexture, nvrhi::TextureSlice());
+        }
 
         // =====================================================================
         // ReSTIR Pass: Generation -> Temporal -> Spatial
@@ -1344,9 +1456,9 @@ public:
             GenConstants.RcpOutputSize[0] = 1.0f / static_cast<float>(CurrentFBInfo.width);
             GenConstants.RcpOutputSize[1] = 1.0f / static_cast<float>(CurrentFBInfo.height);
             GenConstants.FrameIndex = static_cast<float>(TemporalFrameCount);
-            GenConstants.NumCandidates = 8.0f;
-            GenConstants.DepthThreshold = 0.05f;
-            GenConstants.NormalThreshold = 0.5f;
+            GenConstants.NumCandidates = static_cast<float>(CVar_r_ReSTIR_NumCandidates.GetValue());
+            GenConstants.DepthThreshold = CVar_r_ReSTIR_DepthThreshold.GetValue();
+            GenConstants.NormalThreshold = CVar_r_ReSTIR_NormalThreshold.GetValue();
             GenConstants.DebugVis = 0.0f;
 
             ReSTIR::FReSTIRPass::FGenerationDesc GenDesc;
@@ -1386,9 +1498,9 @@ public:
             TempConstants.RcpOutputSize[0] = 1.0f / static_cast<float>(CurrentFBInfo.width);
             TempConstants.RcpOutputSize[1] = 1.0f / static_cast<float>(CurrentFBInfo.height);
             TempConstants.FrameIndex = static_cast<float>(TemporalFrameCount);
-            TempConstants.MaxM = 30.0f;
-            TempConstants.DepthThreshold = 0.05f;
-            TempConstants.NormalThreshold = 0.5f;
+            TempConstants.MaxM = CVar_r_ReSTIR_MaxM.GetValue();
+            TempConstants.DepthThreshold = CVar_r_ReSTIR_DepthThreshold.GetValue();
+            TempConstants.NormalThreshold = CVar_r_ReSTIR_NormalThreshold.GetValue();
             TempConstants.DebugVis = 0.0f;
 
             ReSTIR::FReSTIRPass::FTemporalDesc TempDesc;
@@ -1407,37 +1519,53 @@ public:
             TempDesc.OutRadiance = TemporalRadianceTexture;
             TempDesc.OutputWidth = CurrentFBInfo.width;
             TempDesc.OutputHeight = CurrentFBInfo.height;
-            ReSTIRPass.DispatchTemporal(CmdList, TempDesc, TempConstants);
+            if (CVar_r_ReSTIR_EnableTemporal.GetValue())
+            {
+                ReSTIRPass.DispatchTemporal(CmdList, TempDesc, TempConstants);
 
-            // Swap history with merged for next frame
-            std::swap(Reservoir0HistoryTexture, Reservoir0MergedTexture);
-            std::swap(Reservoir1HistoryTexture, Reservoir1MergedTexture);
+                // Swap history with merged for next frame
+                std::swap(Reservoir0HistoryTexture, Reservoir0MergedTexture);
+                std::swap(Reservoir1HistoryTexture, Reservoir1MergedTexture);
+            }
+            else
+            {
+                // Temporal disabled: use generation output directly as "history" for spatial
+                CmdList->copyTexture(Reservoir0HistoryTexture, nvrhi::TextureSlice(), Reservoir0Texture, nvrhi::TextureSlice());
+                CmdList->copyTexture(Reservoir1HistoryTexture, nvrhi::TextureSlice(), Reservoir1Texture, nvrhi::TextureSlice());
+            }
 
             // Spatial: evaluate merged reservoirs, write to ReSTIROutput
-            // DenoisedHDRTexture is already in ShaderResource state from generation pass
             CmdList->setTextureState(ReSTIROutputTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
 
-            ReSTIR::FReSTIRSpatialConstants SpatConstants;
-            SpatConstants.OutputSize[0] = static_cast<float>(CurrentFBInfo.width);
-            SpatConstants.OutputSize[1] = static_cast<float>(CurrentFBInfo.height);
-            SpatConstants.RcpOutputSize[0] = 1.0f / static_cast<float>(CurrentFBInfo.width);
-            SpatConstants.RcpOutputSize[1] = 1.0f / static_cast<float>(CurrentFBInfo.height);
-            SpatConstants.NormalThreshold = 0.5f;
-            SpatConstants.DepthThreshold = 0.05f;
-            SpatConstants.MaxM = 30.0f;
-            SpatConstants.SpatialRadius = 1.0f;
-            SpatConstants.DebugVis = 0.0f;
+            if (CVar_r_ReSTIR_EnableSpatial.GetValue())
+            {
+                ReSTIR::FReSTIRSpatialConstants SpatConstants;
+                SpatConstants.OutputSize[0] = static_cast<float>(CurrentFBInfo.width);
+                SpatConstants.OutputSize[1] = static_cast<float>(CurrentFBInfo.height);
+                SpatConstants.RcpOutputSize[0] = 1.0f / static_cast<float>(CurrentFBInfo.width);
+                SpatConstants.RcpOutputSize[1] = 1.0f / static_cast<float>(CurrentFBInfo.height);
+                SpatConstants.NormalThreshold = CVar_r_ReSTIR_NormalThreshold.GetValue();
+                SpatConstants.DepthThreshold = CVar_r_ReSTIR_DepthThreshold.GetValue();
+                SpatConstants.MaxM = CVar_r_ReSTIR_MaxM.GetValue();
+                SpatConstants.SpatialRadius = CVar_r_ReSTIR_SpatialRadius.GetValue();
+                SpatConstants.DebugVis = 0.0f;
 
-            ReSTIR::FReSTIRPass::FSpatialDesc SpatDesc;
-            SpatDesc.RadianceTexture = DenoisedHDRTexture;
-            SpatDesc.Reservoir0 = Reservoir0HistoryTexture;
-            SpatDesc.Reservoir1 = Reservoir1HistoryTexture;
-            SpatDesc.NormalTexture = GBufferNormalsTexture;
-            SpatDesc.DepthTexture = GBufferDepthTexture;
-            SpatDesc.OutRadiance = ReSTIROutputTexture;
-            SpatDesc.OutputWidth = CurrentFBInfo.width;
-            SpatDesc.OutputHeight = CurrentFBInfo.height;
-            ReSTIRPass.DispatchSpatial(CmdList, SpatDesc, SpatConstants);
+                ReSTIR::FReSTIRPass::FSpatialDesc SpatDesc;
+                SpatDesc.RadianceTexture = DenoisedHDRTexture;
+                SpatDesc.Reservoir0 = Reservoir0HistoryTexture;
+                SpatDesc.Reservoir1 = Reservoir1HistoryTexture;
+                SpatDesc.NormalTexture = GBufferNormalsTexture;
+                SpatDesc.DepthTexture = GBufferDepthTexture;
+                SpatDesc.OutRadiance = ReSTIROutputTexture;
+                SpatDesc.OutputWidth = CurrentFBInfo.width;
+                SpatDesc.OutputHeight = CurrentFBInfo.height;
+                ReSTIRPass.DispatchSpatial(CmdList, SpatDesc, SpatConstants);
+            }
+            else
+            {
+                // Spatial disabled: copy denoised HDR directly to output
+                CmdList->copyTexture(ReSTIROutputTexture, nvrhi::TextureSlice(), DenoisedHDRTexture, nvrhi::TextureSlice());
+            }
 
             // Copy current frame depth/normal for next frame's temporal reprojection
             CmdList->copyTexture(PrevDepthTexture, nvrhi::TextureSlice(), GBufferDepthTexture, nvrhi::TextureSlice());
@@ -1547,6 +1675,8 @@ public:
         ReSTIROutputTexture = nullptr;
         TemporalRadianceTexture = nullptr;
         RadianceHistoryTexture = nullptr;
+        ReBLURHistoryTexture[0] = nullptr;
+        ReBLURHistoryTexture[1] = nullptr;
         PrevDepthTexture = nullptr;
         PrevNormalTexture = nullptr;
         RTBindingSet = nullptr;
@@ -1569,23 +1699,19 @@ private:
     std::shared_ptr<FScene3DNode> Scene;
     glm::vec3 SceneCenter = glm::vec3(0.f);
 
-    // GI shaders
-    nvrhi::ShaderLibraryHandle ShaderLibrary;
-    nvrhi::ShaderHandle        RayGenShader;
-    nvrhi::ShaderHandle        ClosestHitShader;
-    nvrhi::ShaderHandle        MissShader;
-    nvrhi::ShaderHandle        ShadowMissShader;
-
     // Acceleration structures
     nvrhi::rt::AccelStructHandle          TopLevelAS;
     TVector<nvrhi::rt::AccelStructHandle> MeshBLASHandles;
     FTLASBuilder                          TLASBuilder;
 
-    // GI pipeline
-    nvrhi::rt::PipelineHandle    RTPipeline;
-    nvrhi::rt::ShaderTableHandle ShaderTable;
-    nvrhi::BindingLayoutHandle   RTBindingLayout;
+    // GI ray tracing pipeline (encapsulates shaders, layout, pipeline, shader table)
+    FRayTracingPipeline          RTPipeline;
     nvrhi::BindingSetHandle      RTBindingSet;
+
+    // Bindless texture support
+    FTextureCache                TextureCache;
+    std::shared_ptr<FDescriptorTableManager> DescTableMgr;
+    nvrhi::BindingLayoutHandle   BindlessLayout;
     nvrhi::TextureHandle         HDRTexture;
     nvrhi::TextureHandle         DenoisedHDRTexture;  // Denoised output
 
@@ -1635,6 +1761,11 @@ private:
     // Denoise pass (bilateral filter on GI output)
     FBilateralDenoisePass DenoisePass;
 
+    // ReBLUR pass
+    ReBLUR::FReBLURPass ReBLURPass;
+    nvrhi::TextureHandle ReBLURHistoryTexture[2];
+    bool bReBLURInitialized = false;
+
     // ReSTIR pass
     ReSTIR::FReSTIRPass ReSTIRPass;
     nvrhi::TextureHandle Reservoir0Texture;
@@ -1669,6 +1800,10 @@ private:
 RECORD_BOOL(test_FewBounceGI)
 {
     HLVM_LOG(LogTest, info, TXT("=== Starting Few-bounce GI Test ==="));
+
+    // Load CVar overrides from INI (Engine.ini / Game.ini / System.ini)
+    GetCVarManager().AddIniSearchPath(GExecutablePath);
+    GetCVarManager().LoadAllFromIni();
 
     try
     {
