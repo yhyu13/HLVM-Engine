@@ -5,6 +5,7 @@
 #include "Renderer/PostProcess/FReBLURPass.h"
 #include "Core/Log.h"
 #include "Renderer/ShaderMake/ShaderBlob.h"
+#include "Renderer/Common/FBindingLayoutBuilder.h"
 #include <glm/glm.hpp>
 #include <fstream>
 
@@ -94,34 +95,20 @@ namespace ReBLUR
             LinearSampler = Device->createSampler(SamplerDesc);
         }
 
-        // Create binding layout
+        // Create binding layout using FBindingLayoutBuilder (eliminates manual shift math)
         {
-            nvrhi::BindingLayoutDesc LayoutDesc;
-            LayoutDesc.visibility = nvrhi::ShaderType::Compute;
+            FBindingLayoutBuilder Builder;
+            Builder.SetVisibility(nvrhi::ShaderType::Compute)
+                .AddConstantBuffer(0)       // b0 → binding 256 (Constants)
+                .AddTextureSRV(0)           // t0 → binding 0   (Current radiance)
+                .AddTextureSRV(1)           // t1 → binding 1   (History)
+                .AddTextureSRV(2)           // t2 → binding 2   (Depth)
+                .AddTextureSRV(3)           // t3 → binding 3   (Normal+roughness)
+                .AddSampler(0)              // s0 → binding 128 (Point sampler)
+                .AddSampler(1)              // s1 → binding 129 (Linear sampler)
+                .AddTextureUAV(0);          // u0 → binding 384 (Output)
 
-            nvrhi::VulkanBindingOffsets offsets;
-            offsets.setConstantBufferOffset(0).setShaderResourceOffset(0).setSamplerOffset(0).setUnorderedAccessViewOffset(0);
-            LayoutDesc.setBindingOffsets(offsets);
-
-            // b0 -> 256 (Constants)
-            // t0 -> 0 (Current radiance + hit distance)
-            // t1 -> 1 (History texture - SH encoded)
-            // t2 -> 2 (Depth texture)
-            // t3 -> 3 (Normal + roughness texture)
-            // s0 -> 128 (Point sampler for normals/depth)
-            // s1 -> 144 (Linear sampler for history)
-            // u0 -> 384 (Output texture)
-            LayoutDesc.bindings = {
-                nvrhi::BindingLayoutItem::ConstantBuffer(256),
-                nvrhi::BindingLayoutItem::Texture_SRV(0),   // Current radiance
-                nvrhi::BindingLayoutItem::Texture_SRV(1),   // History
-                nvrhi::BindingLayoutItem::Texture_SRV(2),   // Depth
-                nvrhi::BindingLayoutItem::Texture_SRV(3),   // Normal+roughness
-                nvrhi::BindingLayoutItem::Sampler(128),    // Point sampler
-                nvrhi::BindingLayoutItem::Sampler(129),    // Linear sampler
-                nvrhi::BindingLayoutItem::Texture_UAV(384) // Output
-            };
-
+            nvrhi::BindingLayoutDesc LayoutDesc = Builder.Build();
             BindingLayout = Device->createBindingLayout(LayoutDesc);
         }
 
@@ -231,18 +218,24 @@ namespace ReBLUR
 
         CmdList->writeBuffer(ConstantBuffer, ConstantsData, sizeof(ConstantsData));
 
-        // Create binding set
-        nvrhi::BindingSetDesc BindingSetDesc;
-        BindingSetDesc.bindings = {
-            nvrhi::BindingSetItem::ConstantBuffer(256, ConstantBuffer),
-            nvrhi::BindingSetItem::Texture_SRV(0, Desc.CurrentRadianceTexture),
-            nvrhi::BindingSetItem::Texture_SRV(1, Desc.HistoryTexture),
-            nvrhi::BindingSetItem::Texture_SRV(2, Desc.DepthTexture),
-            nvrhi::BindingSetItem::Texture_SRV(3, Desc.NormalRoughnessTexture),
-            nvrhi::BindingSetItem::Sampler(128, PointSampler),
-            nvrhi::BindingSetItem::Sampler(129, LinearSampler),
-            nvrhi::BindingSetItem::Texture_UAV(384, Desc.OutputTexture)
-        };
+        // Create binding set using FBindingSetBuilder (mirrors layout builder shift math)
+        FBindingSetBuilder SetBuilder;
+        SetBuilder.SetConstantBuffer(0, ConstantBuffer)
+            .SetTextureSRV(0, Desc.CurrentRadianceTexture)
+            .SetTextureSRV(1, Desc.HistoryTexture)
+            .SetTextureSRV(2, Desc.DepthTexture)
+            .SetTextureSRV(3, Desc.NormalRoughnessTexture)
+            .SetSampler(0, PointSampler)
+            .SetSampler(1, LinearSampler)
+            .SetTextureUAV(0, Desc.OutputTexture);
+
+        nvrhi::BindingSetDesc BindingSetDesc = SetBuilder.Build();
+
+        // Debug validation: assert binding set matches layout (catches b0/b1/b257/b512 class bugs)
+        const nvrhi::BindingLayoutDesc* ExpectedLayout = BindingLayout->getDesc();
+        HLVM_ENSURE(ExpectedLayout != nullptr);
+        HLVM_ENSURE(FBindingSetBuilder::ValidateAgainstLayout(BindingSetDesc, *ExpectedLayout));
+
         nvrhi::BindingSetHandle BindingSet = Device->createBindingSet(BindingSetDesc, BindingLayout);
 
         // Dispatch (8x8 thread groups)
