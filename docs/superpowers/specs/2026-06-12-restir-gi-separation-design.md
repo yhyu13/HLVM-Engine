@@ -1,10 +1,10 @@
 # ReSTIR/GI Architectural Separation
 
-**Status**: Draft
-**Date**: 2026-06-12
+**Status**: Draft (revised)
+**Date**: 2026-06-12 (initial) → 2026-06-13 (revised after user review)
 **Author**: Claude + user
 **Scope**: 1-2 weeks (Week 1: GI extraction; Week 2: ReSTIR rewrite + cleanup)
-**Bugs addressed**: bug-046 (ReSTIR GI retrospective), bug-054 (ReBLUR frame stat validation), and the "checkerboard" / "snow-flower flicker" complaints from the current TestFewBounceGI
+**Bugs addressed**: bug-046 (ReSTIR GI retrospective), bug-053 (ReBLUR temporal alpha), bug-054 (ReBLUR frame stat validation), and the "checkerboard" / "snow-flower flicker" complaints from the current TestFewBounceGI
 
 ---
 
@@ -38,7 +38,9 @@ The current pipeline applies ReSTIR as a **post-process** on the denoised GI out
 2. **Both features extracted to Runtime/Renderer/**, owned by reusable pass classes with documented public APIs.
 3. **No architectural confusion**: ReSTIR operates on light samples, not on denoised GI. The two passes are independent and composable.
 4. **Bug-046 regression tests**: pairwise MIS, position-hash stability, W-weighting all locked in by automated tests.
-5. **`TestFewBounceGI.cpp` deleted** by end of Week 2. The kitchen-sink test outlived its purpose.
+5. **`TestFewBounceGI.cpp` deleted** by end of Week 1 (per "no feature lives in a test for more than one iteration"). The kitchen-sink test outlived its purpose.
+6. **Bindless texture support preserved**: `FGIPass` continues to use `FDescriptorTableManager` + bindless `Texture_SRV` for material albedo sampling, matching the current `TestFewBounceGI` implementation (commit `d03a99a`). This is required for Sponza's ~70 unique materials to fit in a single descriptor table.
+7. **BilateralDenoise float4 fix verified**: Per the user's prior analysis, the current dark-pixel artifact in dumped frames may be a `Texture2D<float3>` vs `RGBA32_FLOAT` mismatch in `BilateralDenoise_cs.hlsl` (`.bak` file suggests the fix is mid-progress). This is a hard prerequisite for quality gates (Pre-Week 1 Day 0).
 
 ## Non-Goals
 
@@ -83,7 +85,7 @@ Engine/Source/Runtime/
     ├── TestReSTIR_DI.cpp                       [NEW — ~200 lines, Week 2]
     ├── TestPathTraceGI_Data/                   [NEW — scene + ShaderMake.cfg]
     ├── TestReSTIR_DI_Data/                     [NEW]
-    └── TestFewBounceGI.cpp                     [DELETED — end of Week 2]
+    └── TestFewBounceGI.cpp                     [DELETED — end of Week 1]
 ```
 
 **Key principles:**
@@ -106,6 +108,8 @@ public:
                     const FGIPassDesc& desc = {});
     void Shutdown();
 
+    // Model A: pass owns scene reference; reads TLAS from scene each frame.
+    // DispatchRays takes only the per-frame data, not the TLAS.
     void DispatchRays(nvrhi::ICommandList* cmd,
                       const FGIDispatchParams& params);
 
@@ -118,10 +122,14 @@ public:
     // r_GI.MinRayLength       float  default 0.001
     // r_GI.EnableRR           bool   default true
     // r_GI.RussianRoulette    float  default 0.95
+    // r_GI.DebugBounceStats   bool   default false # gates per-bounce debug UAV
+    // Note: any CVar that affects GI output must be read at DispatchRays() time,
+    //       not Initialize() time, so runtime changes take effect.
 
 private:
     FRayTracingPipeline mPipeline;
     nvrhi::TextureHandle mRadianceTex;       // RGBA32_FLOAT
+    const FScene* mScene = nullptr;          // not owned; reads TLAS from here
     FGIPassStats mLastStats;                 // avg bounces, RR survival rate
 };
 
@@ -133,14 +141,27 @@ struct FGIPassDesc
     bool useMIS              = true;
 };
 
-struct FGIDispatchParams
+struct FGIPassStats
+{
+    float avgBounces;          // mean bounce count across all completed paths
+    float rrSurvivalRate;      // mean survival rate across ALL bounces (not at maxBounces)
+    uint32_t primaryHits;      // count of primary rays that hit geometry
+    uint32_t totalSamples;     // total samples dispatched
+    double avgRadiance;        // mean output radiance (for log spam, not for validation)
+};
+
+struct FRTDispatchParamsBase
 {
     nvrhi::TextureHandle gbufferAlbedo;     // t0
     nvrhi::TextureHandle gbufferNormal;     // t1
     nvrhi::TextureHandle gbufferMaterial;   // t2
-    FViewConstants viewConstants;           // b0
-    uint32_t frameIndex;                    // for RNG seeding
-    FRayTracingAccelStruct tlas;            // t3
+    const FViewConstants& viewConstants;    // b0  (const ref, not value; struct must be brace-initialized)
+    uint32_t frameIndex;                    // 0-based frame counter, for RNG seeding
+};
+
+struct FGIDispatchParams : FRTDispatchParamsBase
+{
+    // No additional fields. TLAS is read from mScene (set in Initialize).
 };
 ```
 
@@ -163,10 +184,13 @@ public:
                     const FReSTIRPassDesc& desc = {});
     void Shutdown();
 
+    // Model A: pass owns scene reference; reads TLAS from scene each frame.
     void DispatchRays(nvrhi::ICommandList* cmd,
                       const FReSTIRDispatchParams& params);
 
-    void ResetHistory();  // Call on scene change (camera move, mesh edit, light change)
+    // Manual history invalidation. Tests call this on scene changes
+    // (camera move, mesh edit, light change).
+    void ResetHistory();
 
     nvrhi::TextureHandle GetOutputTexture() const { return mRadianceTex; }
 
@@ -178,11 +202,15 @@ public:
     // Note: enablePairwiseMIS is NOT a CVar. It is init-time only via FReSTIRPassDesc,
     //       and defaults to true. Bug-046 proved pairwise MIS reduces variance 6x;
     //       exposing it as a runtime CVar would invite accidental re-introduction.
+    // Note: r_ReSTIR.ResetHistory does NOT auto-clear. The user/test must set it
+    //       back to false. The pass logs a warning when ResetHistory fires via CVar
+    //       (so the user can see the state transition in console output).
 
 private:
     FRayTracingPipeline mPipeline;
     nvrhi::TextureHandle mReservoirTex[2];   // ping-pong for temporal reuse
     nvrhi::TextureHandle mRadianceTex;       // RGBA32_FLOAT output
+    const FScene* mScene = nullptr;          // not owned; reads TLAS from here
     int mHistoryIdx = 0;                     // 0 or 1
 };
 
@@ -194,14 +222,8 @@ struct FReSTIRPassDesc
     bool enableTemporal           = true;    // toggle for ablation tests
 };
 
-struct FReSTIRDispatchParams
+struct FReSTIRDispatchParams : FRTDispatchParamsBase
 {
-    nvrhi::TextureHandle gbufferAlbedo;     // t0
-    nvrhi::TextureHandle gbufferNormal;     // t1
-    nvrhi::TextureHandle gbufferMaterial;   // t2
-    FViewConstants viewConstants;           // b0
-    uint32_t frameIndex;                    // for RNG seeding (NEVER in position hash — bug-046)
-    FRayTracingAccelStruct tlas;            // t3
     nvrhi::TextureHandle lightBuffer;       // t4 — StructuredBuffer<FLight>
 };
 ```
@@ -214,23 +236,43 @@ struct FReSTIRDispatchParams
 
 ### Light representation
 
-`FReSTIRDispatchParams::lightBuffer` is a `StructuredBuffer<FLight>`. The `FLight` struct lives in `Runtime/Renderer/Common/FLight.h` and is shared by FGIPass and FReSTIRPass. At minimum:
+`FReSTIRDispatchParams::lightBuffer` is a `StructuredBuffer<FLight>`. The `FLight` struct lives in `Runtime/Renderer/Common/FLight.h` and is shared by FGIPass and FReSTIRPass. **GPU layout matters here** — AGENTS.md notes that `FVec3` is `double`-based, so the C++ struct must use `glm::vec3`/`float3` for GPU compatibility, with explicit padding to match std430 layout:
 
 ```cpp
+// Runtime/Renderer/Common/FLight.h
+// IMPORTANT: This struct must match the HLSL definition exactly (std430 layout).
+// Use float3/float4, NOT FVec3 (which is double-based per project conventions).
 struct FLight
 {
-    FVec3 position;       // for point/spot
-    FVec3 direction;      // for directional
-    FVec3 color;          // linear RGB intensity
-    float intensity;      // multiplier
-    float cosOuterCone;   // for spot lights; -1 for non-spot
-    float cosInnerCone;   // for spot lights; -1 for non-spot
-    uint32_t type;        // 0=point, 1=spot, 2=directional, 3=area
-    float area;           // for area lights
+    glm::vec3 position;        // float3 in HLSL; std430 pads to 16 bytes
+    uint32_t type;             // 0=point, 1=spot, 2=directional, 3=area
+    glm::vec3 direction;       // float3 in HLSL; std430 pads to 16 bytes
+    float intensity;           // multiplier
+    glm::vec3 color;           // float3 in HLSL; std430 pads to 16 bytes
+    float area;                // for area lights
+    float cosOuterCone;        // for spot lights; -1 for non-spot
+    float cosInnerCone;        // for spot lights; -1 for non-spot
+    glm::vec2 _pad0;           // pad to vec4 alignment
 };
+// Total: 80 bytes (matches HLSL `struct FLight` with cbuffer-style alignment)
 ```
 
-Sponza's analytic light list (for both thin tests) is **1 sun (directional) + 4 area lights** positioned in the arches. Defined in `TestPathTraceGI_Data/Scene.json` and `TestReSTIR_DI_Data/Scene.json`.
+HLSL counterpart (`Runtime/Shader/Common/FLight.hlsl`):
+```hlsl
+struct FLight
+{
+    float3 position;   uint type;
+    float3 direction;  float intensity;
+    float3 color;      float area;
+    float cosOuterCone;
+    float cosInnerCone;
+    float2 _pad0;
+};
+
+StructuredBuffer<FLight> gLights;
+```
+
+Sponza's analytic light list (for both thin tests) is **1 sun (directional) + 4 area lights** positioned in the arches. Stored in `TestPathTraceGI_Data/Scene.json` and `TestReSTIR_DI_Data/Scene.json` — these are **ad-hoc test data files**, not a formal engine scene format. Per non-goal #1, no general scene file format is being designed.
 
 ---
 
@@ -373,13 +415,28 @@ RECORD(test_path_trace_gi_quality) {
 
 | Pass | Metric | Target | Why |
 |------|--------|--------|-----|
-| FGIPass | 4-frame stdev | < 10 | GI should be stable frame-to-frame on static scene |
-| FGIPass | Bounce 2 contribution | ≥ 5% of bounce 1 | GI is doing work, not just direct |
-| FGIPass | RR survival rate | 30-70% at maxBounces | RR is firing but not too aggressively |
-| FReSTIRPass | 4-frame stdev | < 5 | ReSTIR should be more stable than naive |
+| FGIPass | 4-frame stdev | < 10 (with fixed tonemap) | GI should be stable frame-to-frame on static scene |
+| FGIPass | Bounce 2 contribution | ≥ 5% of bounce 1 (per-pixel mean) | GI is doing work, not just direct |
+| FGIPass | RR survival rate | 30-70% **average across all bounces** | RR is firing but not too aggressively; per-bounce survival should be high near origin and decay toward the end |
+| FReSTIRPass | 4-frame stdev | < 5 (with fixed tonemap) | ReSTIR should be more stable than naive |
 | FReSTIRPass | Pairwise MIS on/off variance ratio | > 3.0 | Replicates bug-046 lesson (12.3 → 2.08) |
-| FReSTIRPass | Temporal convergence | variance ↓ 50% in 4 frames | TAA-style stability test |
-| FReSTIRPass | Pixel-diff on static scene | < 0.05 | Replicates bug-046 (FrameIndex in position hash → flicker) |
+| FReSTIRPass | Temporal convergence | variance after 4 frames with temporal on **≤** variance with temporal off | First frame may be uninitialized; convergence is the steady-state behavior |
+| FReSTIRPass | Pixel-diff on static scene | < 0.05 in [0,1] linear radiance (≈ 13/255 in 8-bit sRGB) | Replicates bug-046 (FrameIndex in position hash → flicker) |
+
+**Tonemap gating:** All stdev measurements assume a fixed exposure/tonemap curve in the test. The exact curve is ACES filmic with `Exposure=1.0` (no further adjustment). If the test changes tonemap params, the stdev gates must be re-validated. Tests must set this explicitly:
+
+```cpp
+// In test setup:
+r_Tonemap.Mode = 1;       // ACES
+r_Tonemap.Exposure = 1.0;
+r_Tonemap.Gamma = 1.0;
+```
+
+**Bounce 2 measurement:** The "Bounce 2 contribution ≥ 5%" gate is measured via an **optional per-bounce debug UAV** in `GIClosestHit.hlsl`, gated by `r_GI.DebugBounceStats` CVar (default false). When enabled, the shader writes to a `RWStructuredBuffer<FBounceStats>` with per-bounce accumulated radiance. Test reads back, asserts the ratio. When the CVar is false (production path), the UAV is unbound and there is zero overhead. This avoids forcing a separate render pass for measurement.
+
+**Pixel-diff units clarified:** "Pixel-diff < 0.05" means the per-pixel L1 distance in [0,1] linear radiance space, between two consecutive frames on a static scene. 0.05 in linear ≈ 13/255 in 8-bit sRGB. The test must:
+1. Use a fixed tonemap (above)
+2. Compare in linear space (not sRGB), since 8-bit sRGB has gamma compression that hides small differences
 
 **No debug visualizations in shipping shaders** (per bug-046 lesson). `#ifdef DEBUG_VIS` is allowed during dev but must be removed before the iteration ends.
 
@@ -402,31 +459,39 @@ RECORD(test_temporal_does_not_use_frameindex_in_position_hash) {
 
 ## Migration Plan
 
+### Pre-Week 1 — Denoiser fix (Day 0)
+
+| Day | Task | Acceptance |
+|-----|------|------------|
+| 0 (Fri) | Verify BilateralDenoise float4 fix is landed in `FReBLURPass`. If not, land it. The `.bak` file at `TestFewBounceGI_Data/BilateralDenoise_cs.hlsl.bak` suggests the fix is mid-progress — check git log. | Quality gates (Layer 3) are unreliable without this fix |
+
+Without this fix, the "4-frame stdev < 10" gate is meaningless — the denoiser is corrupting pixel data before the gate measurement.
+
 ### Week 1 — Extract `FGIPass` + thin `TestPathTraceGI`
 
 | Day | Task | Acceptance |
 |-----|------|------------|
-| 1 (Mon) | Move `TestFewBounceGI_Data/Shaders/*GI*` to `Runtime/Shader/GI/`. Add `Runtime/Shader/GI/ShaderMake.cfg`. | Shaders compile, .sblob files generated |
-| 2 | Create `FGIPass.h` with API. Implement `Initialize()` and `DispatchRays()` using `FRayTracingPipeline` + `FBindingLayoutBuilder`. | Pass compiles, links, initializes |
-| 3 | Implement multi-bounce path tracing in `GIClosestHit.hlsl` (extracted from current). RR, MIS, bounce accumulation. CVar-driven. | Pixel output stable on `TestCubeOnPlane` |
-| 4 | Create `TestPathTraceGI.cpp` (~200 lines): load Sponza, fill GBuffer, call `FGIPass::DispatchRays`, call `FReBLURPass`, tonemap. | Sponza renders, GI contribution visible |
-| 5 | Quality tests (Layer 2 + 3). Delete ReSTIR code from `TestFewBounceGI.cpp`. | 4-frame stdev < 10, Bounce 2 contribution ≥ 5% |
+| 1 (Mon) | Create `Runtime/Renderer/GI/Shader/` directory. Create stub `GIRayGen.hlsl`, `GIClosestHit.hlsl`, `GIMiss.hlsl`, `GIPathTracing.hlsl` (empty body, return black). Create stub `FGIPass.h` with API but no implementation. Add `Runtime/Renderer/GI/Shader/ShaderMake.cfg`. Add `GetCVarManager().LoadAllFromIni()` call to test entry points (bug-052). | Shaders compile (return black). Stub compiles. |
+| 2 | Move real shader bodies from `TestFewBounceGI_Data/Shaders/` to `Runtime/Renderer/GI/Shader/`. Implement `FGIPass::Initialize()` and `FGIPass::DispatchRays()` using `FRayTracingPipeline` + `FBindingLayoutBuilder`. | Pass compiles, links, initializes, runs on `TestCubeOnPlane` |
+| 3 | Implement multi-bounce path tracing in `GIClosestHit.hlsl` (extracted from current). RR, MIS, bounce accumulation. CVar-driven. Add `r_GI.DebugBounceStats` UAV for measurement. | Pixel output stable on `TestCubeOnPlane`, multi-bounce visible |
+| 4 | Create `TestPathTraceGI.cpp` (~200 lines): load Sponza, fill GBuffer, call `FGIPass::DispatchRays`, call `FReBLURPass`, tonemap. Fixed tonemap (ACES, Exposure=1.0). | Sponza renders, GI contribution visible |
+| 5 | Quality tests (Layer 2 + 3). **Delete `TestFewBounceGI.cpp` entirely** (do not keep with ReSTIR stripped — there's no point in a GI-only test when `TestPathTraceGI` exists). | 4-frame stdev < 10, Bounce 2 contribution ≥ 5%, build passes |
 
-**Week 1 milestone**: `TestPathTraceGI` is the GI reference. `TestFewBounceGI` still exists but has ReSTIR stripped.
+**Week 1 milestone**: `TestPathTraceGI` is the GI reference. `TestFewBounceGI.cpp` deleted.
 
-### Week 2 — Rewrite `FReSTIRPass` + thin `TestReSTIR_DI` + delete kitchen-sink
+### Week 2 — Rewrite `FReSTIRPass` + thin `TestReSTIR_DI` + final cleanup
 
 | Day | Task | Acceptance |
 |-----|------|------------|
-| 6 (Mon) | Move `ReSTIR/PostProcess/FReSTIRPass.{h,cpp}` to `ReSTIR/ReSTIR/FReSTIRPass.{h,cpp}`. Delete old Generate/Temporal/Spatial code. | Old methods gone, file compiles |
-| 7 | Implement new `FReSTIRPass::DispatchRays` with single-call API. In-shader RIS in `ReSTIR_DI_ClosestHit.hlsl`. Pairwise MIS default-on. | Pipeline compiles, links |
-| 8 | Implement temporal compute pass with bug-046 fix (alpha = `max(1/(F+1), 1/FadeIn)`). Implement spatial compute pass with pairwise MIS. | Both passes work in isolation |
-| 9 | Create `TestReSTIR_DI.cpp` (~200 lines). `StructuredBuffer<FLight>` for Sponza. Sponza analytic light list (sun + 4 area lights for the arches). | Sponza renders, DI dominant |
-| 10 | Quality tests (Layer 2 + 3) for ReSTIR. Variance ratio, temporal convergence, position-hash stability. | All 3 quality gates pass |
-| 11 | Delete `TestFewBounceGI.cpp` and `TestFewBounceGI_Data/`. Update `Build.sh` / CMakeLists. | Build passes without TestFewBounceGI |
-| 12 | Update `FDeferredFrameRenderer` to register `FGIPass` and `FReSTIRPass`. Write design doc updates. Bug-046 regression test. | All tests pass Debug + RelWithDebInfo |
+| 6 (Mon) | Move `Runtime/Renderer/PostProcess/FReSTIRPass.{h,cpp}` to `Runtime/Renderer/ReSTIR/FReSTIRPass.{h,cpp}`. Delete old Generate/Temporal/Spatial methods. Create `Runtime/Renderer/ReSTIR/Shader/` with stub shaders. | Old methods gone, file compiles |
+| 7 | Implement in-shader RIS in `ReSTIR_DI_ClosestHit.hlsl`. Single-frame output (no temporal, no spatial). Pairwise MIS default-on via init-time flag. `StructuredBuffer<FLight>` from `Runtime/Renderer/Common/FLight.h`. | Pipeline compiles, links, single-frame Sponza DI visible |
+| 8 | Implement temporal compute pass. Bug-046 + bug-053 fix: alpha = `max(1/(FrameIndex+1), 1/HistoryFadeIn)`. `FrameIndex` in RNG only, **never** in position hash. | Temporal pass converges (variance after 4 frames ≤ without temporal) |
+| 9 | Implement spatial compute pass with pairwise MIS over K×K neighborhood. W-clamped weighted blend. Spatial pass writes the final radiance. | Full ReSTIR DI pipeline works end-to-end |
+| 10 | Create `TestReSTIR_DI.cpp` (~200 lines). Sponza analytic light list (1 sun + 4 area lights). Fixed tonemap. | Sponza renders, DI dominant, all 3 quality gates pass |
+| 11 | Quality tests (Layer 2 + 3) for ReSTIR. Variance ratio, temporal convergence, position-hash stability. | All 3 quality gates pass |
+| 12 | **Contingent**: if `FDeferredFrameRenderer` already exists, register `FGIPass` and `FReSTIRPass` with the pass registry. Otherwise, document the integration point in a `Runtime/Renderer/Deferred/INTEGRATION.md` file. Update `CLAUDE.md` and `.wolf/cerebrum.md` to reflect new module layout and add bug-046 regression test. | All tests pass Debug + RelWithDebInfo |
 
-**Week 2 milestone**: Two clean reference tests, both extracted to Runtime, kitchen-sink deleted.
+**Week 2 milestone**: Two clean reference tests, both extracted to Runtime, kitchen-sink deleted, regression test in place.
 
 ---
 
@@ -452,12 +517,26 @@ RECORD(test_temporal_does_not_use_frameindex_in_position_hash) {
 |------|----------|-----------|
 | 2026-06-12 | Approach A: Incremental extraction (TestPathTraceGI first) | Matches user's instinct; bug-046 lesson ("validate GI before adding ReSTIR"); each week ends with a verifiable milestone |
 | 2026-06-12 | Rewrite FReSTIRPass in place (delete old Generate/Temporal/Spatial methods) | Old API encodes the wrong architecture. Keeping it would create two ReSTIR modules with different semantics. |
-| 2026-06-12 | Delete TestFewBounceGI in Week 2 | Per project policy "no feature lives in a test for more than one iteration"; thin tests are the references; .bak is on disk for archaeology |
+| 2026-06-12 | Delete TestFewBounceGI (originally Week 2; superseded 2026-06-13: end of Week 1) | Per project policy "no feature lives in a test for more than one iteration"; thin tests are the references; .bak is on disk for archaeology |
 | 2026-06-12 | `StructuredBuffer<FLight>` for ReSTIR candidate sampling | ReSTIR's whole point is to sample from many candidates. Analytic constants don't exercise the algorithm. |
 | 2026-06-12 | Manual `ResetHistory()` API + `r_ReSTIR.ResetHistory` CVar | Predictable, debuggable, no magic. Hash-based auto-detect hides failures. |
 | 2026-06-12 | CVar prefixes: `r_GI.*` and `r_ReSTIR.*` | Two new CVar groups, INI sections `[GI]` and `[ReSTIR]`. Clear separation, easy to toggle a whole algorithm. |
 | 2026-06-12 | Module layout: `Runtime/Renderer/{GI,ReSTIR,PostProcess,Common,Deferred}` | Two new top-level modules. Clean separation by algorithm. |
 | 2026-06-12 | Temporal pass is reservoir-only; spatial pass writes radiance | Removes "dead bindings" (bug-046). Single source of truth for radiance: the final reservoir. |
+| 2026-06-13 | TLAS ownership: Model A (pass owns `FScene*` ref, reads TLAS from scene each frame) | Pass class is the natural unit of scene-resource ownership. `DispatchRays` signature stays simple. Per-frame TLAS changes are common in dynamic scenes. |
+| 2026-06-13 | Shared `FRTDispatchParamsBase` for GI and ReSTIR params | Both passes bind identical GBuffer + view constants + frame index. The only difference is `lightBuffer` (ReSTIR-only). Inheritance is cleaner than duplication. |
+| 2026-06-13 | `FViewConstants` by `const&` in params struct | Avoids ~64-byte value copy. Struct must be brace-initialized. C++20 designated initializers work. |
+| 2026-06-13 | Bindless texture arrays preserved in `FGIPass` | Sponza has ~70 unique materials; bindless is required for a single descriptor table. Established in commit `d03a99a`. |
+| 2026-06-13 | BilateralDenoise float4 fix is a hard prerequisite (Pre-Week 1 Day 0) | Without it, the stdev quality gates are unreliable. The `.bak` file indicates the fix is mid-progress. |
+| 2026-06-13 | `FReBLURPass` must consume external `nvrhi::TextureHandle` (not always allocate its own) | Both new tests compose the pass with an upstream GI/DI output. The existing pass API must already support this; if not, the writing-plans phase should add a `Dispatch(cmd, inputTex, outputTex)` overload. |
+| 2026-06-13 | `r_ReSTIR.ResetHistory` does NOT auto-clear | Auto-clearing hides state transitions and confuses users debugging. Pass logs a warning when the CVar triggers reset, so users can see the transition in console. |
+| 2026-06-13 | `FGIPass` / `FReSTIRPass` take `const FScene*` (not `FSceneResourceManager&`) | Spec uses raw `FScene*` for consistency with the existing `FReSTIRPass` API. If `FSceneResourceManager` is the project's preferred scene-lifetime abstraction, the writing-plans phase should switch both passes to take a reference to it instead. This is a low-priority cleanup, not a blocker. |
+| 2026-06-13 | CVar INI loading must be explicit in test entry points (bug-052) | `GetCVarManager().LoadAllFromIni()` is not called automatically. Tests that rely on `Engine.ini` overrides must call this in their entry point. Added to Week 1 Day 1. |
+| 2026-06-13 | RR survival rate measured as **average across all bounces**, not at `maxBounces` | Per-bounce survival should be high near the origin and decay toward the end. Averaging captures the algorithm's behavior, not the worst-case tail. |
+| 2026-06-13 | Temporal convergence is a steady-state property, not a frame-1-to-4 slope | First frame may be uninitialized. Quality gate compares variance after 4 frames with temporal on vs off, not a 50% drop in 4 frames. |
+| 2026-06-13 | Stdev gates assume a fixed tonemap (ACES, Exposure=1.0) | Tonemap parameters affect stdev measurements. Tests must set the tonemap explicitly to make stdev gates reproducible. |
+| 2026-06-13 | Bounce 2 contribution measured via `r_GI.DebugBounceStats`-gated UAV | Avoids forcing a separate render pass. The UAV is unbound in the production path; zero overhead. |
+| 2026-06-13 | `TestFewBounceGI.cpp` deleted at end of Week 1, not Week 2 | Once ReSTIR is stripped, the file is a redundant GI test. `TestPathTraceGI` is the GI reference. No point in keeping both. |
 
 ---
 
@@ -476,7 +555,7 @@ RECORD(test_temporal_does_not_use_frameindex_in_position_hash) {
 - [ ] Lives in `Runtime/Renderer/ReSTIR/`
 - [ ] Old Generate/Temporal/Spatial methods deleted
 - [ ] `TestReSTIR_DI` shows Sponza with dominant DI
-- [ ] Quality stats: stdev < 5, variance ratio > 3.0 vs naive, temporal convergence ↓ 50%
+- [ ] Quality stats: stdev < 5, variance ratio > 3.0 vs naive, temporal convergence (variance after 4 frames with temporal on ≤ variance with temporal off)
 - [ ] Bug-046 regression test: pixel-diff < 0.05 on static scene
 - [ ] CVars: `r_ReSTIR.M`, `r_ReSTIR.SpatialRadius`, `r_ReSTIR.TemporalAlpha`, `r_ReSTIR.ResetHistory`
 - [ ] Code reviewed via `code-reviewer` skill
