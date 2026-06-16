@@ -99,6 +99,7 @@ https://zhuanlan.zhihu.com/p/677704467
    - Reference object removal
    - Non-null pointer template
    - Memory-alloc free `printf` template
+ - **GI regression test**: `TestCornellBoxGI` validates the few-bounce GI + ReBLUR + ReSTIR spatial-MIS pipeline (color bleed, temporal stability, denoiser wiring). Keep green — trips on RNG/temporal/denoiser regressions.
  - Debugging utilities for Linux and Windows [link](Engine/Source/Common/Public/Platform/GenericPlatformDebuggerUtil.h)
    - Using `ptrace` under linux to determine if a debugger is present
    - Using `WinAPI` under windows to determine if a debugger is present

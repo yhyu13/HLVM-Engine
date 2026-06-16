@@ -23,12 +23,12 @@ cbuffer Constants : register(b0)
     float  Pad2;
 };
 
-Texture2D<float3> t_Input   : register(t0);  // Noisy HDR RGB input
+Texture2D<float4> t_Input   : register(t0);  // Noisy HDR RGBA input (RGB + hitDist in alpha)
 Texture2D<float>  t_Depth  : register(t1);   // Depth guide
 Texture2D<float4> t_Normal : register(t2);   // Normal guide (RGB + 1.0)
 SamplerState      PointSampler : register(s0);
 
-RWTexture2D<float3> u_Output : register(u0); // Denoised HDR RGB output
+RWTexture2D<float4> u_Output : register(u0); // Denoised HDR RGBA output (RGB + propagated hitDist)
 
 // Gaussian weight for spatial distance
 float spatialWeight(float distSq, float sigma)
@@ -65,9 +65,9 @@ void main(uint2 dispatchThreadId : SV_DispatchThreadID)
     // Center pixel data
     float centerDepth = t_Depth[pixelCoord];
     float3 centerNormal = normalize(t_Normal[pixelCoord].rgb * 2.0 - 1.0);
-    float3 centerValue = t_Input[pixelCoord];
+    float4 centerValue = t_Input[pixelCoord];
 
-    float3 sum = centerValue;
+    float4 sum = centerValue;
     float weightSum = 1.0;
 
     // 5x5 bilateral kernel
@@ -106,7 +106,7 @@ void main(uint2 dispatchThreadId : SV_DispatchThreadID)
             float weight = wSpatial * wDepth * wNormal;
 
             // Accumulate
-            float3 neighborValue = t_Input[uint2(neighborPixel)];
+            float4 neighborValue = t_Input[uint2(neighborPixel)];
             sum += neighborValue * weight;
             weightSum += weight;
         }

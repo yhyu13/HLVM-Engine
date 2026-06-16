@@ -1,0 +1,1064 @@
+{
+  "version": 1,
+  "bugs": [
+    {
+      "id": "bug-001",
+      "timestamp": "2026-05-09T04:35:15.751Z",
+      "error_message": "Significant refactor of ",
+      "file": "Engine/Source/Runtime/Test/TestSponzaDeferred.cpp",
+      "root_cause": "3 lines replaced/restructured",
+      "fix": "Rewrote 6→6 lines (3 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "cpp"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-09T04:35:15.751Z"
+    },
+    {
+      "id": "bug-002",
+      "timestamp": "2026-05-09T04:35:21.671Z",
+      "error_message": "Significant refactor of ",
+      "file": "Engine/Source/Runtime/Test/TestRTShadowsGBuffer_Data/RTShadowsGBuffer.hlsl",
+      "root_cause": "5 lines replaced/restructured",
+      "fix": "Rewrote 11→4 lines (5 removed) | Also: float3 worldPos = rayOrigin + rayDir * primaryPayl; // Reconstruct screen UV from world position | Also: // DEBUG: Just show primary hitT as color to see i; float hitTNorm = clamp(primaryPayload.hitT / 50.0,",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "hlsl"
+      ],
+      "related_bugs": [],
+      "occurrences": 3,
+      "last_seen": "2026-05-09T04:38:07.367Z"
+    },
+    {
+      "id": "bug-003",
+      "timestamp": "2026-05-09T04:41:12.755Z",
+      "error_message": "Wrong reference: InvViewProj should be ViewProj",
+      "file": "Engine/Source/Runtime/Test/TestRTShadowsGBuffer_Data/RTShadowsGBuffer.hlsl",
+      "root_cause": "Used \"InvViewProj\" instead of \"ViewProj\"",
+      "fix": "Changed InvViewProj → ViewProj",
+      "tags": [
+        "auto-detected",
+        "wrong-reference",
+        "hlsl"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-09T04:41:12.755Z"
+    },
+    {
+      "id": "bug-004",
+      "timestamp": "2026-05-09T06:33:20.312Z",
+      "error_message": "Significant refactor of ",
+      "file": "Engine/Source/Runtime/Test/TestRTShadowsGBuffer_Data/RTShadowsGBuffer.hlsl",
+      "root_cause": "23 lines replaced/restructured",
+      "fix": "Rewrote 40→7 lines (23 removed) | Also: // Sky gradient - green to show miss; finalColor = float3(0.0, 1.0, 0.0);  // Pure green",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "hlsl"
+      ],
+      "related_bugs": [],
+      "occurrences": 2,
+      "last_seen": "2026-05-09T06:36:19.688Z"
+    },
+    {
+      "id": "bug-005",
+      "timestamp": "2026-05-09T06:38:38.103Z",
+      "error_message": "Significant refactor of ",
+      "file": "Engine/Source/Runtime/Test/TestRTShadowsGBuffer.cpp",
+      "root_cause": "3 lines replaced/restructured",
+      "fix": "Rewrote 11→17 lines (3 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "cpp"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-09T06:38:38.103Z"
+    },
+    {
+      "id": "bug-006",
+      "timestamp": "2026-05-09T06:55:01.991Z",
+      "error_message": "Wrong reference: ViewProj should be InvViewProj",
+      "file": "Engine/Source/Runtime/Test/TestRTShadowsGBuffer_Data/RTShadowsGBuffer.hlsl",
+      "root_cause": "Used \"ViewProj\" instead of \"InvViewProj\"",
+      "fix": "Changed ViewProj → InvViewProj",
+      "tags": [
+        "auto-detected",
+        "wrong-reference",
+        "hlsl"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-09T06:55:01.991Z"
+    },
+    {
+      "id": "bug-007",
+      "timestamp": "2026-05-09T16:05:00.000Z",
+      "error_message": "RT shadow rays hitting at wrong screen position - Sponza appears in bottom-left corner instead of centered",
+      "file": "Engine/Source/Runtime/Test/TestRTShadowsGBuffer.cpp",
+      "root_cause": "TLAS transform was identity but GBuffer used 2x scale ModelMatrix. RT rays hit different world positions than where GBuffer rendered.",
+      "fix": "Added 2x scale to TLAS MeshTransform to match GBuffer ModelMatrix: glm::mat4(2,0,0,0, 0,2,0,0, 0,0,2,0, 0,0,0,1)",
+      "tags": [
+        "rt-shadow",
+        "tlas",
+        "transform-mismatch",
+        "cpp"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-09T16:05:00.000Z"
+    },
+    {
+      "id": "bug-046",
+      "timestamp": "2026-05-09T18:30:00.000Z",
+      "error_message": "Sponza scene too small in TestSponzaDeferred - tiny mesh in lower-left corner despite scene having 27 meshes",
+      "file": "Engine/Source/Runtime/Test/TestSponzaDeferred.cpp",
+      "root_cause": "Sponza.glTF has 0.008 scale (cm to m conversion) applied by Assimp. Camera was orbiting at radius 30 looking at fixed point (0,5,0) instead of actual scene center.",
+      "fix": "Calculate actual scene center from bounding box. Use very close camera radius (0.5) to compensate for tiny scene. Scene now fills the frame properly.",
+      "tags": [
+        "cpp",
+        "camera",
+        "scene",
+        "sponza"
+      ],
+      "related_bugs": [
+        "bug-011",
+        "bug-045"
+      ],
+      "occurrences": 1,
+      "last_seen": "2026-05-09T18:30:00.000Z"
+    },
+    {
+      "id": "bug-047",
+      "timestamp": "2026-05-10T06:55:00.000Z",
+      "error_message": "RT shadow rays cause ErrorDeviceLost with hit-computed origins. Fixed far-away origin produces wrong shadows (all red).",
+      "file": "Engine/Source/Runtime/Test/TestRTShadowsGBuffer_Data/RTShadowsGBuffer.hlsl",
+      "root_cause": "worldPos = rayOrigin + rayDir * hitT causes FP precision errors accumulating with multiple shadow rays, leading to GPU/driver unrecoverable error state. Fixed origin approach has ray going FROM far-away THROUGH scene instead of FROM surface TO light.",
+      "fix": "Disabled shadow rays (payload.inShadow = 0u). Scene renders correctly without shadows. Shadow ray precision issue needs further investigation - consider ray query approach or camera-space shadow maps as alternatives.",
+      "tags": [
+        "rt-shadow",
+        "precision",
+        "hlsl",
+        "gpu-crash"
+      ],
+      "related_bugs": [
+        "bug-043"
+      ],
+      "occurrences": 1,
+      "last_seen": "2026-05-10T06:55:00.000Z"
+    },
+    {
+      "id": "bug-009",
+      "timestamp": "2026-05-09T13:49:44.707Z",
+      "error_message": "Significant refactor of ",
+      "file": "Engine/Source/Runtime/Test/TestSponzaDeferred_Data/GBufferSponzaPS.hlsl",
+      "root_cause": "13 lines replaced/restructured",
+      "fix": "Rewrote 26→13 lines (13 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "hlsl"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-09T13:49:44.707Z"
+    },
+    {
+      "id": "bug-010",
+      "timestamp": "2026-05-09T13:49:50.751Z",
+      "error_message": "Significant refactor of ",
+      "file": "Engine/Source/Runtime/Test/TestSponzaDeferred_Data/SponzaDeferredLighting_cs.hlsl",
+      "root_cause": "4 lines replaced/restructured",
+      "fix": "Rewrote 10→8 lines (4 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "hlsl"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-09T13:49:50.751Z"
+    },
+    {
+      "id": "bug-047",
+      "timestamp": "2026-05-09T21:50:00.000Z",
+      "error_message": "TestSponzaDeferred appears black - geometry renders but lighting produces black",
+      "file": "Engine/Source/Runtime/Test/TestSponzaDeferred.cpp and TestSponzaDeferred_Data/SponzaDeferredLighting_cs.hlsl",
+      "root_cause": "Light direction was (-0.577, -0.577, -0.577) pointing DOWN, causing NdotL=0 for floor/walls. Sponza diffuse textures are very dark (near-black values).",
+      "fix": "Changed light direction to (0.577, 0.577, 0.577) - sunlight from upper-right-front. Debug with ambient*10 confirmed scene renders correctly.",
+      "tags": [
+        "cpp",
+        "hlsl",
+        "lighting",
+        "sponza"
+      ],
+      "related_bugs": [
+        "bug-046"
+      ],
+      "occurrences": 1,
+      "last_seen": "2026-05-09T23:12:00.000Z"
+    },
+    {
+      "id": "bug-012",
+      "timestamp": "2026-05-09T14:26:01.453Z",
+      "error_message": "Significant refactor of ",
+      "file": "Engine/Source/Runtime/Test/TestSponzaDeferred_Data/GBufferSponzaPS.hlsl",
+      "root_cause": "5 lines replaced/restructured",
+      "fix": "Rewrote 13→26 lines (5 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "hlsl"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-09T14:26:01.453Z"
+    },
+    {
+      "id": "bug-013",
+      "timestamp": "2026-05-09T14:30:37.720Z",
+      "error_message": "Wrong reference: RGBA32_FLOAT should be RGBA16_FLOAT",
+      "file": "Engine/Source/Runtime/Test/TestSponzaDeferred.cpp",
+      "root_cause": "Used \"RGBA32_FLOAT\" instead of \"RGBA16_FLOAT\"",
+      "fix": "Changed RGBA32_FLOAT → RGBA16_FLOAT",
+      "tags": [
+        "auto-detected",
+        "wrong-reference",
+        "cpp"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-09T14:30:37.720Z"
+    },
+    {
+      "id": "bug-014",
+      "timestamp": "2026-05-09T14:36:56.495Z",
+      "error_message": "Significant refactor of ",
+      "file": "../../../.claude/plans/some-test-cases-home-hangyu5-documents-g-twinkling-gizmo.md",
+      "root_cause": "4 lines replaced/restructured",
+      "fix": "Rewrote 15→41 lines (4 removed) | Also: - `anthropic` SDK (pip install anthropic); - `python-dotenv` for .env loading | Also: # Call vision API; model=\"claude-sonnet-4-6-20250514\",",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "md"
+      ],
+      "related_bugs": [],
+      "occurrences": 3,
+      "last_seen": "2026-05-09T14:37:07.015Z"
+    },
+    {
+      "id": "bug-015",
+      "timestamp": "2026-05-09T15:07:50.314Z",
+      "error_message": "Significant refactor of ",
+      "file": "Engine/Source/Runtime/Test/TestSponzaDeferred.cpp",
+      "root_cause": "2 lines replaced/restructured",
+      "fix": "Rewrote 4→4 lines (2 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "cpp"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-09T15:07:50.314Z"
+    },
+    {
+      "id": "bug-016",
+      "timestamp": "2026-05-09T15:11:38.082Z",
+      "error_message": "Incorrect value in code",
+      "file": "Engine/Scripts/ai_tools/analyze_frames.py",
+      "root_cause": "Had \"https://api.anthropic.com\"",
+      "fix": "Changed to \"https://api.minimaxi.com/anthropic\"",
+      "tags": [
+        "auto-detected",
+        "wrong-value",
+        "py"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-09T15:11:38.082Z"
+    },
+    {
+      "id": "bug-017",
+      "timestamp": "2026-05-09T15:11:42.685Z",
+      "error_message": "Significant refactor of ",
+      "file": "Engine/Scripts/ai_tools/analyze_frames.py",
+      "root_cause": "2 lines replaced/restructured",
+      "fix": "Rewrote 7→6 lines (2 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "py"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-09T15:11:42.685Z"
+    },
+    {
+      "id": "bug-048",
+      "timestamp": "2026-05-09T16:30:00.000Z",
+      "error_message": "Build failed: old-style cast warning treated as error",
+      "file": "Engine/Source/Runtime/Test/TestSponzaDeferred.cpp",
+      "root_cause": "(void*)HDRTexture.Get() is an old-style C cast",
+      "fix": "Changed to static_cast<void*>(HDRTexture.Get())",
+      "tags": [
+        "cpp",
+        "build-error",
+        "cast"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-09T16:30:00.000Z"
+    },
+    {
+      "id": "bug-019",
+      "timestamp": "2026-05-09T22:35:46.397Z",
+      "error_message": "Significant refactor of ",
+      "file": ".claude/skills/hlvm-debug-workflow/SKILL.md",
+      "root_cause": "5 lines replaced/restructured",
+      "fix": "Rewrote 7→4 lines (5 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "md"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-09T22:35:46.397Z"
+    },
+    {
+      "id": "bug-020",
+      "timestamp": "2026-05-09T22:44:27.263Z",
+      "error_message": "Significant refactor of ",
+      "file": "Engine/Source/Runtime/Private/Image/FRenderPassDumper.cpp",
+      "root_cause": "8 lines replaced/restructured",
+      "fix": "Rewrote 20→35 lines (8 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "cpp"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-09T22:44:27.263Z"
+    },
+    {
+      "id": "bug-021",
+      "timestamp": "2026-05-09T22:48:15.375Z",
+      "error_message": "Significant refactor of ",
+      "file": "Engine/Source/Runtime/Test/TestRTShadowsGBuffer_Data/RTShadowsGBuffer.hlsl",
+      "root_cause": "28 lines replaced/restructured",
+      "fix": "Rewrote 38→9 lines (28 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "hlsl"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-09T22:48:15.375Z"
+    },
+    {
+      "id": "bug-022",
+      "timestamp": "2026-05-09T22:52:13.101Z",
+      "error_message": "Wrong return value",
+      "file": "Engine/Source/Runtime/Public/Image/FRenderPassDumper.h",
+      "root_cause": "Was returning: mant == 0 ? 0.0f : (sign ? -1.0f : 1.0f) * mant / ",
+      "fix": "Now returns: mant == 0 ? 0.0f : (sign ? -1.0f : 1.0f) * static_",
+      "tags": [
+        "auto-detected",
+        "return-value",
+        "h"
+      ],
+      "related_bugs": [],
+      "occurrences": 2,
+      "last_seen": "2026-05-09T22:53:59.355Z"
+    },
+    {
+      "id": "bug-024",
+      "timestamp": "2026-05-09T23:39:13.411Z",
+      "error_message": "Significant refactor of ",
+      "file": "Engine/Source/Runtime/Test/TestSponzaDeferred_Data/SponzaDeferredLighting_cs.hlsl",
+      "root_cause": "35 lines replaced/restructured",
+      "fix": "Rewrote 79→54 lines (35 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "hlsl"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-09T23:39:13.411Z"
+    },
+    {
+      "id": "bug-025",
+      "timestamp": "2026-05-09T23:42:02.089Z",
+      "error_message": "Significant refactor of ",
+      "file": "Engine/Source/Runtime/Test/TestRTShadowsGBuffer_Data/RTShadowsGBuffer.hlsl",
+      "root_cause": "5 lines replaced/restructured",
+      "fix": "Rewrote 16→7 lines (5 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "hlsl"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-09T23:42:02.089Z"
+    },
+    {
+      "id": "bug-049",
+      "timestamp": "2026-05-10T08:10:00.000Z",
+      "error_message": "RT shadow rays working - shadows now cast correctly on Sponza scene",
+      "file": "Engine/Source/Runtime/Test/TestRTShadowsGBuffer_Data/RTShadowsGBuffer.hlsl",
+      "root_cause": "N/A - successful implementation of shadow rays that were previously disabled due to ErrorDeviceLost",
+      "fix": "Added rayType field to payload (0=primary, 1=shadow) to prevent infinite recursion. Shadow ray origin offset along GBuffer surface normal (0.1 units). Used RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH to skip ClosestHit on shadow rays. Shadow rays now compute inShadow correctly: 0=lit (ray missed all geometry), 1=shadow (ray hit something).",
+      "tags": [
+        "rt-shadow",
+        "hlsl",
+        "fixed"
+      ],
+      "related_bugs": [
+        "bug-047"
+      ],
+      "occurrences": 1,
+      "last_seen": "2026-05-10T08:10:00.000Z"
+    },
+    {
+      "id": "bug-027",
+      "timestamp": "2026-05-10T07:11:06.808Z",
+      "error_message": "Significant refactor of ",
+      "file": "Engine/Source/Runtime/Test/TestSponzaDeferred_Data/GBufferSponzaPS.hlsl",
+      "root_cause": "15 lines replaced/restructured",
+      "fix": "Rewrote 26→13 lines (15 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "hlsl"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-10T07:11:06.808Z"
+    },
+    {
+      "id": "bug-028",
+      "timestamp": "2026-05-10T09:29:44.162Z",
+      "error_message": "Significant refactor of ",
+      "file": "Engine/Source/Runtime/Test/TestRTShadowsGBuffer_Data/RTShadowsGBuffer.hlsl",
+      "root_cause": "4 lines replaced/restructured",
+      "fix": "Rewrote 10→102 lines (4 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "hlsl"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-10T09:29:44.162Z"
+    },
+    {
+      "id": "bug-029",
+      "timestamp": "2026-05-10T10:48:42.918Z",
+      "error_message": "Significant refactor of ",
+      "file": "Engine/Source/Runtime/Test/TestRTShadowsGBuffer_Data/RTShadowsGBuffer.hlsl",
+      "root_cause": "2 lines replaced/restructured",
+      "fix": "Rewrote 3→3 lines (2 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "hlsl"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-10T10:48:42.918Z"
+    },
+    {
+      "id": "bug-030",
+      "timestamp": "2026-05-10T13:12:20.265Z",
+      "error_message": "Significant refactor of ",
+      "file": ".claude/plans/contine-home-hangyu5-documents-gitrepo-m-dynamic-umbrella.md",
+      "root_cause": "3 lines replaced/restructured",
+      "fix": "Rewrote 9→17 lines (3 removed) | Also: Use `mmx` vision CLI to analyze the render output:; mmx vision describe --image Engine/Source/Runtime/ | Also: - [ ] Build completes successfully; - [ ] Test runs without crashing | Also: ## Rollback If Needed; If current changes don't work, compare directly wi",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "md"
+      ],
+      "related_bugs": [],
+      "occurrences": 4,
+      "last_seen": "2026-05-10T13:13:02.419Z"
+    },
+    {
+      "id": "bug-031",
+      "timestamp": "2026-05-10T15:11:18.676Z",
+      "error_message": "Significant refactor of ",
+      "file": "Vibe_Coding/22_Dounts_migration/AI_Task.md",
+      "root_cause": "10 lines replaced/restructured",
+      "fix": "Rewrote 12→25 lines (10 removed) | Also: For all shaders, use correct profile:; [name].vert.hlsl -T vs | Also: float2 uv = pixelCenter / float2(GetDimensions());; float3 rayDir = float3(uv * 2.0 - 1.0, 1.0);",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "md"
+      ],
+      "related_bugs": [],
+      "occurrences": 3,
+      "last_seen": "2026-05-10T15:12:08.681Z"
+    },
+    {
+      "id": "bug-032",
+      "timestamp": "2026-05-10T21:23:56.310Z",
+      "error_message": "Significant refactor of ",
+      "file": "Vibe_Coding/22_Dounts_migration/steps/06_TestBindless/STEP.md",
+      "root_cause": "8 lines replaced/restructured",
+      "fix": "Rewrote 26→37 lines (8 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "md"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-10T21:23:56.310Z"
+    },
+    {
+      "id": "bug-033",
+      "timestamp": "2026-05-10T21:24:59.924Z",
+      "error_message": "Significant refactor of ",
+      "file": "Vibe_Coding/22_Dounts_migration/crush_critic/steps_critic/steps_critic.md",
+      "root_cause": "20 lines replaced/restructured",
+      "fix": "Rewrote 26→11 lines (20 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "md"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-10T21:24:59.924Z"
+    },
+    {
+      "id": "bug-034",
+      "timestamp": "2026-05-11T05:19:00.000Z",
+      "error_message": "TestSponzaDeferred GBuffer→Lighting output solid blue/orange/black — no geometry pixels visible in lighting",
+      "file": "Engine/Source/Runtime/Test/TestSponzaDeferred.cpp",
+      "root_cause": "Matrix upload row-major vs column-major mismatch (slangc ignores #pragma pack_matrix). C++ manually wrote view[0][0], view[1][0]... which is row-major, but SPIR-V expects column-major.",
+      "fix": "Changed to memcpy(&ViewConstantsData[16], glm::value_ptr(view), 64) which emits GLM's native column-major layout.",
+      "tags": [
+        "matrix-layout",
+        "slangc",
+        "hlsl",
+        "spirv",
+        "deferred-rendering"
+      ],
+      "related_bugs": [
+        "bug-035",
+        "bug-036",
+        "bug-037"
+      ],
+      "occurrences": 1,
+      "last_seen": "2026-05-11T05:19:00.000Z"
+    },
+    {
+      "id": "bug-035",
+      "timestamp": "2026-05-11T05:19:00.000Z",
+      "error_message": "TestSponzaDeferred vertex varyings all zero/uniform in pixel shader — normals/texcoords don't vary across triangles",
+      "file": "Engine/Source/Runtime/Test/TestSponzaDeferred.cpp",
+      "root_cause": "FVertex uses glm::aligned_lowp — vec3 is 16 bytes, not 12. sizeof(FVertex)=64. Input layout used hardcoded offsets 0/12/24/32 but actual offsets are 0/16/32/48.",
+      "fix": "Replaced hardcoded offsets with offsetof(FVertex, Position)/offsetof(FVertex, Normal)/offsetof(FVertex, UV)/offsetof(FVertex, Tangent).",
+      "tags": [
+        "vertex-layout",
+        "glm",
+        "aligned-types",
+        "input-layout",
+        "nvrhi"
+      ],
+      "related_bugs": [
+        "bug-034",
+        "bug-036",
+        "bug-037"
+      ],
+      "occurrences": 1,
+      "last_seen": "2026-05-11T05:19:00.000Z"
+    },
+    {
+      "id": "bug-036",
+      "timestamp": "2026-05-11T05:19:00.000Z",
+      "error_message": "TestSponzaDeferred GBuffer textures recreated with wrong format on first frame resize",
+      "file": "Engine/Source/Runtime/Test/TestSponzaDeferred.cpp",
+      "root_cause": "Resize code used RGBA8_UNORM for GBuffer MRTs while Initialize() created them as RGBA16_FLOAT. Format mismatch between framebuffer and pipeline.",
+      "fix": "Changed resize code to use RGBA16_FLOAT to match Initialize().",
+      "tags": [
+        "gbuffer",
+        "format-mismatch",
+        "resize",
+        "rgba16f"
+      ],
+      "related_bugs": [
+        "bug-034",
+        "bug-035",
+        "bug-037"
+      ],
+      "occurrences": 1,
+      "last_seen": "2026-05-11T05:19:00.000Z"
+    },
+    {
+      "id": "bug-037",
+      "timestamp": "2026-05-11T05:19:00.000Z",
+      "error_message": "TestSponzaDeferred only draws 1 mesh instead of all 27 Sponza meshes",
+      "file": "Engine/Source/Runtime/Test/TestSponzaDeferred.cpp",
+      "root_cause": "Debug loop limit `MeshIdx < 1` left in draw loop from earlier debugging session.",
+      "fix": "Changed to `MeshIdx < AllMeshDrawData.size()` to draw all 27 meshes.",
+      "tags": [
+        "loop-bug",
+        "debug-residue",
+        "mesh-draw"
+      ],
+      "related_bugs": [
+        "bug-034",
+        "bug-035",
+        "bug-036"
+      ],
+      "occurrences": 1,
+      "last_seen": "2026-05-11T05:19:00.000Z"
+    },
+    {
+      "id": "bug-038",
+      "timestamp": "2026-05-14T23:57:00.000Z",
+      "error_message": "writeBuffer: dataSize + destOffsetBytes is greater than the buffer size",
+      "file": "Engine/Source/Runtime/Test/TestSponzaDeferred.cpp",
+      "root_cause": "MaterialConstantBuffer created with 28 bytes (sizeof(float)*4 + sizeof(float)*3) but C++ wrote 32 bytes (float[8]) per draw call. NVRHI validation caught the overflow when shader cbuffer layout changed.",
+      "fix": "Changed MatCBDesc.byteSize from sizeof(float)*7 to sizeof(float)*8 to match the actual MaterialConstants cbuffer layout in HLSL (float4 + 4 floats = 32 bytes).",
+      "tags": [
+        "buffer-overflow",
+        "nvrhi",
+        "cbuffer-size-mismatch",
+        "constant-buffer"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-14T23:57:00.000Z"
+    },
+    {
+      "id": "bug-039",
+      "timestamp": "2026-05-16T22:18:22.412Z",
+      "error_message": "VUID-vkCmdTraceRaysKHR-None-08608: VkPipeline does not set up VK_DYNAMIC_STATE_VIEWPORT|VK_DYNAMIC_STATE_SCISSOR but calls related dynamic state commands",
+      "file": "Engine/Source/Runtime/Test/TestRTShadowsGBuffer.cpp",
+      "root_cause": "Known Vulkan validation layer false positive (#8038). Dynamic viewport/scissor from prior graphics pipeline incorrectly attributed to ray-tracing dispatch. Triggered because non-volatile constant buffer in writeBuffer() calls endRenderPass() before setRayTracingState(), creating command sequence that exposes the layer bug. Donut avoids it by using volatile buffers (no endRenderPass in writeBuffer).",
+      "fix": "Added messageIdNumber-based filtering to DebugCallback (DeviceManagerVk5_Misc.cpp) and suppressed 0x29056f6a in TestRTShadowsGBuffer.cpp IgnoredVulkanValidationMessageLocations. Alternative (volatile buffers) would require BindingLayoutItem::VolatileConstantBuffer refactoring.",
+      "tags": [
+        "validation-layer-false-positive",
+        "vulkan",
+        "ray-tracing",
+        "nvrhi",
+        "VUID-08608",
+        "suppression"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-16T22:18:22.412Z"
+    },
+    {
+      "id": "bug-050",
+      "timestamp": "2026-05-22T10:40:00.000Z",
+      "error_message": "KTX texture loading: 'Two or more immediate command lists cannot be open at the same time' followed by 'command list must be opened'",
+      "file": "TestRenderSponza.cpp, TestRTShadowsGBuffer.cpp, FSceneGPUData.cpp",
+      "root_cause": "UploadCmdList was opened before a loop that creates and opens per-texture KtxCmdList handles. NVRHI only allows one immediate command list to be open at a time, so KtxCmdList->open() failed. Subsequent writeTexture calls hit 'command list must be opened' because handle was still in INITIAL state.",
+      "fix": "Moved UploadCmdList->open() to after the KTX loading loops, so it only opens once per-texture command lists have been closed and executed by LoadKTX2Texture/LoadTexture.",
+      "tags": [
+        "nvrhi",
+        "command-list",
+        "ktx",
+        "texture-loading",
+        "vulkan"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-22T10:40:00.000Z"
+    },
+    {
+      "id": "bug-051",
+      "timestamp": "2026-05-23T08:35:00.000Z",
+      "error_message": "Week3 LoadMaterialTexturesAsync does not compile: FPBRMaterial.h not found, ThreadPool.h not found, spurious @param in docs",
+      "file": "AsyncTextureLoader.h:5, AsyncTextureLoader.cpp:10, AsyncTextureLoader.cpp:11, AsyncTextureLoader.h:71",
+      "root_cause": "Header includes FPBRMaterial.h (wrong name - actual file is PBRMaterial.h). cpp includes non-existent ThreadPool.h (should be WorkStealThreadPool.h). Doxygen @param LogCategory in header doesn't match function signature.",
+      "fix": "Fixed AsyncTextureLoader.h: changed FPBRMaterial.h->PBRMaterial.h, removed spurious @param LogCategory. Fixed AsyncTextureLoader.cpp: changed FPBRMaterial.h->PBRMaterial.h, ThreadPool.h->WorkStealThreadPool.h.",
+      "tags": [
+        "build-failure",
+        "week3",
+        "texture-loading",
+        "header-mismatch"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-23T08:45:00.000Z"
+    },
+    {
+      "id": "bug-042",
+      "timestamp": "2026-05-23T01:40:06.653Z",
+      "error_message": "Incorrect value in code",
+      "file": "Engine/Source/Runtime/Public/Renderer/Texture/AsyncTextureLoader.h",
+      "root_cause": "Had \"Renderer/Material/FPBRMaterial.h\"",
+      "fix": "Changed to \"Renderer/Material/PBRMaterial.h\"",
+      "tags": [
+        "auto-detected",
+        "wrong-value",
+        "h"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-23T01:40:06.653Z"
+    },
+    {
+      "id": "bug-043",
+      "timestamp": "2026-05-23T01:40:55.476Z",
+      "error_message": "Incorrect value in code",
+      "file": "Engine/Source/Runtime/Private/Renderer/Texture/AsyncTextureLoader.cpp",
+      "root_cause": "Had \"Renderer/Material/FPBRMaterial.h\"",
+      "fix": "Changed to \"Renderer/Material/PBRMaterial.h\"",
+      "tags": [
+        "auto-detected",
+        "wrong-value",
+        "cpp"
+      ],
+      "related_bugs": [],
+      "occurrences": 2,
+      "last_seen": "2026-05-23T01:41:27.160Z"
+    },
+    {
+      "id": "bug-044",
+      "timestamp": "2026-05-23T08:37:29.871Z",
+      "error_message": "Wrong reference: SuccessCount should be UniqueSuccessCount",
+      "file": "Engine/Source/Runtime/Private/Renderer/Texture/AsyncTextureLoader.cpp",
+      "root_cause": "Used \"SuccessCount\" instead of \"UniqueSuccessCount\"",
+      "fix": "Changed SuccessCount → UniqueSuccessCount",
+      "tags": [
+        "auto-detected",
+        "wrong-reference",
+        "cpp"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-05-23T08:37:29.871Z"
+    },
+    {
+      "id": "bug-045",
+      "timestamp": "2026-06-06T03:32:00.000Z",
+      "error_message": "Few-bounce GI output is sparse snow-flower noise with no coherent shading or direct lighting; per-frame flicker",
+      "file": "Engine/Source/Runtime/Test/TestFewBounceGI_Data/FewBounceGI.hlsl",
+      "root_cause": "(1) RayGen fires 1 ray per pixel — no SPP loop. (2) ClosestHit declares 'in float3 hitAttr : SV_HitT' but SV_HitT is a scalar (ray T); HLSL broadcasts to (T,T,T) and normalize() yields constant (0.577,0.577,0.577) — every surface in bounces 1-3 has identical NdotL. (3) albedo is hardcoded float3(0.7) — no GBuffer sampling at hit. (4) throughput *= 0.5 per bounce darkens GI further. ReSTIR resamples a 1-SPP input, FrameIndex in candidate hash causes per-frame flicker, spatial pass adopts neighbor's y (random screen pixel) and discards W weight.",
+      "fix": "P0: Fix FewBounceGI.hlsl — remove hitAttr as normal, use WorldRayOrigin()+WorldRayDirection()*RayTCurrent() for hitPosition, sample GBuffer at hit, add SPP loop in RayGen. P1: ReSTIR_Generate — drop FrameIndex from candidate positions, increase radius, apply W in spatial output, use real BRDF evaluation. P2: Remove unused TemporalRadiance/RadianceHistory textures.",
+      "tags": [
+        "restir",
+        "gi",
+        "raytracing",
+        "sponza",
+        "noise",
+        "1spp",
+        "wrong-semantic",
+        "hlsl",
+        "diagnostic-2026-06-06"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-06T03:32:00.000Z"
+    },
+    {
+      "id": "bug-046",
+      "timestamp": "2026-06-06T07:59:00.000Z",
+      "error_message": "Post SV_HitT fix: Sponza geometry is visible in frame dumps but covered in snow-flower noise that flickers per frame. No color variation, no shadows, no direct light highlights. User describes as 'snow flower flickering, no real GI or direct rendering'.",
+      "file": "Engine/Source/Runtime/Test/TestFewBounceGI_Data/ReSTIR_Generate_cs.hlsl + FewBounceGI.hlsl",
+      "root_cause": "Predecessor critic (bug-045) was correct that the structural issues exist, but its visual description (90% black, sparse speckle) is no longer accurate after the SV_HitT→barycentric normal fix landed in the working tree. Current dumps show Sponza geometry clearly visible. Remaining issues: (1) RayGen still 1-SPP, (2) albedo still hardcoded float3(0.7) in FewBounceGI.hlsl:258 (TODO), (3) no shadow ray / no sky-occlusion ambient, (4) ReSTIR_Generate_cs.hlsl:76 puts FrameIndex INSIDE the candidate-position hash so y flickers per frame on a static scene, (5) ReSTIR_Spatial_cs.hlsl:130 computes W then discards it (raw gRadiance[y] output), (6) ReSTIR_Temporal binds CurrentRadiance/HistoryRadiance/OutRadiance but the temporal shader doesn't read or write them — temporal pass is reservoir-only and does not stabilize per-frame output.",
+      "fix": "P0 (recognizable Sponza): (A) Sample GBufferDiffuse at hit position for albedo in FewBounceGI.hlsl:258. (B) Add SPP loop in RayGen — for s=0..SPP accumulate payload.radiance. (C) Sky-occlusion ambient in ClosestHit — SampleSky(hitNormal)*0.3. P1 (kill flicker): (D) Remove gConstants.FrameIndex from candidate-position hash in ReSTIR_Generate_cs.hlsl:76 — use hash22(pixel + float2(i*7, i*13)) and keep FrameIndex only on the selection step (line 91). (E) Apply W in spatial output: gOutput = float4(outRadiance * W, 1.0) with W clamped to [0,5]. P2: tighten normal/depth thresholds in spatial pass, increase generation radius after SPP fix, wire up or remove TemporalRadianceTexture/RadianceHistoryTexture.",
+      "tags": [
+        "restir",
+        "gi",
+        "raytracing",
+        "sponza",
+        "noise",
+        "flicker",
+        "1spp",
+        "albedo",
+        "frameindex-hash",
+        "w-discarded",
+        "diagnostic-2026-06-06"
+      ],
+      "related_bugs": [
+        "bug-045"
+      ],
+      "occurrences": 1,
+      "last_seen": "2026-06-06T07:59:00.000Z"
+    },
+    {
+      "id": "bug-047",
+      "timestamp": "2026-06-06T08:19:43.059Z",
+      "error_message": "Significant refactor of ",
+      "file": "Engine/Source/Runtime/Test/TestFewBounceGI_Data/FewBounceGI.hlsl",
+      "root_cause": "2 lines replaced/restructured",
+      "fix": "Rewrote 5→30 lines (2 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "hlsl"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-06T08:19:43.059Z"
+    },
+    {
+      "id": "bug-048",
+      "timestamp": "2026-06-06T08:22:26.522Z",
+      "error_message": "Significant refactor of ",
+      "file": "Engine/Source/Runtime/Test/TestFewBounceGI.cpp",
+      "root_cause": "2 lines replaced/restructured",
+      "fix": "Rewrote 6→3 lines (2 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "cpp"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-06T08:22:26.522Z"
+    },
+    {
+      "id": "bug-049",
+      "timestamp": "2026-06-06T08:22:56.992Z",
+      "error_message": "Wrong condition in logic",
+      "file": "Engine/Source/Runtime/Test/TestFewBounceGI.cpp",
+      "root_cause": "Condition was: if (!RayGenShader || !ClosestHitShader || !MissShader)",
+      "fix": "Changed to: if (!RayGenShader || !ClosestHitShader || !MissShader )",
+      "tags": [
+        "auto-detected",
+        "logic-fix",
+        "cpp"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-06T08:22:56.992Z"
+    },
+    {
+      "id": "bug-050",
+      "timestamp": "2026-06-07T10:29:00.000Z",
+      "error_message": "ReSTIR snow-flower flicker + uniform-gray bounce + ViewConstants reading garbage. Post-fix from bug-046.",
+      "file": "Engine/Source/Runtime/Test/TestFewBounceGI.cpp + TestFewBounceGI_Data/{FewBounceGI.hlsl,ReSTIR_Spatial_cs.hlsl}",
+      "root_cause": "Three independent bugs fixed in commit 2d36716: (1) ReSTIR_Spatial used naive 'pick one y from neighbor, output radiance[y]' — for 1-SPP input this propagates a single bright speckle to 9 spatial neighbors with no calibration, causing the snow-flower flicker. (2) FewBounceGI.hlsl ClosestHit used per-instance info.AlbedoColor which was unset/zero for the few-bounce path, making all bounce-hit materials look uniform gray regardless of Sponza's actual red/marble/brick textures. (3) TestFewBounceGI.cpp binding layout declared ViewConstants at slot 512 — should be 257 (b0=256, b1=256+1) given bRegShift=256 — so the GI shader was reading the wrong constant buffer for camera/clip-space info, producing nonsense clipPos in the new GBuffer reprojection path.",
+      "fix": "(1) Replaced spatial merge with pairwise MIS weighted blend: numerator = sum_i(w_sum_i * radiance_i), denominator = sum_i(M_i * p_hat_i), output = numerator/denominator. Added MaxM clamp and per-reservoir radiance lookup. (2) In FewBounceGI.hlsl ClosestHit, replaced `float3 albedo = info.AlbedoColor` with screen-space reprojection of the primary pass's GBufferDiffuse texture: project hit position through ViewMatrix*ProjMatrix, sample GBufferDiffuse.Load at the resulting pixel. (3) Changed BindingLayoutItem::ConstantBuffer(512) -> ConstantBuffer(257) and matching BindingSetItem::ConstantBuffer(512, ...) -> ConstantBuffer(257, ...) in TestFewBounceGI.cpp.",
+      "tags": [
+        "restir",
+        "gi",
+        "pairwise-mis",
+        "snow-flower",
+        "albedo",
+        "binding-slot",
+        "gbuffer-reprojection",
+        "resolution",
+        "commit-2d36716"
+      ],
+      "related_bugs": [
+        "bug-046"
+      ],
+      "occurrences": 1,
+      "last_seen": "2026-06-07T10:29:00.000Z"
+    },
+    {
+      "id": "bug-051",
+      "timestamp": "2026-06-07T06:15:13.638Z",
+      "error_message": "Wrong reference: false should be true",
+      "file": "Engine/Source/Runtime/Public/Renderer/GI/GICVars.h",
+      "root_cause": "Used \"false\" instead of \"true\"",
+      "fix": "Changed false → true",
+      "tags": [
+        "auto-detected",
+        "wrong-reference",
+        "h"
+      ],
+      "related_bugs": [],
+      "occurrences": 2,
+      "last_seen": "2026-06-07T06:19:52.244Z"
+    },
+    {
+      "id": "bug-052",
+      "timestamp": "2026-06-08T03:36:00Z",
+      "error_message": "CVar override via Engine.ini silently broken",
+      "file": "Engine/Source/Runtime/Test/TestFewBounceGI.cpp",
+      "root_cause": "GetCVarManager().LoadAllFromIni() was never called from any test or main entry point. AUTO_CVAR_* globals register at static init, but no code loaded INI files after registration. Result: Engine.ini settings were ignored entirely.",
+      "fix": "Added GetCVarManager().AddIniSearchPath(GExecutablePath) + GetCVarManager().LoadAllFromIni() to RECORD_BOOL(test_FewBounceGI) entry point.",
+      "tags": [
+        "cvar",
+        "ini",
+        "static-init-order",
+        "test-infrastructure"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-08T03:36:00Z"
+    },
+    {
+      "id": "bug-053",
+      "timestamp": "2026-06-08T03:48:00Z",
+      "error_message": "ReBLUR temporal instability with BlurRadius=0: stdev doubled by frame 4, green channel crashed 34 points",
+      "file": "Engine/Source/Runtime/Test/TestFewBounceGI.cpp",
+      "root_cause": "copyTexture() from DenoisedHDRTexture (RGBA32F) to ReBLURHistoryTexture (RGBA16F) is ILLEGAL in Vulkan — formats are not size-compatible (16 bytes vs 8 bytes per texel). Validation layer caught it: VUID-vkCmdCopyImage-format-size-compatibility. The history texture was never updated, causing historyValid=false every frame or reading garbage.",
+      "fix": "Changed ReBLUR history texture format from RGBA16_FLOAT to RGBA32_FLOAT to match the output texture. Also fixed temporal blend factor from confidence=(FrameIndex-1)/HistoryFadeIn (converges to 100% current) to alpha=max(1/(FrameIndex+1), 1/HistoryFadeIn) for proper exponential moving average.",
+      "tags": [
+        "reblur",
+        "denoiser",
+        "vulkan",
+        "copytexture",
+        "format-mismatch",
+        "validation-layer"
+      ],
+      "related_bugs": [
+        "bug-046"
+      ],
+      "occurrences": 1,
+      "last_seen": "2026-06-08T03:48:00Z"
+    },
+    {
+      "id": "bug-054",
+      "timestamp": "2026-06-08T03:36:00Z",
+      "error_message": "Test framework exit-0 passes hide rendering bugs",
+      "file": "Engine/Source/Runtime/Test/TestFewBounceGI.cpp",
+      "root_cause": "RECORD_BOOL macro only checks return value (true/false). A denoiser that outputs a uniform green rectangle returns true and passes. No visual validation exists in the test framework.",
+      "fix": "Added frame dump infrastructure (HLVM_DUMP_GI env var) and statistical validation (mean/stdev/frame-to-frame diff) for denoiser verification. Future: add automated stdev-monotonic assertion across N frames.",
+      "tags": [
+        "testing",
+        "visual-regression",
+        "denoiser",
+        "quality-gate"
+      ],
+      "related_bugs": [
+        "bug-053"
+      ],
+      "occurrences": 1,
+      "last_seen": "2026-06-08T03:36:00Z"
+    },
+    {
+      "id": "bug-055",
+      "timestamp": "2026-06-12T10:20:48.871Z",
+      "error_message": "Significant refactor of ",
+      "file": "docs/superpowers/specs/2026-06-12-restir-gi-separation-design.md",
+      "root_cause": "2 lines replaced/restructured",
+      "fix": "Rewrote 6→8 lines (2 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "md"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-12T10:20:48.871Z"
+    },
+    {
+      "id": "bug-056",
+      "timestamp": "2026-06-13T00:37:29.016Z",
+      "error_message": "Significant refactor of ",
+      "file": "docs/superpowers/specs/2026-06-12-restir-gi-separation-design.md",
+      "root_cause": "4 lines replaced/restructured",
+      "fix": "Rewrote 44→63 lines (4 removed) | Also: `FReSTIRDispatchParams::lightBuffer` is a `Structu; FVec3 position;       // for point/spot | Also: | FGIPass | 4-frame stdev | < 10 | GI should be st; | FGIPass | Bounce 2 contribution | ≥ 5% of bounce | Also: | 1 (Mon) | Move `TestFewBounceGI_Data/Shaders/*GI; | 2 | Create `FGIPass.h` with API. Implement `Init",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "md"
+      ],
+      "related_bugs": [],
+      "occurrences": 4,
+      "last_seen": "2026-06-13T00:38:51.630Z"
+    },
+    {
+      "id": "bug-057",
+      "timestamp": "2026-06-14T08:17:00.000Z",
+      "error_message": "ReBLUR temporal accumulation had no signal to accumulate — ReBLUR-only output frames were byte-identical across 4 frames",
+      "file": "Engine/Source/Runtime/Test/TestFewBounceGI_Data/FewBounceGI.hlsl",
+      "root_cause": "Per-pixel GI seed depended only on pixel coordinates (pixel.x * 1920u + pixel.y). R0 fixed per-sample/per-bounce independence but did not include frame index, so every frame produced identical ray paths. ReBLUR saw identical input every frame.",
+      "fix": "Inject TemporalFrameCount into ViewConstants padding slot [50] and add it to pixelSeed with a large prime multiplier: pixelSeed = pixel.x * 1920u + pixel.y + (uint)g_View.FrameIndex * 73856093u.",
+      "tags": [
+        "gi",
+        "reblur",
+        "denoiser",
+        "temporal",
+        "seed",
+        "hlsl"
+      ],
+      "related_bugs": [
+        "bug-046"
+      ],
+      "occurrences": 1,
+      "last_seen": "2026-06-14T08:17:00.000Z"
+    },
+    {
+      "id": "bug-058",
+      "timestamp": "2026-06-14T08:13:00.000Z",
+      "error_message": "ReBLUR spatial blur overwrote temporal result and collapsed to black when bilateral weights were zero",
+      "file": "Engine/Source/Runtime/Test/TestFewBounceGI_Data/ReBLUR_cs.hlsl",
+      "root_cause": "SpatialBlur returned float3(0.0) when weightSum < 0.001, and main() assigned the blurred value directly to temporal.radiance, discarding the accumulated history.",
+      "fix": "Changed SpatialBlur fallback to return temporalRadiance. Changed main() to lerp(temporal.radiance, blurred, SpatialAlpha) so spatial blur is additive rather than a destructive overwrite.",
+      "tags": [
+        "reblur",
+        "denoiser",
+        "spatial",
+        "hlsl"
+      ],
+      "related_bugs": [
+        "bug-053"
+      ],
+      "occurrences": 1,
+      "last_seen": "2026-06-14T08:13:00.000Z"
+    },
+    {
+      "id": "bug-059",
+      "timestamp": "2026-06-14T08:12:00.000Z",
+      "error_message": "ReBLUR view-position reconstruction was wrong for LH_ZO projection, causing spatial blur weights to reject valid neighbors",
+      "file": "Engine/Source/Runtime/Test/TestFewBounceGI_Data/ReBLUR_cs.hlsl",
+      "root_cause": "ReconstructViewPos remapped depth with depth * 2.0 - 1.0, assuming [-1,1] NDC. The test uses glm::perspectiveLH_ZO which already outputs [0,1] NDC z. This placed reconstructed positions far behind the camera.",
+      "fix": "Use depth directly in clipPos: float4(uv * 2.0 - 1.0, depth, 1.0).",
+      "tags": [
+        "reblur",
+        "denoiser",
+        "projection",
+        "hlsl"
+      ],
+      "related_bugs": [
+        "bug-058"
+      ],
+      "occurrences": 1,
+      "last_seen": "2026-06-14T08:12:00.000Z"
+    },
+    {
+      "id": "bug-060",
+      "timestamp": "2026-06-16T20:04:00.159Z",
+      "error_message": "Wrong reference: float3 should be float4",
+      "file": "Engine/Source/Runtime/Shader/BilateralDenoise_cs.hlsl",
+      "root_cause": "Used \"float3\" instead of \"float4\"",
+      "fix": "Changed float3 → float4",
+      "tags": [
+        "auto-detected",
+        "wrong-reference",
+        "hlsl"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-16T20:04:00.159Z"
+    }
+  ]
+}
+[
+  {
+    "id": "bug-060",
+    "timestamp": "2026-06-17T00:00:00.000Z",
+    "error_message": "TestFewBounceGI build failed after Day 0 BilateralDenoise float3→float4 fix: 'expected vector<float,3>, got vector<float,4>' at lines 68, 109, 115",
+    "file": "Engine/Source/Runtime/Test/TestFewBounceGI_Data/BilateralDenoise_cs.hlsl (and 2 sibling copies in Engine/Source/Runtime/Shader/ and TestCornellBoxGI_Data/)",
+    "root_cause": "Day 0 changed t_Input/RW u_Output format from float3 to float4 (alpha channel for hitDist propagation) but the shader body still used float3 locals (centerValue, sum, neighborValue). Cascade: signature type change requires body type change.",
+    "fix": "Updated centerValue (line 68), sum (line 70), and neighborValue (line 109) from float3 to float4 in all 3 BilateralDenoise copies. The body is now float4 throughout; final output sum/weightSum naturally produces float4 since weightSum is a scalar.",
+    "tags": ["shaderc-fix", "cascading-type-change", "bilateral-denoise", "float3-to-float4", "sprint-1-day-0-cascade"],
+    "related_bugs": ["bug-046", "bug-050"],
+    "occurrences": 1,
+    "last_seen": "2026-06-17T00:00:00.000Z"
+  }
+]
