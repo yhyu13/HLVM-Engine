@@ -14,6 +14,7 @@
 #pragma once
 
 #include "Core/String.h"
+#include "Renderer/RayTracing/FRayTracingPipeline.h"
 #include <nvrhi/nvrhi.h>
 
 class FScene;
@@ -31,6 +32,11 @@ namespace GI
         nvrhi::rt::AccelStructHandle SceneTLAS; // t0 (SceneBVH)
         nvrhi::TextureHandle OutputTexture;     // u0 (radiance)
         nvrhi::TextureHandle DebugStatsTexture; // u1 (optional, see FGIPassStats)
+
+        // RT geometry (vertex/index/instance buffers for closest-hit barycentric lookup)
+        nvrhi::BufferHandle RTVertices;
+        nvrhi::BufferHandle RTIndices;
+        nvrhi::BufferHandle RTInstanceInfo;
 
         uint32_t OutputWidth  = 0;
         uint32_t OutputHeight = 0;
@@ -89,9 +95,8 @@ namespace GI
         FString ShaderDataDir;
 
         nvrhi::ShaderLibraryHandle ShaderLibrary;
-        nvrhi::rt::PipelineHandle RTPipeline;
-        nvrhi::rt::ShaderTableHandle ShaderTable;
-        nvrhi::BindingLayoutHandle BindingLayout;
+        FRayTracingPipeline RTPipeline;          // RT pipeline wrapper (owns shader table + binding layout)
+        nvrhi::BindingLayoutHandle BindingLayout; // cached from RTPipeline for per-frame binding set creation
         nvrhi::BufferHandle ConstantBuffer;
 
         nvrhi::TextureHandle OutputTexture; // last output (for debugging / test exposure)
