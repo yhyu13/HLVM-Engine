@@ -1,27 +1,33 @@
 // GIPathTracing.hlsl - Few-bounce GI ray-tracing shader library.
 //
-// Task 1.3 of ReSTIR/GI separation sprint-1: stub phase. Returns black for all
-// paths so the pipeline can dispatch without crashing. Real multi-bounce
-// path tracing lands in Task 1.5 (shader bodies migrated from
-// TestFewBounceGI_Data/FewBounceGI.hlsl) and Task 1.6 (loop + RR + EvalBRDF).
+// Task 1.5 of ReSTIR/GI separation sprint-1: migrated real shader bodies from
+// TestFewBounceGI_Data/FewBounceGI.hlsl, adapted to FGIPass binding layout.
 //
 // Entry points (all compiled into one RT library):
 //   - RayGen       [shader("raygeneration")]
 //   - ClosestHit   [shader("closesthit")]
 //   - Miss         [shader("miss")]
+//   - ShadowMiss   [shader("miss")]
 //
-// Resources (bound via FGIPass binding layout, see Task 1.4):
-//   b0  FViewConstants
+// Resources (bound via FGIPass binding layout):
+//   b0  GIConstants
+//   b1  ViewConstants
 //   t0  SceneBVH
 //   t1  GBufferWorldPos
 //   t2  GBufferNormal
-//   t3  GBufferMaterial
+//   t3  GBufferMaterial   (rgb = albedo/diffuse)
+//   t5  RTVertices
+//   t6  RTIndices
+//   t7  RTInstanceInfo
+//   s2  LinearSampler
 //   u0  OutputTexture (radiance)
 //   u1  DebugStatsTexture (optional)
-//   s2  LinearSampler
 
-struct GIPayload
-{
+// =============================================================================
+// Payloads
+// =============================================================================
+
+struct GIPayload {
     float3 throughput;
     float3 radiance;
     float3 origin;
@@ -29,39 +35,333 @@ struct GIPayload
     float  hitDistance;
     uint   bounceCount;
     uint   flags;
+    uint   seed;
 };
 
-struct FViewConstants
-{
+struct ShadowPayload {
+    bool occluded;
+};
+
+// =============================================================================
+// Constant buffers
+// =============================================================================
+
+struct GIConstants {
+    float4 LightDir;
+    float4 AmbientColor;
+    float4 CameraPos;
+    float4 Params;   // x=MaxBounces, y=SPP, z=ShadowTMin, w=ShadowTMax
+    float4 Params2;  // x=AmbientScale, y=RayTMin, z=RayTMax, w=ShadowEnable
+};
+
+struct ViewConstants {
     float4x4 ModelMatrix;
     float4x4 ViewMatrix;
     float4x4 ProjMatrix;
     float2   RenderTargetSize;
-    float2   Padding;
+    float    FrameIndex;
+    float    Pad;
 };
 
-struct Attributes
-{
+ConstantBuffer<GIConstants> g_GI : register(b0);
+ConstantBuffer<ViewConstants> g_View : register(b1);
+
+// =============================================================================
+// Resources
+// =============================================================================
+
+RWTexture2D<float4> Output : register(u0);
+
+RaytracingAccelerationStructure SceneBVH : register(t0);
+
+Texture2D<float4> GBufferWorldPos   : register(t1);
+Texture2D<float4> GBufferNormal     : register(t2);
+Texture2D<float4> GBufferMaterial   : register(t3);
+
+StructuredBuffer<FRTVertex>     RTVertices      : register(t5);
+StructuredBuffer<uint>          RTIndices       : register(t6);
+StructuredBuffer<FInstanceInfo> RTInstanceInfo  : register(t7);
+
+SamplerState LinearSampler : register(s2);
+
+// =============================================================================
+// Vertex / instance data (must match C++ FRTVertex / FInstanceInfo)
+// =============================================================================
+
+struct FRTVertex {
+    float3 Position;
+    float3 Normal;
+    float2 UV;
+};
+
+struct FInstanceInfo {
+    uint   VertexOffset;
+    uint   IndexOffset;
+    uint   VertexCount;
+    uint   IndexCount;
+    float3 AlbedoColor;
+    uint   AlbedoTextureIndex;
+};
+
+// =============================================================================
+// Random Number Generation
+// =============================================================================
+
+uint hashUint(uint seed) {
+    seed ^= seed >> 16;
+    seed *= 0x21f0aaadU;
+    seed ^= seed >> 15;
+    seed *= 0x735a2d97U;
+    seed ^= seed >> 15;
+    return seed;
+}
+
+float hash(uint seed) {
+    return float(hashUint(seed)) / float(0xFFFFFFFFU);
+}
+
+float random(uint pixelSeed, uint bounce, uint sampleIdx) {
+    return hash(pixelSeed + bounce * 17u + sampleIdx * 31u);
+}
+
+// =============================================================================
+// Cosine-Weighted Hemisphere Sampling
+// =============================================================================
+
+float3 sampleHemisphereCosine(float3 normal, float r1, float r2) {
+    float phi = 2.0 * 3.14159265 * r2;
+    float cosTheta = sqrt(1.0 - r1);
+    float sinTheta = sqrt(r1);
+
+    float3 up = (abs(normal.z) < 0.999) ? float3(0.0, 0.0, 1.0) : float3(1.0, 0.0, 0.0);
+    float3 tangent = normalize(cross(up, normal));
+    float3 bitangent = cross(normal, tangent);
+
+    return tangent * cos(phi) * sinTheta + bitangent * sin(phi) * sinTheta + normal * cosTheta;
+}
+
+// =============================================================================
+// Filmic Tonemap
+// =============================================================================
+
+float3 aces(float3 x) {
+    float a = 2.51, b = 0.03, c = 2.43, d = 0.59, e = 0.14;
+    return saturate((x * (a * x + b)) / (x * (c * x + d) + e));
+}
+
+// =============================================================================
+// Environment Sampling
+// =============================================================================
+
+float3 SampleSky(float3 direction) {
+    float3 sunDir = normalize(g_GI.LightDir.xyz);
+    float sunDot = dot(direction, sunDir);
+
+    float3 zenithColor = float3(0.4, 0.6, 1.0);
+    float3 horizonColor = float3(0.7, 0.8, 0.9);
+    float3 groundColor = float3(0.15, 0.12, 0.1);
+
+    float3 skyColor = (direction.y > 0.0)
+        ? lerp(horizonColor, zenithColor, direction.y)
+        : lerp(horizonColor, groundColor, -direction.y);
+
+    float sunDisk = pow(max(sunDot, 0.0), 512.0);
+    float3 sunColor = float3(1.0, 0.95, 0.8) * g_GI.LightDir.w;
+    float sunGlow = pow(max(sunDot, 0.0), 6.0) * 0.15;
+    float skyIntensity = 0.5;
+
+    return (skyColor + sunColor * sunDisk + sunColor * sunGlow) * skyIntensity;
+}
+
+// =============================================================================
+// Ray Generation Shader
+// =============================================================================
+
+[shader("raygeneration")]
+void RayGen() {
+    uint2 pixel = DispatchRaysIndex().xy;
+
+    float3 worldPos = GBufferWorldPos[pixel].rgb;
+    float3 normal = normalize(GBufferNormal[pixel].rgb * 2.0 - 1.0);
+    float3 diffuse = GBufferMaterial[pixel].rgb;
+
+    if (length(worldPos) < 0.001) {
+        Output[pixel] = float4(0.0, 0.0, 0.0, 1.0);
+        return;
+    }
+
+    float3 lightDir = normalize(g_GI.LightDir.xyz);
+
+    uint spp         = (uint)g_GI.Params.y;
+    uint maxBounces  = (uint)g_GI.Params.x;
+    float ambientScale = g_GI.Params2.x;
+    float shadowEnable = g_GI.Params2.w;
+
+    // Primary visible surface direct lighting with shadow ray
+    float NdotL0 = max(dot(normal, lightDir), 0.0);
+    float3 primaryDirect = diffuse * NdotL0 * g_GI.LightDir.w;
+
+    ShadowPayload shadowPayload;
+    shadowPayload.occluded = true;
+    RayDesc shadowRay;
+    shadowRay.Origin = worldPos + normal * 0.01;
+    shadowRay.Direction = lightDir;
+    shadowRay.TMin = g_GI.Params.z;
+    shadowRay.TMax = g_GI.Params.w;
+    TraceRay(
+        SceneBVH,
+        RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER | RAY_FLAG_FORCE_OPAQUE,
+        0xFF, 0, 0, 1,
+        shadowRay,
+        shadowPayload);
+    float primaryVisibility = lerp(1.0, shadowPayload.occluded ? 0.0 : 1.0, shadowEnable);
+    primaryDirect *= primaryVisibility;
+
+    float3 primaryAmbient = diffuse * g_GI.AmbientColor.rgb * ambientScale;
+    float3 result = primaryDirect + primaryAmbient;
+
+    // Multi-sample indirect GI
+    float3 indirect = float3(0.0);
+    float avgFirstHitDist = 0.0;
+
+    uint pixelSeed = pixel.x * 1920u + pixel.y + (uint)g_View.FrameIndex * 73856093u;
+
+    for (uint s = 0; s < spp; ++s) {
+        GIPayload payload;
+        payload.radiance = float3(0.0);
+        payload.throughput = float3(1.0);
+        payload.bounceCount = 0;
+        payload.flags = 0;
+        payload.hitDistance = 0.0;
+        payload.seed = pixelSeed + s * 7919u;
+
+        float3 rayOrigin = worldPos + normal * 0.01;
+        float3 rayDir = sampleHemisphereCosine(
+            normal,
+            random(pixelSeed + s * 7919u, 0, 0),
+            random(pixelSeed + s * 7919u, 0, 1));
+
+        float firstHitDist = 0.0;
+        for (uint bounce = 0; bounce < maxBounces; ++bounce) {
+            RayDesc ray;
+            ray.Origin = rayOrigin;
+            ray.Direction = rayDir;
+            ray.TMin = g_GI.Params2.y;
+            ray.TMax = g_GI.Params2.z;
+
+            TraceRay(
+                SceneBVH,
+                RAY_FLAG_FORCE_OPAQUE,
+                0xFF, 0, 0, 0,
+                ray,
+                payload);
+
+            if (bounce == 0)
+                firstHitDist = payload.hitDistance;
+
+            if ((payload.flags & 0x01) == 0)
+                break;
+
+            rayOrigin = payload.origin;
+            rayDir = payload.direction;
+            payload.bounceCount = bounce + 1;
+        }
+
+        indirect += payload.radiance;
+        avgFirstHitDist += firstHitDist;
+    }
+
+    result += indirect / max(float(spp), 1.0);
+    avgFirstHitDist /= max(float(spp), 1.0);
+
+    Output[pixel] = float4(aces(result), avgFirstHitDist);
+}
+
+// =============================================================================
+// Closest Hit
+// =============================================================================
+
+struct Attributes {
     float2 barycentrics;
 };
 
-[shader("raygeneration")]
-void RayGen()
-{
-    // Real implementation lands in Task 1.5 + 1.6. For now, output is black
-    // and the binding layout can be exercised without crashes.
-    // We intentionally do NOT write to Output[u] here -- that requires u0
-    // being bound. Task 1.4 wires u0; until then DispatchRays is a no-op.
+[shader("closesthit")]
+void ClosestHit(inout GIPayload payload : SV_RayPayload, in Attributes attr : SV_IntersectionAttributes) {
+    float ambientScale = g_GI.Params2.x;
+    float shadowEnable = g_GI.Params2.w;
+
+    float3 worldPos = WorldRayOrigin();
+    float3 worldDir = WorldRayDirection();
+    float hitT = RayTCurrent();
+
+    float3 hitPosition = worldPos + worldDir * hitT;
+    payload.hitDistance = hitT;
+
+    uint instanceIdx = InstanceIndex();
+    uint primitiveIdx = PrimitiveIndex();
+
+    FInstanceInfo info = RTInstanceInfo[instanceIdx];
+
+    uint i0 = RTIndices[info.IndexOffset + primitiveIdx * 3 + 0];
+    uint i1 = RTIndices[info.IndexOffset + primitiveIdx * 3 + 1];
+    uint i2 = RTIndices[info.IndexOffset + primitiveIdx * 3 + 2];
+
+    FRTVertex v0 = RTVertices[i0];
+    FRTVertex v1 = RTVertices[i1];
+    FRTVertex v2 = RTVertices[i2];
+
+    float3 bary = float3(1.0 - attr.barycentrics.x - attr.barycentrics.y, attr.barycentrics.x, attr.barycentrics.y);
+
+    float3 localNormal = v0.Normal * bary.x + v1.Normal * bary.y + v2.Normal * bary.z;
+    float3 hitNormal = normalize(mul(ObjectToWorld3x4(), float4(localNormal, 0.0)).xyz);
+
+    float3 albedo = info.AlbedoColor;
+
+    float3 lightDir = normalize(g_GI.LightDir.xyz);
+    float NdotL = max(dot(hitNormal, lightDir), 0.0);
+
+    ShadowPayload shadowPayload;
+    shadowPayload.occluded = true;
+    RayDesc shadowRay;
+    shadowRay.Origin = hitPosition + hitNormal * 0.01;
+    shadowRay.Direction = lightDir;
+    shadowRay.TMin = g_GI.Params.z;
+    shadowRay.TMax = g_GI.Params.w;
+    TraceRay(
+        SceneBVH,
+        RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER | RAY_FLAG_FORCE_OPAQUE,
+        0xFF, 0, 0, 1,
+        shadowRay,
+        shadowPayload);
+    float visibility = lerp(1.0, shadowPayload.occluded ? 0.0 : 1.0, shadowEnable);
+
+    payload.radiance += payload.throughput * albedo * NdotL * g_GI.LightDir.w * visibility;
+    payload.radiance += payload.throughput * albedo * g_GI.AmbientColor.rgb * ambientScale;
+
+    payload.throughput *= albedo;
+
+    uint seedInput = payload.seed + payload.bounceCount * 13u + 17u;
+    payload.seed = hashUint(seedInput);
+    float r1 = random(payload.seed, 0, 0);
+    float r2 = random(payload.seed, 0, 1);
+    payload.direction = sampleHemisphereCosine(hitNormal, r1, r2);
+    payload.origin = hitPosition + hitNormal * 0.01;
+
+    payload.flags |= 0x01;
 }
 
-[shader("closesthit")]
-void ClosestHit(inout GIPayload /*payload*/, in Attributes /*attr*/)
-{
-    // Real implementation lands in Task 1.5 (migrated from FewBounceGI.hlsl).
+// =============================================================================
+// Miss Shaders
+// =============================================================================
+
+[shader("miss")]
+void Miss(inout GIPayload payload : SV_RayPayload) {
+    float3 skyRadiance = SampleSky(WorldRayDirection());
+    payload.radiance += payload.throughput * skyRadiance;
+    payload.flags &= ~0x01;
 }
 
 [shader("miss")]
-void Miss(inout GIPayload /*payload*/)
-{
-    // Real implementation lands in Task 1.5 (migrated from FewBounceGI.hlsl).
+void ShadowMiss(inout ShadowPayload payload : SV_RayPayload) {
+    payload.occluded = false;
 }
