@@ -11,3 +11,6 @@
 [submodule "Document"]
 	path = Document
 	url = https://github.com/yhyu13/HLVM-Engine-Doc.git
+[submodule "Engine/Source/Plugin/mcp-framework"]
+	path = Engine/Source/Plugin/mcp-framework
+	url = https://github.com/QuantGeekDev/mcp-framework.git

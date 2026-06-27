@@ -1,0 +1,33 @@
+{
+  "name": "hlvm-engine-mcp",
+  "version": "0.1.0",
+  "description": "MCP server for HLVM Engine — run tests and inspect the codebase",
+  "type": "module",
+  "bin": {
+    "hlvm-engine-mcp": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc && mcp-build",
+    "watch": "tsc --watch",
+    "start": "node dist/index.js",
+    "smoke": "node scripts/smoke.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "mcp-framework": "file:../mcp-framework",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.28",
+    "typescript": "^5.3.3"
+  },
+  "overrides": {
+    "zod": "^3.23.0"
+  },
+  "engines": {
+    "node": ">=18.19.0"
+  }
+}

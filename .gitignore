@@ -32,3 +32,10 @@ __pycache__/
 .vs/
 .vscode/
 .idea/
+
+# MCP framework + server
+Engine/Source/Plugin/mcp-framework/node_modules/
+Engine/Source/Plugin/mcp-framework/dist/
+Engine/Source/Plugin/hlvm-engine-mcp/node_modules/
+Engine/Source/Plugin/hlvm-engine-mcp/dist/
+Engine/Source/Plugin/hlvm-engine-mcp/logs/
