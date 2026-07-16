@@ -256,8 +256,8 @@ class RuntimeTestModule(BaseModule):
                 shader_cmake = ShaderMakeBuild.create_rt_shadows_gbuffer_shadermake(self.target_name)
             elif "RTReflections" in self.target_name:
                 shader_cmake = ShaderMakeBuild.create_rt_reflections_shadermake(self.target_name)
-            elif "FewBounceGI" in self.target_name:
-                shader_cmake = ShaderMakeBuild.create_few_bounce_gi_shadermake(self.target_name)
+            elif "CornellBoxGI" in self.target_name:
+                shader_cmake = ShaderMakeBuild.create_cornell_box_gi_shadermake(self.target_name)
             elif "SponzaDeferred" in self.target_name:
                 shader_cmake = ShaderMakeBuild.create_sponza_deferred_shadermake(self.target_name)
             elif "RenderSponza" in self.target_name:
@@ -268,6 +268,8 @@ class RuntimeTestModule(BaseModule):
                 shader_cmake = ShaderMakeBuild.create_tone_mapping_shadermake(self.target_name)
             elif "GPUInstancing" in self.target_name:
                 shader_cmake = ShaderMakeBuild.create_gpu_instancing_shadermake(self.target_name)
+            elif "PathTraceGI" in self.target_name:
+                shader_cmake = ShaderMakeBuild.create_path_trace_gi_shadermake(self.target_name)
             else:
                 shader_cmake = ShaderMakeBuild.create_deferred_shading_shadermake(self.target_name)
             shader_cmake.dump(fp)
@@ -355,6 +357,10 @@ class RuntimeProject(BaseProject):
         # Add common shader compilation for shared Blit shaders
         common_shaders = ShaderMakeBuild.create_common_shadermake()
         self.modules.append(common_shaders)
+
+        # Add shared GI path-tracing shaders (FGIPass)
+        gi_shaders = ShaderMakeBuild.create_gi_shadermake()
+        self.modules.append(gi_shaders)
 
         # Create test modules - detect tests with shader data directories
         for test_cpp in glob.glob("./Test/*.cpp"):

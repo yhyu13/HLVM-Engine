@@ -3,6 +3,8 @@
 // MIT License
 
 #include "Renderer/FSceneResourceManager.h"
+#include "Renderer/Common/FLightBuilder.h"
+#include "Renderer/Common/FLightLoader.h"
 #include "Renderer/Texture/AsyncTextureLoader.h"
 #include "Core/Log.h"
 
@@ -33,6 +35,40 @@ bool FSceneResourceManager::Initialize(nvrhi::IDevice* InDevice, const FPath& Sc
         SceneGPUData.reset();
         Device = nullptr;
         return false;
+    }
+
+    // Load sibling Lights.json if present.
+    Lights.clear();
+    LightsBuffer = nullptr;
+    LightCount = 0;
+    {
+        FPath LightsPath = ScenePath.parent_path() / FPath(TXT("Lights.json"));
+        std::string Error;
+        if (Renderer::LoadLightsFromJSONFile(LightsPath.string(), Lights, Error))
+        {
+            LightsBuffer = Renderer::UploadLightBuffer(Device, Lights);
+            if (LightsBuffer)
+            {
+                LightCount = static_cast<uint32_t>(Lights.size());
+                HLVM_LOG(LogResourceManager, info,
+                    TXT("FSceneResourceManager: uploaded {} lights from {}"),
+                    LightCount,
+                    *FString(LightsPath.string().c_str()));
+            }
+            else
+            {
+                HLVM_LOG(LogResourceManager, err,
+                    TXT("FSceneResourceManager: failed to upload lights from {}"),
+                    *FString(LightsPath.string().c_str()));
+            }
+        }
+        else
+        {
+            HLVM_LOG(LogResourceManager, warn,
+                TXT("FSceneResourceManager: no lights loaded from {} ({})"),
+                *FString(LightsPath.string().c_str()),
+                *FString(Error.c_str()));
+        }
     }
 
     bIsInitialized = true;
@@ -80,6 +116,10 @@ void FSceneResourceManager::Shutdown()
 
     // TextureCache persists across scene reloads — only release active pointer
     FAsyncTextureLoader::SetTextureCache(nullptr);
+
+    LightsBuffer = nullptr;
+    Lights.clear();
+    LightCount = 0;
 
     Device = nullptr;
     bIsInitialized = false;

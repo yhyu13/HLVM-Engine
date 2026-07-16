@@ -5,17 +5,6 @@
 #include "Renderer/Deferred/FGBufferFillPass.h"
 #include "Renderer/Deferred/FDeferredLightingPass.h"
 #include "Renderer/Deferred/FLightData.h"
-#include "Renderer/PostProcess/FBloomPass.h"
-#include "Renderer/PostProcess/FToneMappingPass.h"
-#include "Renderer/PostProcess/FJointBilateralUpsamplePass.h"
-#include "Renderer/PostProcess/FSSAOPass.h"
-#include "Renderer/PostProcess/FSSRPass.h"
-#include "Renderer/PostProcess/FTAAPass.h"
-#include "Renderer/PostProcess/FMotionBlurPass.h"
-#include "Renderer/PostProcess/FDOFPass.h"
-#include "Renderer/PostProcess/FLensEffectsPass.h"
-#include "Renderer/PostProcess/FExposureAdaptationPass.h"
-#include "Renderer/PostProcess/FContactShadowsPass.h"
 #include "Renderer/Shadow/FShadowMapPass.h"
 #include "Renderer/Utility/FGPUProfiler.h"
 #include "Renderer/Shader/ShaderHotReloader.h"
@@ -23,8 +12,30 @@
 #include <nvrhi/nvrhi.h>
 #include <glm/glm.hpp>
 
+// Forward declarations — post-process passes are implementation details
+namespace SSao { class FSSAOPass; }
+namespace SSr { class FSSRPass; }
+namespace TAA { class FTAAPass; }
+namespace MotionBlur { class FMotionBlurPass; }
+namespace DOF { class FDOFPass; }
+namespace LensEffects { class FLensEffectsPass; }
+namespace Exposure { class FExposureAdaptationPass; }
+namespace ContactShadows { class FContactShadowsPass; }
+class FBloomPass;
+class FToneMappingPass;
+class FJointBilateralUpsamplePass;
 class FRenderPassDumper;
 
+/**
+ * @brief Deferred frame renderer — thin orchestrator over passes
+ *
+ * Core passes (GBuffer, Shadow, Lighting) are direct members.
+ * Post-process passes are owned via TUniquePtr to reduce header coupling.
+ *
+ * To add a post-process pass:
+ *   1. Create the pass class
+ *   2. Add it in FDeferredFrameRenderer.cpp (not this header!)
+ */
 class FDeferredFrameRenderer : public IShaderReloadable
 {
 public:
@@ -51,20 +62,18 @@ public:
         nvrhi::TextureHandle RoughnessTexture;
         nvrhi::TextureHandle AOTexture;
         FGBufferFillPass::FMaterialConstants MaterialConstants;
-        glm::mat4 ModelMatrix{1.0f};  // Per-mesh world transform
+        glm::mat4 ModelMatrix{1.0f};
     };
 
     struct FRenderParams
     {
-        const FViewData* View;
-        const FGBufferMeshItem* GBufferMeshes;
-        uint32_t GBufferMeshCount;
-        const FShadowMapPass::FMeshDrawItem* ShadowMeshes;
-        uint32_t ShadowMeshCount;
-        nvrhi::IFramebuffer* OutputFramebuffer;
-        FRenderPassDumper* FrameDumper;
-
-        // Lighting data (single directional light for now)
+        const FViewData* View = nullptr;
+        const FGBufferMeshItem* GBufferMeshes = nullptr;
+        uint32_t GBufferMeshCount = 0;
+        const FShadowMapPass::FMeshDrawItem* ShadowMeshes = nullptr;
+        uint32_t ShadowMeshCount = 0;
+        nvrhi::IFramebuffer* OutputFramebuffer = nullptr;
+        FRenderPassDumper* FrameDumper = nullptr;
         const FLightData* Lights = nullptr;
         uint32_t LightCount = 0;
     };
@@ -73,27 +82,18 @@ public:
     void Render(nvrhi::ICommandList* CmdList, const FRenderParams& Params);
     void Shutdown();
 
-    // IShaderReloadable
     virtual void ReloadShaders() override;
-
-    // Shader hot-reload update (call once per frame)
     void UpdateShaderHotReload();
 
-    // GPU profiling
     void EndProfilingFrame() { Profiler.EndFrame(); }
     [[nodiscard]] const FGPUProfiler& GetProfiler() const { return Profiler; }
     [[nodiscard]] FGPUProfiler& GetProfiler() { return Profiler; }
 
-    nvrhi::TextureHandle GetSDRTexture() const
-    {
-        return SDRTexture;
-    }
+    [[nodiscard]] nvrhi::TextureHandle GetSDRTexture() const { return SDRTexture; }
 
-    FDeferredFrameRenderer() = default;
-    ~FDeferredFrameRenderer() override
-    {
-        Shutdown();
-    }
+    FDeferredFrameRenderer();
+    ~FDeferredFrameRenderer() override;
+
     FDeferredFrameRenderer(const FDeferredFrameRenderer&) = delete;
     FDeferredFrameRenderer& operator=(const FDeferredFrameRenderer&) = delete;
 
@@ -101,7 +101,6 @@ private:
     void ResizeIfNeeded(uint32_t Width, uint32_t Height);
     void CreateIntermediateTextures(uint32_t Width, uint32_t Height);
 
-    // GPU Instancing helpers
     struct FInstancedMeshGroup
     {
         nvrhi::BufferHandle VertexBuffer;
@@ -122,23 +121,31 @@ private:
     TVector<FInstancedMeshGroup> GroupMeshesByGeometry(const FGBufferMeshItem* Meshes, uint32_t Count);
     TVector<FInstancedShadowGroup> GroupShadowMeshesByGeometry(const FShadowMapPass::FMeshDrawItem* Meshes, uint32_t Count);
 
-    // Sub-passes
+    // =====================================================================
+    // Core passes (direct members — fundamental to deferred pipeline)
+    // =====================================================================
     FGBufferFillPass GBufferPass;
     FShadowMapPass ShadowPass;
-    SSao::FSSAOPass HBAOPass;
-    FJointBilateralUpsamplePass BilateralBlurPass;
-    SSr::FSSRPass SSRPass;
     FDeferredLightingPass LightingPass;
-    TAA::FTAAPass TAAPass;
-    MotionBlur::FMotionBlurPass MotionBlurPass;
-    DOF::FDOFPass DOFPass;
-    FBloomPass BloomPass;
-    FToneMappingPass ToneMapPass;
-    LensEffects::FLensEffectsPass LensEffectsPass;
-    Exposure::FExposureAdaptationPass ExposurePass;
-    ContactShadows::FContactShadowsPass ContactShadowsPass;
 
+    // =====================================================================
+    // Post-process passes (opaque pointers — reduces header coupling)
+    // =====================================================================
+    TUniquePtr<SSao::FSSAOPass> HBAOPass;
+    TUniquePtr<FJointBilateralUpsamplePass> BilateralBlurPass;
+    TUniquePtr<SSr::FSSRPass> SSRPass;
+    TUniquePtr<TAA::FTAAPass> TAAPass;
+    TUniquePtr<MotionBlur::FMotionBlurPass> MotionBlurPass;
+    TUniquePtr<DOF::FDOFPass> DOFPass;
+    TUniquePtr<FBloomPass> BloomPass;
+    TUniquePtr<FToneMappingPass> ToneMapPass;
+    TUniquePtr<LensEffects::FLensEffectsPass> LensEffectsPass;
+    TUniquePtr<Exposure::FExposureAdaptationPass> ExposurePass;
+    TUniquePtr<ContactShadows::FContactShadowsPass> ContactShadowsPass;
+
+    // =====================================================================
     // Intermediate textures
+    // =====================================================================
     nvrhi::TextureHandle HDRTexture;
     nvrhi::TextureHandle SDRTexture;
     nvrhi::TextureHandle SSAOTexture;
@@ -158,7 +165,6 @@ private:
     uint32_t FrameIndex = 0;
     bool bTAANeedsHistoryInit = true;
 
-    // State
     nvrhi::IDevice* Device = nullptr;
     FString ShaderDataDir;
     uint32_t CurrentWidth = 0;

@@ -24,6 +24,7 @@ struct FReBLURConstants
     float FrameIndex;
     float HistoryFadeIn;
     float ConfidenceScale;
+    float SpatialAlpha;
     float PassIndex;
     float Pad;
 };
@@ -55,7 +56,8 @@ float GetNormHitDist(float hitDist, float viewZ, float roughness)
 
 float3 ReconstructViewPos(float2 uv, float depth)
 {
-    float4 clipPos = float4(uv * 2.0 - 1.0, depth * 2.0 - 1.0, 1.0);
+    // LH_ZO projection: NDC z is already in [0,1], do not remap to [-1,1]
+    float4 clipPos = float4(uv * 2.0 - 1.0, depth, 1.0);
     float4 viewPos = mul(gConstants.InverseCurrViewProj, clipPos);
     return viewPos.xyz / viewPos.w;
 }
@@ -96,7 +98,7 @@ float ComputeAntiLagScale(DiffSH current, DiffSH history)
 }
 
 // 3x3 bilateral spatial blur with normal/depth rejection
-float3 SpatialBlur(int2 centerPixel, float3 centerPos, float3 centerNormal, float centerDepth)
+float3 SpatialBlur(int2 centerPixel, float3 centerPos, float3 centerNormal, float centerDepth, float3 temporalRadiance)
 {
     float3 sum = float3(0.0);
     float weightSum = 0.0;
@@ -141,7 +143,7 @@ float3 SpatialBlur(int2 centerPixel, float3 centerPos, float3 centerNormal, floa
         }
     }
 
-    return weightSum > 0.001 ? sum / weightSum : float3(0.0);
+    return weightSum > 0.001 ? sum / weightSum : temporalRadiance;
 }
 
 [numthreads(8, 8, 1)]
@@ -201,8 +203,10 @@ void main(uint3 dispatchThreadID : SV_DispatchThreadID)
     // Spatial blur (only when PassIndex < 0.5, i.e. combined pass)
     if (gConstants.BlurRadius > 0.5 && gConstants.PassIndex < 0.5)
     {
-        temporal.radiance = SpatialBlur(
-            dispatchThreadID.xy, viewPos, normal, depth);
+        float3 blurred = SpatialBlur(
+            dispatchThreadID.xy, viewPos, normal, depth, temporal.radiance);
+        // Blend spatial blur with temporal result instead of overwriting
+        temporal.radiance = lerp(temporal.radiance, blurred, gConstants.SpatialAlpha);
     }
 
     gOutput[dispatchThreadID.xy] = float4(temporal.radiance, temporal.hitDist);

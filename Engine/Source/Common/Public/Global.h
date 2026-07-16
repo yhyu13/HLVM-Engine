@@ -19,6 +19,7 @@ HLVM_EXTERN_VAR FTimer GlobalTimerFromStart;
  */
 HLVM_EXTERN_VAR FString GExecutableName;
 HLVM_EXTERN_VAR FPath	GExecutablePath;
+HLVM_EXTERN_VAR FPath	GExecutableDirectory;
 
 /**
  * Project root directory (git root)

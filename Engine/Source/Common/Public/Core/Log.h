@@ -21,6 +21,7 @@
 	#include <spdlog/async.h>
 #endif
 #include <spdlog/sinks/stdout_color_sinks.h>
+#include <spdlog/sinks/basic_file_sink.h>
 #include <spdlog/sinks/rotating_file_sink.h>
 
 #include <forward_list>
@@ -248,6 +249,27 @@ public:
 	NOCOPYMOVE(FSpdlogConsoleDevice);
 	FSpdlogConsoleDevice();
 	~FSpdlogConsoleDevice() override;
+
+	// Log the message
+	virtual void Sink(const FLogContext& Context, const FString& Message) const override;
+
+public:
+	// The asynchronous logger
+	std::shared_ptr<spdlog::logger> AsyncLogger;
+	// The error logger
+	std::shared_ptr<spdlog::logger> ImmediateLogger;
+};
+
+/**
+ * @brief FSpdlogFileDevice is a log device that logs to a local file under the executable directory.
+ *
+ */
+class FSpdlogFileDevice final : public FLogDevice
+{
+public:
+	NOCOPYMOVE(FSpdlogFileDevice);
+	FSpdlogFileDevice();
+	~FSpdlogFileDevice() override;
 
 	// Log the message
 	virtual void Sink(const FLogContext& Context, const FString& Message) const override;

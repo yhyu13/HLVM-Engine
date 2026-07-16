@@ -211,8 +211,10 @@ inline double RunTestAndCalculateAvg(const TestFuncType& func, uint32_t num_iter
 int main(int ac, char* av[])
 {
 	{
-		GExecutableName = boost::filesystem::path(TO_CHAR_CSTR(av[0])).filename().c_str();
+		const boost::filesystem::path ExecutablePath = boost::filesystem::path(TO_CHAR_CSTR(av[0]));
+		GExecutableName = ExecutablePath.filename().c_str();
 		GExecutablePath = boost::filesystem::current_path();
+		GExecutableDirectory = ExecutablePath.has_parent_path() ? ExecutablePath.parent_path() : GExecutablePath;
 #ifdef HLVM_ROOT
 		GProjectRoot = TCHARSTR(LITERAL(HLVM_ROOT));
 #else
@@ -229,6 +231,23 @@ int main(int ac, char* av[])
 		else
 		{
 			std::cout << "Project root: " << GProjectRoot << std::endl;
+		}
+		// Print other paths
+		if (!boost::filesystem::exists(GExecutablePath))
+		{
+			std::cout << "GExecutablePath invalid" << std::endl;
+		}
+		else
+		{
+			std::cout << "GExecutablePath: " << GExecutablePath << std::endl;
+		}
+		if (!boost::filesystem::exists(GExecutableDirectory))
+		{
+			std::cout << "GExecutableDirectory invalid" << std::endl;
+		}
+		else
+		{
+			std::cout << "GExecutableDirectory: " << GExecutableDirectory << std::endl;
 		}
 	}
 	{
@@ -303,6 +322,7 @@ int main(int ac, char* av[])
 	// Initialize log redirector
 	{
 		FLogRedirector::Get()->AddDevice<FSpdlogConsoleDevice>();
+		FLogRedirector::Get()->AddDevice<FSpdlogFileDevice>();
 	}
 	// Run tests
 	{

@@ -211,8 +211,9 @@ namespace ReBLUR
         ConstantsData[offset++] = Constants.FrameIndex;
         ConstantsData[offset++] = Constants.HistoryFadeIn;
 
-        // ConfidenceScale, PassIndex, then 2 padding to 16-byte boundary
+        // ConfidenceScale, SpatialAlpha, PassIndex, then 2 padding to 16-byte boundary
         ConstantsData[offset++] = Constants.ConfidenceScale;
+        ConstantsData[offset++] = Constants.SpatialAlpha;
         ConstantsData[offset++] = Constants.PassIndex;
         offset += 2;
 
@@ -249,6 +250,68 @@ namespace ReBLUR
         CmdList->dispatch(dispatchX, dispatchY, 1);
     }
 
+    static void EnsureDummyTexture(nvrhi::IDevice* Device, nvrhi::TextureHandle& Texture, uint32_t W, uint32_t H,
+                                   nvrhi::Format Format, const char* DebugName)
+    {
+        bool bNeedsRecreate = true;
+        if (Texture)
+        {
+            auto Desc = Texture->getDesc();
+            bNeedsRecreate = (Desc.width != W || Desc.height != H || Desc.format != Format);
+        }
+
+        if (bNeedsRecreate)
+        {
+            nvrhi::TextureDesc Desc;
+            Desc.dimension = nvrhi::TextureDimension::Texture2D;
+            Desc.width = W;
+            Desc.height = H;
+            Desc.format = Format;
+            Desc.isUAV = true;
+            Desc.initialState = nvrhi::ResourceStates::UnorderedAccess;
+            Desc.keepInitialState = true;
+            Desc.debugName = DebugName;
+            Texture = Device->createTexture(Desc);
+        }
+    }
+
+    void FReBLURPass::Dispatch(nvrhi::ICommandList* CmdList, nvrhi::TextureHandle Input,
+                               nvrhi::TextureHandle Output, uint32_t W, uint32_t H)
+    {
+        if (!CmdList || !Device || !Input || !Output || W == 0 || H == 0)
+            return;
+
+        // Dummy depth = 1.0 (valid, no early-out), dummy normal = (0,0,1), roughness = 1.0
+        EnsureDummyTexture(Device, DummyDepthTexture, W, H, nvrhi::Format::R32_FLOAT, "ReBLUR.DummyDepth");
+        EnsureDummyTexture(Device, DummyNormalTexture, W, H, nvrhi::Format::RGBA8_UNORM, "ReBLUR.DummyNormal");
+
+        FDesc Desc;
+        Desc.CurrentRadianceTexture = Input;
+        Desc.HistoryTexture = Input; // No temporal history; use current as history
+        Desc.DepthTexture = DummyDepthTexture;
+        Desc.NormalRoughnessTexture = DummyNormalTexture;
+        Desc.OutputTexture = Output;
+        Desc.OutputWidth = W;
+        Desc.OutputHeight = H;
+
+        FReBLURConstants Constants{};
+        Constants.OutputSize[0] = static_cast<TFP32>(W);
+        Constants.OutputSize[1] = static_cast<TFP32>(H);
+        Constants.RcpOutputSize[0] = 1.0f / static_cast<TFP32>(W);
+        Constants.RcpOutputSize[1] = 1.0f / static_cast<TFP32>(H);
+        Constants.HitDistParams[0] = 3.0f;
+        Constants.HitDistParams[1] = 0.1f;
+        Constants.HitDistParams[2] = 20.0f;
+        Constants.HitDistParams[3] = -25.0f;
+        Constants.FrameIndex = 0.0f;
+        Constants.HistoryFadeIn = 1.0f;
+        Constants.ConfidenceScale = 1.0f;
+        Constants.PassIndex = 0.0f;
+
+        FPooledBlurParams BlurParams = GetDefaultBlurParams();
+        Dispatch(CmdList, Desc, Constants, BlurParams);
+    }
+
     void FReBLURPass::Shutdown()
     {
         HLVM_LOG(LogPostProcess, info, TXT("FReBLURPass::Shutdown"));
@@ -276,6 +339,14 @@ namespace ReBLUR
         if (LinearSampler)
         {
             LinearSampler = nullptr;
+        }
+        if (DummyDepthTexture)
+        {
+            DummyDepthTexture = nullptr;
+        }
+        if (DummyNormalTexture)
+        {
+            DummyNormalTexture = nullptr;
         }
         Device = nullptr;
         bIsInitialized = false;

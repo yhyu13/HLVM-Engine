@@ -1,11 +1,25 @@
 #include "Renderer/Deferred/FDeferredFrameRenderer.h"
 #include "Renderer/Common/FCommonRenderPasses.h"
+#include "Renderer/PostProcess/FSSAOPass.h"
+#include "Renderer/PostProcess/FSSRPass.h"
+#include "Renderer/PostProcess/FTAAPass.h"
+#include "Renderer/PostProcess/FMotionBlurPass.h"
+#include "Renderer/PostProcess/FDOFPass.h"
+#include "Renderer/PostProcess/FBloomPass.h"
+#include "Renderer/PostProcess/FToneMappingPass.h"
+#include "Renderer/PostProcess/FJointBilateralUpsamplePass.h"
+#include "Renderer/PostProcess/FLensEffectsPass.h"
+#include "Renderer/PostProcess/FExposureAdaptationPass.h"
+#include "Renderer/PostProcess/FContactShadowsPass.h"
 #include "Image/FRenderPassDumper.h"
 #include "Core/Log.h"
 #include "Utility/CVar/CVarMacros.h"
 #include <glm/gtc/type_ptr.hpp>
 
 DECLARE_LOG_CATEGORY(LogRenderer)
+
+FDeferredFrameRenderer::FDeferredFrameRenderer() = default;
+FDeferredFrameRenderer::~FDeferredFrameRenderer() { Shutdown(); }
 
 AUTO_CVAR_BOOL(r_SSAO, true,
     "Enable SSAO (HBAO)", EConsoleVariableFlag::Saved)
@@ -106,19 +120,22 @@ bool FDeferredFrameRenderer::Initialize(nvrhi::IDevice* InDevice, const FString&
         TXT("{}/Engine/Source/Runtime/Shader"),
         *GProjectRoot);
 
-    if (!HBAOPass.Initialize(Device, CommonShaderDir))
+    HBAOPass = std::make_unique<SSao::FSSAOPass>();
+    if (!HBAOPass->Initialize(Device, CommonShaderDir))
     {
         HLVM_LOG(LogRenderer, err, TXT("FDeferredFrameRenderer: Failed to initialize HBAO pass"));
         return false;
     }
 
-    if (!BilateralBlurPass.Initialize(Device, CommonShaderDir))
+    BilateralBlurPass = std::make_unique<FJointBilateralUpsamplePass>();
+    if (!BilateralBlurPass->Initialize(Device, CommonShaderDir))
     {
         HLVM_LOG(LogRenderer, err, TXT("FDeferredFrameRenderer: Failed to initialize bilateral blur pass"));
         return false;
     }
 
-    if (!SSRPass.Initialize(Device, ShaderDataDir))
+    SSRPass = std::make_unique<SSr::FSSRPass>();
+    if (!SSRPass->Initialize(Device, ShaderDataDir))
     {
         HLVM_LOG(LogRenderer, err, TXT("FDeferredFrameRenderer: Failed to initialize SSR pass"));
         return false;
@@ -130,19 +147,22 @@ bool FDeferredFrameRenderer::Initialize(nvrhi::IDevice* InDevice, const FString&
         return false;
     }
 
-    if (!BloomPass.Initialize(Device, ShaderDataDir))
+    BloomPass = std::make_unique<FBloomPass>();
+    if (!BloomPass->Initialize(Device, ShaderDataDir))
     {
         HLVM_LOG(LogRenderer, err, TXT("FDeferredFrameRenderer: Failed to initialize bloom pass"));
         return false;
     }
 
-    if (!ContactShadowsPass.Initialize(Device, ShaderDataDir))
+    ContactShadowsPass = std::make_unique<ContactShadows::FContactShadowsPass>();
+    if (!ContactShadowsPass->Initialize(Device, ShaderDataDir))
     {
         HLVM_LOG(LogRenderer, err, TXT("FDeferredFrameRenderer: Failed to initialize contact shadows pass"));
         return false;
     }
 
-    if (!ToneMapPass.Initialize(Device, ShaderDataDir))
+    ToneMapPass = std::make_unique<FToneMappingPass>();
+    if (!ToneMapPass->Initialize(Device, ShaderDataDir))
     {
         HLVM_LOG(LogRenderer, err, TXT("FDeferredFrameRenderer: Failed to initialize tone mapping pass"));
         return false;
@@ -174,18 +194,29 @@ void FDeferredFrameRenderer::Shutdown()
     Profiler.Shutdown();
     GBufferPass.Shutdown();
     ShadowPass.Shutdown();
-    HBAOPass.Shutdown();
-    BilateralBlurPass.Shutdown();
-    SSRPass.Shutdown();
     LightingPass.Shutdown();
-    TAAPass.Shutdown();
-    MotionBlurPass.Shutdown();
-    DOFPass.Shutdown();
-    BloomPass.Shutdown();
-    ToneMapPass.Shutdown();
-    LensEffectsPass.Shutdown();
-    ExposurePass.Shutdown();
-    ContactShadowsPass.Shutdown();
+    if (HBAOPass) HBAOPass->Shutdown();
+    if (BilateralBlurPass) BilateralBlurPass->Shutdown();
+    if (SSRPass) SSRPass->Shutdown();
+    if (TAAPass) TAAPass->Shutdown();
+    if (MotionBlurPass) MotionBlurPass->Shutdown();
+    if (DOFPass) DOFPass->Shutdown();
+    if (BloomPass) BloomPass->Shutdown();
+    if (ToneMapPass) ToneMapPass->Shutdown();
+    if (LensEffectsPass) LensEffectsPass->Shutdown();
+    if (ExposurePass) ExposurePass->Shutdown();
+    if (ContactShadowsPass) ContactShadowsPass->Shutdown();
+    HBAOPass.reset();
+    BilateralBlurPass.reset();
+    SSRPass.reset();
+    TAAPass.reset();
+    MotionBlurPass.reset();
+    DOFPass.reset();
+    BloomPass.reset();
+    ToneMapPass.reset();
+    LensEffectsPass.reset();
+    ExposurePass.reset();
+    ContactShadowsPass.reset();
 
     HDRTexture = nullptr;
     SDRTexture = nullptr;
@@ -486,7 +517,8 @@ void FDeferredFrameRenderer::Render(nvrhi::ICommandList* CmdList, const FRenderP
     // Initialize TAA pass on first render if enabled
     if (CVar_r_TAA && !bTAAInitialized)
     {
-        if (!TAAPass.Initialize(Device, ShaderDataDir))
+        if (!TAAPass) TAAPass = std::make_unique<TAA::FTAAPass>();
+        if (!TAAPass->Initialize(Device, ShaderDataDir))
         {
             HLVM_LOG(LogRenderer, err, TXT("FDeferredFrameRenderer: Failed to initialize TAA pass"));
             return;
@@ -497,7 +529,8 @@ void FDeferredFrameRenderer::Render(nvrhi::ICommandList* CmdList, const FRenderP
     // Initialize motion blur pass on first render if enabled
     if (CVar_r_MotionBlur && !bMotionBlurInitialized)
     {
-        if (!MotionBlurPass.Initialize(Device, ShaderDataDir))
+        if (!MotionBlurPass) MotionBlurPass = std::make_unique<MotionBlur::FMotionBlurPass>();
+        if (!MotionBlurPass->Initialize(Device, ShaderDataDir))
         {
             HLVM_LOG(LogRenderer, err, TXT("FDeferredFrameRenderer: Failed to initialize motion blur pass"));
             return;
@@ -508,7 +541,8 @@ void FDeferredFrameRenderer::Render(nvrhi::ICommandList* CmdList, const FRenderP
     // Initialize DOF pass on first render if enabled
     if (CVar_r_DOF && !bDOFInitialized)
     {
-        if (!DOFPass.Initialize(Device, ShaderDataDir))
+        if (!DOFPass) DOFPass = std::make_unique<DOF::FDOFPass>();
+        if (!DOFPass->Initialize(Device, ShaderDataDir))
         {
             HLVM_LOG(LogRenderer, err, TXT("FDeferredFrameRenderer: Failed to initialize DOF pass"));
             return;
@@ -519,7 +553,8 @@ void FDeferredFrameRenderer::Render(nvrhi::ICommandList* CmdList, const FRenderP
     // Initialize lens effects pass on first render if enabled
     if (CVar_r_LensEffects && !bLensEffectsInitialized)
     {
-        if (!LensEffectsPass.Initialize(Device, ShaderDataDir))
+        if (!LensEffectsPass) LensEffectsPass = std::make_unique<LensEffects::FLensEffectsPass>();
+        if (!LensEffectsPass->Initialize(Device, ShaderDataDir))
         {
             HLVM_LOG(LogRenderer, err, TXT("FDeferredFrameRenderer: Failed to initialize lens effects pass"));
             return;
@@ -530,7 +565,8 @@ void FDeferredFrameRenderer::Render(nvrhi::ICommandList* CmdList, const FRenderP
     // Initialize exposure adaptation pass on first render if enabled
     if (CVar_r_ExposureAdaptation && !bExposureAdaptationInitialized)
     {
-        if (!ExposurePass.Initialize(Device, ShaderDataDir))
+        if (!ExposurePass) ExposurePass = std::make_unique<Exposure::FExposureAdaptationPass>();
+        if (!ExposurePass->Initialize(Device, ShaderDataDir))
         {
             HLVM_LOG(LogRenderer, err, TXT("FDeferredFrameRenderer: Failed to initialize exposure adaptation pass"));
             return;
@@ -849,7 +885,7 @@ void FDeferredFrameRenderer::Render(nvrhi::ICommandList* CmdList, const FRenderP
         HBAODesc.OutputHeight = CurrentHeight;
 
         CmdList->setTextureState(SSAOTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
-        HBAOPass.Dispatch(CmdList, HBAODesc, HBAOConstants);
+        HBAOPass->Dispatch(CmdList, HBAODesc, HBAOConstants);
         Profiler.EndPass(CmdList);
 
         // Transition SSAO to SRV for blur
@@ -868,7 +904,7 @@ void FDeferredFrameRenderer::Render(nvrhi::ICommandList* CmdList, const FRenderP
         BilateralDesc.OutputWidth = CurrentWidth;
         BilateralDesc.OutputHeight = CurrentHeight;
         BilateralDesc.DepthSigma = 0.01f;
-        BilateralBlurPass.Dispatch(CmdList, BilateralDesc);
+        BilateralBlurPass->Dispatch(CmdList, BilateralDesc);
         Profiler.EndPass(CmdList);
     }
 
@@ -911,7 +947,7 @@ void FDeferredFrameRenderer::Render(nvrhi::ICommandList* CmdList, const FRenderP
         CSDesc.Width = CurrentWidth;
         CSDesc.Height = CurrentHeight;
 
-        ContactShadowsPass.Dispatch(CmdList, CSDesc, CSConstants);
+        ContactShadowsPass->Dispatch(CmdList, CSDesc, CSConstants);
 
         // Transition contact shadow texture to SRV for lighting
         CmdList->setTextureState(ContactShadowTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
@@ -1121,7 +1157,7 @@ void FDeferredFrameRenderer::Render(nvrhi::ICommandList* CmdList, const FRenderP
                 SSRDesc.OutputWidth = halfW;
                 SSRDesc.OutputHeight = halfH;
 
-                SSRPass.Dispatch(GraphCmdList, SSRDesc, SSRConstants);
+                SSRPass->Dispatch(GraphCmdList, SSRDesc, SSRConstants);
                 Profiler.EndPass(GraphCmdList);
 
                 GraphCmdList->setTextureState(SSRTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
@@ -1180,7 +1216,7 @@ void FDeferredFrameRenderer::Render(nvrhi::ICommandList* CmdList, const FRenderP
                 TAADesc.OutputWidth = CurrentWidth;
                 TAADesc.OutputHeight = CurrentHeight;
 
-                TAAPass.Dispatch(GraphCmdList, TAADesc, TAAConstants);
+                TAAPass->Dispatch(GraphCmdList, TAADesc, TAAConstants);
 
                 GraphCmdList->setTextureState(TAAOutputTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
 
@@ -1233,7 +1269,7 @@ void FDeferredFrameRenderer::Render(nvrhi::ICommandList* CmdList, const FRenderP
                 MBDesc.OutputWidth = CurrentWidth;
                 MBDesc.OutputHeight = CurrentHeight;
 
-                MotionBlurPass.Dispatch(GraphCmdList, MBDesc, MBConstants);
+                MotionBlurPass->Dispatch(GraphCmdList, MBDesc, MBConstants);
 
                 GraphCmdList->setTextureState(MotionBlurTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
 
@@ -1277,7 +1313,7 @@ void FDeferredFrameRenderer::Render(nvrhi::ICommandList* CmdList, const FRenderP
                 DOFDesc.OutputWidth = CurrentWidth;
                 DOFDesc.OutputHeight = CurrentHeight;
 
-                DOFPass.Dispatch(GraphCmdList, DOFDesc, DOFConstants);
+                DOFPass->Dispatch(GraphCmdList, DOFDesc, DOFConstants);
 
                 GraphCmdList->setTextureState(DOFTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
 
@@ -1313,7 +1349,7 @@ void FDeferredFrameRenderer::Render(nvrhi::ICommandList* CmdList, const FRenderP
                 GraphCmdList->setTextureState(ToneMapInputTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
                 GraphCmdList->setTextureState(BloomTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
 
-                BloomPass.Dispatch(GraphCmdList, BloomDesc);
+                BloomPass->Dispatch(GraphCmdList, BloomDesc);
 
                 GraphCmdList->setTextureState(BloomTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
                 Profiler.EndPass(GraphCmdList);
@@ -1343,7 +1379,7 @@ void FDeferredFrameRenderer::Render(nvrhi::ICommandList* CmdList, const FRenderP
                 ExposureDesc.SceneColorTexture = ToneMapInputTexture;
                 ExposureDesc.AdaptedLuminanceTexture = AdaptedLuminanceTexture;
 
-                ExposurePass.Dispatch(GraphCmdList, ExposureDesc, ExposureConstants);
+                ExposurePass->Dispatch(GraphCmdList, ExposureDesc, ExposureConstants);
 
                 GraphCmdList->setTextureState(AdaptedLuminanceTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
                 Profiler.EndPass(GraphCmdList);
@@ -1383,7 +1419,7 @@ void FDeferredFrameRenderer::Render(nvrhi::ICommandList* CmdList, const FRenderP
             ToneMapConstants.KeyValue = CVar_r_Exposure_KeyValue;
             ToneMapConstants.UseExposureAdaptation = CVar_r_ExposureAdaptation ? 1 : 0;
 
-            ToneMapPass.Dispatch(GraphCmdList, ToneMapDesc, ToneMapConstants);
+            ToneMapPass->Dispatch(GraphCmdList, ToneMapDesc, ToneMapConstants);
             Profiler.EndPass(GraphCmdList);
         }
     });
@@ -1419,7 +1455,7 @@ void FDeferredFrameRenderer::Render(nvrhi::ICommandList* CmdList, const FRenderP
                 LEDesc.OutputWidth = CurrentWidth;
                 LEDesc.OutputHeight = CurrentHeight;
 
-                LensEffectsPass.Dispatch(GraphCmdList, LEDesc, LEConstants);
+                LensEffectsPass->Dispatch(GraphCmdList, LEDesc, LEConstants);
 
                 GraphCmdList->setTextureState(LensEffectsTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
 

@@ -10,9 +10,13 @@
 #include "Core/String.h"
 #include "Platform/FileSystem/Path.h"
 #include "Renderer/Common/FBindingLayoutBuilder.h"
+#include "Renderer/Common/FLight.h"
+#include "Renderer/GI/GICVars.h"
 #include "Renderer/ShaderMake/ShaderBlob.h"
 #include "Utility/CVar/CVarMacros.h"
 
+#include <cmath>
+#include <cstdlib>
 #include <fstream>
 #include <vector>
 
@@ -22,16 +26,8 @@ DECLARE_LOG_CATEGORY(LogGI)
 
 namespace GI
 {
-    // CVars - read at DispatchRays time so runtime tuning works without re-init.
-    AUTO_CVAR_INT  (r_GI_MaxBounces,      4,    "Maximum number of GI bounces (0 = direct only)", EConsoleVariableFlag::Saved)
-    AUTO_CVAR_INT  (r_GI_SamplesPerPixel, 8,    "Samples per pixel for indirect lighting",      EConsoleVariableFlag::Saved)
-    AUTO_CVAR_FLOAT(r_GI_MinRayLength,    0.001f, "GI bounce ray TMin (avoid self-intersection)", EConsoleVariableFlag::Saved)
-    AUTO_CVAR_BOOL (r_GI_EnableRR,        true, "Enable Russian Roulette path termination",     EConsoleVariableFlag::Saved)
-    AUTO_CVAR_FLOAT(r_GI_RussianRoulette, 0.95f, "Russian Roulette survival threshold",          EConsoleVariableFlag::Saved)
-    AUTO_CVAR_BOOL (r_GI_DebugBounceStats, false, "Write per-frame bounce stats to u1 UAV (gates DebugStatsTexture binding)", EConsoleVariableFlag::Console)
-
     // GI constants cbuffer layout (must match GIPathTracing.hlsl GIConstants).
-    // 5 * float4 = 80 bytes.
+    // 7 * float4 = 112 bytes.
     struct FGIConstantsData
     {
         float LightDir[4];
@@ -39,11 +35,47 @@ namespace GI
         float CameraPos[4];
         float Params[4];   // x=MaxBounces, y=SPP, z=ShadowTMin, w=ShadowTMax
         float Params2[4];  // x=AmbientScale, y=RayTMin, z=RayTMax, w=ShadowEnable
+        float Params3[4];  // x=EnableRR, y=RussianRouletteMinSurvival, z=DebugStatsEnabled, w=LightCount
+        float Params4[4];  // x=EnableNEE, y=MISPower, z=SingleLightNEE, w=BSDFDirectMIS
+        float Params5[4];  // x=DebugMode, yzw=unused
     };
-    static_assert(sizeof(FGIConstantsData) == 80, "FGIConstantsData must be 80 bytes (5x float4)");
+    static_assert(sizeof(FGIConstantsData) == 128, "FGIConstantsData must be 128 bytes (8x float4)");
 
     namespace
     {
+        // Default directional light direction (toward the light) and intensity.
+        // Keep in sync with WriteConstants() LightDir.
+        constexpr float DefaultLightDir[3] = { 0.577f, 0.577f, 0.577f };
+        constexpr float DefaultLightIntensity = 1.0f;
+
+        Renderer::FLight BuildDefaultDirectionalLight(const float* Dir, float Intensity)
+        {
+            Renderer::FLight Light{};
+            Light.position[0] = 0.0f;
+            Light.position[1] = 0.0f;
+            Light.position[2] = 0.0f;
+            Light.range = 1e20f;
+
+            Light.direction[0] = Dir[0];
+            Light.direction[1] = Dir[1];
+            Light.direction[2] = Dir[2];
+            Light.intensity = Intensity;
+
+            Light.color[0] = 1.0f;
+            Light.color[1] = 1.0f;
+            Light.color[2] = 1.0f;
+            Light.type = static_cast<uint32_t>(Renderer::ELightType::Directional);
+
+            Light.innerConeAngle = 0.0f;
+            Light.outerConeAngle = 0.0f;
+            Light.areaWidth = 0.0f;
+            Light.areaHeight = 0.0f;
+
+            Light.flags = Renderer::kLightFlag_CastShadow;
+            Light.shadowMapIndex = Renderer::kNoShadowMap;
+            return Light;
+        }
+
         std::vector<char> ReadBinaryFile(const std::string& Filename)
         {
             std::ifstream file(Filename, std::ios::ate | std::ios::binary);
@@ -76,11 +108,13 @@ namespace GI
 
         if (!LoadShaders())
             return false;
-        if (!CreatePipeline())
-            return false;
         if (!CreateBindingLayout())
             return false;
+        if (!CreatePipeline())
+            return false;
         if (!CreateConstantBuffer())
+            return false;
+        if (!UploadLights())
             return false;
 
         bIsInitialized = true;
@@ -92,14 +126,17 @@ namespace GI
     {
         // FRayTracingPipeline's copy/move ops are deleted, so we can't reassign.
         // Shutdown() is a public method that clears internal state.
-        ShaderLibrary  = nullptr;
+        ShaderLibrary          = nullptr;
         RTPipeline.Shutdown();
-        BindingLayout  = nullptr;
-        ConstantBuffer = nullptr;
-        OutputTexture  = nullptr;
-        Device         = nullptr;
-        Scene          = nullptr;
-        bIsInitialized  = false;
+        BindingLayout          = nullptr;
+        ConstantBuffer         = nullptr;
+        LightsBuffer           = nullptr;
+        LightsCount            = 0;
+        OutputTexture          = nullptr;
+        DummyDebugStatsTexture = nullptr;
+        Device                 = nullptr;
+        Scene                  = nullptr;
+        bIsInitialized          = false;
     }
 
     bool FGIPass::LoadShaders()
@@ -144,9 +181,9 @@ namespace GI
             return false;
         }
 
-        // MaxPayloadSize = 64 (GIPayload: throughput+radiance+origin+direction+hitDist+bounceCount+flags+seed)
+        // MaxPayloadSize = 80 (GIPayload: throughput+radiance+origin+direction+hitNormal+hitDist+bounceCount+flags+seed)
         // MaxAttributeSize = 8 (barycentric float2 attributes - standard)
-        if (!RTPipeline.FinalizePipeline(/*MaxPayloadSize*/ 64, /*MaxAttributeSize*/ 8))
+        if (!RTPipeline.FinalizePipeline(/*MaxPayloadSize*/ 80, /*MaxAttributeSize*/ 8))
         {
             HLVM_LOG(LogGI, err, TXT("FRayTracingPipeline finalize failed"));
             return false;
@@ -155,6 +192,13 @@ namespace GI
         if (!RTPipeline.BuildShaderTable())
         {
             HLVM_LOG(LogGI, err, TXT("FRayTracingPipeline shader table build failed"));
+            return false;
+        }
+
+        BindingLayout = RTPipeline.GetBindingLayout();
+        if (!BindingLayout)
+        {
+            HLVM_LOG(LogGI, err, TXT("FRayTracingPipeline did not produce a binding layout"));
             return false;
         }
 
@@ -173,10 +217,11 @@ namespace GI
         //   t3 = GBufferMaterial (Texture2D<float4>)
         //   t5 = RTVertices  (StructuredBuffer<FRTVertex>)
         //   t6 = RTIndices   (StructuredBuffer<uint>)
-        //   t7 = RTInstanceInfo (StructuredBuffer<FInstanceInfo>)
+        //   t7 = Lights      (StructuredBuffer<FLight>)
+        //   t8 = RTInstanceInfo (StructuredBuffer<FInstanceInfo>)
         //   s2 = LinearSampler
         //   u0 = OutputTexture (RWTexture2D<float4>)
-        //   u1 = DebugStatsTexture (RWTexture2D<float4>, optional - added at DispatchRays time)
+        //   u1 = DebugStatsTexture (RWTexture2D<float4>, bound always; dummy when unused)
         auto& Builder = RTPipeline.CreateBindingLayout();
         Builder.SetVisibility(nvrhi::ShaderType::All)
                .AddConstantBuffer(0)             // b0 - GIConstants
@@ -187,12 +232,15 @@ namespace GI
                .AddTextureSRV(3)                 // t3 - GBufferMaterial
                .AddStructuredBufferSRV(5)        // t5 - RTVertices
                .AddStructuredBufferSRV(6)        // t6 - RTIndices
-               .AddStructuredBufferSRV(7)        // t7 - RTInstanceInfo
+               .AddStructuredBufferSRV(7)        // t7 - Lights
+               .AddStructuredBufferSRV(8)        // t8 - RTInstanceInfo
                .AddSampler(2)                    // s2 - LinearSampler
-               .AddTextureUAV(0);                // u0 - OutputTexture
+               .AddTextureUAV(0)                 // u0 - OutputTexture
+               .AddTextureUAV(1);                // u1 - DebugStatsTexture
 
-        BindingLayout = RTPipeline.GetBindingLayout();
-        return static_cast<bool>(BindingLayout);
+        // The actual binding layout handle is created inside FRayTracingPipeline::FinalizePipeline();
+        // we only need to make sure the builder was populated here.
+        return true;
     }
 
     bool FGIPass::CreateConstantBuffer()
@@ -207,31 +255,128 @@ namespace GI
         return static_cast<bool>(ConstantBuffer);
     }
 
-    void FGIPass::WriteConstants(nvrhi::ICommandList* CmdList, const FGIPassDesc& /*Desc*/)
+    bool FGIPass::UploadLights()
     {
-        // Read CVars at dispatch time (per spec). AUTO_CVAR_* macros create
-        // CVar_<name> global instances.
-        const uint32_t maxBounces   = static_cast<uint32_t>(CVar_r_GI_MaxBounces.GetValue());
-        const uint32_t spp          = static_cast<uint32_t>(CVar_r_GI_SamplesPerPixel.GetValue());
-        const float    minRayLength = CVar_r_GI_MinRayLength.GetValue();
+        if (LightsBuffer)
+            return true;
 
-        // Defaults - mirror TestFewBounceGI's baked constants. Future: read from Desc.
-        const float LightDir[4]    = { 0.577f, 0.577f, 0.577f, 1.0f };
-        const float AmbientColor[4] = { 0.6f,  0.6f,  0.65f,  0.0f };
-        const float CameraPos[4]   = { 0.0f,  0.0f,  0.0f,  1.0f };
+        std::vector<Renderer::FLight> LightsToUpload;
+
+        if (Scene && !Scene->Lights.empty())
+        {
+            LightsToUpload.assign(Scene->Lights.begin(), Scene->Lights.end());
+        }
+        else
+        {
+            // Use the current CVar directional sun direction. Falls back to the
+            // canonical sun direction if the CVar vector is degenerate.
+            float DirX = CVar_r_GI_LightDirX.GetValue();
+            float DirY = CVar_r_GI_LightDirY.GetValue();
+            float DirZ = CVar_r_GI_LightDirZ.GetValue();
+            float Len  = std::sqrt(DirX * DirX + DirY * DirY + DirZ * DirZ);
+            if (Len < 1e-6f)
+            {
+                DirX = DefaultLightDir[0];
+                DirY = DefaultLightDir[1];
+                DirZ = DefaultLightDir[2];
+                Len  = 1.0f;
+            }
+            const float Dir[3] = { DirX / Len, DirY / Len, DirZ / Len };
+            LightsToUpload.push_back(BuildDefaultDirectionalLight(Dir, DefaultLightIntensity));
+        }
+
+        if (LightsToUpload.empty())
+        {
+            HLVM_LOG(LogGI, err, TXT("FGIPass::UploadLights: no lights to upload"));
+            return false;
+        }
+
+        const size_t BufferSize = LightsToUpload.size() * sizeof(Renderer::FLight);
+
+        nvrhi::BufferDesc Desc;
+        Desc.byteSize = BufferSize;
+        Desc.structStride = sizeof(Renderer::FLight);
+        Desc.initialState = nvrhi::ResourceStates::ShaderResource;
+        Desc.keepInitialState = true;
+        Desc.debugName = "FGIPass.Lights";
+        LightsBuffer = Device->createBuffer(Desc);
+        if (!LightsBuffer)
+        {
+            HLVM_LOG(LogGI, err, TXT("FGIPass::UploadLights: failed to create lights buffer"));
+            return false;
+        }
+
+        nvrhi::CommandListHandle Cmd = Device->createCommandList();
+        Cmd->open();
+        Cmd->writeBuffer(LightsBuffer, LightsToUpload.data(), BufferSize);
+        Cmd->close();
+        Device->executeCommandList(Cmd);
+        Device->waitForIdle();
+
+        LightsCount = static_cast<uint32_t>(LightsToUpload.size());
+        HLVM_LOG(LogGI, info, TXT("FGIPass::UploadLights: uploaded {} light(s)"), LightsCount);
+        return true;
+    }
+
+    void FGIPass::WriteConstants(nvrhi::ICommandList* CmdList, const FGIPassDesc& Desc)
+    {
+        // Per-frame constants: Desc overrides CVar defaults for bounce/SPP so tests
+        // can set them without mutating global CVars; everything else is CVar-driven.
+        const uint32_t maxBounces   = (Desc.MaxBounces > 0)
+            ? Desc.MaxBounces
+            : static_cast<uint32_t>(CVar_r_GI_MaxBounces.GetValue());
+        const uint32_t spp          = (Desc.SamplesPerPixel > 0)
+            ? Desc.SamplesPerPixel
+            : static_cast<uint32_t>(CVar_r_GI_SPP.GetValue());
+
+        const float LightDir[4]     = {
+            CVar_r_GI_LightDirX.GetValue(),
+            CVar_r_GI_LightDirY.GetValue(),
+            CVar_r_GI_LightDirZ.GetValue(),
+            DefaultLightIntensity };
+        const float AmbientColor[4] = { 0.6f, 0.6f, 0.65f, 0.0f };
+        const float CameraPos[4]    = { 0.0f, 0.0f, 0.0f, 1.0f };
+
+        // Keep the internal directional light in sync with the per-frame LightDir constant,
+        // but only when we own the fallback buffer (no scene lights, no caller-provided buffer).
+        if (!Desc.LightsBuffer && !Scene && LightsBuffer)
+        {
+            const float Dir[3] = { LightDir[0], LightDir[1], LightDir[2] };
+            Renderer::FLight Light = BuildDefaultDirectionalLight(Dir, DefaultLightIntensity);
+            CmdList->writeBuffer(LightsBuffer, &Light, sizeof(Light));
+        }
 
         FGIConstantsData Data;
-        std::memcpy(Data.LightDir,    LightDir,    sizeof(LightDir));
+        std::memcpy(Data.LightDir,     LightDir,     sizeof(LightDir));
         std::memcpy(Data.AmbientColor, AmbientColor, sizeof(AmbientColor));
-        std::memcpy(Data.CameraPos,   CameraPos,   sizeof(CameraPos));
+        std::memcpy(Data.CameraPos,    CameraPos,    sizeof(CameraPos));
         Data.Params[0]  = static_cast<float>(maxBounces);
         Data.Params[1]  = static_cast<float>(spp);
-        Data.Params[2]  = 0.001f;  // ShadowTMin
-        Data.Params[3]  = 1000.0f; // ShadowTMax
-        Data.Params2[0] = 0.3f;    // AmbientScale
-        Data.Params2[1] = minRayLength;
-        Data.Params2[2] = 1000.0f; // RayTMax
-        Data.Params2[3] = 1.0f;    // ShadowEnable
+        Data.Params[2]  = CVar_r_GI_ShadowTMin.GetValue();
+        Data.Params[3]  = CVar_r_GI_ShadowTMax.GetValue();
+        Data.Params2[0] = CVar_r_GI_AmbientScale.GetValue();
+        Data.Params2[1] = CVar_r_GI_RayTMin.GetValue();
+        Data.Params2[2] = CVar_r_GI_RayTMax.GetValue();
+        Data.Params2[3] = CVar_r_GI_ShadowRays.GetValue() ? 1.0f : 0.0f;
+        Data.Params3[0] = CVar_r_GI_EnableRR.GetValue() ? 1.0f : 0.0f;
+        Data.Params3[1] = CVar_r_GI_RussianRoulette.GetValue();
+        Data.Params3[2] = (Desc.DebugStatsTexture && Desc.DebugBounceStats) ? 1.0f : 0.0f;
+
+        // Explicit light-count path: caller-provided buffer wins; otherwise use internal.
+        uint32_t ActiveLightCount = Desc.LightsBuffer ? Desc.LightCount : LightsCount;
+        Data.Params3[3] = static_cast<float>(ActiveLightCount);
+
+        Data.Params4[0] = CVar_r_GI_EnableNEE.GetValue() ? 1.0f : 0.0f;
+        Data.Params4[1] = CVar_r_GI_MISPower.GetValue();
+        Data.Params4[2] = CVar_r_GI_SingleLightNEE.GetValue() ? 1.0f : 0.0f;
+        Data.Params4[3] = CVar_r_GI_BSDFDirectMIS.GetValue() ? 1.0f : 0.0f;
+
+        int DebugMode = CVar_r_GI_DebugMode.GetValue();
+        if (const char* DebugModeEnv = std::getenv("HLVM_PT_DEBUG_MODE"))
+        {
+            DebugMode = std::atoi(DebugModeEnv);
+        }
+        Data.Params5[0] = static_cast<float>(DebugMode);
 
         CmdList->writeBuffer(ConstantBuffer, &Data, sizeof(Data));
     }
@@ -273,16 +418,45 @@ namespace GI
             SetBuilder.SetStructuredBufferSRV(5, Desc.RTVertices);
         if (Desc.RTIndices)
             SetBuilder.SetStructuredBufferSRV(6, Desc.RTIndices);
+
+        nvrhi::BufferHandle ActiveLightsBuffer = Desc.LightsBuffer ? Desc.LightsBuffer : LightsBuffer;
+        if (ActiveLightsBuffer)
+            SetBuilder.SetStructuredBufferSRV(7, ActiveLightsBuffer);
+
         if (Desc.RTInstanceInfo)
-            SetBuilder.SetStructuredBufferSRV(7, Desc.RTInstanceInfo);
+            SetBuilder.SetStructuredBufferSRV(8, Desc.RTInstanceInfo);
 
         if (Desc.LinearSampler)
             SetBuilder.SetSampler(2, Desc.LinearSampler);
 
         SetBuilder.SetTextureUAV(0, Desc.OutputTexture);
 
-        if (Desc.DebugStatsTexture && Desc.DebugBounceStats)
-            SetBuilder.SetTextureUAV(1, Desc.DebugStatsTexture);
+        nvrhi::TextureHandle DebugStatsUAV = Desc.DebugStatsTexture;
+        if (DebugStatsUAV && Desc.DebugBounceStats)
+        {
+            CmdList->setTextureState(DebugStatsUAV, nvrhi::AllSubresources,
+                                     nvrhi::ResourceStates::UnorderedAccess);
+        }
+        else
+        {
+            if (!DummyDebugStatsTexture)
+            {
+                nvrhi::TextureDesc DummyDesc;
+                DummyDesc.dimension = nvrhi::TextureDimension::Texture2D;
+                DummyDesc.width = 1;
+                DummyDesc.height = 1;
+                DummyDesc.format = nvrhi::Format::RGBA32_FLOAT;
+                DummyDesc.isUAV = true;
+                DummyDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
+                DummyDesc.keepInitialState = true;
+                DummyDesc.debugName = "FGIPass.DummyDebugStats";
+                DummyDebugStatsTexture = Device->createTexture(DummyDesc);
+            }
+            DebugStatsUAV = DummyDebugStatsTexture;
+            CmdList->setTextureState(DebugStatsUAV, nvrhi::AllSubresources,
+                                     nvrhi::ResourceStates::UnorderedAccess);
+        }
+        SetBuilder.SetTextureUAV(1, DebugStatsUAV);
 
         nvrhi::BindingSetHandle BindingSet = Device->createBindingSet(
             SetBuilder.Build(), BindingLayout);

@@ -17,7 +17,7 @@
 #include "Renderer/RayTracing/FRayTracingPipeline.h"
 #include <nvrhi/nvrhi.h>
 
-class FScene;
+#include "Renderer/Scene3D/FScene.h"
 
 namespace GI
 {
@@ -32,6 +32,10 @@ namespace GI
         nvrhi::rt::AccelStructHandle SceneTLAS; // t0 (SceneBVH)
         nvrhi::TextureHandle OutputTexture;     // u0 (radiance)
         nvrhi::TextureHandle DebugStatsTexture; // u1 (optional, see FGIPassStats)
+
+        // Lights array for Next Event Estimation (NEE)
+        nvrhi::BufferHandle LightsBuffer;
+        uint32_t            LightCount = 0;
 
         // RT geometry (vertex/index/instance buffers for closest-hit barycentric lookup)
         nvrhi::BufferHandle RTVertices;
@@ -74,7 +78,7 @@ namespace GI
 
         bool Initialize(nvrhi::IDevice* InDevice,
                         const FString& InShaderDataDir,
-                        const FScene* InScene);
+                        const FScene* InScene = nullptr);
         void DispatchRays(nvrhi::ICommandList* CmdList, const FGIPassDesc& Desc);
         void Shutdown();
 
@@ -87,6 +91,7 @@ namespace GI
         bool CreatePipeline();
         bool CreateBindingLayout();
         bool CreateConstantBuffer();
+        bool UploadLights();
 
         void WriteConstants(nvrhi::ICommandList* CmdList, const FGIPassDesc& Desc);
 
@@ -98,8 +103,11 @@ namespace GI
         FRayTracingPipeline RTPipeline;          // RT pipeline wrapper (owns shader table + binding layout)
         nvrhi::BindingLayoutHandle BindingLayout; // cached from RTPipeline for per-frame binding set creation
         nvrhi::BufferHandle ConstantBuffer;
+        nvrhi::BufferHandle LightsBuffer;      // internal lights buffer (synthesized if Desc.LightsBuffer is null)
+        uint32_t            LightsCount = 0;
 
         nvrhi::TextureHandle OutputTexture; // last output (for debugging / test exposure)
+        nvrhi::TextureHandle DummyDebugStatsTexture; // 1x1 fallback when debug UAV not requested
 
         FGIPassStats LastFrameStats{};
         bool bIsInitialized = false;

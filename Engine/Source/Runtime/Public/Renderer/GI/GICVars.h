@@ -10,14 +10,25 @@
 // Ray Traced GI Tunables
 // =============================================================================
 
-AUTO_CVAR_INT(r_GI_MaxBounces, 3, "Maximum number of indirect bounces (0 = direct only)", EConsoleVariableFlag::Saved)
-AUTO_CVAR_INT(r_GI_SPP, 8, "Samples per pixel for indirect lighting (1-32)", EConsoleVariableFlag::Saved)
+AUTO_CVAR_INT(r_GI_MaxBounces, 1, "Maximum number of indirect bounces (0 = direct only)", EConsoleVariableFlag::Saved)
+AUTO_CVAR_INT(r_GI_SPP, 2, "Samples per pixel for indirect lighting (1-32)", EConsoleVariableFlag::Saved)
 AUTO_CVAR_FLOAT(r_GI_AmbientScale, 0.3f, "Ambient light multiplier for occluded surfaces", EConsoleVariableFlag::Saved)
 AUTO_CVAR_BOOL(r_GI_ShadowRays, true, "Enable shadow rays for direct lighting", EConsoleVariableFlag::Saved)
 AUTO_CVAR_FLOAT(r_GI_ShadowTMin, 0.001f, "Shadow ray TMin (avoid self-intersection)", EConsoleVariableFlag::Saved)
 AUTO_CVAR_FLOAT(r_GI_ShadowTMax, 1000.0f, "Shadow ray TMax (max shadow distance)", EConsoleVariableFlag::Saved)
 AUTO_CVAR_FLOAT(r_GI_RayTMin, 0.001f, "GI bounce ray TMin", EConsoleVariableFlag::Saved)
 AUTO_CVAR_FLOAT(r_GI_RayTMax, 1000.0f, "GI bounce ray TMax", EConsoleVariableFlag::Saved)
+AUTO_CVAR_BOOL (r_GI_EnableNEE, true, "Enable Next Event Estimation (NEE) direct-light sampling", EConsoleVariableFlag::Saved)
+AUTO_CVAR_FLOAT(r_GI_MISPower, 2.0f, "MIS heuristic power exponent (pdf^p / (pdf^p + bsdfPdf^p))", EConsoleVariableFlag::Saved)
+AUTO_CVAR_BOOL (r_GI_SingleLightNEE, true, "Select one light per shading point for NEE/BSDF-MIS (scales by light count)", EConsoleVariableFlag::Saved)
+AUTO_CVAR_BOOL (r_GI_BSDFDirectMIS, true, "Add BSDF-sampled direct lighting with MIS for area lights", EConsoleVariableFlag::Saved)
+AUTO_CVAR_FLOAT(r_GI_LightDirX, 0.577f, "Default directional sun direction X", EConsoleVariableFlag::Saved)
+AUTO_CVAR_FLOAT(r_GI_LightDirY, 0.577f, "Default directional sun direction Y", EConsoleVariableFlag::Saved)
+AUTO_CVAR_FLOAT(r_GI_LightDirZ, 0.577f, "Default directional sun direction Z", EConsoleVariableFlag::Saved)
+AUTO_CVAR_BOOL (r_GI_EnableRR,        true,  "Enable Russian Roulette path termination",     EConsoleVariableFlag::Saved)
+AUTO_CVAR_FLOAT(r_GI_RussianRoulette, 0.95f, "Russian Roulette survival threshold",          EConsoleVariableFlag::Saved)
+AUTO_CVAR_BOOL (r_GI_DebugBounceStats, false, "Write per-frame bounce stats to u1 UAV",       EConsoleVariableFlag::Console)
+AUTO_CVAR_INT  (r_GI_DebugMode,        0,     "Debug visualization: 0=final,1=albedo,2=normal,3=direct,4=indirect,5=firstHitDist,6=vertexNormal,7=geoNormal,8=normalFlags", EConsoleVariableFlag::Console)
 
 // =============================================================================
 // ReSTIR GI Tunables
@@ -47,5 +58,6 @@ AUTO_CVAR_BOOL(r_ReBLUR_Enable, false, "Enable ReBLUR temporal+spatial denoiser 
 AUTO_CVAR_FLOAT(r_ReBLUR_BlurRadius, 6.0f, "ReBLUR spatial blur radius in pixels", EConsoleVariableFlag::Saved)
 AUTO_CVAR_FLOAT(r_ReBLUR_NormalWeight, 0.2f, "ReBLUR normal rejection weight", EConsoleVariableFlag::Saved)
 AUTO_CVAR_FLOAT(r_ReBLUR_PlaneWeight, 50.0f, "ReBLUR plane distance weight", EConsoleVariableFlag::Saved)
+AUTO_CVAR_FLOAT(r_ReBLUR_SpatialAlpha, 0.5f, "ReBLUR spatial blend alpha (0=temporal only, 1=full spatial)", EConsoleVariableFlag::Saved)
 AUTO_CVAR_FLOAT(r_ReBLUR_AntiLag, 0.5f, "ReBLUR anti-lag intensity (0-1)", EConsoleVariableFlag::Saved)
 AUTO_CVAR_FLOAT(r_ReBLUR_HistoryFadeIn, 6.0f, "ReBLUR history fade-in frames", EConsoleVariableFlag::Saved)

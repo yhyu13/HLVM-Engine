@@ -27,10 +27,11 @@ namespace ReBLUR
         TFP32 FrameIndex;               // Frame counter
         TFP32 HistoryFadeIn;            // Frames to fade in history
         TFP32 ConfidenceScale;           // Confidence scale factor
+        TFP32 SpatialAlpha;              // Spatial blend alpha (0=temporal only, 1=full spatial)
         TFP32 PassIndex;                 // 0 = temporal, 1 = spatial
         TFP32 Pad[2];
     };
-    static_assert(sizeof(FReBLURConstants) == 336, "FReBLURConstants must be 336 bytes");
+    static_assert(sizeof(FReBLURConstants) == 340, "FReBLURConstants must be 340 bytes");
 
     struct FPooledBlurParams
     {
@@ -40,6 +41,7 @@ namespace ReBLUR
         float RoughnessWeight = 0.3f;
         float AntiLagIntensity = 0.5f;
         float DarknessSensitivity = 0.01f;
+        float SpatialAlpha = 0.5f;
     };
 
     class FReBLURPass
@@ -66,6 +68,11 @@ namespace ReBLUR
 
         bool Initialize(nvrhi::IDevice* InDevice, const FString& InShaderDataDir);
         void Dispatch(nvrhi::ICommandList* CmdList, const FDesc& Desc, const FReBLURConstants& Constants, const FPooledBlurParams& BlurParams);
+
+        // Smoke-test overload: spatial-only blur with internally-created dummy depth/normal.
+        // Uses Input as both current and history (no temporal accumulation).
+        void Dispatch(nvrhi::ICommandList* CmdList, nvrhi::TextureHandle Input, nvrhi::TextureHandle Output, uint32_t W, uint32_t H);
+
         void Shutdown();
 
         // Helpers to set default blur params
@@ -79,6 +86,8 @@ namespace ReBLUR
         nvrhi::BufferHandle ConstantBuffer;
         nvrhi::SamplerHandle PointSampler;
         nvrhi::SamplerHandle LinearSampler;
+        nvrhi::TextureHandle DummyDepthTexture;
+        nvrhi::TextureHandle DummyNormalTexture;
         FString ShaderDataDir;
         bool bIsInitialized = false;
     };

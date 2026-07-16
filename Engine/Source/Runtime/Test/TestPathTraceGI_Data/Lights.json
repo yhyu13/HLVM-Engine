@@ -1,0 +1,34 @@
+[
+  {
+    "type": "directional",
+    "direction": [0.5, -0.7, 0.3],
+    "color": [1.0, 0.95, 0.8],
+    "intensity": 1.0
+  },
+  {
+    "type": "point",
+    "position": [2.0, 3.0, 2.0],
+    "range": 15.0,
+    "color": [1.0, 0.8, 0.6],
+    "intensity": 20.0
+  },
+  {
+    "type": "spot",
+    "position": [-2.0, 4.0, 0.0],
+    "direction": [0.0, -1.0, 0.0],
+    "range": 20.0,
+    "innerConeAngle": 0.4,
+    "outerConeAngle": 0.8,
+    "color": [0.8, 0.9, 1.0],
+    "intensity": 80.0
+  },
+  {
+    "type": "area",
+    "position": [0.0, 3.0, 0.0],
+    "direction": [0.0, -1.0, 0.0],
+    "width": 3.0,
+    "height": 1.5,
+    "color": [1.0, 1.0, 1.0],
+    "intensity": 10.0
+  }
+]

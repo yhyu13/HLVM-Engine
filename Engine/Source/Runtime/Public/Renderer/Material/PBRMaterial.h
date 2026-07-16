@@ -235,6 +235,9 @@ public:
 	//! Roughness factor (0.0 = smooth, 1.0 = rough)
 	float Roughness = 1.0f;
 
+	//! Emissive color (RGB); can be HDR for area lights
+	FVec3 EmissiveColor = FVec3(0.0f);
+
 	//! Texture paths
 	FPath AlbedoTexture;
 	FPath NormalTexture;

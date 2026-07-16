@@ -29,6 +29,7 @@ struct GIPayload {
     float hitDistance;
     uint bounceCount;
     uint flags;
+    uint seed;
 };
 
 struct ShadowPayload {
@@ -48,7 +49,8 @@ struct ViewConstants {
     float4x4 ViewMatrix;
     float4x4 ProjMatrix;
     float2 RenderTargetSize;
-    float2 Padding;
+    float FrameIndex;
+    float Pad;
 };
 
 struct FRTVertex {
@@ -64,6 +66,8 @@ struct FInstanceInfo {
     uint IndexCount;
     float3 AlbedoColor;
     uint AlbedoTextureIndex;
+    float3 EmissiveColor;
+    uint EmissiveTextureIndex;
 };
 
 // =============================================================================
@@ -94,13 +98,17 @@ SamplerState LinearSampler : register(s2);
 // Random Number Generation
 // =============================================================================
 
-float hash(uint seed) {
+uint hashUint(uint seed) {
     seed ^= seed >> 16;
     seed *= 0x21f0aaadU;
     seed ^= seed >> 15;
     seed *= 0x735a2d97U;
     seed ^= seed >> 15;
-    return float(seed) / float(0xFFFFFFFFU);
+    return seed;
+}
+
+float hash(uint seed) {
+    return float(hashUint(seed)) / float(0xFFFFFFFFU);
 }
 
 float random(uint pixelSeed, uint bounce, uint sampleIdx) {
@@ -137,7 +145,7 @@ float3 aces(float3 x) {
 void RayGen() {
     uint2 pixel = DispatchRaysIndex().xy;
     uint2 dim = DispatchRaysDimensions().xy;
-    uint pixelSeed = pixel.x * 1920u + pixel.y;
+    uint pixelSeed = pixel.x * 1920u + pixel.y + (uint)g_View.FrameIndex * 73856093u;
 
     float3 worldPos = GBufferWorldPos[pixel].rgb;
     float3 normal = normalize(GBufferNormals[pixel].rgb * 2.0 - 1.0);
@@ -194,6 +202,7 @@ void RayGen() {
         payload.bounceCount = 0;
         payload.flags = 0;
         payload.hitDistance = 0.0;
+        payload.seed = pixelSeed + s * 7919u;
 
         float3 rayOrigin = worldPos + normal * 0.01;
         float3 rayDir = sampleHemisphereCosine(
@@ -291,6 +300,9 @@ void ClosestHit(inout GIPayload payload : SV_RayPayload, in Attributes attr : SV
             .SampleLevel(LinearSampler, hitUV, 0).rgb;
     }
 
+    // Emissive contribution from the hit surface (Cornell Box area light)
+    payload.radiance += payload.throughput * info.EmissiveColor;
+
     float3 lightDir = normalize(g_GI.LightDir.xyz);
     float NdotL = max(dot(hitNormal, lightDir), 0.0);
 
@@ -318,10 +330,11 @@ void ClosestHit(inout GIPayload payload : SV_RayPayload, in Attributes attr : SV
 
     payload.throughput *= albedo;
 
-    uint2 pixel = DispatchRaysIndex().xy;
-    uint pixelSeed = pixel.x * 1920u + pixel.y;
-    float r1 = random(pixelSeed, payload.bounceCount + 1, 0);
-    float r2 = random(pixelSeed, payload.bounceCount + 1, 1);
+    // Advance the per-sample seed each bounce so every SPP path is independent
+    uint seedInput = payload.seed + payload.bounceCount * 13u + 17u;
+    payload.seed = hashUint(seedInput);
+    float r1 = random(payload.seed, 0, 0);
+    float r2 = random(payload.seed, 0, 1);
     payload.direction = sampleHemisphereCosine(hitNormal, r1, r2);
     payload.origin = hitPosition + hitNormal * 0.01;
 

@@ -14,6 +14,7 @@ FTimer GlobalTimerFromStart{ true };
  */
 FString GExecutableName{};
 FPath	GExecutablePath{};
+FPath	GExecutableDirectory{};
 FPath	GProjectRoot{};
 
 #if HLVM_ALLOW_GPERF

@@ -1,16 +1,16 @@
 /**
  * Copyright (c) 2026. MIT License. All rights reserved.
  *
- * Few-bounce GI Test - Clean Baseline (Phase 0)
+ * Cornell Box GI Validation Test
  *
  * Pipeline:
- * 1. Load Sponza scene (27 meshes) with glTF textures
+ * 1. Inline Cornell Box geometry (12 tris box + 2 tris light)
  * 2. GBuffer Pass: Render all meshes to 5 MRTs
  * 3. GI Pass: Sequential bounce tracing (3 bounces), cosine-weighted sampling
- * 4. Bilateral Denoise: Edge-preserving filter on GI output
+ * 4. ReBLUR / ReSTIR denoising (same as TestFewBounceGI)
  * 5. Blit Pass: Copy denoised output to swapchain
  *
- * Purpose: Clean baseline before ReSTIR implementation.
+ * Purpose: Validate the GI/denoiser pipeline under ideal signal conditions.
  */
 
 #include "Test.h"
@@ -19,10 +19,8 @@
 #include "Renderer/Common/FBindingCache.h"
 #include "Renderer/Common/FCommonRenderPasses.h"
 #include "Renderer/SceneGraph/FNode.h"
-#include "Renderer/Scene3D/Scene3DLoader.h"
 #include "Renderer/Mesh/StaticMesh.h"
 #include "Renderer/Material/PBRMaterial.h"
-#include "Renderer/Texture/AsyncTextureLoader.h"
 #include "Renderer/Texture/TextureCache.h"
 #include "Renderer/RayTracing/BLASBuilder.h"
 #include "Renderer/RayTracing/TLASBuilder.h"
@@ -50,7 +48,7 @@ DECLARE_LOG_CATEGORY(LogTest)
 // CONFIGURATION
 // =============================================================================
 
-static const char*    WINDOW_TITLE = "Few-bounce GI Test";
+static const char*    WINDOW_TITLE = "Cornell Box GI Validation";
 static const uint32_t WINDOW_WIDTH = 800;
 static const uint32_t WINDOW_HEIGHT = 600;
 
@@ -77,17 +75,17 @@ static std::vector<char> ReadBinaryFile(const std::string& Filename)
 }
 
 // =============================================================================
-// FFewBounceGIPass
+// FCornellBoxGIPass
 // =============================================================================
 
-class FFewBounceGIPass : public IRenderPass
+class FCornellBoxGIPass : public IRenderPass
 {
 public:
     using IRenderPass::IRenderPass;
 
     bool Initialize(nvrhi::IDevice* Device, nvrhi::IFramebuffer* Framebuffer, const FString& InWindowTitle)
     {
-        HLVM_LOG(LogTest, info, TXT("=== FFewBounceGIPass::Initialize ==="));
+        HLVM_LOG(LogTest, info, TXT("=== FCornellBoxGIPass::Initialize ==="));
 
         NvrhiDevice = Device;
         FBInfo = Framebuffer->getFramebufferInfo();
@@ -96,7 +94,7 @@ public:
         BindingCache.SetDevice(NvrhiDevice);
 
         const auto DataDir = FString::Format(
-            TXT("{}/Engine/Source/Runtime/Test/TestFewBounceGI_Data"),
+            TXT("{}/Engine/Source/Runtime/Test/TestCornellBoxGI_Data"),
             *GProjectRoot);
 
         // =====================================================================
@@ -104,7 +102,7 @@ public:
         // =====================================================================
         HLVM_LOG(LogTest, info, TXT("Loading GI shader..."));
         auto GIShaderBlob = ReadBinaryFile(
-            FPath::Combine(DataDir, TXT("FewBounceGI.sblob")).string());
+            FPath::Combine(DataDir, TXT("CornellBoxGI.sblob")).string());
 
         const void* GIShaderBinary = nullptr;
         size_t      GIShaderBinarySize = 0;
@@ -171,43 +169,115 @@ public:
         HLVM_LOG(LogTest, info, TXT("GBuffer shaders loaded successfully"));
 
         // =====================================================================
-        // Load Sponza scene
+        // Build inline Cornell Box geometry
         // =====================================================================
-        HLVM_LOG(LogTest, info, TXT("Loading Sponza scene..."));
-        const FString GitRoot = FString::Format(TXT("{}"), *GProjectRoot);
-        const FPath   ScenePath = FPath(FString::Format(
-              TXT("{}/Samples/Assets/Sponza/glTF/Sponza.gltf"), *GitRoot));
+        HLVM_LOG(LogTest, info, TXT("Building Cornell Box geometry..."));
 
-        Scene = FScene3DLoader::LoadFromFile(ScenePath);
-        if (!Scene || Scene->IsEmpty())
+        const float E = CBExtent;
+        const glm::vec3 Red(0.8f, 0.1f, 0.1f);
+        const glm::vec3 Green(0.1f, 0.8f, 0.1f);
+        const glm::vec3 White(0.85f, 0.85f, 0.85f);
+
+        auto MakeQuad = [&](const FString& Name, const glm::vec3& A, const glm::vec3& B,
+                            const glm::vec3& C, const glm::vec3& D, const glm::vec3& N) -> std::shared_ptr<FStaticMesh>
         {
-            HLVM_LOG(LogTest, err, TXT("Failed to load Sponza scene"));
-            return false;
-        }
+            auto Mesh = std::make_shared<FStaticMesh>(Name);
+            glm::vec3 Tangent = glm::normalize(B - A);
+            FVertex V0(A, N, glm::vec2(0, 0), Tangent);
+            FVertex V1(B, N, glm::vec2(1, 0), Tangent);
+            FVertex V2(C, N, glm::vec2(1, 1), Tangent);
+            FVertex V3(D, N, glm::vec2(0, 1), Tangent);
+            Mesh->AddVertex(V0);
+            Mesh->AddVertex(V1);
+            Mesh->AddVertex(V2);
+            Mesh->AddVertex(V3);
+            Mesh->AddTriangle(0, 1, 2);
+            Mesh->AddTriangle(0, 2, 3);
+            return Mesh;
+        };
 
-        auto StaticMeshes = Scene->GetAllStaticMesh();
-        auto Materials = Scene->GetAllMaterial();
-        HLVM_LOG(LogTest, info, TXT("Loaded scene with {} meshes, {} materials"),
-            StaticMeshes.size(), Materials.size());
-
-        // Calculate scene bounding box and center
-        glm::vec3 BBoxMin(FLT_MAX, FLT_MAX, FLT_MAX);
-        glm::vec3 BBoxMax(-FLT_MAX, -FLT_MAX, -FLT_MAX);
-        for (const auto& Mesh : StaticMeshes)
+        auto MakeMaterial = [&](const FString& Name, const glm::vec3& Color) -> std::shared_ptr<FPBRMaterial>
         {
-            for (auto& vert : Mesh->GetVertices())
-            {
-                glm::vec3 pos(vert.Position.x, vert.Position.y, vert.Position.z);
-                BBoxMin = glm::min(BBoxMin, pos);
-                BBoxMax = glm::max(BBoxMax, pos);
-            }
-        }
-        HLVM_LOG(LogTest, info, TXT("Scene bounding box: Min({:.2f}, {:.2f}, {:.2f}), Max({:.2f}, {:.2f}, {:.2f})"),
-            BBoxMin.x, BBoxMin.y, BBoxMin.z, BBoxMax.x, BBoxMax.y, BBoxMax.z);
-        SceneCenter = (BBoxMin + BBoxMax) * 0.5f;
-        float SceneRadius = glm::length(BBoxMax - BBoxMin) * 0.5f;
-        HLVM_LOG(LogTest, info, TXT("Scene center: ({:.2f}, {:.2f}, {:.2f}), radius: {:.2f}"),
-            SceneCenter.x, SceneCenter.y, SceneCenter.z, SceneRadius);
+            auto Mat = std::make_shared<FPBRMaterial>(Name);
+            Mat->AlbedoColor = FVec3(Color.x, Color.y, Color.z);
+            Mat->Metallic = 0.0f;
+            Mat->Roughness = 1.0f;
+
+            // Create a 1x1 solid-color albedo texture so the GBuffer pass writes
+            // the correct diffuse color for each Cornell Box face.
+            nvrhi::TextureDesc Desc;
+            Desc.dimension = nvrhi::TextureDimension::Texture2D;
+            Desc.width = 1;
+            Desc.height = 1;
+            Desc.format = nvrhi::Format::RGBA8_UNORM;
+            Desc.initialState = nvrhi::ResourceStates::ShaderResource;
+            Desc.keepInitialState = true;
+            nvrhi::TextureHandle Tex = NvrhiDevice->createTexture(Desc);
+
+            uint8_t Pixel[4] = {
+                static_cast<uint8_t>(glm::clamp(Color.r, 0.0f, 1.0f) * 255.0f),
+                static_cast<uint8_t>(glm::clamp(Color.g, 0.0f, 1.0f) * 255.0f),
+                static_cast<uint8_t>(glm::clamp(Color.b, 0.0f, 1.0f) * 255.0f),
+                255
+            };
+            nvrhi::CommandListHandle TexCmdList = NvrhiDevice->createCommandList();
+            TexCmdList->open();
+            TexCmdList->writeTexture(Tex, 0, 0, Pixel, 4);
+            TexCmdList->close();
+            NvrhiDevice->executeCommandList(TexCmdList);
+
+            Mat->GetGPUTexture(IMaterial::ETextureType::Albedo).InitializeFromHandle(Tex, NvrhiDevice);
+            return Mat;
+        };
+
+        // Floor (y = -E), normal +Y
+        StaticMeshes.push_back(MakeQuad(TXT("Floor"),
+            glm::vec3(-E, -E,  E), glm::vec3( E, -E,  E),
+            glm::vec3( E, -E, -E), glm::vec3(-E, -E, -E), glm::vec3(0, 1, 0)));
+        MeshMaterials.push_back(MakeMaterial(TXT("White"), White));
+
+        // Ceiling (y = E), normal -Y; dim emissive fill for general illumination
+        StaticMeshes.push_back(MakeQuad(TXT("Ceiling"),
+            glm::vec3(-E,  E, -E), glm::vec3( E,  E, -E),
+            glm::vec3( E,  E,  E), glm::vec3(-E,  E,  E), glm::vec3(0, -1, 0)));
+        auto CeilingMat = MakeMaterial(TXT("White"), White);
+        CeilingMat->EmissiveColor = FVec3(1.0f, 1.0f, 1.0f);
+        MeshMaterials.push_back(CeilingMat);
+
+        // Front wall (z = E), normal -Z (closes the box so GI rays stay inside)
+        StaticMeshes.push_back(MakeQuad(TXT("FrontWall"),
+            glm::vec3(-E, -E,  E), glm::vec3(-E,  E,  E),
+            glm::vec3( E,  E,  E), glm::vec3( E, -E,  E), glm::vec3(0, 0, -1)));
+        MeshMaterials.push_back(MakeMaterial(TXT("White"), White));
+
+        // Back wall (z = -E), normal +Z
+        StaticMeshes.push_back(MakeQuad(TXT("BackWall"),
+            glm::vec3(-E, -E, -E), glm::vec3( E, -E, -E),
+            glm::vec3( E,  E, -E), glm::vec3(-E,  E, -E), glm::vec3(0, 0, 1)));
+        MeshMaterials.push_back(MakeMaterial(TXT("White"), White));
+
+        // Left wall (x = -E), normal +X (red) - made emissive to give a strong,
+        // stable color-bleed signal on the floor for validation.
+        StaticMeshes.push_back(MakeQuad(TXT("LeftWall"),
+            glm::vec3(-E, -E, -E), glm::vec3(-E, -E,  E),
+            glm::vec3(-E,  E,  E), glm::vec3(-E,  E, -E), glm::vec3(1, 0, 0)));
+        auto LeftWallMat = MakeMaterial(TXT("Red"), Red);
+        LeftWallMat->EmissiveColor = FVec3(3.0f, 0.0f, 0.0f);
+        MeshMaterials.push_back(LeftWallMat);
+
+        // Right wall (x = E), normal -X (green) - made emissive to give a strong,
+        // stable color-bleed signal on the floor for validation.
+        StaticMeshes.push_back(MakeQuad(TXT("RightWall"),
+            glm::vec3( E, -E,  E), glm::vec3( E, -E, -E),
+            glm::vec3( E,  E, -E), glm::vec3( E,  E,  E), glm::vec3(-1, 0, 0)));
+        auto RightWallMat = MakeMaterial(TXT("Green"), Green);
+        RightWallMat->EmissiveColor = FVec3(0.0f, 3.0f, 0.0f);
+        MeshMaterials.push_back(RightWallMat);
+
+
+
+        SceneCenter = glm::vec3(0.0f);
+        HLVM_LOG(LogTest, info, TXT("Cornell Box built with {} meshes"), StaticMeshes.size());
 
         // =====================================================================
         // Set up bindless texture descriptor table
@@ -252,14 +322,10 @@ public:
             TextureCache.SetDescriptorTableManager(DescTableMgr.get());
             TextureCache.Insert(FPath(TXT("__BindlessWhiteFallback__")), WhiteTexture);
 
-            // Set cache for async loader so textures get bindless slots on insert
-            FAsyncTextureLoader::SetTextureCache(&TextureCache);
-
-            // Load material albedo textures (blocking, populates cache + descriptor table)
-            FAsyncTextureLoader::LoadMaterialTexturesAsync(
-                NvrhiDevice, Materials,
-                {IMaterial::ETextureType::Albedo});
-
+            // Cornell Box uses inline 1x1 albedo textures created below rather than
+            // loaded asset textures. The bindless table only needs the white fallback
+            // because the GI closest-hit shader falls back to InstanceInfo.AlbedoColor
+            // when AlbedoTextureIndex == 0.
             HLVM_LOG(LogTest, info, TXT("Bindless descriptor table: {} textures registered"),
                 DescTableMgr->GetAllocatedCount());
         }
@@ -302,8 +368,8 @@ public:
             InstanceDesc.BottomLevelAS = MeshBLASHandles[i];
             InstanceDesc.InstanceMask = 1;
             InstanceDesc.InstanceFlags = nvrhi::rt::InstanceFlags::TriangleFrontCounterclockwise;
-            // Apply 2x scale to match TestSponzaDeferred
-            glm::mat4 MeshTransform = glm::scale(glm::mat4(1.0f), glm::vec3(2.0f));
+            // Cornell Box geometry is already in world units; no additional scaling
+            glm::mat4 MeshTransform = glm::mat4(1.0f);
             InstanceDesc.SetTransform(MeshTransform);
             if (!TLASBuilder.AddInstance(InstanceDesc))
             {
@@ -331,6 +397,8 @@ public:
                 uint32_t IndexCount;
                 float AlbedoColor[3];
                 uint32_t AlbedoTextureIndex;
+                float EmissiveColor[3];
+                uint32_t EmissiveTextureIndex;
             };
 
             TVector<FRTVertex> AllVertices;
@@ -356,35 +424,29 @@ public:
                 Info.AlbedoColor[1] = 0.7f;
                 Info.AlbedoColor[2] = 0.7f;
                 Info.AlbedoTextureIndex = 0; // Default to white fallback (slot 0)
+                Info.EmissiveColor[0] = 0.0f;
+                Info.EmissiveColor[1] = 0.0f;
+                Info.EmissiveColor[2] = 0.0f;
+                Info.EmissiveTextureIndex = 0;
 
-                // Look up material albedo color and texture index for this mesh
-                if (Mesh && Scene)
+                // Look up material albedo/emissive color for this mesh
+                size_t MatIdx = static_cast<size_t>(&Mesh - StaticMeshes.data());
+                if (MatIdx < MeshMaterials.size())
                 {
-                    auto it = Scene->MeshMultiMaterialMap.find(Mesh);
-                    if (it != Scene->MeshMultiMaterialMap.end())
+                    auto PBRMat = MeshMaterials[MatIdx];
+                    if (PBRMat)
                     {
-                        auto& materials = it->second;
-                        if (!materials.empty())
-                        {
-                            if (auto PBRMat = std::dynamic_pointer_cast<FPBRMaterial>(materials[0]))
-                            {
-                                FVec3 albedo = PBRMat->GetAlbedoColor();
-                                Info.AlbedoColor[0] = albedo.x;
-                                Info.AlbedoColor[1] = albedo.y;
-                                Info.AlbedoColor[2] = albedo.z;
+                        FVec3 albedo = PBRMat->GetAlbedoColor();
+                        Info.AlbedoColor[0] = albedo.x;
+                        Info.AlbedoColor[1] = albedo.y;
+                        Info.AlbedoColor[2] = albedo.z;
 
-                                // Look up bindless texture index for albedo
-                                FPath AlbedoPath = PBRMat->GetTexturePath(IMaterial::ETextureType::Albedo);
-                                if (!AlbedoPath.empty())
-                                {
-                                    int BindlessIdx = TextureCache.GetBindlessIndex(AlbedoPath);
-                                    if (BindlessIdx >= 0)
-                                    {
-                                        Info.AlbedoTextureIndex = static_cast<uint32_t>(BindlessIdx);
-                                    }
-                                }
-                            }
-                        }
+                        FVec3 emissive = PBRMat->EmissiveColor;
+                        Info.EmissiveColor[0] = emissive.x;
+                        Info.EmissiveColor[1] = emissive.y;
+                        Info.EmissiveColor[2] = emissive.z;
+
+                        // AlbedoTextureIndex stays 0; GI shader uses AlbedoColor directly
                     }
                 }
 
@@ -781,7 +843,7 @@ public:
 
             RTPipeline.SetBindlessLayout(BindlessLayout);
 
-            if (!RTPipeline.FinalizePipeline(sizeof(float) * 12))
+            if (!RTPipeline.FinalizePipeline(sizeof(float) * 16))
             {
                 HLVM_LOG(LogTest, err, TXT("Failed to create GI ray tracing pipeline"));
                 return false;
@@ -916,6 +978,7 @@ public:
             Reservoir1MergedTexture = NvrhiDevice->createTexture(Desc);
 
             Desc.format = nvrhi::Format::RGBA32_FLOAT;
+            Desc.isShaderResource = true;  // sampled by Blit + ReSTIR temporal history
             Desc.debugName = "ReSTIROutput";
             ReSTIROutputTexture = NvrhiDevice->createTexture(Desc);
             Desc.debugName = "TemporalRadiance";
@@ -1201,12 +1264,16 @@ public:
         CmdList->open();
 
         // =====================================================================
-        // Static camera setup - looking at Sponza
+        // Static camera setup - inside Cornell Box looking at back wall
         // =====================================================================
-        glm::vec3 CameraPos = SceneCenter + glm::vec3(0.0f, 2.0f, 8.0f);
-        glm::mat4 view = glm::lookAtLH(CameraPos, SceneCenter, glm::vec3(0.0f, 1.0f, 0.0f));
+        // Camera sits inside the box (z < 1) and looks toward the back corner
+        // with a wide FOV so floor, back wall and both colored side walls are
+        // visible for the classic Cornell Box color-bleed effect.
+        glm::vec3 CameraPos = SceneCenter + glm::vec3(0.0f, 0.0f, 0.5f);
+        glm::vec3 CameraTarget = SceneCenter + glm::vec3(0.0f, -0.2f, -1.0f);
+        glm::mat4 view = glm::lookAtLH(CameraPos, CameraTarget, glm::vec3(0.0f, 1.0f, 0.0f));
         float aspectRatio = float(CurrentFBInfo.width) / float(CurrentFBInfo.height);
-        glm::mat4 proj = glm::perspectiveLH_ZO(glm::radians(90.0f), aspectRatio, 0.1f, 1000.0f);
+        glm::mat4 proj = glm::perspectiveLH_ZO(glm::radians(90.0f), aspectRatio, 0.01f, 10.0f);
 
         // Write ViewConstants (column-major via glm::value_ptr)
         float ViewConstantsData[16 * 3 + 4]; // Model(16) + View(16) + Proj(16) + RenderTargetSize(2) + Padding(2)
@@ -1215,7 +1282,7 @@ public:
         memcpy(&ViewConstantsData[32], glm::value_ptr(proj), 64);
         ViewConstantsData[48] = static_cast<float>(CurrentFBInfo.width);
         ViewConstantsData[49] = static_cast<float>(CurrentFBInfo.height);
-        ViewConstantsData[50] = 0.0f; // padding
+        ViewConstantsData[50] = static_cast<float>(TemporalFrameCount); // frame index for per-frame GI seed
         ViewConstantsData[51] = 0.0f; // padding
         CmdList->writeBuffer(ViewConstantsBuffer, ViewConstantsData, sizeof(ViewConstantsData));
 
@@ -1238,25 +1305,15 @@ public:
 
             // Look up material texture for this mesh
             nvrhi::TextureHandle DiffuseTex = PlaceholderTexture;
-            if (DrawData.Mesh && Scene)
+            if (MeshIdx < MeshMaterials.size())
             {
-                auto it = Scene->MeshMultiMaterialMap.find(DrawData.Mesh);
-                if (it != Scene->MeshMultiMaterialMap.end())
+                auto PBRMat = MeshMaterials[MeshIdx];
+                if (PBRMat && PBRMat->HasGPUTexture(IMaterial::ETextureType::Albedo))
                 {
-                    auto& materials = it->second;
-                    if (!materials.empty())
+                    DiffuseTex = PBRMat->GetGPUTexture(IMaterial::ETextureType::Albedo).GetTextureSRV();
+                    if (!DiffuseTex)
                     {
-                        if (auto PBRMat = std::dynamic_pointer_cast<FPBRMaterial>(materials[0]))
-                        {
-                            if (PBRMat->HasGPUTexture(IMaterial::ETextureType::Albedo))
-                            {
-                                DiffuseTex = PBRMat->GetGPUTexture(IMaterial::ETextureType::Albedo).GetTextureSRV();
-                                if (!DiffuseTex)
-                                {
-                                    DiffuseTex = PlaceholderTexture;
-                                }
-                            }
-                        }
+                        DiffuseTex = PlaceholderTexture;
                     }
                 }
             }
@@ -1315,11 +1372,13 @@ public:
         // GI Pass - Sequential Bounce Tracing
         // =====================================================================
 
-        // Static light direction (stable for temporal accumulation testing)
+        // Cornell Box uses an emissive ceiling quad for lighting.
+        // The analytical directional light is disabled (w=0) so all energy
+        // comes from GI bounces off the emissive surface.
         static const float LightAngle = 0.0f;
-        glm::vec3 LightDir = glm::normalize(glm::vec3(sinf(LightAngle), 0.6f, cosf(LightAngle)));
+        glm::vec3 LightDir = glm::normalize(glm::vec3(sinf(LightAngle), -1.0f, cosf(LightAngle)));
         float GIConstantsData[20] = {
-            LightDir.x, LightDir.y, LightDir.z, 1.0f,                          // LightDir + intensity
+            LightDir.x, LightDir.y, LightDir.z, 0.0f,                          // LightDir + intensity (disabled; lighting from emissive ceiling)
             0.6f, 0.6f, 0.65f, 0.0f,                                           // Ambient color
             CameraPos.x, CameraPos.y, CameraPos.z, 1.0f,                        // CameraPos
             static_cast<float>(CVar_r_GI_MaxBounces.GetValue()),
@@ -1393,6 +1452,7 @@ public:
             BlurParams.BlurRadius = CVar_r_ReBLUR_BlurRadius.GetValue();
             BlurParams.NormalWeight = CVar_r_ReBLUR_NormalWeight.GetValue();
             BlurParams.PlaneWeight = CVar_r_ReBLUR_PlaneWeight.GetValue();
+            BlurParams.SpatialAlpha = CVar_r_ReBLUR_SpatialAlpha.GetValue();
             BlurParams.AntiLagIntensity = CVar_r_ReBLUR_AntiLag.GetValue();
 
             ReBLUR::FReBLURPass::FDesc ReBLURDesc;
@@ -1593,6 +1653,11 @@ public:
         // =====================================================================
         // Always blit denoised output to screen
         // =====================================================================
+        // Defensive clear: if the blit misses pixels, show black instead of
+        // uninitialized swapchain memory (can look like noise flicker).
+        nvrhi::Color swapchainClearBlack(0.f, 0.f, 0.f, 1.f);
+        nvrhi::utils::ClearColorAttachment(CmdList, Framebuffer, 0, swapchainClearBlack);
+
         CmdList->setTextureState(DumpTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
         FCommonRenderPasses::BlitParameters BlitParams;
         FCommonRenderPasses::BlitTexture(
@@ -1644,7 +1709,7 @@ public:
                 NvrhiDevice->unmapStagingTexture(StagingTexture.Get());
 
                 // Use GProjectRoot for correct path, create dir if needed
-                FString DumpDir = FString::Format(TXT("{}/Engine/Source/Runtime/Test/TestFewBounceGI_Data/dumps"), *GProjectRoot);
+                FString DumpDir = FString::Format(TXT("{}/Engine/Source/Runtime/Test/TestCornellBoxGI_Data/dumps"), *GProjectRoot);
                 std::filesystem::create_directories(FPath(DumpDir).string());
                 FString baseFilename = FImageDump::GenerateTimestampedFilename(DumpDir);
                 FString filename = FString::Format(TXT("{}_frame{:04d}.png"), baseFilename.substr(0, baseFilename.length() - 4).c_str(), framesToDump);
@@ -1696,8 +1761,12 @@ private:
     FString                WindowTitle;
 
     // Scene
-    std::shared_ptr<FScene3DNode> Scene;
     glm::vec3 SceneCenter = glm::vec3(0.f);
+    TVector<std::shared_ptr<FStaticMesh>> StaticMeshes;
+    TVector<std::shared_ptr<FPBRMaterial>> MeshMaterials;
+
+    // Cornell Box configuration
+    static constexpr float CBExtent = 1.0f; // half-extent; box spans [-1,1] on each axis
 
     // Acceleration structures
     nvrhi::rt::AccelStructHandle          TopLevelAS;
@@ -1850,8 +1919,8 @@ RECORD_BOOL(test_FewBounceGI)
         nvrhi::IFramebuffer* FirstFB = DeviceManager->GetFramebuffer(0);
 
         HLVM_LOG(LogTest, info, TXT("Creating render pass..."));
-        TSharedPtr<FFewBounceGIPass> GIPass =
-            std::make_shared<FFewBounceGIPass>(DeviceManager.get());
+        TSharedPtr<FCornellBoxGIPass> GIPass =
+            std::make_shared<FCornellBoxGIPass>(DeviceManager.get());
         if (!GIPass->Initialize(NvrhiDevice, FirstFB, FString(TXT("Few-bounce GI Test"))))
         {
             throw std::runtime_error("Failed to initialize FFewBounceGIPass");

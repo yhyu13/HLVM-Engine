@@ -225,6 +225,21 @@ bool FDeviceManagerVk::EndFrame()
 		return false;
 	}
 
+	// Ensure the swapchain image is in the Present state before signalling the
+	// present semaphore. Some render passes reuse command lists or leave the
+	// back-buffer in an intermediate layout, so we cannot rely on NVRHI's
+	// implicit keep-initial-state transition alone.
+	{
+		nvrhi::CommandListHandle TransitionCmd = m_NvrhiDevice->createCommandList();
+		TransitionCmd->open();
+		TransitionCmd->setTextureState(
+			m_SwapChainImages[m_SwapChainIndex].rhiHandle,
+			nvrhi::AllSubresources,
+			nvrhi::ResourceStates::Present);
+		TransitionCmd->close();
+		m_NvrhiDevice->executeCommandList(TransitionCmd);
+	}
+
 	// Signal the present semaphore we're done with this image
 	const auto& presentSemaphore = m_PresentSemaphores[m_SwapChainIndex];
 	m_NvrhiDevice->queueSignalSemaphore(nvrhi::CommandQueue::Graphics, presentSemaphore, 0);

@@ -4,7 +4,9 @@
 
 #pragma once
 
+#include "Core/Container/ContainerDefinition.h"
 #include "Core/String.h"
+#include "Renderer/Common/FLight.h"
 #include "Renderer/Scene3D/FSceneGPUData.h"
 #include "Renderer/Mesh/MeshCache.h"
 #include "Renderer/Texture/TextureCache.h"
@@ -65,6 +67,11 @@ public:
         return SceneGPUData.get();
     }
 
+    // Lights accessors
+    nvrhi::BufferHandle GetLightsBuffer() const { return LightsBuffer; }
+    uint32_t GetLightCount() const { return LightCount; }
+    const std::vector<Renderer::FLight>& GetLights() const { return Lights; }
+
     // Test accessors
     const FTextureCache& GetTextureCache() const { return TextureCache; }
     const FMeshCache* GetMeshCache() const { return MeshCache.get(); }
@@ -89,5 +96,10 @@ private:
     TUniquePtr<FMeshCache> MeshCache;
     FTextureCache TextureCache;
     FMemoryBudget MemoryBudget;
+
+    std::vector<Renderer::FLight> Lights;
+    nvrhi::BufferHandle LightsBuffer;
+    uint32_t LightCount = 0;
+
     bool bIsInitialized = false;
 };

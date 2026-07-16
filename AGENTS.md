@@ -119,6 +119,12 @@ boost::filesystem::current_path()  // This IS GExecutablePath
 FString::Format(TXT("{}/../../Test/{}_Data"), *GExecutablePath, *GExecutableName);
 ```
 
+### GExecutableDirectory
+```cpp
+// Actual directory containing the executable binary (derived from av[0])
+FString::Format(TXT("{}/{}.log"), *GExecutableDirectory, *GExecutableName);
+```
+
 ### GProjectRoot
 ```cpp
 // Use GProjectRoot for paths that must work regardless of CWD
@@ -171,6 +177,8 @@ DECLARE_LOG_CATEGORY(LogMyModule)
 HLVM_LOG(LogMyModule, info, TXT("Message: {}"), val);
 HLVM_CLOG(condition, LogMyModule, warning, TXT("Warn: {}"), msg);
 ```
+
+Test executables automatically register both `FSpdlogConsoleDevice` and `FSpdlogFileDevice`. File logs are written to `{GExecutableDirectory}/{GExecutableName}.log`. On each run the previous log is rotated to `{Name}_1.log` and then `{Name}_2.log`; only the latest 3 runs are kept. There is no per-file size limit.
 
 ### Console Variables (CVar)
 ```cpp
