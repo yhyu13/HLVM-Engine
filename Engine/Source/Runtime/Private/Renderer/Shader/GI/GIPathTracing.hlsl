@@ -30,31 +30,28 @@
 // Payloads
 // =============================================================================
 
-// Explicitly padded payload. HLSL aligns float3 to 16 bytes in ray payloads,
-// so every float3 is followed by a 4-byte scalar and every uint group is a uint4.
+// Compact 64-byte payload (same layout as the proven TestCornellBoxGI shader).
+// Every field is both written and read on BOTH sides of the TraceRay boundary
+// (raygen and closesthit). slangc compiles each entry point independently and
+// can dead-strip payload fields that a given entry never uses; if that happens
+// asymmetrically the two shaders disagree on the payload layout and every
+// closesthit -> raygen value arrives as garbage (observed as red/black noise
+// GI with valid IDs/barycentrics but corrupt normals and albedos).
 struct GIPayload {
     float3 throughput;
-    float  _pad0;
     float3 radiance;
-    float  _pad1;
     float3 origin;
-    float  _pad2;
     float3 direction;
-    float  _pad3;
-    float3 hitNormal;
     float  hitDistance;
     uint   bounceCount;
     uint   flags;            // bit 0 = continue path, bit 1 = terminated by RR
     uint   seed;
-    uint   debugNormalFlags; // 1 = per-vertex normal invalid, 2 = geometric fallback invalid
-    float3 debugVertexNormal;
-    float  _pad4;
-    float3 debugGeoNormal;
-    float  _pad5;
 };
 
 struct ShadowPayload {
-    bool occluded;
+    // Use uint instead of bool: HLSL bool is implementation-defined in ray payloads
+    // and has caused per-pixel corruption on some Vulkan drivers.
+    uint occluded;
 };
 
 // =============================================================================
@@ -436,7 +433,7 @@ float3 EstimateDirectLighting(float3 origin, float3 normal, float3 albedo,
 
 float TraceShadowRay(float3 origin, float3 direction, float tMin, float tMax) {
     ShadowPayload shadowPayload;
-    shadowPayload.occluded = true;
+    shadowPayload.occluded = 1u;
 
     RayDesc shadowRay;
     shadowRay.Origin = origin;
@@ -451,7 +448,7 @@ float TraceShadowRay(float3 origin, float3 direction, float tMin, float tMax) {
         shadowRay,
         shadowPayload);
 
-    return shadowPayload.occluded ? 0.0 : 1.0;
+    return shadowPayload.occluded != 0u ? 0.0 : 1.0;
 }
 
 // =============================================================================
@@ -514,6 +511,12 @@ void RayGen() {
         float3 rayDir = sampleHemisphereCosine(normal, random_float2(sampleSeed));
         float3 rayOrigin = OffsetRayOrigin(worldPos, normal, rayDir);
 
+        // Fully initialize every payload field: slangc compiles entry points
+        // independently and can dead-strip fields an entry never touches,
+        // which would desync the payload layout across the TraceRay boundary.
+        payload.origin = rayOrigin;
+        payload.direction = rayDir;
+
         float firstHitDist = 0.0f;
         for (uint bounce = 0; bounce < maxBounces; ++bounce) {
             RayDesc ray;
@@ -535,14 +538,9 @@ void RayGen() {
             if ((payload.flags & 0x01) == 0)
                 break;
 
-            // Direct lighting at the bounce vertex (NEE + BSDF MIS).
-            // payload.throughput already includes the surface albedo from ClosestHit.
-            if (g_GI.Params4.x > 0.5f) {
-                uint bounceSeed = pixelSeed + s * 7919u + (bounce + 1) * 1733u;
-                indirect += EstimateDirectLighting(
-                    payload.origin, payload.hitNormal, payload.throughput,
-                    bounceSeed);
-            }
+            // Direct lighting at each bounce vertex is evaluated inside
+            // ClosestHit (valid local normal, keeps the payload compact)
+            // and lands in payload.radiance.
 
             rayOrigin = payload.origin;
             rayDir = payload.direction;
@@ -572,60 +570,19 @@ void RayGen() {
     if (isnan(avgFirstHitDist) || isinf(avgFirstHitDist))
         avgFirstHitDist = 0.0f;
 
-    // Debug visualisation modes (r_GI_DebugMode).
+    // Debug visualisation modes (r_GI_DebugMode). All values are raygen-local:
+    // no debug data crosses the TraceRay payload boundary.
     uint debugMode = (uint)(g_GI.Params5.x + 0.5f);
     float3 debugColor = result;
     if (debugMode != 0u) {
-        GIPayload dbgPayload;
-        dbgPayload.radiance = float3(0.0f, 0.0f, 0.0f);
-        dbgPayload.throughput = float3(1.0f, 1.0f, 1.0f);
-        dbgPayload.bounceCount = 0u;
-        dbgPayload.flags = 0u;
-        dbgPayload.hitDistance = 0.0f;
-        dbgPayload.seed = pixelSeed;
-
-        uint dbgSeed = pixelSeed;
-        float3 dbgDir = sampleHemisphereCosine(normal, random_float2(dbgSeed));
-        float3 dbgOrigin = OffsetRayOrigin(worldPos, normal, dbgDir);
-
-        RayDesc dbgRay;
-        dbgRay.Origin = dbgOrigin;
-        dbgRay.Direction = dbgDir;
-        dbgRay.TMin = g_GI.Params2.y;
-        dbgRay.TMax = g_GI.Params2.z;
-        TraceRay(SceneBVH, RAY_FLAG_FORCE_OPAQUE, 0xFF, 0, 0, 0, dbgRay, dbgPayload);
-
         switch (debugMode) {
             case 1u:  debugColor = diffuse; break;
             case 2u:  debugColor = normal * 0.5f + 0.5f; break;
             case 3u:  debugColor = primaryDirect; break;
             case 4u:  debugColor = indirect / max(float(spp), 1.0f); break;
             case 5u:  debugColor = float3(avgFirstHitDist, avgFirstHitDist, avgFirstHitDist) * 0.1f; break;
-            case 6u:  {
-                float3 vn = dbgPayload.debugVertexNormal;
-                if (any(isnan(vn)) || any(isinf(vn)) || length(vn) < 1e-6f)
-                    debugColor = float3(1.0f, 0.0f, 1.0f);
-                else
-                    debugColor = normalize(vn) * 0.5f + 0.5f;
-                break;
-            }
-            case 7u:  {
-                float3 gn = dbgPayload.debugGeoNormal;
-                if (any(isnan(gn)) || any(isinf(gn)) || length(gn) < 1e-6f)
-                    debugColor = float3(1.0f, 0.0f, 1.0f);
-                else
-                    debugColor = normalize(gn) * 0.5f + 0.5f;
-                break;
-            }
-            case 8u:  {
-                if (dbgPayload.debugNormalFlags & 0x02u)
-                    debugColor = float3(1.0f, 0.0f, 0.0f); // safety net triggered
-                else if (dbgPayload.debugNormalFlags & 0x01u)
-                    debugColor = float3(0.0f, 1.0f, 0.0f); // geometric fallback triggered
-                else
-                    debugColor = float3(0.0f, 0.0f, 1.0f); // vertex normal valid
-                break;
-            }
+            case 13u: debugColor = RTInstanceInfo[0].AlbedoColor; break;         // SRV sanity read
+            case 14u: debugColor = RTVertices[0].Position * 0.25f + 0.5f; break; // SRV sanity read
             default: break;
         }
     }
@@ -676,39 +633,33 @@ void ClosestHit(inout GIPayload payload : SV_RayPayload, in Attributes attr : SV
 
     float3 bary = float3(1.0 - attr.barycentrics.x - attr.barycentrics.y, attr.barycentrics.x, attr.barycentrics.y);
 
-    float3 localNormal = v0.Normal * bary.x + v1.Normal * bary.y + v2.Normal * bary.z;
-    float3 vertexNormal = localNormal;
-    payload.debugVertexNormal = vertexNormal;
+    float3 vertexNormal = v0.Normal * bary.x + v1.Normal * bary.y + v2.Normal * bary.z;
     float3 hitNormal = normalize(vertexNormal);
 
-    float3 p0w = mul(ObjectToWorld3x4(), float4(v0.Position, 1.0)).xyz;
-    float3 p1w = mul(ObjectToWorld3x4(), float4(v1.Position, 1.0)).xyz;
-    float3 p2w = mul(ObjectToWorld3x4(), float4(v2.Position, 1.0)).xyz;
-    float3 geoNormal = cross(p1w - p0w, p2w - p0w);
-    payload.debugGeoNormal = geoNormal;
-
-    uint normalFlags = 0u;
-
-    // Fallback to geometric normal if the interpolated normal is invalid.
+    // Fallback to the geometric normal if the interpolated normal is invalid.
     if (any(isnan(hitNormal)) || any(isinf(hitNormal))) {
-        normalFlags |= 0x01u;
-        hitNormal = normalize(geoNormal);
+        float3 p0w = mul(ObjectToWorld3x4(), float4(v0.Position, 1.0)).xyz;
+        float3 p1w = mul(ObjectToWorld3x4(), float4(v1.Position, 1.0)).xyz;
+        float3 p2w = mul(ObjectToWorld3x4(), float4(v2.Position, 1.0)).xyz;
+        hitNormal = normalize(cross(p1w - p0w, p2w - p0w));
     }
 
     // Absolute safety net: any remaining NaN/inf would poison the path.
-    if (any(isnan(hitNormal)) || any(isinf(hitNormal))) {
-        normalFlags |= 0x02u;
+    if (any(isnan(hitNormal)) || any(isinf(hitNormal)))
         hitNormal = float3(0.0f, 1.0f, 0.0f);
-    }
-
-    payload.debugNormalFlags = normalFlags;
-    payload.hitNormal = hitNormal;
-
-
 
     float3 albedo = info.AlbedoColor;
 
-    // Direct lighting is handled exclusively by EstimateDirectLighting in RayGen.
+    // Direct lighting at this bounce vertex (NEE + optional BSDF MIS), weighted
+    // by the incoming path throughput. Evaluated here - not in RayGen - because
+    // the valid hit normal only exists locally; this also keeps the payload
+    // compact (no hitNormal field crossing the TraceRay boundary).
+    if (g_GI.Params4.x > 0.5f) {
+        uint directSeed = payload.seed + 401u;
+        float3 direct = EstimateDirectLighting(hitPosition, hitNormal, albedo, directSeed);
+        payload.radiance += payload.throughput * direct;
+    }
+
     payload.throughput *= albedo;
 
     // Russian Roulette path termination
@@ -746,5 +697,5 @@ void Miss(inout GIPayload payload : SV_RayPayload) {
 
 [shader("miss")]
 void ShadowMiss(inout ShadowPayload payload : SV_RayPayload) {
-    payload.occluded = false;
+    payload.occluded = 0u;
 }

@@ -97,6 +97,14 @@ HLVM_LOG(LogCat, error, TXT("Error: {}"), val);
 2. Buffers require `isConstantBuffer=true` + `keepInitialState=true`
 3. Depth clear: `ClearDepthStencilAttachment(cmd, fb, 1.0f, 0u)` NOT `ClearDepthAttachment`
 
+### Ray-Tracing Payloads (slangc)
+- **Keep RT payloads compact (<=64 bytes) with every field written+read on BOTH sides of TraceRay.** slangc compiles each entry point independently and can dead-strip payload fields an entry never uses; asymmetric stripping desyncs the raygen/closesthit payload layout and every returned value arrives as garbage (symptom: valid instance IDs/barycentrics but corrupt normals/albedos - red/black noise GI).
+- Fully initialize all payload fields in raygen before `TraceRay`.
+- Move bounce shading that needs the hit normal INTO closesthit instead of passing the normal through the payload.
+
+### Area Lights vs Geometry
+- **Never place an area light exactly coplanar with occluding geometry** (e.g. a ceiling-sized light at the ceiling plane). Normal-offset shadow rays then hit the coplanar geometry just inside `tMax = lightDistance - eps` and systematically self-occlude (floor black with fireflies). Drop the light slightly off the surface (e.g. y=0.99 for a unit box) - see `TestPathTraceGI_Data/CornellBox_Lights.json`.
+
 ### FNode Scene Graph
 ```cpp
 auto& child = parentNode.AddChild<FNode>(TXT("ChildName"));

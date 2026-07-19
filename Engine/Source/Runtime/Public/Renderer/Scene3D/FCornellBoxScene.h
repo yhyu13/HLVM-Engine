@@ -98,16 +98,18 @@ public:
                 FVec3( E,  E, -E), FVec3(-E,  E, -E),
                 FVec3(0.0f, 0.0f, 1.0f), White);
 
-        // Left wall (x = -E), normal +X, red
+        // Left wall (x = -E), normal +X, red.
+        // NOTE: quads are wound so the geometric (cross-product) normal matches
+        // the assigned vertex normal, i.e. front faces point INTO the room.
         AddQuad(TXT("LeftWall"),
-                FVec3(-E, -E, -E), FVec3(-E, -E,  E),
-                FVec3(-E,  E,  E), FVec3(-E,  E, -E),
+                FVec3(-E, -E, -E), FVec3(-E,  E, -E),
+                FVec3(-E,  E,  E), FVec3(-E, -E,  E),
                 FVec3(1.0f, 0.0f, 0.0f), Red);
 
         // Right wall (x = E), normal -X, green
         AddQuad(TXT("RightWall"),
-                FVec3( E, -E,  E), FVec3( E, -E, -E),
-                FVec3( E,  E, -E), FVec3( E,  E,  E),
+                FVec3( E, -E,  E), FVec3( E,  E,  E),
+                FVec3( E,  E, -E), FVec3( E, -E, -E),
                 FVec3(-1.0f, 0.0f, 0.0f), Green);
 
         // Load lights from JSON. An empty light list is not fatal for geometry,

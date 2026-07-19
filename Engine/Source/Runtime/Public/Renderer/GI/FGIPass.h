@@ -53,6 +53,7 @@ namespace GI
         float    RussianRoulette = 0.95f;
         bool     DebugBounceStats = false;
         uint32_t FrameIndex       = 0; // seeds RNG so bounces diverge frame-to-frame
+        float    AmbientScale     = -1.0f; // < 0 = use CVar r_GI_AmbientScale; 0 disables the fake ambient term
     };
 
     // Output from DebugStatsTexture readback (u1 UAV written when DebugBounceStats=true).

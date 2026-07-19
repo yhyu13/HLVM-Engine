@@ -28,7 +28,7 @@ AUTO_CVAR_FLOAT(r_GI_LightDirZ, 0.577f, "Default directional sun direction Z", E
 AUTO_CVAR_BOOL (r_GI_EnableRR,        true,  "Enable Russian Roulette path termination",     EConsoleVariableFlag::Saved)
 AUTO_CVAR_FLOAT(r_GI_RussianRoulette, 0.95f, "Russian Roulette survival threshold",          EConsoleVariableFlag::Saved)
 AUTO_CVAR_BOOL (r_GI_DebugBounceStats, false, "Write per-frame bounce stats to u1 UAV",       EConsoleVariableFlag::Console)
-AUTO_CVAR_INT  (r_GI_DebugMode,        0,     "Debug visualization: 0=final,1=albedo,2=normal,3=direct,4=indirect,5=firstHitDist,6=vertexNormal,7=geoNormal,8=normalFlags", EConsoleVariableFlag::Console)
+AUTO_CVAR_INT  (r_GI_DebugMode,        0,     "Debug visualization: 0=final,1=albedo,2=normal,3=direct,4=indirect,5=firstHitDist,13/14=SRV sanity reads", EConsoleVariableFlag::Console)
 
 // =============================================================================
 // ReSTIR GI Tunables

@@ -181,9 +181,10 @@ namespace GI
             return false;
         }
 
-        // MaxPayloadSize = 80 (GIPayload: throughput+radiance+origin+direction+hitNormal+hitDist+bounceCount+flags+seed)
+        // MaxPayloadSize = 64 (GIPayload is a compact fully-used 64-byte struct in
+        // GIPathTracing.hlsl - see its comment about slangc per-entry dead-stripping)
         // MaxAttributeSize = 8 (barycentric float2 attributes - standard)
-        if (!RTPipeline.FinalizePipeline(/*MaxPayloadSize*/ 80, /*MaxAttributeSize*/ 8))
+        if (!RTPipeline.FinalizePipeline(/*MaxPayloadSize*/ 64, /*MaxAttributeSize*/ 8))
         {
             HLVM_LOG(LogGI, err, TXT("FRayTracingPipeline finalize failed"));
             return false;
@@ -354,12 +355,16 @@ namespace GI
         Data.Params[1]  = static_cast<float>(spp);
         Data.Params[2]  = CVar_r_GI_ShadowTMin.GetValue();
         Data.Params[3]  = CVar_r_GI_ShadowTMax.GetValue();
-        Data.Params2[0] = CVar_r_GI_AmbientScale.GetValue();
+        Data.Params2[0] = (Desc.AmbientScale >= 0.0f)
+            ? Desc.AmbientScale
+            : CVar_r_GI_AmbientScale.GetValue();
         Data.Params2[1] = CVar_r_GI_RayTMin.GetValue();
         Data.Params2[2] = CVar_r_GI_RayTMax.GetValue();
         Data.Params2[3] = CVar_r_GI_ShadowRays.GetValue() ? 1.0f : 0.0f;
-        Data.Params3[0] = CVar_r_GI_EnableRR.GetValue() ? 1.0f : 0.0f;
-        Data.Params3[1] = CVar_r_GI_RussianRoulette.GetValue();
+        Data.Params3[0] = Desc.EnableRR ? 1.0f : 0.0f;
+        Data.Params3[1] = (Desc.RussianRoulette > 0.0f)
+            ? Desc.RussianRoulette
+            : CVar_r_GI_RussianRoulette.GetValue();
         Data.Params3[2] = (Desc.DebugStatsTexture && Desc.DebugBounceStats) ? 1.0f : 0.0f;
 
         // Explicit light-count path: caller-provided buffer wins; otherwise use internal.

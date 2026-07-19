@@ -4,10 +4,20 @@
  * TestPathTraceGI - Reference path-tracing GI test using FGIPass.
  *
  * Validates the reusable FGIPass with a minimal RT scene:
- *  1. Procedural ground plane GBuffer (CPU-filled)
- *  2. Minimal TLAS/BLAS with one instance
+ *  1. Cornell box scene (FCornellBoxScene), CPU-filled primary GBuffer
+ *  2. Minimal TLAS/BLAS with one instance per quad
  *  3. FGIPass::DispatchRays
- *  4. Blit result to swapchain
+ *  4. Temporal accumulation + tonemap, blit to swapchain
+ *
+ * Debug/verification aids:
+ *  - HLVM_DUMP_PTGI=1        dump Output/Accum/Display/Backbuffer PNGs on the last frame
+ *  - HLVM_PT_CPU_REF=1       also dump a traditional CPU reference render
+ *                            (CPUReference_{Direct,Albedo,Normal}.png) that validates
+ *                            scene geometry/materials/camera/light without any GPU RT
+ *  - HLVM_PT_DEBUG_MODE=N    shader debug visualisation (0=final,1=albedo,2=normal,
+ *                            3=direct,4=indirect,5=firstHitDist,13/14=SRV sanity)
+ *  - HLVM_PT_ACCUM_FRAMES=N  accumulation target (default 16)
+ *  - HLVM_PT_EXPOSURE=F      pre-tonemap exposure (default 1.0)
  */
 
 #include "Test.h"
@@ -140,6 +150,61 @@ struct FCPUTriangle
 };
 
 // =============================================================================
+// CAMERA (shared by GPU view constants, CPU GBuffer fill, CPU reference render)
+// =============================================================================
+
+struct FCameraRig
+{
+    glm::vec3 Position;
+    glm::vec3 Target;
+    glm::vec3 Up;
+    float     FovYDegrees;
+    float     NearZ;
+    float     FarZ;
+};
+
+// Classic Cornell-box viewpoint: inside the box near the front wall, looking at
+// the back wall. 90-degree vertical FOV so the colored side walls plus the
+// floor/ceiling are all in frame (a 60-degree FOV from the box center sees only
+// a single flat wall - the old "uniform gray image" failure mode).
+static FCameraRig GetCameraRig()
+{
+    FCameraRig Rig;
+    Rig.Position    = glm::vec3(0.0f, 0.0f, 0.9f);
+    Rig.Target      = glm::vec3(0.0f, 0.0f, -1.0f);
+    Rig.Up          = glm::vec3(0.0f, 1.0f, 0.0f);
+    Rig.FovYDegrees = 90.0f;
+    Rig.NearZ       = 0.05f;
+    Rig.FarZ        = 100.0f;
+    return Rig;
+}
+
+static glm::mat4 GetCameraView(const FCameraRig& Rig)
+{
+    return glm::lookAt(Rig.Position, Rig.Target, Rig.Up);
+}
+
+static glm::mat4 GetCameraProj(const FCameraRig& Rig, uint32_t W, uint32_t H)
+{
+    return glm::perspective(glm::radians(Rig.FovYDegrees), float(W) / float(H), Rig.NearZ, Rig.FarZ);
+}
+
+// World-space primary ray for pixel (X, Y). The camera looks down -Z in view
+// space (glm::perspective convention), so the unprojected direction uses z=-1.
+static glm::vec3 MakeCameraRay(
+    uint32_t X, uint32_t Y, uint32_t W, uint32_t H,
+    const glm::mat4& InvView, const glm::mat4& InvProj)
+{
+    const float NdcX = (2.0f * (float(X) + 0.5f) / float(W)) - 1.0f;
+    const float NdcY = 1.0f - (2.0f * (float(Y) + 0.5f) / float(H));
+
+    glm::vec4 RayClip(NdcX, NdcY, -1.0f, 1.0f);
+    glm::vec4 RayEye = InvProj * RayClip;
+    RayEye = glm::vec4(RayEye.x, RayEye.y, -1.0f, 0.0f);
+    return glm::normalize(glm::vec3(InvView * RayEye));
+}
+
+// =============================================================================
 // FPathTraceGIPass
 // =============================================================================
 
@@ -262,10 +327,18 @@ public:
             HLVM_LOG(LogTest, info, TXT("Frame dumping enabled (set HLVM_DUMP_PTGI to dump PNGs)"));
         }
 
-        // Default exposure 0.3 — Cornell box radiance saturates ACES at exposure=1.0,
-// collapsing the dynamic range into a uniform pale image ("white noise" symptom).
-// Override with HLVM_PT_EXPOSURE env var.
-        Exposure = 0.3f;
+        // Traditional CPU reference render: validates scene geometry, materials,
+        // camera and light with zero GPU ray-tracing involvement.
+        if (bDumpRequested || std::getenv("HLVM_PT_CPU_REF"))
+        {
+            RenderCPUReferenceAndDump();
+        }
+
+        // Default exposure 1.0 — with the payload/camera fixes the Cornell box
+        // radiance sits in a sane range for ACES (the old 0.3 default was a
+        // workaround for the saturated white-noise output of the broken build).
+        // Override with HLVM_PT_EXPOSURE env var.
+        Exposure = 1.0f;
         if (const char* EnvExposure = std::getenv("HLVM_PT_EXPOSURE"))
         {
             try
@@ -278,7 +351,7 @@ public:
             }
             catch (...) {}
         }
-        HLVM_LOG(LogTest, info, TXT("PathTraceGI exposure: {} (set HLVM_PT_EXPOSURE to override; 0.3 typical, 1.0 saturates ACES)"), Exposure);
+        HLVM_LOG(LogTest, info, TXT("PathTraceGI exposure: {} (set HLVM_PT_EXPOSURE to override)"), Exposure);
 
         CommandList = NvrhiDevice->createCommandList();
 
@@ -368,6 +441,10 @@ public:
         Desc.SamplesPerPixel = 4;
         Desc.EnableRR = true;
         Desc.FrameIndex = FrameIndex++;
+        // The Cornell box is a closed room lit only by the ceiling light: the
+        // fake constant ambient term would wash out the GI result (indirect
+        // light comes from the path tracer's own bounces instead).
+        Desc.AmbientScale = 0.0f;
 
         GIPass.DispatchRays(CommandList, Desc);
 
@@ -669,7 +746,13 @@ private:
                 Tri.V0 = glm::vec3(A.Position[0], A.Position[1], A.Position[2]);
                 Tri.V1 = glm::vec3(B.Position[0], B.Position[1], B.Position[2]);
                 Tri.V2 = glm::vec3(C.Position[0], C.Position[1], C.Position[2]);
-                Tri.Normal = glm::normalize(glm::cross(Tri.V1 - Tri.V0, Tri.V2 - Tri.V0));
+                // Use the mesh vertex normals (constant per quad): the left/right
+                // walls are wound so their geometric cross-product normal points
+                // OUT of the box, while shading needs the inward-facing normal.
+                Tri.Normal = glm::normalize(
+                    glm::vec3(A.Normal[0], A.Normal[1], A.Normal[2]) +
+                    glm::vec3(B.Normal[0], B.Normal[1], B.Normal[2]) +
+                    glm::vec3(C.Normal[0], C.Normal[1], C.Normal[2]));
                 Tri.Albedo = Albedo;
                 CPUTriangles.push_back(Tri);
             }
@@ -764,13 +847,10 @@ private:
         for (int i = 0; i < 4; ++i)
             Constants.Model[i][i] = 1.0f;
 
-        // Camera inside the Cornell box, looking toward the back wall
-        glm::vec3 CameraPos(0.0f, 0.0f, 0.0f);
-        glm::vec3 Target(0.0f, 0.0f, -1.0f);
-        glm::mat4 View = glm::lookAt(CameraPos, Target, glm::vec3(0.0f, 1.0f, 0.0f));
-
-        float Aspect = float(W) / float(H);
-        glm::mat4 Proj = glm::perspective(glm::radians(60.0f), Aspect, 0.1f, 100.0f);
+        // Shared Cornell-box camera (inside the box near the front wall)
+        const FCameraRig Rig = GetCameraRig();
+        glm::mat4 View = GetCameraView(Rig);
+        glm::mat4 Proj = GetCameraProj(Rig, W, H);
 
         memcpy(Constants.View, glm::value_ptr(View), sizeof(Constants.View));
         memcpy(Constants.Proj, glm::value_ptr(Proj), sizeof(Constants.Proj));
@@ -821,15 +901,19 @@ private:
 
     void FillGBufferTextures(uint32_t W, uint32_t H)
     {
+        // The camera is static, so the CPU GBuffer only needs to be filled once.
+        if (bGBufferFilled)
+            return;
+        bGBufferFilled = true;
+
         std::vector<float> WorldPosData(size_t(W) * H * 4);
         std::vector<uint8_t> NormalData(size_t(W) * H * 4);
         std::vector<uint32_t> MaterialData(size_t(W) * H);
 
-        glm::vec3 CameraPos(0.0f, 0.0f, 0.0f);
-        glm::vec3 Target(0.0f, 0.0f, -1.0f);
-        glm::mat4 View = glm::lookAt(CameraPos, Target, glm::vec3(0.0f, 1.0f, 0.0f));
-        float Aspect = float(W) / float(H);
-        glm::mat4 Proj = glm::perspective(glm::radians(60.0f), Aspect, 0.1f, 100.0f);
+        const FCameraRig Rig = GetCameraRig();
+        const glm::vec3 CameraPos = Rig.Position;
+        glm::mat4 View = GetCameraView(Rig);
+        glm::mat4 Proj = GetCameraProj(Rig, W, H);
         glm::mat4 InvProj = glm::inverse(Proj);
         glm::mat4 InvView = glm::inverse(View);
 
@@ -839,14 +923,7 @@ private:
             {
                 size_t idx = size_t(y) * W + x;
 
-                float ndcX = (2.0f * (float(x) + 0.5f) / float(W)) - 1.0f;
-                float ndcY = 1.0f - (2.0f * (float(y) + 0.5f) / float(H));
-
-                glm::vec4 RayClip(ndcX, ndcY, 1.0f, 1.0f);
-                glm::vec4 RayEye = InvProj * RayClip;
-                RayEye = glm::vec4(RayEye.x, RayEye.y, 1.0f, 0.0f);
-                glm::vec4 RayWorld = InvView * RayEye;
-                glm::vec3 RayDir = glm::normalize(glm::vec3(RayWorld));
+                glm::vec3 RayDir = MakeCameraRay(x, y, W, H, InvView, InvProj);
 
                 float ClosestT = std::numeric_limits<float>::max();
                 const FCPUTriangle* HitTri = nullptr;
@@ -915,6 +992,184 @@ private:
 
         Cmd->close();
         NvrhiDevice->executeCommandList(Cmd);
+    }
+
+    // ------------------------------------------------------------------
+    // Traditional CPU reference render. Validates scene geometry, materials,
+    // camera and light with zero GPU ray-tracing involvement: primary rays +
+    // direct lighting from the area light (stratified sampling + CPU shadow
+    // rays). Dumps CPUReference_{Direct,Albedo,Normal}.png for comparison
+    // against the GPU path-traced result.
+    // ------------------------------------------------------------------
+    bool TraceCPUScene(const glm::vec3& Origin, const glm::vec3& Dir,
+                       float& OutT, const FCPUTriangle*& OutTri) const
+    {
+        float ClosestT = std::numeric_limits<float>::max();
+        const FCPUTriangle* HitTri = nullptr;
+        for (const FCPUTriangle& Tri : CPUTriangles)
+        {
+            float T = 0.0f;
+            if (IntersectRayTriangle(Origin, Dir, Tri, T) && T < ClosestT)
+            {
+                ClosestT = T;
+                HitTri = &Tri;
+            }
+        }
+        if (HitTri)
+        {
+            OutT = ClosestT;
+            OutTri = HitTri;
+            return true;
+        }
+        return false;
+    }
+
+    static glm::vec3 ACESFilm(const glm::vec3& x)
+    {
+        const float a = 2.51f, b = 0.03f, c = 2.43f, d = 0.59f, e = 0.14f;
+        return glm::clamp((x * (a * x + b)) / (x * (c * x + d) + e),
+                          glm::vec3(0.0f), glm::vec3(1.0f));
+    }
+
+    void RenderCPUReferenceAndDump()
+    {
+        if (CPUTriangles.empty() || !Scene)
+            return;
+
+        // Find the first area light in the scene.
+        const Renderer::FLight* AreaLight = nullptr;
+        for (const auto& L : Scene->Lights)
+        {
+            if (L.type == static_cast<uint32_t>(Renderer::ELightType::Area))
+            {
+                AreaLight = &L;
+                break;
+            }
+        }
+        if (!AreaLight)
+        {
+            HLVM_LOG(LogTest, warn, TXT("CPU reference: no area light found, skipping"));
+            return;
+        }
+
+        const FCameraRig Rig = GetCameraRig();
+        const glm::vec3 CameraPos = Rig.Position;
+        const glm::mat4 InvView = glm::inverse(GetCameraView(Rig));
+        const glm::mat4 InvProj = glm::inverse(GetCameraProj(Rig, WIDTH, HEIGHT));
+
+        const glm::vec3 LightPos(AreaLight->position[0], AreaLight->position[1], AreaLight->position[2]);
+        const glm::vec3 LightNormal = glm::normalize(glm::vec3(
+            AreaLight->direction[0], AreaLight->direction[1], AreaLight->direction[2]));
+        const glm::vec3 LightColor = glm::vec3(
+            AreaLight->color[0], AreaLight->color[1], AreaLight->color[2]) * AreaLight->intensity;
+        const float LightArea = AreaLight->areaWidth * AreaLight->areaHeight;
+        const glm::vec3 UpRef = (std::fabs(LightNormal.y) < 0.999f) ? glm::vec3(0, 1, 0) : glm::vec3(1, 0, 0);
+        const glm::vec3 LightTangent = glm::normalize(glm::cross(UpRef, LightNormal));
+        const glm::vec3 LightBitangent = glm::cross(LightNormal, LightTangent);
+
+        constexpr uint32_t LIGHT_SAMPLES = 8; // 8x8 stratified over the light
+        constexpr float kPi = 3.14159265f;
+
+        std::vector<float> DirectData(size_t(WIDTH) * HEIGHT * 4);
+        std::vector<float> AlbedoData(size_t(WIDTH) * HEIGHT * 4);
+        std::vector<float> NormalData(size_t(WIDTH) * HEIGHT * 4);
+
+        for (uint32_t y = 0; y < HEIGHT; ++y)
+        {
+            for (uint32_t x = 0; x < WIDTH; ++x)
+            {
+                const size_t Idx = (size_t(y) * WIDTH + x) * 4;
+                const glm::vec3 RayDir = MakeCameraRay(x, y, WIDTH, HEIGHT, InvView, InvProj);
+
+                float HitT = 0.0f;
+                const FCPUTriangle* HitTri = nullptr;
+                if (!TraceCPUScene(CameraPos, RayDir, HitT, HitTri))
+                {
+                    DirectData[Idx + 3] = 1.0f;
+                    AlbedoData[Idx + 3] = 1.0f;
+                    NormalData[Idx + 3] = 1.0f;
+                    continue;
+                }
+
+                const glm::vec3 HitPos = CameraPos + RayDir * HitT;
+                const glm::vec3 N = HitTri->Normal;
+                const glm::vec3 Albedo = HitTri->Albedo;
+
+                AlbedoData[Idx + 0] = Albedo.r;
+                AlbedoData[Idx + 1] = Albedo.g;
+                AlbedoData[Idx + 2] = Albedo.b;
+                AlbedoData[Idx + 3] = 1.0f;
+                NormalData[Idx + 0] = N.x * 0.5f + 0.5f;
+                NormalData[Idx + 1] = N.y * 0.5f + 0.5f;
+                NormalData[Idx + 2] = N.z * 0.5f + 0.5f;
+                NormalData[Idx + 3] = 1.0f;
+
+                // Direct lighting: stratified sampling of the area light.
+                glm::vec3 Direct(0.0f);
+                for (uint32_t sy = 0; sy < LIGHT_SAMPLES; ++sy)
+                {
+                    for (uint32_t sx = 0; sx < LIGHT_SAMPLES; ++sx)
+                    {
+                        const float u = (float(sx) + 0.5f) / float(LIGHT_SAMPLES) - 0.5f;
+                        const float v = (float(sy) + 0.5f) / float(LIGHT_SAMPLES) - 0.5f;
+                        const glm::vec3 SamplePos = LightPos
+                            + LightTangent * (u * AreaLight->areaWidth)
+                            + LightBitangent * (v * AreaLight->areaHeight);
+
+                        glm::vec3 ToLight = SamplePos - HitPos;
+                        const float R2 = glm::dot(ToLight, ToLight);
+                        const float R = std::sqrt(R2);
+                        ToLight /= R;
+
+                        const float CosLight = glm::dot(-ToLight, LightNormal);
+                        if (CosLight <= 0.0f)
+                            continue;
+                        const float NdotL = glm::dot(N, ToLight);
+                        if (NdotL <= 0.0f)
+                            continue;
+
+                        // Shadow ray toward the light sample.
+                        const glm::vec3 ShadowOrigin = HitPos + N * 0.001f;
+                        bool Occluded = false;
+                        for (const FCPUTriangle& Tri : CPUTriangles)
+                        {
+                            float T = 0.0f;
+                            if (IntersectRayTriangle(ShadowOrigin, ToLight, Tri, T) && T < R - 0.002f)
+                            {
+                                Occluded = true;
+                                break;
+                            }
+                        }
+                        if (Occluded)
+                            continue;
+
+                        const float Pdf = R2 / (LightArea * CosLight); // solid-angle pdf
+                        Direct += Albedo * (NdotL / kPi) * LightColor / Pdf;
+                    }
+                }
+                Direct /= float(LIGHT_SAMPLES * LIGHT_SAMPLES);
+
+                const glm::vec3 Mapped = glm::pow(ACESFilm(Direct), glm::vec3(1.0f / 2.2f));
+                DirectData[Idx + 0] = Mapped.r;
+                DirectData[Idx + 1] = Mapped.g;
+                DirectData[Idx + 2] = Mapped.b;
+                DirectData[Idx + 3] = 1.0f;
+            }
+        }
+
+        FString DumpDir = FString::Format(
+            TXT("{}/Engine/Source/Runtime/Test/TestPathTraceGI_Data/dumps"),
+            *GProjectRoot);
+        std::filesystem::create_directories(FPath(DumpDir).string());
+
+        FImageDump::DumpToPNG(FPath::Combine(DumpDir, TXT("CPUReference_Direct.png")).string(),
+            static_cast<int>(WIDTH), static_cast<int>(HEIGHT), DirectData.data());
+        FImageDump::DumpToPNG(FPath::Combine(DumpDir, TXT("CPUReference_Albedo.png")).string(),
+            static_cast<int>(WIDTH), static_cast<int>(HEIGHT), AlbedoData.data());
+        FImageDump::DumpToPNG(FPath::Combine(DumpDir, TXT("CPUReference_Normal.png")).string(),
+            static_cast<int>(WIDTH), static_cast<int>(HEIGHT), NormalData.data());
+
+        HLVM_LOG(LogTest, info, TXT("CPU reference render dumped (Direct/Albedo/Normal)"));
     }
 
 public:
@@ -1224,6 +1479,7 @@ private:
     uint32_t AccumFrameCount = 0;
     uint32_t AccumTargetFrames = DEFAULT_ACCUM_TARGET_FRAMES;
     bool     bDumpRequested = false;
+    bool     bGBufferFilled = false;
     float    Exposure = 1.0f;
     float    FPSUpdateTimer = 0.0f;
 };
