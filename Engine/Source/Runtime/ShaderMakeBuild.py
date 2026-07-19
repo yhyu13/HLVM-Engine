@@ -521,6 +521,37 @@ def create_gi_shadermake() -> ShaderMakeModule:
     )
 
 
+def create_path_trace_triangle_shadermake(test_target_name: str) -> ShaderMakeModule:
+    """Factory function to create ShaderMake module for TestPathTraceTriangle shaders."""
+    shader_target_name = test_target_name + "_ShaderMake"
+
+    # CMAKE_SOURCE_DIR for Runtime = Engine/Source/Runtime
+    test_data_dir = "${CMAKE_SOURCE_DIR}/Test/TestPathTraceTriangle_Data"
+
+    # Config file is in TestPathTraceTriangle_Data directory
+    config_file = "${CMAKE_SOURCE_DIR}/Test/TestPathTraceTriangle_Data/ShaderMake.cfg"
+
+    # Shader source files for TestPathTraceTriangle
+    shader_sources = [
+        test_data_dir + "/PathTraceTriangle.hlsl",
+    ]
+
+    # Include directories
+    include_dirs = [
+        test_data_dir,
+    ]
+
+    return ShaderMakeModule(
+        target_name=shader_target_name,
+        config_file_cmake=config_file,
+        shader_sources_cmake=shader_sources,
+        output_dir_cmake=test_data_dir,
+        include_dirs_cmake=include_dirs,
+        project_name="HLVM_PathTraceTriangle",
+        slang_options=""
+    )
+
+
 def create_path_trace_gi_shadermake(test_target_name: str) -> ShaderMakeModule:
     """Factory function to create ShaderMake module for TestPathTraceGI.
 

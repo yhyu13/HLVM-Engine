@@ -270,6 +270,8 @@ class RuntimeTestModule(BaseModule):
                 shader_cmake = ShaderMakeBuild.create_gpu_instancing_shadermake(self.target_name)
             elif "PathTraceGI" in self.target_name:
                 shader_cmake = ShaderMakeBuild.create_path_trace_gi_shadermake(self.target_name)
+            elif "PathTraceTriangle" in self.target_name:
+                shader_cmake = ShaderMakeBuild.create_path_trace_triangle_shadermake(self.target_name)
             else:
                 shader_cmake = ShaderMakeBuild.create_deferred_shading_shadermake(self.target_name)
             shader_cmake.dump(fp)
