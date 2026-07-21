@@ -236,9 +236,15 @@ public:
             HLVM_LOG(LogTest, err, TXT("Failed to create GBuffer textures"));
             return false;
         }
-        // Fill GBuffer with hardcoded values so FGIPass has real input
-        // (out-of-scope card replaced the Sponza GBuffer VS/PS pipeline).
-        FillGBufferHardcoded();
+        // Real Sponza GBuffer pass — replaces the previous hardcoded fill.
+        // Uses GBufferPT_VS / GBufferPT_PS (3 MRTs: worldPos, normal, material)
+        // and per-instance FInstanceInfo as a constant buffer to seed the
+        // material color.
+        if (!CreateGBufferPipeline(DataDir))
+        {
+            HLVM_LOG(LogTest, err, TXT("Failed to create GBuffer pipeline"));
+            return false;
+        }
 
         // GI pass
         if (!GIPass.Initialize(NvrhiDevice, DataDir, nullptr))
@@ -326,6 +332,17 @@ public:
         AccumulateCS            = nullptr;
         AccumulateConstants     = nullptr;
         CommandList             = nullptr;
+
+        // GBuffer PT pass resources
+        GBufferVS               = nullptr;
+        GBufferPS               = nullptr;
+        GBufferInputLayout      = nullptr;
+        GBufferBindingLayout    = nullptr;
+        GBufferPipeline         = nullptr;
+        GBufferFrameBuffer      = nullptr;
+        GBufferVertexBuffer     = nullptr;
+        GBufferIndexBuffer      = nullptr;
+        GBufferPerInstanceCB    = nullptr;
         Scene.reset();
     }
 
@@ -360,6 +377,11 @@ public:
         CommandList->open();
 
         UpdateViewConstants(FB.width, FB.height);
+
+        // (0) GBuffer raster pass — renders Sponza into GBufferWorldPos /
+        //     GBufferNormal / GBufferMaterial MRTs. Must run BEFORE FGIPass
+        //     so the RT shader sees populated GBuffer inputs.
+        RenderGBuffer(FB.width, FB.height);
 
         // (1) GI ray trace — produces OutputTexture (HDR rgb + hitDist alpha)
         {
@@ -859,6 +881,12 @@ private:
     //   normal = GBufferNormal[i].rgb * 2.0 - 1.0
     // so we must store the *encoded* `(n*0.5+0.5)` form, not the raw
     // [-1,+1] direction. WorldPos and Material pass through unchanged.
+    //
+    // SUPERSEDED by the real Sponza GBuffer PT pass (GBufferPT_VS/PS +
+    // RenderGBuffer) — this function is retained as a documented
+    // "no-Sponza GBuffer" fallback for tests where the raster pass is
+    // not desired. Kept here so the build does not need a deep edit
+    // when someone wants to disable the raster pass temporarily.
     void FillGBufferHardcoded()
     {
         const uint32_t W = WIDTH, H = HEIGHT;
@@ -921,6 +949,358 @@ private:
 
         HLVM_LOG(LogTest, info, TXT("Filled GBuffer with hardcoded quad: "
             "worldPos=(-0.5,-0.5,0.5), normal=(0,0,1), material=(0.8,0.2,0.2)"));
+    }
+
+    // ---- GBuffer PT pipeline ------------------------------------------------
+    // Builds the real Sponza GBuffer raster pass that produces the inputs
+    // FGIPass reads. The GBuffer pass uses:
+    //   - GBufferPT_VS.hlsl   (input: FVertex POS/NORMAL/UV/TANGENT, 44B stride)
+    //   - GBufferPT_PS.hlsl   (output: 3 MRTs -> WorldPos, Normal, Material)
+    //
+    // Bindings (see GBufferPT_VS.hlsl):
+    //   b0  ViewConstants    (per-frame, shared across draws)
+    //   b1  PerInstanceInfo  (one FInstanceInfo per draw, 48B)
+    //
+    // Per-draw constants are bound via a small 48B constant buffer
+    // (GBufferPerInstanceCB). We do N draws (one per FStaticMesh) so that
+    // each draw only sees its own FInstanceInfo via b1.
+    //
+    // Note: GBuffer textures are created in `ResourceStates::RenderTarget`
+    // initial state by CreateGBufferTextures. The framebuffer therefore
+    // attaches them as color attachments directly; no extra transition
+    // required at init time. RenderGBuffer transitions them to ShaderResource
+    // after the draw for FGIPass's SRV reads.
+    bool CreateGBufferPipeline(const FString& DataDir)
+    {
+        // ---- Load shaders from sblob --------------------------------------
+        auto VSBlob = ReadBinaryFile(
+            FPath::Combine(DataDir, TXT("GBufferPT_VS.sblob")).string());
+        const void* VSBin = nullptr; size_t VSBinSize = 0;
+        if (!ShaderMake::FindPermutationInBlob(VSBlob.data(), VSBlob.size(),
+                nullptr, 0, &VSBin, &VSBinSize))
+        {
+            HLVM_LOG(LogTest, err, TXT("Failed to extract GBufferPT_VS"));
+            return false;
+        }
+        nvrhi::ShaderDesc VSDesc;
+        VSDesc.setShaderType(nvrhi::ShaderType::Vertex);
+        GBufferVS = NvrhiDevice->createShader(VSDesc, VSBin, VSBinSize);
+
+        auto PSBlob = ReadBinaryFile(
+            FPath::Combine(DataDir, TXT("GBufferPT_PS.sblob")).string());
+        const void* PSBin = nullptr; size_t PSBinSize = 0;
+        if (!ShaderMake::FindPermutationInBlob(PSBlob.data(), PSBlob.size(),
+                nullptr, 0, &PSBin, &PSBinSize))
+        {
+            HLVM_LOG(LogTest, err, TXT("Failed to extract GBufferPT_PS"));
+            return false;
+        }
+        nvrhi::ShaderDesc PSDesc;
+        PSDesc.setShaderType(nvrhi::ShaderType::Pixel);
+        GBufferPS = NvrhiDevice->createShader(PSDesc, PSBin, PSBinSize);
+
+        if (!GBufferVS || !GBufferPS)
+        {
+            HLVM_LOG(LogTest, err, TXT("Failed to create GBuffer PT shaders"));
+            return false;
+        }
+        HLVM_LOG(LogTest, info, TXT("GBuffer PT shaders loaded"));
+
+        // ---- Input layout (matches GBufferPT_VS.hlsl VSInput) -------------
+        // FVertex layout from IMesh.h: Position(12) Normal(12) UV(8) Tangent(12)
+        // elementStride = 44 bytes.
+        nvrhi::VertexAttributeDesc Attrs[4];
+        Attrs[0].setName("POSITION").setFormat(nvrhi::Format::RGB32_FLOAT)
+            .setOffset(0).setElementStride(sizeof(FVertex));
+        Attrs[1].setName("NORMAL").setFormat(nvrhi::Format::RGB32_FLOAT)
+            .setOffset(12).setElementStride(sizeof(FVertex));
+        Attrs[2].setName("TEXCOORD0").setFormat(nvrhi::Format::RG32_FLOAT)
+            .setOffset(24).setElementStride(sizeof(FVertex));
+        Attrs[3].setName("TANGENT").setFormat(nvrhi::Format::RGB32_FLOAT)
+            .setOffset(32).setElementStride(sizeof(FVertex));
+        GBufferInputLayout = NvrhiDevice->createInputLayout(
+            Attrs, 4, GBufferVS);
+
+        // ---- Binding layout: b0 ViewConstants, b1 PerInstanceInfo ---------
+        FBindingLayoutBuilder BLB;
+        BLB.SetVisibility(nvrhi::ShaderType::Vertex | nvrhi::ShaderType::Pixel)
+           .AddConstantBuffer(0)
+           .AddConstantBuffer(1);
+
+        nvrhi::VulkanBindingOffsets Offsets;
+        Offsets.setConstantBufferOffset(0)
+               .setShaderResourceOffset(0)
+               .setSamplerOffset(0)
+               .setUnorderedAccessViewOffset(0);
+        BLB.SetBindingOffsets(Offsets);
+
+        GBufferBindingLayout = NvrhiDevice->createBindingLayout(BLB.Build());
+
+        // ---- Per-instance constants buffer (48B; one FInstanceInfo) -------
+        {
+            nvrhi::BufferDesc Desc;
+            Desc.byteSize = sizeof(FInstanceInfo);
+            Desc.isConstantBuffer = true;
+            Desc.initialState = nvrhi::ResourceStates::ConstantBuffer;
+            Desc.keepInitialState = true;
+            Desc.debugName = "GBufferPerInstanceCB";
+            GBufferPerInstanceCB = NvrhiDevice->createBuffer(Desc);
+        }
+
+        // ---- GBuffer framebuffer (3 color attachments, no depth) ----------
+        {
+            nvrhi::FramebufferDesc FBDesc;
+            nvrhi::FramebufferAttachment Wp, Nm, Mt;
+            Wp.setTexture(GBufferWorldPos);
+            Nm.setTexture(GBufferNormal);
+            Mt.setTexture(GBufferMaterial);
+            FBDesc.addColorAttachment(Wp);
+            FBDesc.addColorAttachment(Nm);
+            FBDesc.addColorAttachment(Mt);
+            GBufferFrameBuffer = NvrhiDevice->createFramebuffer(FBDesc);
+            if (!GBufferFrameBuffer)
+            {
+                HLVM_LOG(LogTest, err, TXT("Failed to create GBuffer framebuffer"));
+                return false;
+            }
+        }
+        HLVM_LOG(LogTest, info, TXT("GBuffer framebuffer created (3 MRTs, no depth)"));
+
+        // ---- Graphics pipeline -------------------------------------------
+        {
+            nvrhi::GraphicsPipelineDesc PipelineDesc;
+            PipelineDesc.setVertexShader(GBufferVS);
+            PipelineDesc.setPixelShader(GBufferPS);
+            PipelineDesc.setInputLayout(GBufferInputLayout);
+            PipelineDesc.addBindingLayout(GBufferBindingLayout);
+            PipelineDesc.setPrimType(nvrhi::PrimitiveType::TriangleList);
+            PipelineDesc.renderState.setRasterState(
+                nvrhi::RasterState().setCullNone());
+            // No depth — single raster pass on opaque geometry; last-writer-wins
+            // is acceptable here because no overdraw matters (we only need a
+            // valid primary hit for the path tracer, not correct occlusion
+            // between rasterized fragments).
+            PipelineDesc.renderState.depthStencilState
+                .setDepthTestEnable(false)
+                .setDepthWriteEnable(false);
+
+            GBufferPipeline = NvrhiDevice->createGraphicsPipeline(
+                PipelineDesc, GBufferFrameBuffer->getFramebufferInfo());
+            if (!GBufferPipeline)
+            {
+                HLVM_LOG(LogTest, err, TXT("Failed to create GBuffer PT pipeline"));
+                return false;
+            }
+        }
+        HLVM_LOG(LogTest, info, TXT("GBuffer PT pipeline created"));
+
+        // ---- GBuffer vertex/index buffers (FVertex 44B layout) -----------
+        // Build a flat concatenation of all FStaticMesh vertex/index data
+        // so the GBuffer pass can issue N drawIndexed calls (one per mesh)
+        // against a single VB/IB pair. Per-mesh offsets are encoded in
+        // FInstanceInfo (VertexOffset / IndexOffset) and used as draw-time
+        // startVertexLocation / startIndexLocation.
+        if (!Scene)
+        {
+            HLVM_LOG(LogTest, err, TXT("GBuffer PT: Scene is null"));
+            return false;
+        }
+        std::vector<FVertex>  AllGBufferVerts;
+        std::vector<uint32_t> AllGBufferIndices;
+        for (auto& Entry : Scene->MeshTree)
+        {
+            auto StaticMesh = std::dynamic_pointer_cast<FStaticMesh>(Entry.second);
+            if (!StaticMesh) continue;
+            const auto& V = StaticMesh->GetVertices();
+            const auto& I = StaticMesh->GetIndices();
+            if (V.empty() || I.empty()) continue;
+            for (const auto& v : V)     AllGBufferVerts.push_back(v);
+            for (uint32_t idx : I)      AllGBufferIndices.push_back(idx);
+        }
+        if (AllGBufferVerts.empty() || AllGBufferIndices.empty())
+        {
+            HLVM_LOG(LogTest, err, TXT("GBuffer PT: Sponza produced no geometry"));
+            return false;
+        }
+        {
+            nvrhi::BufferDesc VDesc;
+            VDesc.byteSize = static_cast<uint32_t>(AllGBufferVerts.size() * sizeof(FVertex));
+            VDesc.structStride = sizeof(FVertex);
+            VDesc.initialState = nvrhi::ResourceStates::ShaderResource;
+            VDesc.keepInitialState = true;
+            VDesc.debugName = "GBufferVertices";
+            GBufferVertexBuffer = NvrhiDevice->createBuffer(VDesc);
+        }
+        {
+            nvrhi::BufferDesc IDesc;
+            IDesc.byteSize = static_cast<uint32_t>(AllGBufferIndices.size() * sizeof(uint32_t));
+            IDesc.structStride = sizeof(uint32_t);
+            IDesc.initialState = nvrhi::ResourceStates::ShaderResource;
+            IDesc.keepInitialState = true;
+            IDesc.debugName = "GBufferIndices";
+            GBufferIndexBuffer = NvrhiDevice->createBuffer(IDesc);
+        }
+        nvrhi::CommandListHandle InitCmd = NvrhiDevice->createCommandList();
+        InitCmd->open();
+        InitCmd->writeBuffer(GBufferVertexBuffer, AllGBufferVerts.data(),
+            static_cast<uint32_t>(AllGBufferVerts.size() * sizeof(FVertex)));
+        InitCmd->writeBuffer(GBufferIndexBuffer, AllGBufferIndices.data(),
+            static_cast<uint32_t>(AllGBufferIndices.size() * sizeof(uint32_t)));
+        InitCmd->setBufferState(GBufferVertexBuffer, nvrhi::ResourceStates::ShaderResource);
+        InitCmd->setBufferState(GBufferIndexBuffer,  nvrhi::ResourceStates::ShaderResource);
+        InitCmd->close();
+        NvrhiDevice->executeCommandList(InitCmd);
+        NvrhiDevice->waitForIdle();
+
+        HLVM_LOG(LogTest, info, TXT("GBuffer VB/IB built: %u verts, %u indices"),
+            static_cast<uint32_t>(AllGBufferVerts.size()),
+            static_cast<uint32_t>(AllGBufferIndices.size()));
+        return true;
+    }
+
+    // ---- GBuffer raster pass (per-frame) -----------------------------------
+    // Issues N drawIndexed calls — one per FStaticMesh — to populate the
+    // GBuffer MRTs. Each draw binds:
+    //   - GBufferVertexBuffer (FVertex 44B) with offset=0
+    //   - GBufferIndexBuffer with offset=0
+    //   - ViewConstantsBuffer (b0) — same per-frame matrix for all draws
+    //   - GBufferPerInstanceCB (b1) — updated per-draw with that mesh's FInstanceInfo
+    //
+    // After the loop, transitions the 3 GBuffer MRTs to ShaderResource so
+    // FGIPass's Texture2D<float4> SRV reads find the correct layout.
+    void RenderGBuffer(uint32_t /*W*/, uint32_t /*H*/)
+    {
+        if (!GBufferPipeline || !GBufferFrameBuffer) return;
+        if (!Scene) return;
+
+        // The textures were created in RenderTarget initial state; transitions
+        // for the FB-attached draws are emitted implicitly by the first draw.
+        // After the draws we must move them back to ShaderResource for FGIPass.
+        size_t MeshCount = 0;
+        for (auto& Entry : Scene->MeshTree)
+        {
+            auto StaticMesh = std::dynamic_pointer_cast<FStaticMesh>(Entry.second);
+            if (!StaticMesh) continue;
+            const auto& V = StaticMesh->GetVertices();
+            const auto& I = StaticMesh->GetIndices();
+            if (V.empty() || I.empty()) continue;
+
+            // Locate matching FInstanceInfo by mesh pointer — same loop order
+            // as LoadSponza uses.
+            // (We could cache this during LoadSponza; the linear scan here is
+            //  small (27 Sponza meshes) and keeps the two structures decoupled.)
+            FInstanceInfo ThisInfo{};
+            bool Found = false;
+            // Use the same MeshMultiMaterialMap key — but that needs a mesh
+            // shared_ptr. We have it; just look up Info by matching vertex
+            // count via the offsets baked at LoadSponza.
+            // Simpler: re-walk LoadSponza's order and pair by mesh identity.
+            // (See parallel arrays in LoadSponza; for now we scan SceneBLASes
+            //  and rely on consistent mesh ordering between init and render.)
+            // For correctness we re-derive Info inline here matching LoadSponza.
+            // This mirrors LoadSponza's logic exactly.
+            {
+                uint32_t VOff = 0, IOff = 0;
+                for (auto& E2 : Scene->MeshTree)
+                {
+                    auto M2 = std::dynamic_pointer_cast<FStaticMesh>(E2.second);
+                    if (!M2) continue;
+                    if (M2 == StaticMesh)
+                    {
+                        ThisInfo.VertexOffset = VOff;
+                        ThisInfo.IndexOffset  = IOff;
+                        ThisInfo.VertexCount  = static_cast<uint32_t>(M2->GetVertices().size());
+                        ThisInfo.IndexCount   = static_cast<uint32_t>(M2->GetIndices().size());
+                        ThisInfo.AlbedoTextureIndex = 0;
+                        // Pull material color if available
+                        auto MatIt = Scene->MeshMultiMaterialMap.find(E2.second);
+                        if (MatIt != Scene->MeshMultiMaterialMap.end() && !MatIt->second.empty())
+                        {
+                            const auto& M = MatIt->second[0];
+                            ThisInfo.AlbedoColor[0] = M->AlbedoColor.x;
+                            ThisInfo.AlbedoColor[1] = M->AlbedoColor.y;
+                            ThisInfo.AlbedoColor[2] = M->AlbedoColor.z;
+                        }
+                        else
+                        {
+                            ThisInfo.AlbedoColor[0] = 0.7f;
+                            ThisInfo.AlbedoColor[1] = 0.7f;
+                            ThisInfo.AlbedoColor[2] = 0.7f;
+                        }
+                        ThisInfo.MaterialFlags = 0;
+                        Found = true;
+                        break;
+                    }
+                    VOff += static_cast<uint32_t>(M2->GetVertices().size());
+                    IOff += static_cast<uint32_t>(M2->GetIndices().size());
+                }
+            }
+            if (!Found)
+            {
+                continue;
+            }
+
+            // Upload this mesh's FInstanceInfo to the per-instance CB.
+            CommandList->writeBuffer(GBufferPerInstanceCB, &ThisInfo, sizeof(ThisInfo));
+
+            // Build the per-draw binding set.
+            FBindingSetBuilder SetBuilder;
+            SetBuilder.SetConstantBuffer(0, ViewConstantsBuffer)
+                      .SetConstantBuffer(1, GBufferPerInstanceCB);
+            nvrhi::BindingSetHandle BS = NvrhiDevice->createBindingSet(
+                SetBuilder.Build(), GBufferBindingLayout);
+
+            nvrhi::GraphicsState State;
+            State.setPipeline(GBufferPipeline);
+            State.setFramebuffer(GBufferFrameBuffer);
+            State.addBindingSet(BS);
+
+            nvrhi::VertexBufferBinding VBB;
+            VBB.setBuffer(GBufferVertexBuffer);
+            VBB.setSlot(0);
+            VBB.setOffset(0);
+            State.addVertexBuffer(VBB);
+
+            nvrhi::IndexBufferBinding IBB;
+            IBB.setBuffer(GBufferIndexBuffer);
+            IBB.setOffset(0);
+            IBB.setFormat(nvrhi::Format::R32_UINT);
+            State.setIndexBuffer(IBB);
+
+            nvrhi::Viewport Vp(0.f, float(LastWidth), 0.f, float(LastHeight), 0.f, 1.f);
+            State.viewport.addViewportAndScissorRect(Vp);
+
+            CommandList->setGraphicsState(State);
+
+            nvrhi::DrawArguments Args;
+            Args.vertexCount         = ThisInfo.IndexCount;
+            Args.instanceCount       = 1;
+            Args.startIndexLocation  = ThisInfo.IndexOffset;
+            Args.startVertexLocation = ThisInfo.VertexOffset;
+            Args.startInstanceLocation = 0;
+            CommandList->drawIndexed(Args);
+
+            ++MeshCount;
+        }
+
+        // After all GBuffer draws, transition MRTs to ShaderResource for
+        // FGIPass's SRV reads. nvrhi Vulkan wants
+        // SHADER_READ_ONLY_OPTIMAL for Texture2D<float4> loads.
+        CommandList->setTextureState(GBufferWorldPos, nvrhi::AllSubresources,
+            nvrhi::ResourceStates::ShaderResource);
+        CommandList->setTextureState(GBufferNormal,   nvrhi::AllSubresources,
+            nvrhi::ResourceStates::ShaderResource);
+        CommandList->setTextureState(GBufferMaterial, nvrhi::AllSubresources,
+            nvrhi::ResourceStates::ShaderResource);
+
+        if (MeshCount == 0)
+        {
+            HLVM_LOG(LogTest, warn, TXT("RenderGBuffer: 0 meshes drawn"));
+        }
+        else if (FrameCount % 60 == 0)
+        {
+            HLVM_LOG(LogTest, info, TXT("RenderGBuffer: drew %zu meshes"), MeshCount);
+        }
     }
 
     // ---- View constants ----------------------------------------------------
@@ -1131,6 +1511,18 @@ private:
     nvrhi::BindingLayoutHandle    AccumulateBindingLayout;
     nvrhi::ShaderHandle           AccumulateCS;
     nvrhi::BufferHandle           AccumulateConstants;
+
+    // GBuffer PT pipeline (renders Sponza into GBufferWorldPos /
+    // GBufferNormal / GBufferMaterial MRTs before FGIPass).
+    nvrhi::ShaderHandle           GBufferVS;
+    nvrhi::ShaderHandle           GBufferPS;
+    nvrhi::InputLayoutHandle      GBufferInputLayout;
+    nvrhi::BindingLayoutHandle    GBufferBindingLayout;
+    nvrhi::GraphicsPipelineHandle GBufferPipeline;
+    nvrhi::FramebufferHandle      GBufferFrameBuffer;
+    nvrhi::BufferHandle           GBufferVertexBuffer;
+    nvrhi::BufferHandle           GBufferIndexBuffer;
+    nvrhi::BufferHandle           GBufferPerInstanceCB;
 
     // Frame counters / env
     uint32_t  LastWidth  = 0;
