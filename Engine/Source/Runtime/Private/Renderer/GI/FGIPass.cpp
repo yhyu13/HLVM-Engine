@@ -118,7 +118,7 @@ namespace GI
             return false;
 
         bIsInitialized = true;
-        HLVM_LOG(LogGI, info, TXT("FGIPass initialized (shader dir: %s)"), *InShaderDataDir);
+        HLVM_LOG(LogGI, info, TXT("FGIPass initialized (shader dir: {})"), *InShaderDataDir);
         return true;
     }
 
@@ -145,7 +145,7 @@ namespace GI
         auto Blob = ReadBinaryFile(SblobPath);
         if (Blob.empty())
         {
-            HLVM_LOG(LogGI, err, TXT("Failed to read GIPathTracing.sblob at %s"), *FString(SblobPath.c_str()));
+            HLVM_LOG(LogGI, err, TXT("Failed to read GIPathTracing.sblob at {}"), TO_TCHAR_CSTR(SblobPath.c_str()));
             return false;
         }
 

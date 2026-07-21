@@ -586,3 +586,53 @@ def create_path_trace_gi_shadermake(test_target_name: str) -> ShaderMakeModule:
         project_name="HLVM_GI",
         slang_options="-DGI_DEBUG_STATS=1"
     )
+
+
+def create_restir_gi_temporal_shadermake(test_target_name: str) -> ShaderMakeModule:
+    """Factory for TestReSTIR_GI_Temporal — full Sponza+ReSTIR pipeline.
+
+    Pulls GIPathTracing.hlsl + GIAccumulate_cs.hlsl from the proven shared
+    sources (64-byte payload, see Vibe_Coding/51_PathTraceGI_Debug). The ReSTIR
+    compute shaders (Generate / Temporal / Spatial), BilateralDenoise_cs,
+    ReBLUR_cs, and the Sponza GBuffer VS/PS live in the test data dir so they
+    can be re-tuned per-test without disturbing other tests' blobs.
+    """
+    shader_target_name = test_target_name + "_ShaderMake"
+
+    # CMAKE_SOURCE_DIR for Runtime = Engine/Source/Runtime
+    test_data_dir = "${CMAKE_SOURCE_DIR}/Test/" + test_target_name + "_Data"
+    gi_shader_dir = "${CMAKE_SOURCE_DIR}/Private/Renderer/Shader/GI"
+    shader_base_dir = "${CMAKE_SOURCE_DIR}/Private/Renderer/Shader"
+
+    config_file = test_data_dir + "/ShaderMake.cfg"
+
+    # Re-use proven sources where possible (GIPathTracing.hlsl inherits the
+    # 64-byte compact-fully-used payload fix from session-PathTraceGI_payload_debug.md).
+    # Everything else lives in the test data dir.
+    shader_sources = [
+        gi_shader_dir + "/GIPathTracing.hlsl",
+        test_data_dir + "/GIAccumulate_cs.hlsl",
+        test_data_dir + "/BilateralDenoise_cs.hlsl",
+        test_data_dir + "/ReBLUR_cs.hlsl",
+        test_data_dir + "/ReSTIR_Generate_cs.hlsl",
+        test_data_dir + "/ReSTIR_Temporal_cs.hlsl",
+        test_data_dir + "/ReSTIR_Spatial_cs.hlsl",
+        test_data_dir + "/GBufferSponzaVS.hlsl",
+        test_data_dir + "/GBufferSponzaPS.hlsl",
+    ]
+
+    include_dirs = [
+        test_data_dir,
+        gi_shader_dir,
+        shader_base_dir,
+    ]
+
+    return ShaderMakeModule(
+        target_name=shader_target_name,
+        config_file_cmake=config_file,
+        shader_sources_cmake=shader_sources,
+        output_dir_cmake=test_data_dir,
+        include_dirs_cmake=include_dirs,
+        project_name="HLVM_ReSTIR_GI_Temporal",
+        slang_options="-DGI_DEBUG_STATS=1"
+    )
