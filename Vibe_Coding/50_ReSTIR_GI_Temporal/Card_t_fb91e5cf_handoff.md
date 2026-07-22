@@ -147,3 +147,70 @@ Vibe_Coding/50_ReSTIR_GI_Temporal/Card_t_8291cf8c_completion.md               | 
 ## Commits
 
 - `ee3c2c3` — Real Sponza GBuffer pass (this card)
+- `bfc1a3f` — Doc updates (this card's prior handoff doc, prior card's
+  completion doc, final-state doc update)
+
+## Run-6 re-verification (2026-07-23, re-dispatched by operator)
+
+After the watchdog cron auto-resolved this card back to `ready` per the
+card's `auto_resolve: true` comment, the operator manually re-dispatched
+it (event `promoted_manual`, run 6). This worker re-ran the same
+verification matrix the original worker did — nothing has changed on
+disk since `bfc1a3f`, and the environmental wall (no DISPLAY, no Xvfb,
+no sudo) is unchanged. Results reproduced exactly:
+
+- V1 sblob hashes match: `GBufferPT_VS.sblob` 4056B
+  (`7d4141cc80a8294a`), `GBufferPT_PS.sblob` 916B (`a7d17d30edf1e020`).
+- V3 wiring: `CreateGBufferPipeline(DataDir)` called from `Initialize`;
+  `RenderGBuffer(FB.width, FB.height)` called from `Render()` at body
+  offset 690 (the body offset 611 `FGIPass` reference is in a
+  doc-comment, not a call site — the actual `FGIPass` callsite is
+  after `RenderGBuffer`); `FillGBufferHardcoded()` NOT called from
+  `Initialize` (function retained at line 890 as
+  documented fallback).
+- V6 runtime: executable still fails at
+  `GLFW3VulkanWindow.cpp:33` — same no-display wall.
+- All other checks unchanged.
+
+### Re-verification deltas (none to commit)
+
+The on-disk code is unchanged. The handoff doc was already complete.
+This worker is not adding new commits; the only durable write was
+this re-verification section appended to the handoff doc.
+
+### Why re-running does not produce new evidence
+
+The card body's acceptance criteria separate cleanly into two halves:
+
+1. Compile-time / static-wiring half (criterion 1, partial): all
+   verifiable in this sandbox; all PASS.
+2. Runtime / GPU half (criteria 2, 3, 4): all require
+   `RunMessageLoop()` to actually start, which requires a display.
+
+The runtime half has been a complete wall in this sandbox for three
+consecutive cards now (`t_e2742ccf`, `t_8291cf8c`, `t_fb91e5cf`). See
+`Card_t_8291cf8c_completion.md` for the same conclusion on the
+predecessor card. The work is mechanically complete; the only
+remaining work is to run it on a display-capable host.
+
+If a future worker is dispatched with display capability (e.g.
+xvfb-run after `apt install xvfb`, a desktop session, or a CI runner
+with a virtual display), they should:
+
+  1. Build: `cd HLVM-Engine && ./Build.sh --Config=Debug
+     --Target=TestReSTIR_GI_Temporal` (already verified here).
+  2. Run: `HLVM_DUMP_RGI=1 ./Build.sh --Test
+     --Target=TestReSTIR_GI_Temporal` (or invoke the test executable
+     directly with `HLVM_DUMP_RGI=1`).
+  3. Inspect the dumps in
+     `Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal_Data/dumps/`
+     — the Sponza curtain, floor, and arches should be visible (the
+     previous hardcoded-fill output was uniformly one color).
+  4. If Sponza is visible, re-tighten the validator per the card body
+     ("Re-tighten to the original 4 checks only AFTER Sponza is
+     visible"). The validator file is referenced from the test C++
+     code and the path-trace-debug session doc.
+  5. Run `python3 .../validate_restir_gi.py` and confirm 4/4 PASS.
+  6. Delete `FillGBufferHardcoded()` (line 890) once 4/4 passes — the
+     card body says "can be removed once the Sponza GBuffer pass is
+     wired and validated."
