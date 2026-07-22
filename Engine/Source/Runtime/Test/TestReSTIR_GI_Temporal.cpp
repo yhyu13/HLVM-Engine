@@ -951,6 +951,91 @@ private:
             "worldPos=(-0.5,-0.5,0.5), normal=(0,0,1), material=(0.8,0.2,0.2)"));
     }
 
+    // ---- GBuffer sentinel writes (per-frame, BEFORE the GBuffer pass) ------
+    // Fills the 3 GBuffer textures with unique magic values per channel. The
+    // GBuffer pass immediately overwrites whatever it actually rasterizes; any
+    // pixel the pass does NOT write keeps the sentinel. A downstream dump then
+    // proves "did the pass touch this pixel?" — if a pixel still shows the
+    // sentinel value, the GBuffer rasterizer skipped it.
+    //
+    // Sentinel values are chosen so they cannot be confused with legitimate
+    // Sponza data:
+    //   WorldPos  = (-100, -200, -300, 1.0)
+    //               Sponza's TLAS is scaled 0.01 and centered at floor → bbox is
+    //               roughly ±0.06 in scaled units. -100/-200/-300 is far outside.
+    //   Normal    = (0.111, 0.222, 0.333, 1.0)        (encoded form [0,1])
+    //               Decodes to (-0.778, -0.556, -0.334) — magnitude 1.016, not a
+    //               unit vector; any real normal from normalize() is exactly
+    //               length 1.0 after decoding. The 0.111/0.222/0.333 pattern is
+    //               also distinctive vs the (0.5, 0.5, 1.0) normal-up default.
+    //   Material  = (0.999, 0.001, 0.500, 1.0)
+    //               Distinctive pattern (super-bright R, near-zero G, mid B);
+    //               no plausible PBR albedo looks like this.
+    //
+    // Upload path mirrors FillGBufferHardcoded(): transition RT → CopyDest,
+    // writeTexture, transition back to RenderTarget for the raster pass (the
+    // GBufferFrameBuffer attaches the textures as RTVs).
+    //
+    // Per-frame CPU upload cost is ~5.76 MB (3 × 800×600×4 floats). Cheap.
+    void WriteGBufferSentinels()
+    {
+        if (!NvrhiDevice || !GBufferWorldPos || !GBufferNormal || !GBufferMaterial)
+            return;
+
+        const uint32_t W = WIDTH, H = HEIGHT;
+        const size_t N = static_cast<size_t>(W) * H;
+
+        // WorldPos sentinel: (-100, -200, -300), alpha = 1.0
+        std::vector<float> WpData(N * 4);
+        for (size_t i = 0; i < N; ++i)
+        {
+            WpData[i*4 + 0] = -100.0f;
+            WpData[i*4 + 1] = -200.0f;
+            WpData[i*4 + 2] = -300.0f;
+            WpData[i*4 + 3] =   1.0f;
+        }
+        // Normal sentinel (encoded): (0.111, 0.222, 0.333), alpha = 1.0
+        std::vector<float> NmData(N * 4);
+        for (size_t i = 0; i < N; ++i)
+        {
+            NmData[i*4 + 0] = 0.111f;
+            NmData[i*4 + 1] = 0.222f;
+            NmData[i*4 + 2] = 0.333f;
+            NmData[i*4 + 3] = 1.0f;
+        }
+        // Material sentinel: (0.999, 0.001, 0.500), alpha = 1.0
+        std::vector<float> MtData(N * 4);
+        for (size_t i = 0; i < N; ++i)
+        {
+            MtData[i*4 + 0] = 0.999f;
+            MtData[i*4 + 1] = 0.001f;
+            MtData[i*4 + 2] = 0.500f;
+            MtData[i*4 + 3] = 1.000f;
+        }
+
+        nvrhi::CommandListHandle Cmd = NvrhiDevice->createCommandList();
+        Cmd->open();
+        // GBuffer textures start in RenderTarget initial state (created by
+        // CreateGBufferTextures) and nvrhi tracks per-frame transitions. Before
+        // a writeTexture upload we need CopyDest; the raster pass will move
+        // them back to RenderTarget implicitly when the framebuffer binds.
+        Cmd->setTextureState(GBufferWorldPos, nvrhi::AllSubresources, nvrhi::ResourceStates::CopyDest);
+        Cmd->setTextureState(GBufferNormal,   nvrhi::AllSubresources, nvrhi::ResourceStates::CopyDest);
+        Cmd->setTextureState(GBufferMaterial, nvrhi::AllSubresources, nvrhi::ResourceStates::CopyDest);
+        Cmd->writeTexture(GBufferWorldPos, 0, 0, WpData.data(), static_cast<size_t>(W) * sizeof(float) * 4);
+        Cmd->writeTexture(GBufferNormal,   0, 0, NmData.data(), static_cast<size_t>(W) * sizeof(float) * 4);
+        Cmd->writeTexture(GBufferMaterial, 0, 0, MtData.data(), static_cast<size_t>(W) * sizeof(float) * 4);
+        // Move back to RenderTarget so the framebuffer-driven GBuffer pass can
+        // write into them. (nvrhi Vulkan: COLOR_ATTACHMENT_OPTIMAL for the FB
+        // attachment slot.)
+        Cmd->setTextureState(GBufferWorldPos, nvrhi::AllSubresources, nvrhi::ResourceStates::RenderTarget);
+        Cmd->setTextureState(GBufferNormal,   nvrhi::AllSubresources, nvrhi::ResourceStates::RenderTarget);
+        Cmd->setTextureState(GBufferMaterial, nvrhi::AllSubresources, nvrhi::ResourceStates::RenderTarget);
+        Cmd->close();
+        NvrhiDevice->executeCommandList(Cmd);
+        NvrhiDevice->waitForIdle();
+    }
+
     // ---- GBuffer PT pipeline ------------------------------------------------
     // Builds the real Sponza GBuffer raster pass that produces the inputs
     // FGIPass reads. The GBuffer pass uses:
@@ -1172,6 +1257,16 @@ private:
     {
         if (!GBufferPipeline || !GBufferFrameBuffer) return;
         if (!Scene) return;
+
+        // (a) Constant-sentinel writes BEFORE the GBuffer pass. Any pixel the
+        // raster pass does not write keeps the sentinel; any pixel it DOES
+        // write gets the real Sponza value. The downstream dump therefore
+        // proves "did the pass touch this pixel?" — sentinel still visible
+        // means no rasterization at that pixel.
+        //
+        // Cheap (~5.76 MB CPU→GPU upload per frame); unconditional; gated only
+        // by the resource sanity check.
+        WriteGBufferSentinels();
 
         // The textures were created in RenderTarget initial state; transitions
         // for the FB-attached draws are emitted implicitly by the first draw.
@@ -1395,6 +1490,14 @@ private:
         DumpRGBA32FTexture(SpatialRadiance, TXT("spatial"), dir);
         DumpRGBA32FTexture(DenoisedTexture, TXT("denoised"), dir);
         DumpRGBA32FTexture(OutputTexture, TXT("gi_raw"), dir);
+        // GBuffer channel dumps (per-frame sentinel + post-pass values).
+        // Same HLVM_DUMP_RGI gate; same dir; same naming convention
+        // (timestamp_channel_frameN.png) so the validator can consume them
+        // unchanged. Sentinel pixels remaining in these dumps mark pixels the
+        // raster pass did not write.
+        DumpRGBA32FTexture(GBufferWorldPos, TXT("gbuffer_worldpos"), dir);
+        DumpRGBA32FTexture(GBufferNormal,   TXT("gbuffer_normal"),   dir);
+        DumpRGBA32FTexture(GBufferMaterial, TXT("gbuffer_material"), dir);
         HLVM_LOG(LogTest, info, TXT("Dumped frames to {}"), *FString(dir));
     }
 
