@@ -134,8 +134,13 @@ static_assert(sizeof(FInstanceInfo) == 48, "FInstanceInfo must be 48 bytes");
 //   - camera must be IN FRONT OF the visible scene, not at its center
 //   - FOV must be wide enough (90°) to see the colored side walls
 //   - view direction must be -Z, not +Z (left-handed, RH-conventions glitch)
-static glm::vec3 GetCameraPos()   { return glm::vec3(  0.0f, 3.0f,  8.0f); }
-static glm::vec3 GetCameraTarget(){ return glm::vec3(  0.0f, 2.0f,  0.0f); }
+// Sponza vertices live in the GLTF coord space (hundreds of units), but the
+// TLAS scales them by 0.01 — so the path tracer sees Sponza at ±0.06.
+// Apply the same scale to the raster ModelMatrix and place the camera at the
+// matching scaled coordinates. Original-scale camera with the un-scaled
+// model matrix produced no rasterized fragments (all verts clipped by far).
+static glm::vec3 GetCameraPos()   { return glm::vec3(  0.0f, 0.03f, 0.08f); }
+static glm::vec3 GetCameraTarget(){ return glm::vec3(  0.0f, 0.02f, 0.00f); }
 static glm::vec3 GetCameraUp()    { return glm::vec3(  0.0f, 1.0f,  0.0f); }
 static float     GetCameraFovDeg(){ return 75.0f; }
 
@@ -292,7 +297,13 @@ public:
         if (bDumpRequested)
             HLVM_LOG(LogTest, info, TXT("HLVM_DUMP_RGI=1: enabling frame dumps"));
 
-        CommandList = NvrhiDevice->createCommandList();
+        // (HLVM-bypass: non-immediate pattern, like TestRTShadowsGBuffer.
+        // The validation-layer's immediate-CL state machine silently
+        // dropped setGraphicsState/drawIndexed GPU commands across frames.
+        // Non-immediate CLs get explicit per-frame open/close/execute.)
+        nvrhi::CommandListParameters CmdListParams;
+        CmdListParams.enableImmediateExecution = false;
+        CommandList = NvrhiDevice->createCommandList(CmdListParams);
         HLVM_LOG(LogTest, info, TXT("FReSTIRGITemporalPass initialized successfully"));
         return true;
     }
@@ -600,8 +611,9 @@ public:
                 &BindingCache, FB.width, FB.height, BlitParams);
         }
 
-        CommandList->close();
-        NvrhiDevice->executeCommandList(CommandList);
+        // Note: CommandList was already closed+executed at the end of
+        // RenderGBuffer (HLVM-bypass to isolate raster pass from later-pass
+        // validation errors). The blit above recorded into a fresh open CL.
 
         const bool bLastFrame = (AccumFrameCount >= AccumTargetFrames);
         if (bDumpRequested && bLastFrame)
@@ -638,7 +650,7 @@ private:
             HLVM_LOG(LogTest, err, TXT("FScene3DLoader returned empty scene"));
             return false;
         }
-        HLVM_LOG(LogTest, info, TXT("Sponza loaded (%u mesh groups)"), static_cast<uint32_t>(Scene->MeshTree.size()));
+        HLVM_LOG(LogTest, info, TXT("Sponza loaded ({} mesh groups)"), static_cast<uint32_t>(Scene->MeshTree.size()));
 
         // Build a unified vertex/index buffer + per-instance info for the RT shaders.
         std::vector<FRTVertex> AllVertices;
@@ -834,7 +846,7 @@ private:
         GBufferMaterial = NvrhiDevice->createTexture(MtDesc);
 
         nvrhi::TextureDesc DpDesc = WpDesc;
-        DpDesc.format = nvrhi::Format::R32_FLOAT;
+        DpDesc.format = nvrhi::Format::D32;
         DpDesc.debugName = "GBufferDepth";
         GBufferDepth = NvrhiDevice->createTexture(DpDesc);
 
@@ -985,13 +997,16 @@ private:
         const uint32_t W = WIDTH, H = HEIGHT;
         const size_t N = static_cast<size_t>(W) * H;
 
-        // WorldPos sentinel: (-100, -200, -300), alpha = 1.0
+        // WorldPos sentinel: (99, 99, 99), alpha = 1.0 — bright canary so we can
+        // distinguish raster-written pixels (visible geometry) from sentinel-
+        // only pixels. If the GBuffer dump shows all-99, the raster pass is
+        // not overwriting; if it shows real positions, the raster worked.
         std::vector<float> WpData(N * 4);
         for (size_t i = 0; i < N; ++i)
         {
-            WpData[i*4 + 0] = -100.0f;
-            WpData[i*4 + 1] = -200.0f;
-            WpData[i*4 + 2] = -300.0f;
+            WpData[i*4 + 0] =  99.0f;
+            WpData[i*4 + 1] =  99.0f;
+            WpData[i*4 + 2] =  99.0f;
             WpData[i*4 + 3] =   1.0f;
         }
         // Normal sentinel (encoded): (0.111, 0.222, 0.333), alpha = 1.0
@@ -1092,19 +1107,30 @@ private:
         HLVM_LOG(LogTest, info, TXT("GBuffer PT shaders loaded"));
 
         // ---- Input layout (matches GBufferPT_VS.hlsl VSInput) -------------
-        // FVertex layout from IMesh.h: Position(12) Normal(12) UV(8) Tangent(12)
-        // elementStride = 44 bytes.
+        // FVertex layout from IMesh.h, but FVec3 is glm::aligned_lowp vec3
+        // (16-byte padded, not 12), so sizeof(FVertex) is actually 64 bytes
+        // on this build, not 44 as the comment in IMesh.h claims.
+        //   Position FVec3  -> offset 0   (16B: xyz + 4B pad)
+        //   Normal   FVec3  -> offset 16  (16B)
+        //   UV       FVec2  -> offset 32  (8B)
+        //   Tangent  FVec3  -> offset 40  (16B: xyz + 4B pad, ends at 56)
+        //   elementStride = 64 (sizeof(FVertex) = 64 on aligned build)
         nvrhi::VertexAttributeDesc Attrs[4];
         Attrs[0].setName("POSITION").setFormat(nvrhi::Format::RGB32_FLOAT)
             .setOffset(0).setElementStride(sizeof(FVertex));
         Attrs[1].setName("NORMAL").setFormat(nvrhi::Format::RGB32_FLOAT)
-            .setOffset(12).setElementStride(sizeof(FVertex));
+            .setOffset(16).setElementStride(sizeof(FVertex));
         Attrs[2].setName("TEXCOORD0").setFormat(nvrhi::Format::RG32_FLOAT)
-            .setOffset(24).setElementStride(sizeof(FVertex));
-        Attrs[3].setName("TANGENT").setFormat(nvrhi::Format::RGB32_FLOAT)
             .setOffset(32).setElementStride(sizeof(FVertex));
+        Attrs[3].setName("TANGENT").setFormat(nvrhi::Format::RGB32_FLOAT)
+            .setOffset(40).setElementStride(sizeof(FVertex));
         GBufferInputLayout = NvrhiDevice->createInputLayout(
             Attrs, 4, GBufferVS);
+        HLVM_LOG(LogTest, info, TXT("GBufferInputLayout={} stride={} sizeof(FVertex)={}"),
+            GBufferInputLayout ? 1 : 0,
+            static_cast<uint32_t>(sizeof(FVertex)), static_cast<uint32_t>(sizeof(FVertex)));
+        HLVM_LOG(LogTest, info, TXT("GBuffer input layout: stride={} (sizeof(FVertex)={})"),
+            static_cast<uint32_t>(sizeof(FVertex)), static_cast<uint32_t>(sizeof(FVertex)));
 
         // ---- Binding layout: b0 ViewConstants, b1 PerInstanceInfo ---------
         FBindingLayoutBuilder BLB;
@@ -1161,16 +1187,15 @@ private:
             PipelineDesc.setPrimType(nvrhi::PrimitiveType::TriangleList);
             PipelineDesc.renderState.setRasterState(
                 nvrhi::RasterState().setCullNone());
-            // No depth — single raster pass on opaque geometry; last-writer-wins
-            // is acceptable here because no overdraw matters (we only need a
-            // valid primary hit for the path tracer, not correct occlusion
-            // between rasterized fragments).
             PipelineDesc.renderState.depthStencilState
                 .setDepthTestEnable(false)
                 .setDepthWriteEnable(false);
 
             GBufferPipeline = NvrhiDevice->createGraphicsPipeline(
                 PipelineDesc, GBufferFrameBuffer->getFramebufferInfo());
+            HLVM_LOG(LogTest, info, TXT("GBufferPS={} GBufferVS={} GBufferPipeline={} GBufferInputLayout={}"),
+                GBufferPS ? 1 : 0, GBufferVS ? 1 : 0,
+                GBufferPipeline ? 1 : 0, GBufferInputLayout ? 1 : 0);
             if (!GBufferPipeline)
             {
                 HLVM_LOG(LogTest, err, TXT("Failed to create GBuffer PT pipeline"));
@@ -1210,34 +1235,36 @@ private:
         {
             nvrhi::BufferDesc VDesc;
             VDesc.byteSize = static_cast<uint32_t>(AllGBufferVerts.size() * sizeof(FVertex));
-            VDesc.structStride = sizeof(FVertex);
-            VDesc.initialState = nvrhi::ResourceStates::ShaderResource;
-            VDesc.keepInitialState = true;
+            VDesc.isVertexBuffer = true;
+            VDesc.isVolatile = false;
+            VDesc.initialState = nvrhi::ResourceStates::CopyDest;
             VDesc.debugName = "GBufferVertices";
             GBufferVertexBuffer = NvrhiDevice->createBuffer(VDesc);
         }
         {
             nvrhi::BufferDesc IDesc;
             IDesc.byteSize = static_cast<uint32_t>(AllGBufferIndices.size() * sizeof(uint32_t));
-            IDesc.structStride = sizeof(uint32_t);
-            IDesc.initialState = nvrhi::ResourceStates::ShaderResource;
-            IDesc.keepInitialState = true;
+            IDesc.isIndexBuffer = true;
+            IDesc.isVolatile = false;
+            IDesc.initialState = nvrhi::ResourceStates::CopyDest;
             IDesc.debugName = "GBufferIndices";
             GBufferIndexBuffer = NvrhiDevice->createBuffer(IDesc);
         }
         nvrhi::CommandListHandle InitCmd = NvrhiDevice->createCommandList();
         InitCmd->open();
+        InitCmd->beginTrackingBufferState(GBufferVertexBuffer, nvrhi::ResourceStates::CopyDest);
         InitCmd->writeBuffer(GBufferVertexBuffer, AllGBufferVerts.data(),
             static_cast<uint32_t>(AllGBufferVerts.size() * sizeof(FVertex)));
+        InitCmd->setPermanentBufferState(GBufferVertexBuffer, nvrhi::ResourceStates::VertexBuffer);
+        InitCmd->beginTrackingBufferState(GBufferIndexBuffer, nvrhi::ResourceStates::CopyDest);
         InitCmd->writeBuffer(GBufferIndexBuffer, AllGBufferIndices.data(),
             static_cast<uint32_t>(AllGBufferIndices.size() * sizeof(uint32_t)));
-        InitCmd->setBufferState(GBufferVertexBuffer, nvrhi::ResourceStates::ShaderResource);
-        InitCmd->setBufferState(GBufferIndexBuffer,  nvrhi::ResourceStates::ShaderResource);
+        InitCmd->setPermanentBufferState(GBufferIndexBuffer, nvrhi::ResourceStates::IndexBuffer);
         InitCmd->close();
         NvrhiDevice->executeCommandList(InitCmd);
         NvrhiDevice->waitForIdle();
 
-        HLVM_LOG(LogTest, info, TXT("GBuffer VB/IB built: %u verts, %u indices"),
+        HLVM_LOG(LogTest, info, TXT("GBuffer VB/IB built: {} verts, {} indices"),
             static_cast<uint32_t>(AllGBufferVerts.size()),
             static_cast<uint32_t>(AllGBufferIndices.size()));
         return true;
@@ -1266,12 +1293,15 @@ private:
         //
         // Cheap (~5.76 MB CPU→GPU upload per frame); unconditional; gated only
         // by the resource sanity check.
+        // Sentinel writes RE-ENABLED — without them the GPU work stays
+        // in cache and the dump reads back zeros.
         WriteGBufferSentinels();
 
         // The textures were created in RenderTarget initial state; transitions
         // for the FB-attached draws are emitted implicitly by the first draw.
         // After the draws we must move them back to ShaderResource for FGIPass.
         size_t MeshCount = 0;
+        static bool bDebugLogged = false;
         for (auto& Entry : Scene->MeshTree)
         {
             auto StaticMesh = std::dynamic_pointer_cast<FStaticMesh>(Entry.second);
@@ -1279,6 +1309,23 @@ private:
             const auto& V = StaticMesh->GetVertices();
             const auto& I = StaticMesh->GetIndices();
             if (V.empty() || I.empty()) continue;
+
+            if (!bDebugLogged && FrameCount == 1)
+            {
+                bDebugLogged = true;
+                HLVM_LOG(LogTest, info, TXT("RenderGBuffer debug: mesh '{}' has {} verts, {} indices, first V pos=({},{},{}) first I={}"),
+                    Entry.second->GetName(),
+                    static_cast<uint32_t>(V.size()), static_cast<uint32_t>(I.size()),
+                    V[0].Position.x, V[0].Position.y, V[0].Position.z,
+                    I.size() > 0 ? I[0] : 0u);
+                if (GBufferVertexBuffer && GBufferIndexBuffer)
+                {
+                    nvrhi::BufferDesc VbDesc = GBufferVertexBuffer->getDesc();
+                    nvrhi::BufferDesc IbDesc = GBufferIndexBuffer->getDesc();
+                    HLVM_LOG(LogTest, info, TXT("  GBuffer VB byteSize={} IB byteSize={}"),
+                        VbDesc.byteSize, IbDesc.byteSize);
+                }
+            }
 
             // Locate matching FInstanceInfo by mesh pointer — same loop order
             // as LoadSponza uses.
@@ -1374,6 +1421,15 @@ private:
             Args.startVertexLocation = ThisInfo.VertexOffset;
             Args.startInstanceLocation = 0;
             CommandList->drawIndexed(Args);
+            if (!bDebugLogged && FrameCount == 1 && MeshCount == 1)
+            {
+                bDebugLogged = true;
+                HLVM_LOG(LogTest, info, TXT("After drawIndexed[0]: VS={} PS={} PL={} IL={} BS={} FB={} VB={} IB={}"),
+                    GBufferVS ? 1 : 0, GBufferPS ? 1 : 0, GBufferPipeline ? 1 : 0,
+                    GBufferInputLayout ? 1 : 0, BS ? 1 : 0,
+                    GBufferFrameBuffer ? 1 : 0, GBufferVertexBuffer ? 1 : 0,
+                    GBufferIndexBuffer ? 1 : 0);
+            }
 
             ++MeshCount;
         }
@@ -1388,13 +1444,25 @@ private:
         CommandList->setTextureState(GBufferMaterial, nvrhi::AllSubresources,
             nvrhi::ResourceStates::ShaderResource);
 
+        // HLVM-bypass: close+execute the raster pass in its own CommandList
+        // so a Vulkan validation error in a later pass (e.g. the temporal-
+        // reservoir layout mismatch from bug-075) cannot retroactively drop
+        // all raster work recorded earlier in the same submission.
+        CommandList->close();
+        NvrhiDevice->executeCommandList(CommandList);
+        NvrhiDevice->waitForIdle();
+
+        // Reopen for the remaining passes (FGIPass, denoise, ReSTIR, etc.).
+        CommandList->open();
+
         if (MeshCount == 0)
         {
-            HLVM_LOG(LogTest, warn, TXT("RenderGBuffer: 0 meshes drawn"));
+            HLVM_LOG(LogTest, warn, TXT("RenderGBuffer: 0 meshes drawn (frame {})"), FrameCount);
         }
-        else if (FrameCount % 60 == 0)
+        else if (FrameCount < 4 || FrameCount % 120 == 0)
         {
-            HLVM_LOG(LogTest, info, TXT("RenderGBuffer: drew %zu meshes"), MeshCount);
+            HLVM_LOG(LogTest, info, TXT("RenderGBuffer frame {}: drew {} meshes, viewport {}x{}"),
+                FrameCount, MeshCount, LastWidth, LastHeight);
         }
     }
 
@@ -1406,13 +1474,17 @@ private:
         glm::vec3 CamUp     = GetCameraUp();
         float Fov = GetCameraFovDeg();
 
-        glm::mat4 Model = glm::mat4(1.0f);
+        // Sponza vertices live in the original GLTF coord space (±hundreds).
+        // Apply the 0.01 scale used by the TLAS so rasterized worldPos matches
+        // what FGIPass sees. Without this, all vertices are clipped by the
+        // far plane (vertices are at distance ~500 from the camera at z=8).
+        glm::mat4 Model = glm::scale(glm::mat4(1.0f), glm::vec3(0.01f));
         glm::mat4 View  = glm::lookAt(CamPos, CamTarget, CamUp);
+        // Use RH-ZO perspective WITHOUT Z flip. glm::perspective already
+        // produces [-1, 1] Z (OpenGL convention). Don't flip — flipping moves
+        // geometry away from the viewer when the view matrix expects -Z forward.
         glm::mat4 Proj  = glm::perspective(
-            glm::radians(Fov), float(W) / float(H), 0.05f, 100.0f);
-        // glm::perspective produces an RH-ZO projection; the path tracer assumes
-        // -Z forward unprojection so we flip Z here. (Same trick TestPathTraceGI uses.)
-        Proj[2][2] = -Proj[2][2];
+            glm::radians(Fov), float(W) / float(H), 0.001f, 50.0f);
 
         struct FVC { glm::mat4 Model; glm::mat4 View; glm::mat4 Proj; glm::vec2 Size; float FrameIndex; float Pad; };
         FVC VC{Model, View, Proj, {float(W), float(H)}, float(AccumFrameCount), 0.0f};
@@ -1652,6 +1724,7 @@ RECORD_BOOL(test_ReSTIR_GI_Temporal)
         WindowProps.Title    = WINDOW_TITLE;
         WindowProps.Extent   = { WIDTH, HEIGHT };
         WindowProps.Resizable = true;
+        WindowProps.StartMinimized = true;  // headless CI: don't require real display
         WindowProps.VSync    = IWindow::EVsync::Off;
 
         auto DeviceManager = FDeviceManager::Create(nvrhi::GraphicsAPI::VULKAN);

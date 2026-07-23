@@ -35,16 +35,8 @@ struct MRTOutput {
 
 MRTOutput main(PSInput input) {
     MRTOutput output;
-
-    // WorldPos — pass through.
     output.MRT0 = float4(input.WorldPos, 1.0);
-
-    // Normal — encode [-1,1] -> [0,1]. GIPathTracing.hlsl decodes via *2-1.
-    float3 n = normalize(input.Normal);
-    output.MRT1 = float4(n * 0.5 + 0.5, 1.0);
-
-    // Material — albedo color from per-instance FInstanceInfo.
+    output.MRT1 = float4(input.Normal   * 0.5 + 0.5, 1.0);
     output.MRT2 = float4(input.Albedo, 1.0);
-
     return output;
 }
