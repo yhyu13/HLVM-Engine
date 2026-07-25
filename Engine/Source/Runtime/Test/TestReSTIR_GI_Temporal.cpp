@@ -479,9 +479,10 @@ public:
             CommandList->setTextureState(
                 ReservoirTex1, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
             // On frame > 0 the prev-frame Temporal pass wrote TemporalReservoir0/1
-            // in UnorderedAccess. Aliasing history SRV reads to that requires an
-            // explicit transition. On frame 0 the history == current (alias) so
-            // this is a no-op for that path.
+            // in UnorderedAccess. The temporal pass uses ONE of them as SRV
+            // history and the OTHER as UAV output (ping-pong below). Transition
+            // BOTH to ShaderResource here; nvrhi will auto-transition the UAV-
+            // written one back to GENERAL inside the dispatch.
             CommandList->setTextureState(
                 TemporalReservoir0, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
             CommandList->setTextureState(
@@ -494,16 +495,25 @@ public:
             ReSTIR::FReSTIRPass::FTemporalDesc Td{};
             Td.CurrentReservoir0 = ReservoirTex0;
             Td.CurrentReservoir1 = ReservoirTex1;
-            Td.HistoryReservoir0 = (AccumFrameCount == 0) ? ReservoirTex0 : TemporalReservoir0;
-            Td.HistoryReservoir1 = (AccumFrameCount == 0) ? ReservoirTex1 : TemporalReservoir1;
+            // Ping-pong History and Output across TemporalReservoir0/1 so the
+            // same texture is never bound as both SRV-read (t2/t3) and UAV-
+            // write (u384/u385) in the same dispatch. Without this the
+            // Vulkan validation layer flags SHADER_READ_ONLY_OPTIMAL vs
+            // GENERAL mismatch and (worse) the dispatch's UAV write invalidates
+            // the read of the same texture (UB). On even frames History is
+            // TemporalReservoir1 and Output is TemporalReservoir0; on odd
+            // frames they swap.
+            const bool bPing = (AccumFrameCount % 2) == 0;
+            Td.HistoryReservoir0 = (AccumFrameCount == 0) ? ReservoirTex0 : (bPing ? TemporalReservoir1 : TemporalReservoir0);
+            Td.HistoryReservoir1 = (AccumFrameCount == 0) ? ReservoirTex1 : (bPing ? TemporalReservoir0 : TemporalReservoir1);
+            Td.OutReservoir0     =                                            (bPing ? TemporalReservoir0 : TemporalReservoir1);
+            Td.OutReservoir1     =                                            (bPing ? TemporalReservoir1 : TemporalReservoir0);
             Td.CurrentRadiance   = DenoisedTexture;
             Td.HistoryRadiance   = DenoisedTexture;       // no separate history radiance texture
             Td.DepthTexture      = LinearDepthTexture;
             Td.NormalTexture     = GBufferNormal;
             Td.PrevDepthTexture  = LinearDepthTexture;
             Td.PrevNormalTexture = GBufferNormal;
-            Td.OutReservoir0     = TemporalReservoir0;
-            Td.OutReservoir1     = TemporalReservoir1;
             Td.OutRadiance       = SpatialRadiance;       // output radiance directly
             Td.OutputWidth       = FB.width;
             Td.OutputHeight      = FB.height;
@@ -1566,8 +1576,10 @@ private:
         // Same HLVM_DUMP_RGI gate; same dir; same naming convention
         // (timestamp_channel_frameN.png) so the validator can consume them
         // unchanged. Sentinel pixels remaining in these dumps mark pixels the
-        // raster pass did not write.
-        DumpRGBA32FTexture(GBufferWorldPos, TXT("gbuffer_worldpos"), dir);
+        // raster pass did not write. WorldPos is normalized per-channel so
+        // world-space positions (which fall outside [0,1]) are visible in the
+        // PNG; normal and material are already in [0,1] and stay unnormalized.
+        DumpRGBA32FTexture(GBufferWorldPos, TXT("gbuffer_worldpos"), dir, /*bNormalizePerChannel=*/true);
         DumpRGBA32FTexture(GBufferNormal,   TXT("gbuffer_normal"),   dir);
         DumpRGBA32FTexture(GBufferMaterial, TXT("gbuffer_material"), dir);
         HLVM_LOG(LogTest, info, TXT("Dumped frames to {}"), *FString(dir));
@@ -1575,7 +1587,14 @@ private:
 
     // CPU-readback then PNG for one RGBA32F texture. Creates a one-shot
     // staging texture, copies, maps, runs the bytes through FImageDump::DumpToPNG.
-    void DumpRGBA32FTexture(nvrhi::TextureHandle Texture, const FString& Name, const std::string& dir)
+    //
+    // For textures with values outside [0,1] (e.g. world-space positions in
+    // GBufferWorldPos), pass bNormalizePerChannel=true. The dumper computes
+    // min/max across RGB channels and rescales to [0,1] before byte
+    // encoding, so the visualization reflects relative variation instead of
+    // clamping to 0 or 255.
+    void DumpRGBA32FTexture(nvrhi::TextureHandle Texture, const FString& Name, const std::string& dir,
+                            bool bNormalizePerChannel = false)
     {
         if (!Texture || !NvrhiDevice) return;
 
@@ -1629,6 +1648,40 @@ private:
             }
         }
         NvrhiDevice->unmapStagingTexture(Staging.Get());
+
+        if (bNormalizePerChannel)
+        {
+            // Per-channel min/max across all pixels; rescale RGB to [0,1].
+            // Preserves relative structure (which is what you want for a
+            // worldpos debug visualization) and avoids the clamp-to-extreme
+            // behavior that makes non-normalized textures look like solid
+            // quadrants.
+            float MinR = Pixels[0], MaxR = Pixels[0];
+            float MinG = Pixels[1], MaxG = Pixels[1];
+            float MinB = Pixels[2], MaxB = Pixels[2];
+            const size_t NPix = static_cast<size_t>(WIDTH) * HEIGHT;
+            for (size_t i = 0; i < NPix; ++i)
+            {
+                const float r = Pixels[i*4 + 0];
+                const float g = Pixels[i*4 + 1];
+                const float b = Pixels[i*4 + 2];
+                if (r < MinR) MinR = r; if (r > MaxR) MaxR = r;
+                if (g < MinG) MinG = g; if (g > MaxG) MaxG = g;
+                if (b < MinB) MinB = b; if (b > MaxB) MaxB = b;
+            }
+            const float RangeR = (MaxR - MinR) > 1e-6f ? (MaxR - MinR) : 1.0f;
+            const float RangeG = (MaxG - MinG) > 1e-6f ? (MaxG - MinG) : 1.0f;
+            const float RangeB = (MaxB - MinB) > 1e-6f ? (MaxB - MinB) : 1.0f;
+            for (size_t i = 0; i < NPix; ++i)
+            {
+                Pixels[i*4 + 0] = (Pixels[i*4 + 0] - MinR) / RangeR;
+                Pixels[i*4 + 1] = (Pixels[i*4 + 1] - MinG) / RangeG;
+                Pixels[i*4 + 2] = (Pixels[i*4 + 2] - MinB) / RangeB;
+            }
+            HLVM_LOG(LogTest, info,
+                TXT("DumpRGBA32FTexture: {} normalized per-channel — R[{:.3f},{:.3f}] G[{:.3f},{:.3f}] B[{:.3f},{:.3f}]"),
+                *Name, MinR, MaxR, MinG, MaxG, MinB, MaxB);
+        }
 
         const std::string Filename = dir + "/" + MakeTimestampPrefix() + "_" +
             std::string(Name.begin(), Name.end()) + "_frame" + std::to_string(AccumFrameCount) + ".png";
