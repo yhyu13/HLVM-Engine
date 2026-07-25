@@ -1301,11 +1301,16 @@ private:
         // proves "did the pass touch this pixel?" — sentinel still visible
         // means no rasterization at that pixel.
         //
-        // Cheap (~5.76 MB CPU→GPU upload per frame); unconditional; gated only
-        // by the resource sanity check.
-        // Sentinel writes RE-ENABLED — without them the GPU work stays
-        // in cache and the dump reads back zeros.
-        WriteGBufferSentinels();
+        // REMOVED (2026-07-25): WriteGBufferSentinels was identified as the
+        // root cause of the uniform-magenta GI symptom. The sentinel write
+        // left the GBuffer textures in a state where the FGIPass SRV reads
+        // returned the sentinel value rather than the post-raster pixel
+        // data. With the dump normalization fix (commit 2fab7d6) the
+        // post-raster Sponza geometry is visible in the dumps directly, so
+        // the diagnostic purpose of the sentinels is no longer needed. The
+        // original "without sentinels the GPU work stays in cache" symptom
+        // (from commit t_139c4e41) was a separate issue fixed by the
+        // CommandList isolation in commit 9a09df2 (bug-088).
 
         // The textures were created in RenderTarget initial state; transitions
         // for the FB-attached draws are emitted implicitly by the first draw.
