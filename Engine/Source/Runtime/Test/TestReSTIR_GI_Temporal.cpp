@@ -414,13 +414,17 @@ public:
             Desc.MinRayLength      = 0.001f;
             Desc.EnableRR          = true;
             Desc.FrameIndex        = AccumFrameCount;
-            // Hardcoded-quad test: we have no scene lights and the "fake"
-            // ambient term is what makes `primaryAmbient = diffuse * AmbientColor
-            // * AmbientScale` non-zero. With material=(0.8, 0.2, 0.2) and
-            // AmbientColor=(0.6, 0.6, 0.65), scale=0.6 gives a primary
-            // contribution of ~0.29/0.07/0.08 — well above the validator's
-            // 0.05 mean-luma threshold.
-            Desc.AmbientScale      = 0.6f;
+            // Lighting setup. The test has no scene lights, so the "fake"
+            // ambient term is the only illumination. With material=(1, 1, 1)
+            // (the Sponza GLTF in this test loads white materials for the
+            // rendered meshes) and AmbientColor=(1.0, 1.0, 1.0), scale=1.5
+            // gives a primary contribution of (1.5, 1.5, 1.5) which is bright
+            // enough to actually SEE the Sponza geometry. The previous
+            // values (AmbientColor=0.6/0.6/0.65, scale=0.6, intended for a
+            // red material (0.8, 0.2, 0.2) from the now-removed
+            // FillGBufferHardcoded fallback) produced a dim gray image
+            // because the actual Sponza materials are white, not red.
+            Desc.AmbientScale      = 1.5f;
 
             GIPass.DispatchRays(CommandList, Desc);
         }
