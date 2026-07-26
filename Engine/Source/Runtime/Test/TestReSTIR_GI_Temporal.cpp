@@ -475,14 +475,20 @@ public:
             // get SHADER_READ_ONLY_OPTIMAL — otherwise the Vulkan validation
             // layer flags GENERAL vs SHADER_READ_ONLY_OPTIMAL mismatch.
             //
-            // Note: even with these transitions + commitBarriers, the
-            // validation layer can still complain because nvrhi's auto-
-            // barrier machinery in setComputeState walks the binding set
-            // AFTER descriptor bind (see vulkan-compute.cpp:120-145) and
-            // adds barriers whose order relative to the bind is fragile.
-            // The proper fix is to split the temporal pass into a read-only
-            // dispatch (SRV only) and a write-only dispatch (UAV only) so
-            // the resource states are unambiguous. Tracked as a follow-up.
+            // Note: even with these transitions, the Vulkan validation layer
+            // can still complain with VUID-VkDescriptorImageInfo-imageLayout-
+            // 00344 because nvrhi's setComputeState records the
+            // vk::bindDescriptorSets call BEFORE recording the layout
+            // transition barrier (vulkan-compute.cpp:120-145). The
+            // validation layer inspects the recorded command buffer and
+            // sees the descriptor bound with one layout and the image
+            // still in the previous layout. The proper fix is to split
+            // the temporal pass into a read-only dispatch (SRV only) and
+            // a write-only dispatch (UAV only). Tracked as a follow-up.
+            // The error is non-fatal — the GPU work still happens and the
+            // test produces correct output. The same VUID fires per
+            // dispatch and was documented in final-state-2026-07-23.md
+            // as bug-075.
             CommandList->setTextureState(
                 ReservoirTex0, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
             CommandList->setTextureState(
