@@ -35,7 +35,12 @@ which are `[x]` (done).
   the magenta symptom. Defer the proper fix to a follow-up
   (split temporal pass into read/write dispatches).
 
-## Remaining backlog (lower priority, not blockers)
+## Remaining backlog
+
+Three items remain as `[ ]` below. None of them are blockers
+for the magenta-noise fix (commits `2fab7d6` and `e6b3d52`).
+They are tracked here for future work but should not block
+the next session's startup.
 
 - [ ] **bug-075 proper fix**: split the temporal pass into
   read and write dispatches so the resource state is
@@ -54,24 +59,22 @@ which are `[x]` (done).
   to split FReSTIRPass's binding layout into a read-only
   set (SRVs only) and a write-only set (UAVs only) and
   dispatch the temporal pass in two phases. Deferred —
-  needs an FReSTIRPass interface change.
+  needs an FReSTIRPass interface change AND a shader
+  recompile (separate binding sets require different
+  register indices).
 
 - [ ] **Sponza material colors**: the GLTF loaded for this
   test has white materials for the rendered meshes. Not a
   test code bug; the test just doesn't render the colorful
   parts of Sponza. To improve visual coverage, load a
   different mesh subset or replace materials with a
-  procedural color palette.
+  procedural color palette. CONTENT WORK, not a test bug.
 
 - [ ] **Sponza lighting**: the test uses 1 directional light
   plus a hardcoded ambient term. A real Sponza scene would
   have area lights with proper NEE. The path tracer
-  supports it; the test just doesn't set it up.
-
-- [ ] **Dead code removal**: `WriteGBufferSentinels` and
-  `FillGBufferHardcoded` in `TestReSTIR_GI_Temporal.cpp`
-  are unused after commit `e6b3d52`. Safe to delete but
-  kept for reference.
+  supports it; the test just doesn't set it up. CONTENT
+  WORK, not a test bug.
 
 ## Pipeline status
 
