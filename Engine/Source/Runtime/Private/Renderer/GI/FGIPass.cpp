@@ -48,6 +48,28 @@ namespace GI
         constexpr float DefaultLightDir[3] = { 0.577f, 0.577f, 0.577f };
         constexpr float DefaultLightIntensity = 1.0f;
 
+        // Default point-light positions for the Sponza test scene at
+        // 0.01 scale. The Sponza is a closed building, so a single
+        // directional sun (DefaultLightDir) is fully occluded from
+        // every interior surface and NEE direct lighting produces zero
+        // contribution. Adding point lights INSIDE the building gives
+        // NEE a source that's unoccluded from the surrounding
+        // surfaces, producing a properly lit image. Positions are
+        // placed at mid-hall height (~6 m at 0.01 scale = 0.06),
+        // well inside the main hall (the camera is at z=0.08 looking
+        // at z=0, so the hall extends roughly z=-0.5 to z=+0.5).
+        // Lights are placed at moderate distance from the camera
+        // and from any wall so each light illuminates a broad area
+        // without blowing out the surface right in front of it.
+        constexpr float DefaultPointPositions[3][3] = {
+            { 0.0f,  0.08f, -0.20f }, // center-back, well inside the hall
+            { 0.20f, 0.08f,  0.20f }, // right-front, well inside the hall
+            {-0.20f, 0.08f,  0.20f }, // left-front, well inside the hall
+        };
+        constexpr float DefaultPointColor[3] = { 1.0f, 0.9f, 0.75f }; // warm white
+        constexpr float DefaultPointIntensity = 4.0f;
+        constexpr float DefaultPointRange = 0.6f; // 60 cm at 0.01 scale = 6 m unscaled
+
         Renderer::FLight BuildDefaultDirectionalLight(const float* Dir, float Intensity)
         {
             Renderer::FLight Light{};
@@ -65,6 +87,34 @@ namespace GI
             Light.color[1] = 1.0f;
             Light.color[2] = 1.0f;
             Light.type = static_cast<uint32_t>(Renderer::ELightType::Directional);
+
+            Light.innerConeAngle = 0.0f;
+            Light.outerConeAngle = 0.0f;
+            Light.areaWidth = 0.0f;
+            Light.areaHeight = 0.0f;
+
+            Light.flags = Renderer::kLightFlag_CastShadow;
+            Light.shadowMapIndex = Renderer::kNoShadowMap;
+            return Light;
+        }
+
+        Renderer::FLight BuildDefaultPointLight(const float* Pos, const float* Color, float Intensity, float Range)
+        {
+            Renderer::FLight Light{};
+            Light.position[0] = Pos[0];
+            Light.position[1] = Pos[1];
+            Light.position[2] = Pos[2];
+            Light.range = Range;
+
+            Light.direction[0] = 0.0f;
+            Light.direction[1] = -1.0f; // unused for point lights but conventionally -Y
+            Light.direction[2] = 0.0f;
+            Light.intensity = Intensity;
+
+            Light.color[0] = Color[0];
+            Light.color[1] = Color[1];
+            Light.color[2] = Color[2];
+            Light.type = static_cast<uint32_t>(Renderer::ELightType::Point);
 
             Light.innerConeAngle = 0.0f;
             Light.outerConeAngle = 0.0f;
@@ -284,6 +334,21 @@ namespace GI
             }
             const float Dir[3] = { DirX / Len, DirY / Len, DirZ / Len };
             LightsToUpload.push_back(BuildDefaultDirectionalLight(Dir, DefaultLightIntensity));
+
+            // Also add a few default point lights INSIDE the Sponza so
+            // NEE direct lighting has unoccluded sources. The Sponza is
+            // a closed building; the sun alone is fully occluded from
+            // every interior surface and produces zero contribution. The
+            // point lights at the default positions are inside the
+            // main hall (close to the camera) and will reach the
+            // surrounding walls without occlusion, producing a
+            // properly lit image.
+            for (int i = 0; i < 3; ++i)
+            {
+                LightsToUpload.push_back(BuildDefaultPointLight(
+                    DefaultPointPositions[i], DefaultPointColor,
+                    DefaultPointIntensity, DefaultPointRange));
+            }
         }
 
         if (LightsToUpload.empty())
