@@ -474,6 +474,15 @@ public:
             // them to ShaderResource here so the SRV reads inside the shader
             // get SHADER_READ_ONLY_OPTIMAL — otherwise the Vulkan validation
             // layer flags GENERAL vs SHADER_READ_ONLY_OPTIMAL mismatch.
+            //
+            // Note: even with these transitions + commitBarriers, the
+            // validation layer can still complain because nvrhi's auto-
+            // barrier machinery in setComputeState walks the binding set
+            // AFTER descriptor bind (see vulkan-compute.cpp:120-145) and
+            // adds barriers whose order relative to the bind is fragile.
+            // The proper fix is to split the temporal pass into a read-only
+            // dispatch (SRV only) and a write-only dispatch (UAV only) so
+            // the resource states are unambiguous. Tracked as a follow-up.
             CommandList->setTextureState(
                 ReservoirTex0, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
             CommandList->setTextureState(

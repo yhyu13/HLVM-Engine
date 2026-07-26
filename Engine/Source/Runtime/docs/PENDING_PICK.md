@@ -42,8 +42,19 @@ which are `[x]` (done).
   unambiguous. Currently the temporal pass binds the
   OutReservoir as UAV in the same dispatch as HistoryReservoir
   as SRV, which Vulkan validation flags as a layout
-  mismatch. Non-fatal today; should be cleaned up for
-  production.
+  mismatch. Non-fatal today. Investigated 2026-07-25: tried
+  `commitBarriers()` after the transitions, tried ping-pong-
+  aware per-role transitions, tried `UnorderedAccess` for
+  the OutReservoir. None of these made the validation
+  warning go away. The root cause is in nvrhi's auto-barrier
+  ordering: `setComputeState` walks the binding set AFTER
+  binding descriptor sets (vulkan-compute.cpp:120-145), so
+  the validation layer sees the descriptor-bound state before
+  the transition barrier takes effect. The proper fix is
+  to split FReSTIRPass's binding layout into a read-only
+  set (SRVs only) and a write-only set (UAVs only) and
+  dispatch the temporal pass in two phases. Deferred —
+  needs an FReSTIRPass interface change.
 
 - [ ] **Sponza material colors**: the GLTF loaded for this
   test has white materials for the rendered meshes. Not a
