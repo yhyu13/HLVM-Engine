@@ -85,10 +85,15 @@ ConstantBuffer<ViewConstants> g_View : register(b1);
 // Resources
 // =============================================================================
 
-RWTexture2D<float4> Output : register(u0);
+RWTexture2D<float4> Output : register(u0, space1);
+
+// Primary sample ray direction (ReSTIR GI reservoirs). Written per-pixel as
+// float4(direction, 1.0). The direction is the ray used for the pixel's
+// primary GI sample so the reservoir can reproject/merge a real sample.
+RWTexture2D<float4> OutputDirection : register(u2, space1);
 
 #if GI_DEBUG_STATS
-RWTexture2D<float4> DebugStatsTexture : register(u1);
+RWTexture2D<float4> DebugStatsTexture : register(u1, space1);
 #endif
 
 RaytracingAccelerationStructure SceneBVH : register(t0);
@@ -96,6 +101,14 @@ RaytracingAccelerationStructure SceneBVH : register(t0);
 Texture2D<float4> GBufferWorldPos   : register(t1);
 Texture2D<float4> GBufferNormal     : register(t2);
 Texture2D<float4> GBufferMaterial   : register(t3);
+
+// Per-texel bounce albedo textures (2026-08-10 material rework, Phase 3b):
+// one slot per unique Sponza material, indexed by
+// RTInstanceInfo.AlbedoTextureIndex. Bound t9..t40; slots without a texture
+// must be bound to a white placeholder (the shader falls back to the
+// instance's average AlbedoColor when the flag/index is invalid).
+#define MAX_MATERIAL_TEXTURES 32
+Texture2D<float4> MaterialTextures[MAX_MATERIAL_TEXTURES] : register(t9);
 
 StructuredBuffer<FLight>        Lights          : register(t7);
 StructuredBuffer<FRTVertex>     RTVertices      : register(t5);
@@ -125,7 +138,9 @@ struct FInstanceInfo {
     float3 AlbedoColor;
     uint   AlbedoTextureIndex;
     uint   MaterialFlags;
-    uint3  Padding;
+    float  Roughness;   // gltf roughnessFactor (2026-08-10 Phase 2)
+    float  Metallic;
+    uint   Pad;
 };
 
 // =============================================================================
@@ -195,6 +210,17 @@ float3 sampleHemisphereCosine(float3 normal, float2 u) {
     float3 bitangent = cross(normal, tangent);
 
     return tangent * d.x + bitangent * d.y + normal * z;
+}
+
+// Phase 2 (2026-08-10): roughness-aware indirect lobe. roughness=1 → pure
+// cosine hemisphere (Lambert); roughness→0 concentrates samples near the
+// normal (glossier bounce). Crude (no PDF correction) — acceptable while the
+// tracer uses unweighted throughput; replace with GGX sampling when specular
+// lands. Sponza's gltf roughness ≈ 0.9, so the current scene is near-Lambert.
+float3 sampleRoughnessLobe(float3 normal, float roughness, float2 u) {
+    float3 cosineDir = sampleHemisphereCosine(normal, u);
+    float glossy = 1.0f - saturate(roughness);
+    return normalize(lerp(cosineDir, normal, glossy * glossy));
 }
 
 float DiffusePDF(float NdotL) {
@@ -459,12 +485,48 @@ float TraceShadowRay(float3 origin, float3 direction, float tMin, float tMax) {
 void RayGen() {
     uint2 pixel = DispatchRaysIndex().xy;
 
-    float3 worldPos = GBufferWorldPos[pixel].rgb;
-    float3 normal = normalize(GBufferNormal[pixel].rgb * 2.0 - 1.0);
-    float3 diffuse = GBufferMaterial[pixel].rgb;
+    // Phase D: the tracer dispatches at HALF resolution; scale the dispatch
+    // pixel back to the full-res GBuffer before reading geometry.
+    float2 gbScale = g_View.RenderTargetSize.xy / DispatchRaysDimensions().xy;
+    int2 gbPixel = int2((float2(pixel) + 0.5f) * gbScale);
 
-    if (length(worldPos) < 0.001) {
-        Output[pixel] = float4(0.0, 0.0, 0.0, 1.0);
+    float3 worldPos = GBufferWorldPos[gbPixel].rgb;
+    float3 normal = normalize(GBufferNormal[gbPixel].rgb * 2.0 - 1.0);
+    float3 diffuse = GBufferMaterial[gbPixel].rgb;
+
+    // Debug-only bypass of the no-geometry early-return (modes 20/21/22/30/31
+    // read the GBuffer directly). Compile-gated behind HLVM_RGI_DEBUG_VIS.
+#ifdef HLVM_RGI_DEBUG_VIS
+    uint debugModeEarly = (uint)(g_GI.Params5.x + 0.5f);
+    bool bypassEarlyReturn = (debugModeEarly == 20u
+                           || debugModeEarly == 21u
+                           || debugModeEarly == 22u
+                           || debugModeEarly == 30u
+                           || debugModeEarly == 31u);
+#else
+    bool bypassEarlyReturn = false;
+#endif
+
+    if (!bypassEarlyReturn && length(worldPos) < 0.001) {
+        // Background sky for pixels with no rasterized geometry (fixed
+        // 2026-08-09): was pure black, making 56% of the display black.
+        // Unproject the primary ray through this pixel (GLM RH-ZO) and
+        // evaluate the same SampleSky used by the miss shader, so the
+        // background is consistent with the GI sky.
+        float2 px = float2(gbPixel) + 0.5f;
+        float2 ndc = float2(px.x / g_View.RenderTargetSize.x * 2.0f - 1.0f,
+                            1.0f - px.y / g_View.RenderTargetSize.y * 2.0f);
+        // Diagonal-only unprojection: clip.x = P00*view.x, clip.y = P11*view.y.
+        // P00/P11 are on the diagonal, so the row/column-major memory layout
+        // of the GLM matrix does not matter for these two elements.
+        float3 viewDir = float3(ndc.x / g_View.ProjMatrix[0][0],
+                                ndc.y / g_View.ProjMatrix[1][1],
+                                -1.0f);
+        // mul(vec, M) = M^T * vec: the view rotation is orthonormal, so this
+        // maps the view-space direction back to world space (translation is
+        // killed by the w=0 component).
+        float3 worldDir = normalize(mul(float4(viewDir, 0.0f), g_View.ViewMatrix).xyz);
+        Output[pixel] = float4(SampleSky(worldDir), 1.0f);
         return;
     }
 
@@ -489,6 +551,9 @@ void RayGen() {
     // Multi-sample indirect GI
     float3 indirect = float3(0.0f, 0.0f, 0.0f);
     float avgFirstHitDist = 0.0f;
+    // Direction of the first sample's primary ray — used by ReSTIR GI to
+    // build a reservoir that holds a real (radiance, direction, hitT) sample.
+    float3 firstSampleDir = float3(0.0f, 1.0f, 0.0f);
 
 #if GI_DEBUG_STATS
     float debugTotalBounces = 0.0f;
@@ -508,7 +573,10 @@ void RayGen() {
         payload.seed = pixelSeed + s * 7919u;
 
         uint sampleSeed = pixelSeed + s * 7919u;
-        float3 rayDir = sampleHemisphereCosine(normal, random_float2(sampleSeed));
+        float roughness = GBufferMaterial[gbPixel].a;  // Phase 2 (GBuffer MRT2 alpha)
+        float3 rayDir = sampleRoughnessLobe(normal, roughness, random_float2(sampleSeed));
+        if (s == 0)
+            firstSampleDir = rayDir;
         float3 rayOrigin = OffsetRayOrigin(worldPos, normal, rayDir);
 
         // Fully initialize every payload field: slangc compiles entry points
@@ -564,14 +632,23 @@ void RayGen() {
     result += indirect / max(float(spp), 1.0f);
     avgFirstHitDist /= max(float(spp), 1.0f);
 
+    // Emit the primary sample ray direction for ReSTIR GI reservoir building.
+    // Done unconditionally so downstream reservoirs always have a valid sample.
+    OutputDirection[pixel] = float4(firstSampleDir, 1.0);
+
     // Safety clamp: mark NaN/inf pixels red for debugging.
     if (any(isnan(result)) || any(isinf(result)))
         result = float3(10.0f, 0.0f, 0.0f);
     if (isnan(avgFirstHitDist) || isinf(avgFirstHitDist))
         avgFirstHitDist = 0.0f;
 
-    // Debug visualisation modes (r_GI_DebugMode). All values are raygen-local:
-    // no debug data crosses the TraceRay payload boundary.
+#ifdef HLVM_RGI_DEBUG_VIS
+    // Debug visualisation modes (r_GI_DebugMode). Compile-time gated behind
+    // HLVM_RGI_DEBUG_VIS (2026-08-11): these 12 sentinel modes + the alpha
+    // alive-sentinel were always-compiled, violating the Do-Not-Repeat rule
+    // "debug visualisations must not survive the iteration". They also
+    // override the spec-declared alpha semantic (avgFirstHitDist). Off by
+    // default; re-enable with -D HLVM_RGI_DEBUG_VIS when debugging.
     uint debugMode = (uint)(g_GI.Params5.x + 0.5f);
     float3 debugColor = result;
     if (debugMode != 0u) {
@@ -581,14 +658,156 @@ void RayGen() {
             case 3u:  debugColor = primaryDirect; break;
             case 4u:  debugColor = indirect / max(float(spp), 1.0f); break;
             case 5u:  debugColor = float3(avgFirstHitDist, avgFirstHitDist, avgFirstHitDist) * 0.1f; break;
+            // v13 (six-role-pipeline, 2026-07-27): UAV-write sentinel. Writes
+            // a UNIQUE, recognizable per-pixel constant (1.0, 0.0, 1.0) to
+            // OutputTexture at the very start of the write, BEFORE any other
+            // code. If gi_raw with HLVM_PT_DEBUG_MODE=6 shows magenta-like
+            // values, the dispatch body is running and the UAV write is
+            // landing in the texture. The bug is then in the lighting/payload
+            // math downstream of this line. If gi_raw with mode=6 shows 0,
+            // the dispatch is not running or the UAV write is being dropped
+            // (desc-barrier, descriptor mismatch, no dispatch at all).
+            case 6u:  debugColor = float3(float(pixel.x) / 256.0, 0.0, float(pixel.y) / 256.0); break;
+            // v17 (six-role-pipeline, 2026-07-27): TraceRay-bypass sentinel.
+            // If case 6u shows per-pixel gradient AND case 7u shows non-zero
+            // scene-shape output, the entire non-ray-tracing pipeline works.
+            // Bug is then constrained to TraceRay / payload / SRV-read chain.
+            // If case 7u shows 0 or garbage, bug is in the post-TraceRay code
+            // path (lighting math, payload write, accumulate). Uses the same
+            // diffuse * g_GI.AmbientColor.rgb * ambientScale expression the
+            // primary contribution uses (GIPathTracing.hlsl:486), so a non-zero
+            // result is meaningful: it shows what the shader produces when
+            // ray-tracing is bypassed. Predicted: mode 7 = mode 1 * 1.5.
+            case 7u:  debugColor = diffuse * g_GI.AmbientColor.rgb * ambientScale; break;
+// v18 (six-role-pipeline, 2026-07-27): TraceRay-only sentinel.
+// Calls TraceRay with the same ray setup as the main loop (TMin/TMax
+// from g_GI.Params2.y/.z, RAY_FLAG_FORCE_OPAQUE, 0xFF/0/0/0) but
+// discards the payload results. If mode 8 crashes or produces
+// garbage, the bug is in the TraceRay setup itself (RT flags,
+// TMin/TMax, BVH traversal). If mode 8 produces a clean frame
+// (i.e., the test doesn't crash and gi_raw isn't all-NaN), the
+// ray-tracing setup is healthy; the bug is in the payload/result
+// merge downstream.
+            case 8u:
+            {
+                GIPayload tracePayload;
+                tracePayload.radiance = float3(0.0f, 0.0f, 0.0f);
+                tracePayload.throughput = float3(1.0f, 1.0f, 1.0f);
+                tracePayload.bounceCount = 0u;
+                tracePayload.flags = 0u;
+                tracePayload.hitDistance = 0.0f;
+                tracePayload.seed = pixelSeed;
+                // Re-derive a ray from the primary surface (case 8 runs outside
+                // the SPP loop, so rayDir/rayOrigin aren't in scope here).
+                float3 sentinelDir = sampleHemisphereCosine(normal, float2(0.5f, 0.5f));
+                float3 sentinelOrigin = OffsetRayOrigin(worldPos, normal, sentinelDir);
+                tracePayload.origin = sentinelOrigin;
+                tracePayload.direction = sentinelDir;
+                RayDesc traceRay;
+                traceRay.Origin = sentinelOrigin;
+                traceRay.Direction = sentinelDir;
+                traceRay.TMin = g_GI.Params2.y;
+                traceRay.TMax = g_GI.Params2.z;
+                TraceRay(SceneBVH, RAY_FLAG_FORCE_OPAQUE, 0xFF, 0, 0, 0, traceRay, tracePayload);
+                debugColor = float3(tracePayload.hitDistance > 0.0f ? 1.0f : 0.0f,
+                                    tracePayload.hitDistance * 0.1f,
+                                    float(tracePayload.flags) / 8.0f);
+                break;
+            }
+// v18: diffuse-only sentinel (mode 9 = mode 1 * 1.5). Verifies
+// GBufferMaterial SRV independently of the AmbientColor/AmbientScale
+// uniforms. If mode 9 produces a scene-shape image identical to mode 1,
+// GBufferMaterial SRV is healthy. If mode 9 = 0, GBufferMaterial SRV
+// has a binding issue. If mode 9 differs from mode 1 * 1.5, the
+// multiplier is wrong (unlikely).
+            case 9u:  debugColor = diffuse * 1.5f; break;
+// v18: debugMode cbuffer reach sentinel. Writes g_GI.Params5.x
+// (the debugMode uniform) directly to OutputTexture. If mode 10
+// shows a recognizable value (e.g., ~0.04 for debugMode=10/256),
+// the cbuffer reach is fine. If mode 10 = 0, the cbuffer is not
+// bound or not being updated by FGIPass::WriteConstants. This is
+// the canonical "is the C++-side constant-buffer update working"
+// test.
+            case 10u: debugColor = float3(g_GI.Params5.x / 256.0f, 0.0f, 0.0f); break;
+// v18: View cbuffer reach sentinel. Writes g_View.FrameIndex /
+// 256.0 to OutputTexture. Tests whether the ViewConstants cbuffer
+// (b1) is bound. If mode 11 shows a non-zero value, View cbuffer
+// reach is fine. If mode 11 = 0, ViewConstants has a binding issue.
+            case 11u: debugColor = float3(g_View.FrameIndex / 256.0f, g_View.FrameIndex / 256.0f, g_View.FrameIndex / 256.0f); break;
+// v19 (six-role-pipeline, 2026-07-27): AmbientColor-only sentinel.
+// Writes ONLY g_GI.AmbientColor.rgb to OutputTexture (no diffuse,
+// no ambientScale). If mode 12 = (1, 1, 1) per pixel, AmbientColor
+// uniform is healthy. If mode 12 = 0, AmbientColor not bound.
+// Combined with mode 7 (= mode 12 * diffuse * ambientScale) and
+// mode 9 (= diffuse * 1.5), this fully bisects the uniform bind.
+// Predicted: mode 12 = (1, 1, 1) since AmbientColor = (1, 1, 1, 1).
+            case 12u: debugColor = g_GI.AmbientColor.rgb; break;
             case 13u: debugColor = RTInstanceInfo[0].AlbedoColor; break;         // SRV sanity read
             case 14u: debugColor = RTVertices[0].Position * 0.25f + 0.5f; break; // SRV sanity read
-            default: break;
+            case 20u: debugColor = GBufferMaterial.Load(int3(pixel, 0)).rgb; break; // SRV read of GBufferMaterial
+            case 21u: debugColor = GBufferNormal.Load(int3(pixel, 0)).rgb * 0.5f + 0.5f; break; // SRV read of GBufferNormal (sanity compare to case 2)
+            case 22u: debugColor = GBufferWorldPos.Load(int3(pixel, 0)).rgb * 0.25f + 0.5f; break; // SRV read of GBufferWorldPos (sanity compare)
+// v128 (six-role-pipeline, tick 113, 2026-07-30): single-pixel sentinel
+// at (0,0,0). If mode 30 shows albedo at (0,0,0) but mode 20 shows zero
+// everywhere, the binding works at (0,0,0) but is masked elsewhere (e.g.,
+// layout transition per ping-pong UAV/SRV). If mode 30 also shows zero,
+// the binding is universally broken. Combined with mode 20/21/22 this
+// discriminates "SRV universally broken" vs "SRV partially bound".
+            case 30u:
+            {
+                float3 sentinelColor = GBufferMaterial.Load(int3(0, 0, 0)).rgb;
+                if (any(sentinelColor > float3(0.001, 0.001, 0.001))) {
+                    debugColor = float3(1.0, 0.0, 1.0); // magenta: binding works at (0,0,0)
+                } else {
+                    debugColor = float3(0.0, 0.0, 0.0); // black: binding universally broken
+                }
+                break;
+            }
+// v131 (six-role-pipeline, tick 151, 2026-07-30): slangc-dead-strip
+// discriminator (Candidate A probe). Mode 31 reads GBufferMaterial with
+// a non-trivial arithmetic transformation (r * 0.5 + 0.1) so the read
+// result is observable to slangc's reachability analysis. If mode 31
+// shows non-uniform color, the SRV reads are alive for mode 31 (rules
+// out slangc dead-strip). If mode 31 still shows uniform zero, slangc
+// IS dead-stripping the SRV reads (root cause is upstream: binding
+// layout or pipeline state, not dead-strip).
+            case 31u:
+            {
+                float3 aliveSentinel = GBufferMaterial.Load(int3(pixel, 0)).rgb * 0.5f + 0.1f;
+                if (any(aliveSentinel > float3(0.1, 0.1, 0.1))) {
+                    debugColor = aliveSentinel; // binding works, slangc keeps the read
+                } else {
+                    debugColor = float3(0.0, 0.0, 1.0); // blue: SRV read alive but value is zero (binding issue)
+                }
+                break;
+            }
+// v19: debugMode raw value (no /256 divide). Sanity check on mode 10.
+// If mode 15 = 10.0, Params5.x is being set correctly. If mode 15 = 0,
+// Params5.x is 0 (same as mode 10 = 0, cbuffer not updated). If mode
+// 15 != 10 and != 0, Params5.x is being set to a wrong value.
+            case 15u: debugColor = float3(g_GI.Params5.x, g_GI.Params5.x, g_GI.Params5.x); break;
+// v19: default-case trace. If debugMode is some value not in {1..15}
+// (e.g., 99) AND the switch is being entered, the default returns
+// gray. If slangc dead-strips ALL case labels, this becomes the
+// catch-all sentinel (every debugMode returns gray). If a valid
+// debugMode is set, this default never runs (existing cases 1u-15u
+// match first).
+            default: debugColor = float3(0.5f, 0.5f, 0.5f); break;
         }
     }
 
-    // Write raw HDR radiance; temporal accumulation + tonemap are done in a separate pass.
+    // Write raw HDR radiance; temporal accumulation + tonemap are done in a
+    // separate pass. Debug mode overrides the color; the alpha stays
+    // avgFirstHitDist except for the debug alive-sentinel below.
     Output[pixel] = float4(debugColor, avgFirstHitDist);
+
+    // Debug alive-sentinel (compile-gated with the modes above).
+    Output[pixel].w = max(Output[pixel].w, 0.99994f);
+#else
+    // Production path: raw HDR radiance, alpha = avgFirstHitDist (the spec
+    // semantic). No debug sentinels survive.
+    Output[pixel] = float4(result, avgFirstHitDist);
+#endif
 
 #if GI_DEBUG_STATS
     if (g_GI.Params3.z > 0.5f && debugTotalSamples > 0.0f) {
@@ -648,7 +867,19 @@ void ClosestHit(inout GIPayload payload : SV_RayPayload, in Attributes attr : SV
     if (any(isnan(hitNormal)) || any(isinf(hitNormal)))
         hitNormal = float3(0.0f, 1.0f, 0.0f);
 
+    // Per-texel albedo from the instance's material texture (Phase 3b),
+    // falling back to the texture's linear average (Phase 3) when the index
+    // is out of range or the mesh is untextured.
     float3 albedo = info.AlbedoColor;
+    if ((info.MaterialFlags & 1u) != 0u && info.AlbedoTextureIndex < MAX_MATERIAL_TEXTURES)
+    {
+        float2 hitUV = v0.UV * bary.x + v1.UV * bary.y + v2.UV * bary.z;
+        // Explicit LOD (mip 0): ImageSampleImplicitLod is invalid in ray
+        // tracing stages; SampleLevel compiles to the explicit-LOD variant.
+        float3 texAlbedo = MaterialTextures[info.AlbedoTextureIndex].SampleLevel(LinearSampler, hitUV, 0.0f).rgb;
+        if (!any(isnan(texAlbedo)) && !any(isinf(texAlbedo)) && length(texAlbedo) > 1e-6f)
+            albedo = texAlbedo;
+    }
 
     // Direct lighting at this bounce vertex (NEE + optional BSDF MIS), weighted
     // by the incoming path throughput. Evaluated here - not in RayGen - because
@@ -678,7 +909,7 @@ void ClosestHit(inout GIPayload payload : SV_RayPayload, in Attributes attr : SV
     }
 
     payload.seed = payload.seed + payload.bounceCount * 13u + 17u;
-    payload.direction = sampleHemisphereCosine(hitNormal, random_float2(payload.seed));
+    payload.direction = sampleRoughnessLobe(hitNormal, info.Roughness, random_float2(payload.seed));
     payload.origin = OffsetRayOrigin(hitPosition, hitNormal, payload.direction);
 
     payload.flags |= 0x01;

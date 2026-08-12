@@ -39,6 +39,8 @@ namespace ReSTIR
         TFP32 DepthThreshold;
         TFP32 NormalThreshold;
         TFP32 DebugVis;
+        TFP32 SceneYaw;      // Phase C: scene Y-rotation this frame (deg)
+        TFP32 PrevSceneYaw;  // Phase C: scene Y-rotation previous frame (deg)
         TFP32 Pad[3];
     };
 
@@ -60,6 +62,7 @@ namespace ReSTIR
         struct FGenerationDesc
         {
             nvrhi::TextureHandle RadianceTexture;
+            nvrhi::TextureHandle DirectionTexture;   // t4: primary ray direction (u2 from FGIPass)
             nvrhi::TextureHandle WorldPosTexture;
             nvrhi::TextureHandle NormalTexture;
             nvrhi::TextureHandle DepthTexture;
@@ -119,8 +122,26 @@ namespace ReSTIR
         nvrhi::ShaderHandle GenerationShader;
         nvrhi::ShaderHandle TemporalShader;
         nvrhi::ShaderHandle SpatialShader;
-        nvrhi::BindingLayoutHandle GenerationLayout;
-        nvrhi::BindingLayoutHandle TemporalLayout;
+        // v151 (six-role-pipeline): the generation shader's binding layout
+        // is split into SRV-only (set 0) + UAV-only (set 1) per the bug-075
+        // pattern that already fixed TemporalLayout. The mixed single-layout
+        // field that lived here (GenerationLayout) was removed — there is
+        // no ABI requirement on private fields, and keeping an unassigned
+        // member invites future code paths to construct a broken binding
+        // set against a stale handle.
+        nvrhi::BindingLayoutHandle GenerationLayoutSRV;
+        nvrhi::BindingLayoutHandle GenerationLayoutUAV;
+        // bug-075 (six-role-pipeline v1): the temporal shader declares UAVs
+        // at register(u0, space1) / register(u1, space1) → SPIR-V set 1.
+        // The binding layout is split into TemporalLayoutSRV (set 0: SRVs +
+        // cbuffer) and TemporalLayoutUAV (set 1: UAVs). The pipeline
+        // composes both in declaration order. Each dispatch binds ONE set
+        // (SRV-only or UAV-only), so nvrhi's requireTextureState infers
+        // only the matching state per dispatch — eliminating the SRV/UAV
+        // descriptor-set collision that produced
+        // VUID-VkDescriptorImageInfo-imageLayout-00344.
+        nvrhi::BindingLayoutHandle TemporalLayoutSRV;
+        nvrhi::BindingLayoutHandle TemporalLayoutUAV;
         nvrhi::BindingLayoutHandle SpatialLayout;
         nvrhi::ComputePipelineHandle GenerationPipeline;
         nvrhi::ComputePipelineHandle TemporalPipeline;

@@ -22,7 +22,7 @@ AUTO_CVAR_REF_BOOL(VulkanFastSync, g_VulkanFastSync, "Use vulkan fast vsync eMai
 HLVM_INLINE_VAR bool g_UseValidationLayers = true;
 AUTO_CVAR_REF_BOOL(UseValidationLayers, g_UseValidationLayers, "Use vulkan validation layers", EConsoleVariableFlag::RequiresRestart)
 
-HLVM_INLINE_VAR bool g_UseDebugRuntime = true;
+HLVM_INLINE_VAR bool g_UseDebugRuntime = false;
 AUTO_CVAR_REF_BOOL(UseDebugRuntime, g_UseDebugRuntime, "Use vulkan debug runtime", EConsoleVariableFlag::RequiresRestart)
 
 HLVM_INLINE_VAR bool g_vkUsePushConstants = true;

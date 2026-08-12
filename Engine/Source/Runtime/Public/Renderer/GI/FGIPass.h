@@ -32,10 +32,17 @@ namespace GI
         nvrhi::rt::AccelStructHandle SceneTLAS; // t0 (SceneBVH)
         nvrhi::TextureHandle OutputTexture;     // u0 (radiance)
         nvrhi::TextureHandle DebugStatsTexture; // u1 (optional, see FGIPassStats)
+        nvrhi::TextureHandle OutputDirection;   // u2 (optional; primary sample ray direction for ReSTIR GI reservoirs)
 
         // Lights array for Next Event Estimation (NEE)
         nvrhi::BufferHandle LightsBuffer;
         uint32_t            LightCount = 0;
+
+        // Per-texel bounce albedo textures (material rework Phase 3b): slots
+        // t9..t40, indexed by RTInstanceInfo.AlbedoTextureIndex in the
+        // closest-hit shader. Empty → white placeholders (average-albedo
+        // fallback path in the shader).
+        TVector<nvrhi::TextureHandle> MaterialTextures;
 
         // RT geometry (vertex/index/instance buffers for closest-hit barycentric lookup)
         nvrhi::BufferHandle RTVertices;
@@ -54,6 +61,11 @@ namespace GI
         bool     DebugBounceStats = false;
         uint32_t FrameIndex       = 0; // seeds RNG so bounces diverge frame-to-frame
         float    AmbientScale     = -1.0f; // < 0 = use CVar r_GI_AmbientScale; 0 disables the fake ambient term
+
+        // v140: expose AmbientColor so callers (notably TestReSTIR_GI_Temporal) can override
+        // the hardcoded fallback in FGIPass::WriteConstants. Default matches the existing
+        // hardcoded value at FGIPass.cpp:447 for backward-compat with TestPathTraceGI.
+        float    AmbientColor[4]  = { 0.6f, 0.6f, 0.65f, 0.0f };
     };
 
     // Output from DebugStatsTexture readback (u1 UAV written when DebugBounceStats=true).
@@ -102,13 +114,16 @@ namespace GI
 
         nvrhi::ShaderLibraryHandle ShaderLibrary;
         FRayTracingPipeline RTPipeline;          // RT pipeline wrapper (owns shader table + binding layout)
-        nvrhi::BindingLayoutHandle BindingLayout; // cached from RTPipeline for per-frame binding set creation
+        nvrhi::BindingLayoutHandle BindingLayout; // cached from RTPipeline for per-frame binding set creation (SRV-only; v22 split)
+        nvrhi::BindingLayoutHandle UAVBindingLayout; // v22 split: separate layout for u0/u1 UAVs (avoids nvrhi-deferred-barrier-ordering)
         nvrhi::BufferHandle ConstantBuffer;
         nvrhi::BufferHandle LightsBuffer;      // internal lights buffer (synthesized if Desc.LightsBuffer is null)
         uint32_t            LightsCount = 0;
 
         nvrhi::TextureHandle OutputTexture; // last output (for debugging / test exposure)
         nvrhi::TextureHandle DummyDebugStatsTexture; // 1x1 fallback when debug UAV not requested
+        nvrhi::TextureHandle DummyDirectionTexture;  // 1x1 fallback when direction UAV not requested
+        nvrhi::TextureHandle MaterialPlaceholderTexture; // 1x1 white (Phase 3b)
 
         FGIPassStats LastFrameStats{};
         bool bIsInitialized = false;

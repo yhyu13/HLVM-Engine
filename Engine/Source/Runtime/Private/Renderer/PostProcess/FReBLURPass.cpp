@@ -211,9 +211,14 @@ namespace ReBLUR
         ConstantsData[offset++] = Constants.FrameIndex;
         ConstantsData[offset++] = Constants.HistoryFadeIn;
 
-        // ConfidenceScale, SpatialAlpha, PassIndex, then 2 padding to 16-byte boundary
+        // ConfidenceScale, SpatialAlpha, PassIndex, then 2 padding to 16-byte boundary.
+        // SpatialAlpha must come from BlurParams (the denoiser tuning struct),
+        // not from FReBLURConstants: callers memset the constants and only fill
+        // per-frame matrices/counters, so reading Constants.SpatialAlpha here
+        // silently zeroed the spatial-blend factor and made ReBLUR a pass-through
+        // (lerp(temporal, blurred, 0.0) == temporal). Fixed 2026-08-09.
         ConstantsData[offset++] = Constants.ConfidenceScale;
-        ConstantsData[offset++] = Constants.SpatialAlpha;
+        ConstantsData[offset++] = BlurParams.SpatialAlpha;
         ConstantsData[offset++] = Constants.PassIndex;
         offset += 2;
 

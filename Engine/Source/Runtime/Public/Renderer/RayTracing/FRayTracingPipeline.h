@@ -5,6 +5,7 @@
 #pragma once
 
 #include "Core/String.h"
+#include "Core/Container/ContainerDefinition.h"
 #include "Renderer/Common/FBindingLayoutBuilder.h"
 #include <nvrhi/nvrhi.h>
 
@@ -114,6 +115,14 @@ public:
     void SetBindlessLayout(nvrhi::BindingLayoutHandle InBindlessLayout);
 
     /**
+     * @brief Append an ordinary binding layout to globalBindingLayouts
+     *
+     * Additional layouts are appended after the main layout and before an
+     * optional bindless layout. Must be called before FinalizePipeline().
+     */
+    void AddBindingLayout(nvrhi::BindingLayoutHandle InLayout);
+
+    /**
      * @brief Create the ray tracing pipeline from loaded shaders + binding layout
      * @param MaxPayloadSize Maximum ray payload size in bytes
      * @param MaxAttributeSize Maximum hit attribute size in bytes (default: 8 for barycentrics)
@@ -173,6 +182,27 @@ public:
     void DispatchRays(nvrhi::ICommandList* CmdList, uint32_t Width, uint32_t Height, uint32_t Depth,
         nvrhi::BindingSetHandle BindingSet, nvrhi::IDescriptorTable* DescriptorTable);
 
+    /**
+     * @brief Dispatch rays with two binding sets (v22 split: SRV + UAV)
+     *
+     * Added for v22 six-role-pipeline to fix the nvrhi-deferred-barrier-ordering pattern.
+     * Mixing SHADER_READ_ONLY_OPTIMAL SRVs and GENERAL UAVs in a single binding set
+     * caused nvrhi to bind descriptors before the implicit UAV->GENERAL barrier landed,
+     * triggering "A command list should be executed before it is reopened" warnings.
+     * Splitting into two binding sets lets nvrhi commit each barrier cleanly.
+     *
+     * @param SRVBindingSet First binding set (all read-only resources)
+     * @param UAVBindingSet Second binding set (write-only UAVs)
+     */
+    void DispatchRays(nvrhi::ICommandList* CmdList, const FDispatchDesc& Desc,
+        nvrhi::BindingSetHandle SRVBindingSet, nvrhi::BindingSetHandle UAVBindingSet);
+
+    /**
+     * @brief Dispatch rays with two binding sets (v22 split) - convenience overload
+     */
+    void DispatchRays(nvrhi::ICommandList* CmdList, uint32_t Width, uint32_t Height, uint32_t Depth,
+        nvrhi::BindingSetHandle SRVBindingSet, nvrhi::BindingSetHandle UAVBindingSet);
+
     void Shutdown();
 
     // Accessors
@@ -203,6 +233,7 @@ private:
     nvrhi::rt::ShaderTableHandle ShaderTable;
     nvrhi::BindingLayoutHandle   BindingLayout;
     nvrhi::BindingLayoutHandle   BindlessLayout;
+    TVector<nvrhi::BindingLayoutHandle> AdditionalBindingLayouts;
 
     // Builder state
     TUniquePtr<FBindingLayoutBuilder> LayoutBuilder;

@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>claude.md</title>
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+       margin: 0; color: #1f2937; }
+body::before { content: ""; display: block; height: 3px;
+                background: linear-gradient(90deg, #dc2626, #2563eb); }
+header { background: #1f2937; color: #fff; padding: 14px 24px;
+          border-bottom: 3px solid #dc2626; }
+header h1 { margin: 0; font-size: 18px; }
+header .crumb { font-size: 12px; opacity: 0.75; }
+header .crumb a { color: #93c5fd; text-decoration: none; }
+header .crumb a:hover { text-decoration: underline; }
+.layout { display: grid; grid-template-columns: 260px 1fr; gap: 0; max-width: 1200px; margin: 0 auto; }
+nav.toc { border-right: 1px solid #e5e7eb; padding: 20px; font-size: 14px; position: sticky; top: 0;
+          max-height: 100vh; overflow-y: auto; box-sizing: border-box; background: #fafafa; }
+nav.toc h2 { font-size: 13px; text-transform: uppercase; color: #6b7280; margin: 0 0 12px;
+              letter-spacing: 0.5px; font-weight: 700; }
+nav.toc ul { list-style: none; padding: 0; margin: 0; }
+nav.toc li { padding: 4px 0; position: relative; padding-left: 14px;
+              transition: background 0.15s; }
+nav.toc li::before { content: ""; position: absolute; left: 0; top: 50%;
+                      transform: translateY(-50%); width: 6px; height: 6px;
+                      border-radius: 50%; background: #dc2626; opacity: 0.55; }
+nav.toc li:hover { background: #fef2f2; }
+nav.toc li:hover::before { opacity: 1; transform: translateY(-50%) scale(1.4); }
+nav.toc li.active { background: #fef2f2; }
+nav.toc li.active::before { background: #dc2626; opacity: 1; transform: translateY(-50%) scale(1.4); }
+nav.toc li.active a { color: #dc2626; font-weight: 600; }
+nav.toc a { color: #2563eb; text-decoration: none; }
+nav.toc a:hover { color: #dc2626; text-decoration: underline; }
+nav.toc .lvl2 { padding-left: 28px; }
+nav.toc .lvl3 { padding-left: 42px; font-size: 13px; }
+nav.toc .lvl3::before { width: 5px; height: 5px; background: #2563eb; opacity: 0.5; }
+nav.toc .empty { color: #9ca3af; font-style: italic; }
+.legend { margin-top: 18px; padding: 10px; background: #fff;
+           border: 1px solid #e5e7eb; border-radius: 6px; font-size: 12px; }
+.legend h2 { font-size: 11px !important; margin: 0 0 6px !important; }
+.legend div { display: flex; align-items: center; gap: 6px; padding: 2px 0; }
+.legend span.swatch { display: inline-block; width: 12px; height: 12px;
+                       border-radius: 3px; flex-shrink: 0; }
+.keywords { margin-top: 14px; padding: 10px; background: #fff;
+             border: 1px solid #e5e7eb; border-radius: 6px; font-size: 12px; }
+.keywords h2 { font-size: 11px !important; margin: 0 0 6px !important; }
+.keywords ul { padding-left: 14px; margin: 0; }
+.keywords li { padding: 1px 0 !important; padding-left: 0 !important;
+                border: 0 !important; background: none !important; }
+.keywords li::before { display: none !important; }
+.keywords a { color: #1f2937 !important; font-size: 12px; }
+.keywords a:hover { color: #dc2626 !important; text-decoration: underline; }
+main { padding: 24px 36px; line-height: 1.6; max-width: 900px; }
+main h1, main h2, main h3 { scroll-margin-top: 16px; }
+main h1 { color: #dc2626; border-bottom: 2px solid #dc2626; padding-bottom: 6px; }
+main h2 { color: #2563eb; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px;
+          margin-top: 32px; padding-left: 10px; border-left: 4px solid #2563eb; }
+main h3 { color: #dc2626; margin-top: 24px; padding-left: 8px;
+          border-left: 3px solid #dc2626; }
+main a { color: #2563eb; text-decoration: none; }
+main a:hover { color: #dc2626; text-decoration: underline; }
+main pre { background: #ffffff; color: #1f2937; padding: 16px; border-radius: 6px;
+            overflow-x: auto; font: 13px/1.5 Menlo, Consolas, monospace;
+            border: 1px solid #e5e7eb; }
+main code { background: #f3f4f6; color: #1f2937; padding: 2px 5px; border-radius: 3px;
+             font: 13px Menlo, Consolas, monospace; }
+main pre code { background: transparent; color: inherit; padding: 0; }
+main table { border-collapse: collapse; }
+main th, main td { border: 1px solid #e5e7eb; padding: 6px 12px; }
+main th { background: #f3f4f6; }
+main blockquote { border-left: 4px solid #d1d5db; margin: 16px 0; padding: 8px 16px;
+                   color: #4b5563; }
+main hr { border: 0; border-top: 1px solid #e5e7eb; margin: 24px 0; }
+main strong.kw { color: #dc2626; font-weight: 700; }
+.summary { background: #eff6ff; border-left: 4px solid #2563eb; padding: 12px 16px;
+            margin: 16px 0 24px; border-radius: 4px; color: #1e3a8a; font-size: 14px;
+            line-height: 1.5; }
+.summary::before { content: "📝 Summary"; display: block; font-weight: 700;
+                    color: #2563eb; font-size: 11px; text-transform: uppercase;
+                    letter-spacing: 0.5px; margin-bottom: 4px; }
+.back { display: inline-block; margin-bottom: 16px; font-size: 0.9em; color: #2563eb;
+         text-decoration: none; }
+.back:hover { color: #dc2626; text-decoration: underline; }
+#topBtn { position: fixed; bottom: 24px; right: 24px; z-index: 100;
+          background: #dc2626; color: #fff; border: 0; border-radius: 50%;
+          width: 44px; height: 44px; font-size: 18px; cursor: pointer;
+          box-shadow: 0 2px 6px rgba(0,0,0,0.2); opacity: 0;
+          transition: opacity 0.2s; pointer-events: none; }
+#topBtn.show { opacity: 1; pointer-events: auto; }
+#topBtn:hover { background: #b91c1c; }
+@media (max-width: 900px) {
+  .layout { grid-template-columns: 1fr; }
+  nav.toc { position: static; max-height: none; border-right: 0;
+             border-bottom: 1px solid #e5e7eb; }
+  main { padding: 16px 20px; }
+}
+@media print {
+  nav.toc, .legend, .keywords, #topBtn { display: none; }
+  .layout { grid-template-columns: 1fr; }
+  body::before { display: none; }
+  header { background: #fff; color: #000; border-bottom: 1px solid #000; }
+  main h1, main h2, main h3 { color: #000; border-color: #000; }
+}
+</style>
+<script>
+(function() {
+  const links = document.querySelectorAll('nav.toc a[href^="#"]');
+  const map = new Map();
+  links.forEach(a => {
+    const id = a.getAttribute('href').slice(1);
+    const li = a.parentElement;
+    map.set(id, li);
+  });
+  const targets = Array.from(map.keys()).map(id => document.getElementById(id)).filter(Boolean);
+  function activate() {
+    if (!targets.length) return;
+    const scrollY = window.scrollY + 80;
+    let current = null;
+    for (const t of targets) {
+      if (t.offsetTop <= scrollY) current = t;
+      else break;
+    }
+    links.forEach(a => a.parentElement.classList.remove('active'));
+    if (current) {
+      const li = map.get(current.id);
+      if (li) li.classList.add('active');
+    }
+  }
+  window.addEventListener('scroll', activate, { passive: true });
+  activate();
+
+  const btn = document.getElementById('topBtn');
+  if (btn) {
+    window.addEventListener('scroll', () => {
+      btn.classList.toggle('show', window.scrollY > 400);
+    }, { passive: true });
+    btn.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+  }
+})();
+</script>
+</head>
+<body>
+<header>
+  <div class="crumb"><a href="./index.html">Vibe_Coding/</a> / <a href="index.html">50_ReSTIR_GI_Temporal</a> / claude.md</div>
+  <h1>📄 claude.md</h1>
+</header>
+<div class="layout">
+  <nav class="toc">
+    <h2>On this page</h2>
+    <ul>
+<li class=""><a href="#restir-gi-temporal-implementation-critical-diagnostic-report">ReSTIR GI Temporal Implementation — CRITICAL DIAGNOSTIC REPORT</a></li>
+      <li class="lvl2"><a href="#executive-summary">Executive Summary</a></li>
+      <li class="lvl2"><a href="#root-cause-analysis">Root Cause Analysis</a></li>
+      <li class="lvl3"><a href="#critical-bug-1-restir-generation-is-a-pass-through">CRITICAL BUG #1: ReSTIR Generation is a Pass-Through</a></li>
+      <li class="lvl3"><a href="#critical-bug-2-spatial-reuse-ignores-reservoir-selection">CRITICAL BUG #2: Spatial Reuse Ignores Reservoir Selection</a></li>
+      <li class="lvl3"><a href="#critical-bug-3-alpha-channel-semantic-mismatch">CRITICAL BUG #3: Alpha Channel Semantic Mismatch</a></li>
+      <li class="lvl3"><a href="#critical-bug-4-no-importance-sampling-ris">CRITICAL BUG #4: No Importance Sampling (RIS)</a></li>
+      <li class="lvl2"><a href="#semantic-confusion-summary">Semantic Confusion Summary</a></li>
+      <li class="lvl2"><a href="#why-works-on-3x3-grid-but-fails-with-poisson-is-misleading">Why "Works on 3x3 Grid but Fails with Poisson" is Misleading</a></li>
+      <li class="lvl2"><a href="#required-rebuild">Required Rebuild</a></li>
+      <li class="lvl3"><a href="#phase-1-true-restir-generation-ris-based">Phase 1: True ReSTIR Generation (RIS-based)</a></li>
+      <li class="lvl3"><a href="#phase-2-spatial-reuse-must-use-y">Phase 2: Spatial Reuse Must Use y</a></li>
+      <li class="lvl3"><a href="#phase-3-fix-alpha-channel">Phase 3: Fix Alpha Channel</a></li>
+      <li class="lvl2"><a href="#severity-assessment">Severity Assessment</a></li>
+    </ul>
+    <div class="legend">
+      <h2>Color Legend</h2>
+      <div><span class="swatch" style="background:#dc2626;"></span> Red = Section / Keyword</div>
+      <div><span class="swatch" style="background:#2563eb;"></span> Blue = Sub-section / Link</div>
+      <div><span class="swatch" style="background:#1f2937;"></span> Black = Body</div>
+    </div>
+<div class="keywords">
+      <h2>Key Terms</h2>
+      <ul>
+      <li>Date</li>
+      <li>Reviewer</li>
+      <li>Verdict</li>
+      <li>REBUILD FROM ASH</li>
+      <li>non-functional</li>
+      <li>ReSTIR Generation doesn&#x27;t actually sample</li>
+      <li>Spatial Reuse outputs the center pixel&#x27;s radiance</li>
+      <li>Alpha channel semantic mismatch</li>
+      <li>Missing the core ReSTIR GI algorithm</li>
+      <li>File</li>
+      <li>Problem</li>
+      <li>no sampling</li>
+      <li>What ReSTIR should do</li>
+      <li>What this code does</li>
+      <li>Impact</li>
+      <li>always the center pixel&#x27;s radiance</li>
+      <li>What it should output</li>
+      <li>Data Flow</li>
+      <li>What ReSTIR requires</li>
+      <li>Q-sampling</li>
+      <li>Evaluate target</li>
+      <li>RIS selection</li>
+      <li>Store result</li>
+      <li>What this implementation does</li>
+      <li>Conclusion</li>
+      </ul>
+    </div>
+  </nav>
+  <main>
+    <a class="back" href="index.html">&larr; Back to 50_ReSTIR_GI_Temporal index</a>
+<div class="summary">Reviewer: Senior Graphics Engineer Verdict: REBUILD FROM ASH — The implementation has fundamental algorithmic failures that cannot be patched.</div>
+<h1 id="restir-gi-temporal-implementation-critical-diagnostic-report">ReSTIR GI Temporal Implementation — CRITICAL DIAGNOSTIC REPORT</h1>
+<p><strong>Date</strong>: 2026-06-05<br />
+<strong>Reviewer</strong>: Senior Graphics Engineer<br />
+<strong>Verdict</strong>: <strong>REBUILD FROM ASH</strong> — The implementation has fundamental algorithmic failures that cannot be patched.</p>
+<hr />
+<h2 id="executive-summary">Executive Summary</h2>
+<p>The ReSTIR GI implementation is <strong>non-functional</strong>. It produces no meaningful GI because:</p>
+<ol>
+<li><strong>ReSTIR Generation doesn't actually sample</strong> — it just copies per-pixel data into a "reservoir" format</li>
+<li><strong>Spatial Reuse outputs the center pixel's radiance</strong> — the reservoir's selected sample (y) is completely ignored</li>
+<li><strong>Alpha channel semantic mismatch</strong> — reservoir weight (luminance) is used where hit distance is expected</li>
+<li><strong>Missing the core ReSTIR GI algorithm</strong> — no Q-sampling, no candidate generation, no importance resampling</li>
+</ol>
+<hr />
+<h2 id="root-cause-analysis">Root Cause Analysis</h2>
+<h3 id="critical-bug-1-restir-generation-is-a-pass-through">CRITICAL BUG #1: ReSTIR Generation is a Pass-Through</h3>
+<p><strong>File</strong>: <code>ReSTIR_Generate_cs.hlsl</code> (lines 59-116)</p>
+<p><strong>Problem</strong>: Each pixel reads its own radiance and stores it as the reservoir. There is <strong>no sampling</strong> — the code just re-formats existing data.</p>
+<pre><code class="language-hlsl">// Line 76-77: Read own radiance
+float4 radianceHitDist = gRadiance.Load(int3(pixel, 0));
+float3 radiance = radianceHitDist.rgb;
+
+// Line 115-116: Store own data as &quot;reservoir&quot;
+gReservoir0[pixel] = float4(worldPos, W);  // W = luminance(radiance)
+gReservoir1[pixel] = float4(w_sum, M, pdf, hitDist);
+</code></pre>
+<p><strong>What ReSTIR should do</strong>: Generate M candidate samples (light paths) at each pixel using Q-sampling, evaluate their radiance, select among them via RIS.</p>
+<p><strong>What this code does</strong>: Copies each pixel's data into a struct and calls it a reservoir.</p>
+<p><strong>Impact</strong>: The reservoir contains zero new information. Temporal and spatial reuse cannot improve what doesn't exist.</p>
+<hr />
+<h3 id="critical-bug-2-spatial-reuse-ignores-reservoir-selection">CRITICAL BUG #2: Spatial Reuse Ignores Reservoir Selection</h3>
+<p><strong>File</strong>: <code>ReSTIR_Spatial_cs.hlsl</code> (lines 203-205)</p>
+<p><strong>Problem</strong>: Despite doing geometric merging, the output is <strong>always the center pixel's radiance</strong>:</p>
+<pre><code class="language-hlsl">// Line 204: Ignore reservoir's y (selected sample position)
+float3 centerRadiance = gRadiance.Load(int3(pixel, 0)).rgb;
+
+// Line 205: Output center radiance, NOT reservoir-selected radiance
+gOutRadiance[pixel] = float4(centerRadiance, spatial.W);
+</code></pre>
+<p><strong>What it should output</strong>: <code>gRadiance.Load(int3(spatial.y, 0)).rgb</code> — the radiance at the reservoir's selected world position.</p>
+<p><strong>Impact</strong>: Even if temporal reuse correctly merged reservoirs with different y positions, spatial reuse throws away that information and returns the center pixel.</p>
+<hr />
+<h3 id="critical-bug-3-alpha-channel-semantic-mismatch">CRITICAL BUG #3: Alpha Channel Semantic Mismatch</h3>
+<p><strong>Data Flow</strong>:
+1. <code>FewBounceGI.hlsl</code> outputs: <code>float4(radiance, 1.0)</code> — hitDist hardcoded to 1.0
+2. <code>ReSTIR_Generate_cs.hlsl</code> stores: <code>hitDist = 1.0</code> in Reservoir1.w
+3. <code>ReSTIR_Spatial_cs.hlsl</code> outputs: <code>SpatialRadiance.A = spatial.W</code> (reservoir weight)
+4. <code>ReBLUR_cs.hlsl</code> reads: <code>hitDist = SpatialRadiance.a = spatial.W</code></p>
+<p>In ReBLUR (lines 46-54):</p>
+<pre><code class="language-hlsl">float GetNormHitDist(float hitDist, float viewZ, float roughness) {
+    float A = gConstants.HitDistParams[0];  // 3.0
+    float B = gConstants.HitDistParams[1];  // 0.1
+    float D = gConstants.HitDistParams[3];  // -25.0
+    float roughnessScale = exp2(D * roughness * roughness);
+    float f = (A + abs(viewZ) * B) * roughnessScale;
+    return saturate(hitDist / f);
+}
+</code></pre>
+<p><strong>Problem</strong>: <code>spatial.W</code> is luminance (0 to ~100+ for bright pixels), NOT hit distance (0 to ~10 for most scenes).</p>
+<p>With <code>HitDistParams = [3.0, 0.1, 20.0, -25.0]</code> and <code>viewZ = 5.0</code>:
+- Expected <code>normHitDist = 1.0 / ((3.0 + 0.5) * small) ≈ 1.0</code> (valid)
+- Actual <code>normHitDist = 50.0 / ((3.0 + 0.5) * small) ≈ 10+</code> (clamped, breaks confidence)</p>
+<p><strong>Impact</strong>: ReBLUR's confidence estimation and anti-lag are completely broken.</p>
+<hr />
+<h3 id="critical-bug-4-no-importance-sampling-ris">CRITICAL BUG #4: No Importance Sampling (RIS)</h3>
+<p><strong>What ReSTIR requires</strong> (from Bitterli et al. and Ouyang et al.):</p>
+<ol>
+<li><strong>Q-sampling</strong>: Generate candidates using a proposal distribution (e.g., tent function over screen)</li>
+<li><strong>Evaluate target</strong>: Compute <code>p_hat(y) = luminance(radiance(y))</code> for each candidate</li>
+<li><strong>RIS selection</strong>: Choose among M candidates with probability proportional to <code>p_hat(y) / q(y)</code></li>
+<li><strong>Store result</strong>: <code>y</code> = selected sample position, <code>W</code> = unbiased weight</li>
+</ol>
+<p><strong>What this implementation does</strong>:
+- No Q-sampling (no secondary ray casting)
+- No candidate generation (just uses self)
+- No RIS selection (M=1, no choice)
+- <code>W = w_sum / M = p_hat / 1 = luminance</code> — not unbiased, not useful</p>
+<hr />
+<h2 id="semantic-confusion-summary">Semantic Confusion Summary</h2>
+<table>
+<thead>
+<tr>
+<th>Stage</th>
+<th>What It Should Be</th>
+<th>What It Actually Is</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Reservoir0.xyz</td>
+<td>Selected sample world position</td>
+<td>Self world position</td>
+</tr>
+<tr>
+<td>Reservoir0.w</td>
+<td>Unbiased weight W = p_hat(y) / p(y) / M</td>
+<td>Luminance (not unbiased)</td>
+</tr>
+<tr>
+<td>Reservoir1.x</td>
+<td>Weight sum w_sum = Sigma p_hat</td>
+<td>Self luminance</td>
+</tr>
+<tr>
+<td>Reservoir1.y</td>
+<td>Sample count M</td>
+<td>Always 1</td>
+</tr>
+<tr>
+<td>Reservoir1.w</td>
+<td>Hit distance for ReBLUR</td>
+<td>Hardcoded 1.0</td>
+</tr>
+<tr>
+<td>Spatial output A</td>
+<td>Hit distance for ReBLUR</td>
+<td>Reservoir weight W</td>
+</tr>
+<tr>
+<td>Final output RGB</td>
+<td>Radiance at selected y</td>
+<td>Center pixel radiance</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="why-works-on-3x3-grid-but-fails-with-poisson-is-misleading">Why "Works on 3x3 Grid but Fails with Poisson" is Misleading</h2>
+<p>The self-review mentions the implementation passed with 3x3 grid but fails with Poisson disk. This is <strong>not</strong> a regression — both are broken. The 3x3 grid appeared to "work" because:</p>
+<ol>
+<li>It was effectively just a 3x3 bilateral filter</li>
+<li>The center pixel dominated the blend due to weight issues</li>
+<li>No actual reservoir-based selection was happening</li>
+</ol>
+<hr />
+<h2 id="required-rebuild">Required Rebuild</h2>
+<h3 id="phase-1-true-restir-generation-ris-based">Phase 1: True ReSTIR Generation (RIS-based)</h3>
+<pre><code class="language-hlsl">// Pseudocode for correct generation
+for each pixel p:
+    for i in 0..M-1:
+        // Q-sample: generate candidate in screen space
+        float2 q = SampleTent(p, random());
+        float3 worldPos_q = gWorldPos.Load(q).rgb;
+
+        // Evaluate target at candidate
+        float3 radiance_q = gRadiance.Load(q).rgb;
+        float p_hat = Luminance(radiance_q);
+
+        // Store in reservoir R
+        R.y = worldPos_q;
+        R.w_sum += p_hat;
+        if (rand() &lt; p_hat / R.w_sum):
+            R.selected = i;
+
+    R.W = R.w_sum / M;  // Unbiased weight
+</code></pre>
+<h3 id="phase-2-spatial-reuse-must-use-y">Phase 2: Spatial Reuse Must Use y</h3>
+<pre><code class="language-hlsl">// Output radiance at reservoir's selected position
+float3 selectedRadiance = gRadiance.Load(int3(spatial.y, 0)).rgb;
+gOutRadiance[pixel] = float4(selectedRadiance, spatial.hitDist);
+</code></pre>
+<h3 id="phase-3-fix-alpha-channel">Phase 3: Fix Alpha Channel</h3>
+<ul>
+<li>Store actual hit distance from GI ray tracing (not hardcoded 1.0)</li>
+<li>Pass hit distance through the pipeline unchanged</li>
+<li>OR: Add a separate texture for hit distance if spatial pass can't preserve it</li>
+</ul>
+<hr />
+<h2 id="severity-assessment">Severity Assessment</h2>
+<table>
+<thead>
+<tr>
+<th>Bug</th>
+<th>Severity</th>
+<th>Fixable?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>No actual sampling</td>
+<td>CRITICAL</td>
+<td>No — requires rewrite</td>
+</tr>
+<tr>
+<td>Spatial ignores y</td>
+<td>CRITICAL</td>
+<td>No — requires rewrite</td>
+</tr>
+<tr>
+<td>Alpha mismatch</td>
+<td>CRITICAL</td>
+<td>Partially — needs semantic change</td>
+</tr>
+<tr>
+<td>No RIS</td>
+<td>CRITICAL</td>
+<td>No — requires algorithm rewrite</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Conclusion</strong>: This is not a bug fix. This is a missing feature that requires architectural redesign.</p>
+  </main>
+</div>
+<button id="topBtn" title="Back to top">↑</button>
+</body>
+</html>

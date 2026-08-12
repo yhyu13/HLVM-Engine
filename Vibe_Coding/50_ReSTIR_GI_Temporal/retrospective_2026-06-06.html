@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>retrospective_2026-06-06.md</title>
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+       margin: 0; color: #1f2937; }
+body::before { content: ""; display: block; height: 3px;
+                background: linear-gradient(90deg, #dc2626, #2563eb); }
+header { background: #1f2937; color: #fff; padding: 14px 24px;
+          border-bottom: 3px solid #dc2626; }
+header h1 { margin: 0; font-size: 18px; }
+header .crumb { font-size: 12px; opacity: 0.75; }
+header .crumb a { color: #93c5fd; text-decoration: none; }
+header .crumb a:hover { text-decoration: underline; }
+.layout { display: grid; grid-template-columns: 260px 1fr; gap: 0; max-width: 1200px; margin: 0 auto; }
+nav.toc { border-right: 1px solid #e5e7eb; padding: 20px; font-size: 14px; position: sticky; top: 0;
+          max-height: 100vh; overflow-y: auto; box-sizing: border-box; background: #fafafa; }
+nav.toc h2 { font-size: 13px; text-transform: uppercase; color: #6b7280; margin: 0 0 12px;
+              letter-spacing: 0.5px; font-weight: 700; }
+nav.toc ul { list-style: none; padding: 0; margin: 0; }
+nav.toc li { padding: 4px 0; position: relative; padding-left: 14px;
+              transition: background 0.15s; }
+nav.toc li::before { content: ""; position: absolute; left: 0; top: 50%;
+                      transform: translateY(-50%); width: 6px; height: 6px;
+                      border-radius: 50%; background: #dc2626; opacity: 0.55; }
+nav.toc li:hover { background: #fef2f2; }
+nav.toc li:hover::before { opacity: 1; transform: translateY(-50%) scale(1.4); }
+nav.toc li.active { background: #fef2f2; }
+nav.toc li.active::before { background: #dc2626; opacity: 1; transform: translateY(-50%) scale(1.4); }
+nav.toc li.active a { color: #dc2626; font-weight: 600; }
+nav.toc a { color: #2563eb; text-decoration: none; }
+nav.toc a:hover { color: #dc2626; text-decoration: underline; }
+nav.toc .lvl2 { padding-left: 28px; }
+nav.toc .lvl3 { padding-left: 42px; font-size: 13px; }
+nav.toc .lvl3::before { width: 5px; height: 5px; background: #2563eb; opacity: 0.5; }
+nav.toc .empty { color: #9ca3af; font-style: italic; }
+.legend { margin-top: 18px; padding: 10px; background: #fff;
+           border: 1px solid #e5e7eb; border-radius: 6px; font-size: 12px; }
+.legend h2 { font-size: 11px !important; margin: 0 0 6px !important; }
+.legend div { display: flex; align-items: center; gap: 6px; padding: 2px 0; }
+.legend span.swatch { display: inline-block; width: 12px; height: 12px;
+                       border-radius: 3px; flex-shrink: 0; }
+.keywords { margin-top: 14px; padding: 10px; background: #fff;
+             border: 1px solid #e5e7eb; border-radius: 6px; font-size: 12px; }
+.keywords h2 { font-size: 11px !important; margin: 0 0 6px !important; }
+.keywords ul { padding-left: 14px; margin: 0; }
+.keywords li { padding: 1px 0 !important; padding-left: 0 !important;
+                border: 0 !important; background: none !important; }
+.keywords li::before { display: none !important; }
+.keywords a { color: #1f2937 !important; font-size: 12px; }
+.keywords a:hover { color: #dc2626 !important; text-decoration: underline; }
+main { padding: 24px 36px; line-height: 1.6; max-width: 900px; }
+main h1, main h2, main h3 { scroll-margin-top: 16px; }
+main h1 { color: #dc2626; border-bottom: 2px solid #dc2626; padding-bottom: 6px; }
+main h2 { color: #2563eb; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px;
+          margin-top: 32px; padding-left: 10px; border-left: 4px solid #2563eb; }
+main h3 { color: #dc2626; margin-top: 24px; padding-left: 8px;
+          border-left: 3px solid #dc2626; }
+main a { color: #2563eb; text-decoration: none; }
+main a:hover { color: #dc2626; text-decoration: underline; }
+main pre { background: #ffffff; color: #1f2937; padding: 16px; border-radius: 6px;
+            overflow-x: auto; font: 13px/1.5 Menlo, Consolas, monospace;
+            border: 1px solid #e5e7eb; }
+main code { background: #f3f4f6; color: #1f2937; padding: 2px 5px; border-radius: 3px;
+             font: 13px Menlo, Consolas, monospace; }
+main pre code { background: transparent; color: inherit; padding: 0; }
+main table { border-collapse: collapse; }
+main th, main td { border: 1px solid #e5e7eb; padding: 6px 12px; }
+main th { background: #f3f4f6; }
+main blockquote { border-left: 4px solid #d1d5db; margin: 16px 0; padding: 8px 16px;
+                   color: #4b5563; }
+main hr { border: 0; border-top: 1px solid #e5e7eb; margin: 24px 0; }
+main strong.kw { color: #dc2626; font-weight: 700; }
+.summary { background: #eff6ff; border-left: 4px solid #2563eb; padding: 12px 16px;
+            margin: 16px 0 24px; border-radius: 4px; color: #1e3a8a; font-size: 14px;
+            line-height: 1.5; }
+.summary::before { content: "📝 Summary"; display: block; font-weight: 700;
+                    color: #2563eb; font-size: 11px; text-transform: uppercase;
+                    letter-spacing: 0.5px; margin-bottom: 4px; }
+.back { display: inline-block; margin-bottom: 16px; font-size: 0.9em; color: #2563eb;
+         text-decoration: none; }
+.back:hover { color: #dc2626; text-decoration: underline; }
+#topBtn { position: fixed; bottom: 24px; right: 24px; z-index: 100;
+          background: #dc2626; color: #fff; border: 0; border-radius: 50%;
+          width: 44px; height: 44px; font-size: 18px; cursor: pointer;
+          box-shadow: 0 2px 6px rgba(0,0,0,0.2); opacity: 0;
+          transition: opacity 0.2s; pointer-events: none; }
+#topBtn.show { opacity: 1; pointer-events: auto; }
+#topBtn:hover { background: #b91c1c; }
+@media (max-width: 900px) {
+  .layout { grid-template-columns: 1fr; }
+  nav.toc { position: static; max-height: none; border-right: 0;
+             border-bottom: 1px solid #e5e7eb; }
+  main { padding: 16px 20px; }
+}
+@media print {
+  nav.toc, .legend, .keywords, #topBtn { display: none; }
+  .layout { grid-template-columns: 1fr; }
+  body::before { display: none; }
+  header { background: #fff; color: #000; border-bottom: 1px solid #000; }
+  main h1, main h2, main h3 { color: #000; border-color: #000; }
+}
+</style>
+<script>
+(function() {
+  const links = document.querySelectorAll('nav.toc a[href^="#"]');
+  const map = new Map();
+  links.forEach(a => {
+    const id = a.getAttribute('href').slice(1);
+    const li = a.parentElement;
+    map.set(id, li);
+  });
+  const targets = Array.from(map.keys()).map(id => document.getElementById(id)).filter(Boolean);
+  function activate() {
+    if (!targets.length) return;
+    const scrollY = window.scrollY + 80;
+    let current = null;
+    for (const t of targets) {
+      if (t.offsetTop <= scrollY) current = t;
+      else break;
+    }
+    links.forEach(a => a.parentElement.classList.remove('active'));
+    if (current) {
+      const li = map.get(current.id);
+      if (li) li.classList.add('active');
+    }
+  }
+  window.addEventListener('scroll', activate, { passive: true });
+  activate();
+
+  const btn = document.getElementById('topBtn');
+  if (btn) {
+    window.addEventListener('scroll', () => {
+      btn.classList.toggle('show', window.scrollY > 400);
+    }, { passive: true });
+    btn.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+  }
+})();
+</script>
+</head>
+<body>
+<header>
+  <div class="crumb"><a href="./index.html">Vibe_Coding/</a> / <a href="index.html">50_ReSTIR_GI_Temporal</a> / retrospective_2026-06-06.md</div>
+  <h1>📄 retrospective_2026-06-06.md</h1>
+</header>
+<div class="layout">
+  <nav class="toc">
+    <h2>On this page</h2>
+    <ul>
+<li class=""><a href="#restir-gi-iterations-retrospective-2026-06-06">ReSTIR GI Iterations — Retrospective (2026-06-06)</a></li>
+      <li class="lvl2"><a href="#what-we-did-right-in-rough-order-of-impact">What We Did Right (in rough order of impact)</a></li>
+      <li class="lvl2"><a href="#what-we-did-wrong-in-order-of-occurrence">What We Did Wrong (in order of occurrence)</a></li>
+      <li class="lvl3"><a href="#1-anchored-on-restir-dimming-and-ignored-upstream-gi-for-too-long">1. Anchored on "ReSTIR dimming" and ignored upstream GI for too long</a></li>
+      <li class="lvl3"><a href="#2-trusted-the-compacted-context-over-the-actual-files-on-disk">2. Trusted the compacted context over the actual files on disk</a></li>
+      <li class="lvl3"><a href="#3-debug-visualisation-became-production-code-temporarily">3. Debug visualisation became production code temporarily</a></li>
+      <li class="lvl3"><a href="#4-double-offset-vertex-index-bug-in-closesthit">4. Double-offset vertex index bug in ClosestHit</a></li>
+      <li class="lvl3"><a href="#5-tonemapping-whiplash-reinhard-too-dark-exposure2-clipping-then-aces">5. Tonemapping whiplash: Reinhard → too dark, Exposure=2 → clipping, then ACES</a></li>
+      <li class="lvl3"><a href="#6-late-analysis-of-pixel-distribution">6. Late analysis of pixel distribution</a></li>
+      <li class="lvl2"><a href="#why-we-kept-making-mistakes-root-cause">Why We Kept Making Mistakes (root cause)</a></li>
+      <li class="lvl2"><a href="#the-one-thing-that-would-have-saved-time">The One Thing That Would Have Saved Time</a></li>
+      <li class="lvl2"><a href="#how-to-apply-this-next-session-on-a-similar-bug">How to Apply This (next session on a similar bug)</a></li>
+      <li class="lvl2"><a href="#cross-references">Cross-references</a></li>
+    </ul>
+    <div class="legend">
+      <h2>Color Legend</h2>
+      <div><span class="swatch" style="background:#dc2626;"></span> Red = Section / Keyword</div>
+      <div><span class="swatch" style="background:#2563eb;"></span> Blue = Sub-section / Link</div>
+      <div><span class="swatch" style="background:#1f2937;"></span> Black = Body</div>
+    </div>
+<div class="keywords">
+      <h2>Key Terms</h2>
+      <ul>
+      <li>Why this exists</li>
+      <li>Why</li>
+      <li>Hypothesis-driven without isolation</li>
+      <li>Modifying instead of measuring</li>
+      <li>Fixing symptoms incrementally</li>
+      <li>Ignoring the critic until late</li>
+      <li>Compacted context ≠ file on disk</li>
+      <li>Read the user&#x27;s critic BEFORE touching code.</li>
+      <li>Disable the post-process and look at the upstream.</li>
+      <li>Don&#x27;t keep debug visualisations in the build.</li>
+      </ul>
+    </div>
+  </nav>
+  <main>
+    <a class="back" href="index.html">&larr; Back to 50_ReSTIR_GI_Temporal index</a>
+<div class="summary">Why this exists: We spent ~15 iterations chasing &quot;ReSTIR temporal dimming&quot; before realising the actual bug was upstream (broken normals, hardcoded gray albedo, 1-SPP). This document records what worked, what failed, and the meta-pattern that kept producing failure. Future sessions on ReSTIR / few-bounce GI / Sponza…</div>
+<h1 id="restir-gi-iterations-retrospective-2026-06-06">ReSTIR GI Iterations — Retrospective (2026-06-06)</h1>
+<p><strong>Why this exists</strong>: We spent ~15 iterations chasing "ReSTIR temporal dimming" before realising the actual bug was upstream (broken normals, hardcoded gray albedo, 1-SPP). This document records what worked, what failed, and the meta-pattern that kept producing failure. Future sessions on ReSTIR / few-bounce GI / Sponza lighting should read this BEFORE debugging.</p>
+<hr />
+<h2 id="what-we-did-right-in-rough-order-of-impact">What We Did Right (in rough order of impact)</h2>
+<table>
+<thead>
+<tr>
+<th>Fix</th>
+<th>Impact</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Removed TAA lerp() from temporal pass</td>
+<td>Eliminated progressive dimming (~33 → ~19 → ~14 → ~12)</td>
+</tr>
+<tr>
+<td>Fixed spatial reading <code>DenoisedHDRTexture</code> instead of uninitialised <code>TemporalRadianceTexture</code></td>
+<td>Eliminated black output</td>
+</tr>
+<tr>
+<td>Restored 3×3 spatial neighbour merge</td>
+<td>ReSTIR actually does spatial reuse now</td>
+</tr>
+<tr>
+<td>Added vertex buffer bindings (RTVertices/RTIndices/RTInstanceInfo) to hit shader</td>
+<td>ClosestHit gets real normals instead of <code>normalize(SV_HitT)</code></td>
+</tr>
+<tr>
+<td>Added per-instance AlbedoColor from PBRMaterial</td>
+<td>Surfaces are no longer uniform gray</td>
+</tr>
+<tr>
+<td>Added primary direct lighting in RayGen</td>
+<td>Base image is recognisable before GI even starts</td>
+</tr>
+<tr>
+<td>SPP loop (8 samples) + stronger bilateral (SpatialSigma=4)</td>
+<td>Reduced Monte Carlo noise</td>
+</tr>
+<tr>
+<td>ACES filmic tonemap + saturate()</td>
+<td>Eliminated HDR clipping to white (12.6% → 0%)</td>
+</tr>
+<tr>
+<td>Deterministic generation hash (removed FrameIndex)</td>
+<td>Frame-to-frame variation dropped to ~0.4/255</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="what-we-did-wrong-in-order-of-occurrence">What We Did Wrong (in order of occurrence)</h2>
+<h3 id="1-anchored-on-restir-dimming-and-ignored-upstream-gi-for-too-long">1. Anchored on "ReSTIR dimming" and ignored upstream GI for too long</h3>
+<p>We spent ~15 iterations tweaking <code>w_sum</code>, M caps, ping-pong swaps, and debug visualisations in ReSTIR shaders. The actual root cause was upstream: <code>SV_HitT</code> declared as <code>float3</code>, hardcoded <code>albedo=0.7</code>, no real normals.</p>
+<p><strong>Why</strong>: The user's context said "temporal dimming bug", so we assumed the bug was in ReSTIR. We should have first asked: "does the raw GI output look reasonable?"</p>
+<h3 id="2-trusted-the-compacted-context-over-the-actual-files-on-disk">2. Trusted the compacted context over the actual files on disk</h3>
+<p>The user's code_state showed a spatial shader with 3×3 neighbour-merge logic. The actual file on disk was a 34-line passthrough copy shader. We debugged merge math that wasn't even running for several iterations.</p>
+<p><strong>Why</strong>: Compacted context showed what the user thought was latest, but the file had been overwritten/reverted.</p>
+<h3 id="3-debug-visualisation-became-production-code-temporarily">3. Debug visualisation became production code temporarily</h3>
+<p>We added <code>gOutRadiance = red/green</code> for <code>historyValid</code> debug to the temporal shader. This debug output got compiled into the build and influenced our perception of what was happening.</p>
+<p><strong>Why</strong>: We modified the shader to debug, then forgot to fully revert before moving to the next hypothesis.</p>
+<h3 id="4-double-offset-vertex-index-bug-in-closesthit">4. Double-offset vertex index bug in ClosestHit</h3>
+<p>C++ adjusted indices by <code>+vertexOffset</code> when building unified buffers. The shader then added <code>+info.VertexOffset</code> again: <code>RTVertices[info.VertexOffset + i0]</code>. This caused out-of-bounds reads → zero normals → black output.</p>
+<p><strong>Why</strong>: We changed the shader to remove <code>VertexOffset</code> after seeing black output, rather than reasoning through the index math upfront.</p>
+<h3 id="5-tonemapping-whiplash-reinhard-too-dark-exposure2-clipping-then-aces">5. Tonemapping whiplash: Reinhard → too dark, Exposure=2 → clipping, then ACES</h3>
+<ul>
+<li>Added <code>Reinhard x/(1+x)</code> → output collapsed to mean ~11/255 (too dark for this scene)</li>
+<li>Switched to raw <code>Exposure=2</code> → brought back 12.6% white pixel clipping</li>
+<li>Finally settled on ACES filmic curve</li>
+</ul>
+<p><strong>Why</strong>: We were fixing the symptom (white pixels in PNG dump) without understanding that the cause was <code>light intensity 3.0 + no tonemap</code>. A better first step would have been "reduce light intensity to 1.0 and add a proper tonemap".</p>
+<h3 id="6-late-analysis-of-pixel-distribution">6. Late analysis of pixel distribution</h3>
+<p>We should have run <code>np.percentile()</code> and black/white pixel counts on frame 1. Instead we stared at mean values (~33, ~19, etc.) for 10+ iterations. The percentile analysis immediately revealed the bimodal distribution (63% black / 35% at 255) that told us the real story.</p>
+<p><strong>Why</strong>: We treated this as a "ReSTIR temporal weight bug" instead of a "HDR pipeline + broken normals + no colour" bug.</p>
+<hr />
+<h2 id="why-we-kept-making-mistakes-root-cause">Why We Kept Making Mistakes (root cause)</h2>
+<table>
+<thead>
+<tr>
+<th>Pattern</th>
+<th>How It Hurt Us</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Hypothesis-driven without isolation</strong></td>
+<td>We kept guessing (w_sum scaling, buffer swap timing, matrix order) instead of first rendering without ReSTIR to see if GI itself was broken</td>
+</tr>
+<tr>
+<td><strong>Modifying instead of measuring</strong></td>
+<td>We changed shaders (gray output, M visualisation, debug colours) to "see what's happening" rather than adding structured logging or inspecting intermediate textures</td>
+</tr>
+<tr>
+<td><strong>Fixing symptoms incrementally</strong></td>
+<td>Each fix addressed one visible issue (black screen → dimming → white pixels → darkness) without a coherent picture of the whole pipeline</td>
+</tr>
+<tr>
+<td><strong>Ignoring the critic until late</strong></td>
+<td>The user provided a detailed critic that correctly identified <code>SV_HitT</code>, hardcoded albedo, and 1-SPP as the real issues. We should have read that first instead of treating it as background noise</td>
+</tr>
+<tr>
+<td><strong>Compacted context ≠ file on disk</strong></td>
+<td>A 15-iteration compacted summary is not a substitute for reading the current shader source. The source is the truth</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="the-one-thing-that-would-have-saved-time">The One Thing That Would Have Saved Time</h2>
+<p><strong>Disable ReSTIR, dump <code>DenoisedHDRTexture</code> directly, and inspect it.</strong></p>
+<p>If we had done this on iteration 2 instead of iteration 15, we would have seen:
+- 90% black pixels (broken normals → NdotL was random)
+- Zero colour variation (hardcoded albedo = 0.7)
+- Salt-and-pepper from 1-SPP</p>
+<p>That would have immediately pointed us to <code>FewBounceGI.hlsl</code> instead of chasing ghosts in ReSTIR merge math.</p>
+<hr />
+<h2 id="how-to-apply-this-next-session-on-a-similar-bug">How to Apply This (next session on a similar bug)</h2>
+<ol>
+<li><strong>Read the user's critic BEFORE touching code.</strong> If they say "the GI is broken", the GI is broken — not the post-process.</li>
+<li><strong>Disable the post-process and look at the upstream.</strong> If ReSTIR output is noisy, dump <code>DenoisedHDRTexture</code>. If that's noisy, dump <code>HDRTexture</code> (raw GI). If that's noisy, the bug is in the GI shader.</li>
+<li><strong>Run <code>np.percentile()</code> on the dumped frame</strong> before any mean/std analysis. Bimodal distributions (lots of 0s and 255s) tell you the pipeline is producing either nothing or saturated output — that immediately narrows the search to "input is zero" vs "tonemap is missing".</li>
+<li><strong>Treat compacted context as a hint, not as the file.</strong> When in doubt, Read the actual source. The harness tracks which files have been read; if you re-read, you'll get the latest.</li>
+<li><strong>Don't keep debug visualisations in the build.</strong> <code>#ifdef DEBUG_VIS</code> or comment them out before iterating. Confirmed by iteration 3 above.</li>
+<li><strong>Mark critics as <code>STATUS: SUPERSEDED</code> when a new one replaces them.</strong> Don't accumulate three critics in one directory without a current pointer.</li>
+</ol>
+<hr />
+<h2 id="cross-references">Cross-references</h2>
+<ul>
+<li>Bug history: <code>.wolf/buglog.json</code> entries <code>bug-045</code> (pre-fix) and <code>bug-046</code> (post-fix)</li>
+<li>Current critic: <code>Vibe_Coding/50_ReSTIR_GI_Temporal/critic_2026-06-06_snowflower_v2.md</code></li>
+<li>Implementation critics: <code>impl_critic.md</code>, <code>impl_7b_critic.md</code>, <code>impl_8_critic.md</code>, <code>impl_9_critic.md</code> (in same directory)</li>
+<li>Code: <code>Engine/Source/Runtime/Test/TestFewBounceGI.cpp</code> + <code>Engine/Source/Runtime/Test/TestFewBounceGI_Data/{FewBounceGI,ReSTIR_*_cs}.hlsl</code></li>
+</ul>
+  </main>
+</div>
+<button id="topBtn" title="Back to top">↑</button>
+</body>
+</html>

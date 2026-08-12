@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>50_ReSTIR_GI_Temporal</title>
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+       margin: 0; color: #1f2937; }
+body::before { content: ""; display: block; height: 3px;
+                background: linear-gradient(90deg, #dc2626, #2563eb); }
+header { background: #1f2937; color: #fff; padding: 14px 24px;
+          border-bottom: 3px solid #dc2626; }
+header h1 { margin: 0; font-size: 18px; }
+header .crumb { font-size: 12px; opacity: 0.75; }
+header .crumb a { color: #93c5fd; text-decoration: none; }
+header .crumb a:hover { text-decoration: underline; }
+.layout { display: grid; grid-template-columns: 260px 1fr; gap: 0; max-width: 1200px; margin: 0 auto; }
+nav.toc { border-right: 1px solid #e5e7eb; padding: 20px; font-size: 14px; position: sticky; top: 0;
+          max-height: 100vh; overflow-y: auto; box-sizing: border-box; background: #fafafa; }
+nav.toc h2 { font-size: 13px; text-transform: uppercase; color: #6b7280; margin: 0 0 12px;
+              letter-spacing: 0.5px; font-weight: 700; }
+nav.toc ul { list-style: none; padding: 0; margin: 0; }
+nav.toc li { padding: 4px 0; position: relative; padding-left: 14px; }
+nav.toc li::before { content: ""; position: absolute; left: 0; top: 50%;
+                      transform: translateY(-50%); width: 6px; height: 6px;
+                      border-radius: 50%; background: #dc2626; opacity: 0.55; }
+nav.toc a { color: #2563eb; text-decoration: none; }
+nav.toc a:hover { color: #dc2626; text-decoration: underline; }
+nav.toc .lvl2 { padding-left: 28px; }
+nav.toc .lvl3 { padding-left: 42px; font-size: 13px; }
+nav.toc .lvl3::before { width: 5px; height: 5px; background: #2563eb; opacity: 0.5; }
+.legend { margin-top: 18px; padding: 10px; background: #fff;
+           border: 1px solid #e5e7eb; border-radius: 6px; font-size: 12px; }
+.legend h2 { font-size: 11px !important; margin: 0 0 6px !important; }
+.legend div { display: flex; align-items: center; gap: 6px; padding: 2px 0; }
+.legend span.swatch { display: inline-block; width: 12px; height: 12px;
+                       border-radius: 3px; flex-shrink: 0; }
+main { padding: 24px 36px; line-height: 1.6; }
+ul.files { list-style: none; padding-left: 0; }
+ul.files li { padding: 6px 0; border-bottom: 1px solid #e5e7eb; }
+ul.files a { color: #2563eb; text-decoration: none; font-weight: 500; }
+ul.files a:hover { color: #dc2626; text-decoration: underline; }
+.size { color: #6b7280; font-size: 0.85em; margin-left: 8px; }
+.dir { font-weight: 600; color: #1f2937; }
+@media (max-width: 900px) {
+  .layout { grid-template-columns: 1fr; }
+  nav.toc { position: static; max-height: none; border-right: 0;
+             border-bottom: 1px solid #e5e7eb; }
+}
+@media print {
+  nav.toc, .legend { display: none; }
+  .layout { grid-template-columns: 1fr; }
+  body::before { display: none; }
+  header { background: #fff; color: #000; border-bottom: 1px solid #000; }
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="crumb"><a href="./index.html">Vibe_Coding/</a></div>
+  <h1>📁 50_ReSTIR_GI_Temporal</h1>
+</header>
+<div class="layout">
+  <nav class="toc">
+    <h2>Navigation</h2>
+    <ul>
+      <li><a href="#files">Files in this folder</a></li>
+      <li><a href="./index.html">↑ Parent</a></li>
+    </ul>
+    <div class="legend">
+      <h2>Color Legend</h2>
+      <div><span class="swatch" style="background:#dc2626;"></span> Red = Section / Keyword</div>
+      <div><span class="swatch" style="background:#2563eb;"></span> Blue = Sub-section / Link</div>
+      <div><span class="swatch" style="background:#1f2937;"></span> Black = Body</div>
+    </div>
+  </nav>
+  <main>
+    <h2 id="files" style="color:#dc2626; padding-bottom:4px; border-bottom:1px solid #e5e7eb;">Files</h2>
+    <ul class="files">
+<li>📄 <a href="cerebrum.html">cerebrum.md</a><span class="size">2,365 bytes</span></li>
+      <li><span class="dir">📁 claude/</span></li>
+      <li>📄 <a href="claude.html">claude.md</a><span class="size">7,109 bytes</span></li>
+      <li>📄 <a href="critic_2026-06-06_snowflower.html">critic_2026-06-06_snowflower.md</a><span class="size">17,962 bytes</span></li>
+      <li>📄 <a href="critic_2026-06-06_snowflower_v2.html">critic_2026-06-06_snowflower_v2.md</a><span class="size">29,915 bytes</span></li>
+      <li>📄 <a href="finish_2026-07-20.html">finish_2026-07-20.md</a><span class="size">7,246 bytes</span></li>
+      <li>📄 <a href="impl_7b_critic.html">impl_7b_critic.md</a><span class="size">1,877 bytes</span></li>
+      <li>📄 <a href="impl_8_critic.html">impl_8_critic.md</a><span class="size">3,482 bytes</span></li>
+      <li>📄 <a href="impl_9_critic.html">impl_9_critic.md</a><span class="size">1,464 bytes</span></li>
+      <li>📄 <a href="impl_critic.html">impl_critic.md</a><span class="size">2,409 bytes</span></li>
+      <li><span class="dir">📁 kimi/</span></li>
+      <li>📄 <a href="phase1_completion_2026-06-06.html">phase1_completion_2026-06-06.md</a><span class="size">12,540 bytes</span></li>
+      <li>📄 <a href="plan.html">plan.md</a><span class="size">9,320 bytes</span></li>
+      <li>📄 <a href="plan_7b.html">plan_7b.md</a><span class="size">10,031 bytes</span></li>
+      <li>📄 <a href="plan_7b_critic.html">plan_7b_critic.md</a><span class="size">3,446 bytes</span></li>
+      <li>📄 <a href="plan_8.html">plan_8.md</a><span class="size">13,012 bytes</span></li>
+      <li>📄 <a href="plan_8_critic.html">plan_8_critic.md</a><span class="size">4,562 bytes</span></li>
+      <li>📄 <a href="plan_9.html">plan_9.md</a><span class="size">6,692 bytes</span></li>
+      <li>📄 <a href="plan_9_critic.html">plan_9_critic.md</a><span class="size">1,807 bytes</span></li>
+      <li>📄 <a href="plan_critic.html">plan_critic.md</a><span class="size">5,509 bytes</span></li>
+      <li>📄 <a href="retrospective_2026-06-06.html">retrospective_2026-06-06.md</a><span class="size">7,224 bytes</span></li>
+      <li>📄 <a href="self_review_final.html">self_review_final.md</a><span class="size">7,510 bytes</span></li>
+    </ul>
+  </main>
+</div>
+</body>
+</html>

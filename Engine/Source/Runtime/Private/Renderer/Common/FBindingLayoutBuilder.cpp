@@ -306,29 +306,44 @@ void FBindingSetBuilder::Reset()
 
 bool FBindingSetBuilder::ValidateAgainstLayout(const nvrhi::BindingSetDesc& SetDesc, const nvrhi::BindingLayoutDesc& LayoutDesc)
 {
-    if (SetDesc.bindings.size() != LayoutDesc.bindings.size())
+    // Build the expected (slot, arrayElement, type) sequence from the layout,
+    // expanding descriptor arrays (layout item size > 1) so a set with N array
+    // elements against one sized layout item validates. 2026-08-10 (Phase 3b).
+    struct FExpected { uint32_t Slot; uint32_t ArrayElement; nvrhi::ResourceType Type; };
+    std::vector<FExpected> Expected;
+    for (const auto& L : LayoutDesc.bindings)
+    {
+        const uint32_t Count = (L.size > 0) ? L.size : 1;
+        for (uint32_t e = 0; e < Count; ++e)
+        {
+            Expected.push_back({ L.slot, e, L.type });
+        }
+    }
+
+    if (SetDesc.bindings.size() != Expected.size())
     {
         HLVM_LOG(LogBindingLayout, err, TXT("BindingSet/Layout mismatch: set has {} items, layout expects {}"),
             static_cast<uint32_t>(SetDesc.bindings.size()),
-            static_cast<uint32_t>(LayoutDesc.bindings.size()));
+            static_cast<uint32_t>(Expected.size()));
         return false;
     }
 
     for (size_t i = 0; i < SetDesc.bindings.size(); ++i)
     {
         const auto& SetItem = SetDesc.bindings[i];
-        const auto& LayoutItem = LayoutDesc.bindings[i];
+        const auto& LayoutItem = Expected[i];
 
-        if (SetItem.slot != LayoutItem.slot)
+        if (SetItem.slot != LayoutItem.Slot || SetItem.arrayElement != LayoutItem.ArrayElement)
         {
-            HLVM_LOG(LogBindingLayout, err, TXT("BindingSet/Layout mismatch at item {}: set slot={}, layout slot={}"),
-                static_cast<uint32_t>(i), SetItem.slot, LayoutItem.slot);
+            HLVM_LOG(LogBindingLayout, err, TXT("BindingSet/Layout mismatch at item {}: set slot={} elem={}, layout slot={} elem={}"),
+                static_cast<uint32_t>(i), SetItem.slot, SetItem.arrayElement,
+                LayoutItem.Slot, LayoutItem.ArrayElement);
             return false;
         }
 
         // Type compatibility check — map set-item type to layout resource type
         bool bTypeMatch = false;
-        switch (LayoutItem.type)
+        switch (LayoutItem.Type)
         {
             case nvrhi::ResourceType::ConstantBuffer:
                 bTypeMatch = (SetItem.type == nvrhi::ResourceType::ConstantBuffer);
@@ -385,7 +400,7 @@ bool FBindingSetBuilder::ValidateAgainstLayout(const nvrhi::BindingSetDesc& SetD
         {
             HLVM_LOG(LogBindingLayout, err, TXT("BindingSet/Layout type mismatch at item {} (slot={}): set type={}, layout type={}"),
                 static_cast<uint32_t>(i), SetItem.slot,
-                static_cast<uint32_t>(SetItem.type), static_cast<uint32_t>(LayoutItem.type));
+                static_cast<uint32_t>(SetItem.type), static_cast<uint32_t>(LayoutItem.Type));
             return false;
         }
     }

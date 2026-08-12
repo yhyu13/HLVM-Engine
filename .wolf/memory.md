@@ -1708,3 +1708,348 @@
 | 04:04 | Edited Engine/Source/Runtime/Test/TestCornellBoxGI_Data/BilateralDenoise_cs.hlsl | 4→4 lines | ~31 |
 | 04:04 | Edited Engine/Source/Runtime/Shader/BilateralDenoise_cs.hlsl | 4→4 lines | ~27 |
 | 04:52 | Session end: 19 writes across 10 files (README.md, Engine.ini, spicy-hopping-hopcroft.md, BilateralDenoise_cs.hlsl, FLight.h) | 26 reads | ~66888 tok |
+| 05:06 | Session end: 19 writes across 10 files (README.md, Engine.ini, spicy-hopping-hopcroft.md, BilateralDenoise_cs.hlsl, FLight.h) | 26 reads | ~66888 tok |
+| 16:25 | Session end: 19 writes across 10 files (README.md, Engine.ini, spicy-hopping-hopcroft.md, BilateralDenoise_cs.hlsl, FLight.h) | 26 reads | ~66888 tok |
+| 22:57 | Session end: 19 writes across 10 files (README.md, Engine.ini, spicy-hopping-hopcroft.md, BilateralDenoise_cs.hlsl, FLight.h) | 26 reads | ~66888 tok |
+| 07:17 | Session end: 19 writes across 10 files (README.md, Engine.ini, spicy-hopping-hopcroft.md, BilateralDenoise_cs.hlsl, FLight.h) | 26 reads | ~66888 tok |
+| 07:26 | Session end: 19 writes across 10 files (README.md, Engine.ini, spicy-hopping-hopcroft.md, BilateralDenoise_cs.hlsl, FLight.h) | 26 reads | ~66888 tok |
+| 07:57 | Session end: 19 writes across 10 files (README.md, Engine.ini, spicy-hopping-hopcroft.md, BilateralDenoise_cs.hlsl, FLight.h) | 26 reads | ~66888 tok |
+| 08:00 | Created ../../../.claude/plans/jovial-navigating-borg.md | — | ~3188 |
+
+| 22:30 | Wrote NEE follow-up sprint plan (Phase A = sun-only delta light NEE, Phase B = point/spot/area) | /home/hangyu5/.claude/plans/jovial-navigating-borg.md | Plan file matches spicy-hopping-hopcroft.md structure. NEE = variance reduction via power-2 MIS combine. Phase A target: Sponza std 48→≤25 at SPP=8. Phase B adds point/spot/area lights + scene JSON schema. Defer to fresh session. | ~3k |
+| 08:01 | Session end: 20 writes across 11 files (README.md, Engine.ini, spicy-hopping-hopcroft.md, BilateralDenoise_cs.hlsl, FLight.h) | 26 reads | ~70303 tok |
+| 14:20 | Session end: 20 writes across 11 files (README.md, Engine.ini, spicy-hopping-hopcroft.md, BilateralDenoise_cs.hlsl, FLight.h) | 26 reads | ~70303 tok |
+| 14:31 | Created Engine/Source/Runtime/Private/Renderer/GI/FGIPass.cpp | — | ~3480 |
+| 14:31 | Session end: 21 writes across 11 files (README.md, Engine.ini, spicy-hopping-hopcroft.md, BilateralDenoise_cs.hlsl, FLight.h) | 28 reads | ~74031 tok |
+| 17:50 | Edited Engine/Source/Runtime/Public/Renderer/GI/FGIPass.h | 16→15 lines | ~164 |
+| 17:51 | Edited Engine/Source/Runtime/Public/Renderer/GI/FGIPass.h | expanded (+6 lines) | ~265 |
+| 17:55 | Created Engine/Source/Runtime/Private/Renderer/GI/FGIPass.cpp | — | ~3269 |
+| 17:55 | Session end: 24 writes across 11 files (README.md, Engine.ini, spicy-hopping-hopcroft.md, BilateralDenoise_cs.hlsl, FLight.h) | 28 reads | ~77992 tok |
+| 23:55 | Edited Engine/Source/Runtime/Private/Renderer/GI/FGIPass.cpp | 4→5 lines | ~65 |
+| 23:57 | Session end: 25 writes across 11 files (README.md, Engine.ini, spicy-hopping-hopcroft.md, BilateralDenoise_cs.hlsl, FLight.h) | 28 reads | ~78061 tok |
+
+## Session: 2026-06-15
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 15:18 | Fixed Cornell Box GBuffer diffuse colors | Engine/Source/Runtime/Test/TestCornellBoxGI.cpp | Created 1x1 solid-color albedo textures per material so GBuffer writes red/green/white instead of default white fallback. | ~400 |
+| 15:20 | Repositioned Cornell Box camera | Engine/Source/Runtime/Test/TestCornellBoxGI.cpp | Camera moved inside box with 90° FOV; all six faces visible. | ~150 |
+| 15:22 | Tuned Cornell Box lighting for validation | Engine/Source/Runtime/Test/TestCornellBoxGI.cpp, Public/Renderer/GI/GICVars.h | Left/right walls emissive (3.0), ceiling dim emissive (1.0), SPP=2, MaxBounces=1. Eliminated 80%+ black-pixel noise seen at higher sample counts. | ~300 |
+| 15:25 | Fixed per-bounce RNG seed truncation | Engine/Source/Runtime/Test/TestCornellBoxGI_Data/CornellBoxGI.hlsl | Added hashUint(uint)->uint; stopped assigning float hash to uint seed (was truncating to 0 after bounce 1). Same class as bug-046. | ~250 |
+| 15:31 | Dumped final denoised output | Engine/Source/Runtime/Test/TestCornellBoxGI.cpp | DumpTexture now uses ReSTIROutputTexture / DenoisedHDRTexture instead of raw HDRTexture. | ~100 |
+| 15:33 | Added Cornell Box validation script | Engine/Source/Runtime/Test/TestCornellBoxGI_Data/validate_cornell.py, README.md | Automated checks: black%<5%, mean drift<5, temporal std<20%, high/low ratio<5, floor red+green bleed. | ~500 |
+| 15:36 | Logged milestone + bug | .wolf/cerebrum.md, .wolf/buglog.json | Added Decision Log entry and bug-061 (float→uint RNG truncation in CornellBoxGI.hlsl). | ~200 |
+| 15:36 | Session end: Cornell Box validation PASS; queued Task 1.5 of ReSTIR/GI separation sprint. | 8 writes, 6 reads | ~1900 |
+
+## Session: 2026-06-20
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 06:30 | Migrated real GI shader bodies to FGIPass | Engine/Source/Runtime/Private/Renderer/Shader/GI/GIPathTracing.hlsl | Replaced stub RayGen/ClosestHit/Miss with bodies adapted from FewBounceGI.hlsl; removed bindless texture dependency (uses AlbedoColor only); applied hashUint seed fix. | ~800 |
+| 06:32 | Added GI shader build rule | Engine/Source/Runtime/ShaderMakeBuild.py, Runtime_cmake.py | New `create_gi_shadermake()` factory + module registration; GIPathTracing.hlsl compiles via `GI_ShaderMake` target. | ~200 |
+| 06:34 | Verified builds + Cornell Box still green | TestFewBounceGI, TestCornellBoxGI, GI_ShaderMake | All build cleanly; Cornell Box validation script passes 5/5 checks. | ~300 |
+| 06:35 | Session end: Task 1.5 complete. Next: Task 1.6 (multi-bounce loop + RR + EvalBRDF helpers). | 3 writes, 4 reads | ~1300 |
+| 06:53 | Session end: 25 writes across 11 files (README.md, Engine.ini, spicy-hopping-hopcroft.md, BilateralDenoise_cs.hlsl, FLight.h) | 28 reads | ~78061 tok |
+| 07:35 | Session end: 25 writes across 11 files (README.md, Engine.ini, spicy-hopping-hopcroft.md, BilateralDenoise_cs.hlsl, FLight.h) | 28 reads | ~78061 tok |
+
+## Session: 2026-06-27 09:32
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 10:02 | Created ../../../.claude/plans/critic-plan-install-quizzical-backus.md | — | ~5022 |
+| 10:37 | Installed + built mcp-framework | Engine/Source/Plugin/mcp-framework/ | `npm install` triggered `prepare` → `tsc`; dist/ built. | ~400 |
+| 10:38 | Created hlvm-engine-mcp project | Engine/Source/Plugin/hlvm-engine-mcp/ | package.json, tsconfig.json, src/index.ts, utils, 3 tools, smoke test, README. | ~1200 |
+| 10:43 | Fixed zod instance mismatch | Engine/Source/Plugin/mcp-framework/src/index.ts | Added `export { z } from 'zod';` so consumer tools use the same zod instance the framework validators check against. | ~150 |
+| 10:49 | Verified MCP tools end-to-end | Engine/Source/Plugin/hlvm-engine-mcp/dist/index.js | Smoke test passes; `run_hlvm_test TestSceneGraphNode` builds + passes; `run_hlvm_tests_by_module` with `TestSceneGraph.*` runs Node+Simple, both pass. | ~600 |
+| 10:50 | Updated .gitignore and README | .gitignore, Engine/Source/Plugin/hlvm-engine-mcp/README.md | Added node_modules/dist ignores; documented build/run/Claude Desktop config. | ~200 |
+| 14:30 | Session end: 1 writes across 1 files (critic-plan-install-quizzical-backus.md) | 12 reads | ~7638 tok |
+| 15:03 | Session end: 1 writes across 1 files (critic-plan-install-quizzical-backus.md) | 12 reads | ~7638 tok |
+| 15:12 | Session end: 1 writes across 1 files (critic-plan-install-quizzical-backus.md) | 12 reads | ~7638 tok |
+| 17:07 | Session end: 1 writes across 1 files (critic-plan-install-quizzical-backus.md) | 12 reads | ~7638 tok |
+
+## Session: 2026-06-27 19:07
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 06:43 | Verified Sprint 1 wrap-up: TestFewBounceGI.cpp + _Data deleted; TestPathTraceGI + TestCornellBoxGI green. Production path now GIPathTracing.hlsl (unified). Legacy test shaders FewBounceGI.hlsl/CornellBoxGI.hlsl remain only inside TestCornellBoxGI_Data with P0 fixes applied. | — | Verification confirmed; minor stale refs in ShaderMakeBuild.py + ReBLUR_Implementation.md + .idea/workspace.xml (non-blocking) | ~600 |
+| 13:18 | Created ../../../.claude/plans/judge-plan-your-assessment-tender-pearl.md | — | ~2303 |
+
+## Session: 2026-06-30 23:25
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+
+## Session: 2026-06-30 23:25
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 13:51 | Created ../../../.claude/plans/judge-plan-your-assessment-tender-pearl.md | — | ~2194 |
+| 00:11 | Session end: 1 writes across 1 files (judge-plan-your-assessment-tender-pearl.md) | 5 reads | ~6125 tok |
+| 21:07 | Session end: 1 writes across 1 files (judge-plan-your-assessment-tender-pearl.md) | 5 reads | ~6125 tok |
+| 16:14 | Session end: 1 writes across 1 files (judge-plan-your-assessment-tender-pearl.md) | 5 reads | ~6125 tok |
+| 16:24 | Session end: 1 writes across 1 files (judge-plan-your-assessment-tender-pearl.md) | 5 reads | ~6125 tok |
+
+## Session: 2026-07-08 23:19
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 23:22 | Created ../../../.claude/plans/critic-1-current-dynamic-moore.md | — | ~1670 |
+
+## Session: 2026-07-10 21:58
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+
+## Session: 2026-07-10 21:58
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+
+## Session: 2026-07-10 06:34
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 06:37 | Verified TestPathTraceGI claims (Cornell box, NEE, UAV→SRV fix, mean luma 0.6620) — PASS across 5/5 runs | Engine/Source/Runtime/Test/TestPathTraceGI.cpp | PASS | ~12k |
+
+## Session: 2026-07-11 07:00
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+
+## Session: 2026-07-13 07:00
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 07:05 | Created ../../../.claude/plans/do-a-1-on-bubbly-mochi.md | — | ~3266 |
+| 00:01 | Edited Engine/Source/Runtime/Test/TestPathTraceGI.cpp | modified if() | ~187 |
+| 00:02 | Edited Engine/Source/Runtime/Test/TestPathTraceGI.cpp | 6→8 lines | ~137 |
+| 00:02 | Edited Engine/Source/Runtime/Test/TestPathTraceGI.cpp | added 2 condition(s) | ~373 |
+
+## Session: 2026-07-16 (TestPathTraceGI white noise fix)
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|---------|
+| 00:01 | Diagnosed TestPathTraceGI 'full white noise' symptom | dumps/ + GIPathTracing.hlsl | Root cause: default Exposure=1.0 saturates ACES; Display mean 0.80 with no shading variation | ~3000 |
+| 00:03 | Verified exposure=0.3 produces valid Cornell box (Display mean 0.50, p01=0.37, p99=0.65) | TestPathTraceGI dumps | Exposure confirmed as root cause | ~500 |
+| 00:04 | Lowered default Exposure 1.0->0.3 in TestPathTraceGI.cpp:268 | TestPathTraceGI.cpp | Bug-063 logged | ~100 |
+| 00:05 | Added sat%/black% stats to DumpRGBA32FTexture log | TestPathTraceGI.cpp | Easier future diagnostics | ~200 |
+| 00:06 | Build + test 2/2 pass with default exposure=0.3 | Binary/Debug/TestPathTraceGI | Test green, dumps show valid Cornell box | ~1000 |
+| 00:06 | Logged bug-063 (white noise fix) + updated buglog.json | .wolf/buglog.json | Done | ~200 |
+| 00:07 | Session end: 4 writes across 2 files (do-a-1-on-bubbly-mochi.md, TestPathTraceGI.cpp) | 30 reads | ~53825 tok |
+
+## Session: 2026-07-15 05:55
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 06:01 | Created ../../../.claude/projects/-home-hangyu5-Documents-Gitrepo-My-HLVM-Engine/memory/linux-crash-dump-locations.md | — | ~1030 |
+| 06:02 | Edited ../../../.claude/projects/-home-hangyu5-Documents-Gitrepo-My-HLVM-Engine/memory/MEMORY.md | 1→2 lines | ~97 |
+| 06:02 | Session end: 2 writes across 2 files (linux-crash-dump-locations.md, MEMORY.md) | 1 reads | ~1207 tok |
+| 06:07 | Session end: 2 writes across 2 files (linux-crash-dump-locations.md, MEMORY.md) | 1 reads | ~1207 tok |
+| 07:20 | Session end: 2 writes across 2 files (linux-crash-dump-locations.md, MEMORY.md) | 1 reads | ~1207 tok |
+
+## Session: 2026-07-16 07:25
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 07:45 | Audited TestPathTraceGI against TestPathTraceTriangle RGBA32_FLOAT fix; ran GI test and frame dump | TestPathTraceGI.cpp, FGIPass.cpp, GIPathTracing.hlsl, .wolf/buglog.json, .wolf/cerebrum.md, .wolf/anatomy.md | GI test passed twice; format fix is already present; found 80-byte RT payload limit vs 128-byte GIPayload and dump-only backbuffer TRANSFER_SRC validation errors; no runtime source change made | ~1800 |
+| 07:55 | Reviewed user-applied GI payload, shadow-payload, and swapchain fixes; reran GI test | FGIPass.cpp, GIPathTracing.hlsl, DeviceManagerVk3_SwapChain.cpp, .wolf/buglog.json, .wolf/cerebrum.md | Current GI test passes twice; raw/display stats unchanged; build emits three uint-to-bool warnings; payload fixes are structurally correct; swapchain usage needs capability guard for portability | ~900 |
+| 08:05 | Freshly verified warning cleanup and recorded final TestPathTraceGI variance diagnosis | GIPathTracing.hlsl, TestPathTraceGI build, .wolf/buglog.json, .wolf/cerebrum.md | Shader build has zero warnings; GI test passes twice; user sweep isolates residual speckles to converging Monte Carlo lighting variance | ~500 |
+
+## Session: 2026-07-19 09:35
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+
+## Session: 2026-07-19 09:35
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+
+## Session: 2026-07-19 00:15
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+00:17 | Compiled Vibe_Coding/1_CodingStyle/ as HTML example (index + 5 .md → .html) | Vibe_Coding/1_CodingStyle/*.html | OK — user will review | ~500 tokens
+06:42 | Regenerated 1_CodingStyle/ with red/blue accents (SPA layout, color-coded h1/h2/h3, dark code blocks, accent bar) | Vibe_Coding/1_CodingStyle/*.html | OK — awaiting final approval before scaling | ~800 tokens
+06:46 | Iterated color scheme: H1 red, H2 blue, H3 red (added), TOC dots+active-state+scroll-spy | Vibe_Coding/1_CodingStyle/*.html | OK — final iteration, awaiting approval | ~1.2k tokens
+06:51 | Selective red labels: <strong>X:</strong> auto-marked with .kw class (e.g. 'Prerequisites:', 'Note:') | Vibe_Coding/1_CodingStyle/*.html | OK — final design | ~1.5k tokens
+06:55 | Final iteration: legend + summary (skip code/tables/shell) + key-terms index in sidebar | Vibe_Coding/1_CodingStyle/*.html | OK — design complete | ~1.8k tokens
+| 06:58 | Created .claude/skills/md-to-html-vibe-folders/SKILL.md | — | ~1034 |
+| 06:59 | Created .claude/skills/md-to-html-vibe-folders/compile.py | — | ~6983 |
+| 07:00 | Edited .claude/skills/md-to-html-vibe-folders/compile.py | ".,;:!?()[]{}" → ".,;:!?()[]{}\" | ~10 |
+07:00 | Compiled all 57 Vibe_Coding folders → 304 HTML files (1 root + 60 indexes + 243 per-md pages) using new md-to-html-vibe-folders skill | Vibe_Coding/**/*.html + .claude/skills/md-to-html-vibe-folders/ | OK — task complete | ~2k tokens
+| 07:01 | Session end: 3 writes across 2 files (SKILL.md, compile.py) | 5 reads | ~10358 tok |
+| 07:04 | Session end: 3 writes across 2 files (SKILL.md, compile.py) | 5 reads | ~10358 tok |
+
+## Session: 2026-07-21 06:26
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+
+## Session: 2026-07-21 06:28
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 06:30 | Edited ../../../.claude/settings.json | expanded (+9 lines) | ~116 |
+| 06:30 | Edited ../../../.claude/settings.json | 3→2 lines | ~7 |
+
+## Session: 2026-07-21 06:34
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+
+## Session: 2026-07-21 06:34
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+
+## Session: 2026-07-21 06:35
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+
+## Session: 2026-07-21 06:35
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+
+## Session: 2026-07-21 06:36
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+
+## Session: 2026-07-22 06:33
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+
+## Session: 2026-07-22 06:37
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 06:39 | Created Vibe_Coding/50_ReSTIR_GI_Temporal/claude/50_ReSTIR_GI_Temporal_debug_plan.md | — | ~5130 |
+| 06:40 | Session end: 1 writes across 1 files (50_ReSTIR_GI_Temporal_debug_plan.md) | 2 reads | ~5496 tok |
+| 06:52 | Edited Vibe_Coding/50_ReSTIR_GI_Temporal/claude/50_ReSTIR_GI_Temporal_debug_plan.md | work() → readback() | ~246 |
+| 06:52 | Session end: 2 writes across 1 files (50_ReSTIR_GI_Temporal_debug_plan.md) | 2 reads | ~5760 tok |
+| 06:55 | Edited Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal_Data/GBufferPT_PS.hlsl | modified main() | ~146 |
+| 06:59 | Edited Engine/Source/Runtime/Build/Debug/_deps/nvrhi-src/src/validation/validation-commandlist.cpp | modified if() | ~138 |
+
+## Session: 2026-07-22 07:03
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 07:06 | Edited Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal_Data/GBufferPT_PS.hlsl | modified main() | ~95 |
+| 07:12 | Created Vibe_Coding/50_ReSTIR_GI_Temporal/final-state-2026-07-23.md | — | ~1337 |
+
+## Session: 2026-07-23 07:12
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 07:12 | Recompiled validation-commandlist.cpp.o (clang++-17) + re-archived libnvrhid.a + relinked TestReSTIR_GI_Temporal directly to bypass ninja cmake reconfigure | libnvrhid.a, TestReSTIR_GI_Temporal binary | OK (manually patched NVRHI bypass works) | ~3K |
+| 07:13 | Ran test with HLVM_DUMP_RGI=1 — 7 dumps produced, gi_raw/display/spatial/denoised now non-black (uniform magenta) — proves bypass | new dumps in TestReSTIR_GI_Temporal_Data/dumps | OK | ~120 |
+| 07:14 | Confirmed GBuffer PT PS sentinel-revert + recompile (GBufferPT_PS.sblob hash changed) — GBuffer dumps still black = independent dump bug | — | finding | ~150 |
+| 07:15 | Recompiled all sblobs via ShaderMake w/ correct include path; restored GIPathTracing.sblob | *.sblob | OK | ~300 |
+| 07:16 | Logged bugs 73-76 in .wolf/buglog.json + wrote final-state-2026-07-23.md | buglog.json, final-state-2026-07-23.md | OK | ~800 |
+
+| 07:13 | Session end: 2 writes across 2 files (GBufferPT_PS.hlsl, final-state-2026-07-23.md) | 2 reads | ~1534 tok |
+| 07:37 | Edited Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal.cpp | modified for() | ~151 |
+
+## Session: 2026-07-22 07:38
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 07:46 | Edited Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal.cpp | "Sponza loaded (%u mesh gr" → "Sponza loaded ({} mesh gr" | ~30 |
+| 07:46 | Edited Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal.cpp | 3→3 lines | ~52 |
+| 07:46 | Edited Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal.cpp | modified if() | ~83 |
+| 07:46 | Edited Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal.cpp | added 1 condition(s) | ~101 |
+| 07:48 | Edited Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal_Data/GBufferPT_PS.hlsl | modified main() | ~146 |
+| 07:53 | Edited Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal.cpp | added 2 condition(s) | ~350 |
+| 07:56 | Edited Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal.cpp | expanded (+8 lines) | ~392 |
+| 07:58 | Edited Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal.cpp | 2→5 lines | ~100 |
+| 07:58 | Edited Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal.cpp | 3→8 lines | ~127 |
+| 07:58 | Edited Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal.cpp | added 1 condition(s) | ~185 |
+| 07:58 | Edited Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal.cpp | modified if() | ~154 |
+| 07:58 | Edited Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal.cpp | 8→6 lines | ~106 |
+| 07:59 | Edited Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal.cpp | 5→5 lines | ~83 |
+| 08:06 | Edited Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal.cpp | added 1 condition(s) | ~174 |
+
+## Session: 2026-07-23 08:09
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 08:13 | Edited Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal.cpp | modified GetCameraPos() | ~176 |
+| 08:13 | Edited Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal.cpp | 7→11 lines | ~202 |
+| 08:13 | Edited Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal.cpp | 4→4 lines | ~50 |
+| 08:13 | Edited Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal.cpp | 9→11 lines | ~135 |
+| 08:19 | Edited Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal.cpp | 4→4 lines | ~49 |
+| 08:19 | Edited Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal.cpp | 3→3 lines | ~45 |
+| 08:21 | Edited Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal.cpp | 4→6 lines | ~78 |
+| 08:22 | Edited Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal.cpp | 3→2 lines | ~26 |
+| 08:23 | Edited Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal.cpp | 6→4 lines | ~49 |
+| 08:23 | Edited Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal.cpp | 11→9 lines | ~111 |
+
+## Session: 2026-07-23 08:26
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 08:30 | Edited Engine/Source/Runtime/Build/Debug/_deps/nvrhi-src/src/validation/validation-commandlist.cpp | modified if() | ~203 |
+| 08:32 | Edited Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal_Data/GBufferPT_PS.hlsl | modified main() | ~143 |
+| 08:33 | Edited Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal.cpp | modified if() | ~287 |
+| 08:33 | Edited Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal.cpp | 2→3 lines | ~28 |
+| 08:33 | Edited Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal.cpp | 3→2 lines | ~20 |
+| 08:33 | Edited Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal.cpp | modified if() | ~143 |
+| 08:33 | Edited Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal.cpp | expanded (+6 lines) | ~126 |
+| 08:37 | Edited Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal.cpp | 2→2 lines | ~23 |
+| 08:39 | Edited Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal.cpp | 2→4 lines | ~71 |
+| 08:44 | Edited Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal.cpp | 4→3 lines | ~42 |
+| 08:45 | Edited Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal.cpp | 7→7 lines | ~130 |
+
+## Session: 2026-07-23 08:46
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 08:47 | Created Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal_Data/GBufferPT_PS.hlsl | — | ~376 |
+| 08:50 | Reverted GBufferPT_PS.hlsl after raster-pass silent-drop debug session; smoke PS still did not execute despite non-immediate CL, nvrhi validation patches, and Z-flip removal. Status: bug-088 UNRESOLVED. | Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal.cpp, .../GBufferPT_PS.hlsl | reverted-clean | ~12k |
+| 08:49 | Session end: 1 writes across 1 files (GBufferPT_PS.hlsl) | 2 reads | ~21891 tok |
+| 00:09 | Session end: 1 writes across 1 files (GBufferPT_PS.hlsl) | 3 reads | ~35901 tok |
+| 06:45 | Edited Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal_Data/GBufferPT_PS.hlsl | modified main() | ~185 |
+| 06:46 | Edited Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal.cpp | expanded (+11 lines) | ~293 |
+| 06:47 | Edited Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal.cpp | 8→9 lines | ~111 |
+| 06:49 | Edited Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal_Data/GBufferPT_PS.hlsl | modified main() | ~60 |
+| 06:50 | Session end: 5 writes across 2 files (GBufferPT_PS.hlsl, TestReSTIR_GI_Temporal.cpp) | 7 reads | ~36737 tok |
+| 06:50 | FIXED bug-088: isolated raster pass into its own CommandList submission. Real Sponza geometry now rasterizes — verified via gradient PS diagnostic (16384+140218 unique pixels) and visual dump (Sponza columns/walls/floor visible). | TestReSTIR_GI_Temporal.cpp, libnvrhid.a | raster-pass-alive | ~5k |
+| 06:53 | Session end: 5 writes across 2 files (GBufferPT_PS.hlsl, TestReSTIR_GI_Temporal.cpp) | 7 reads | ~36737 tok |
+| 07:16 | Edited Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal.cpp | expanded (+9 lines) | ~437 |
+| 07:16 | Edited Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal.cpp | current() → output() | ~176 |
+
+## Session: 2026-07-23 07:17
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+
+## Session: 2026-08-10 22:35
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+
+## Session: 2026-08-10 22:58
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 22:58 | Two-axis code review (Standards + Spec) of main→rhi2 + working tree for TestReSTIR_GI_Temporal scope (FGIPass/FReSTIRPass/FReBLURPass/FRayTracingPipeline/FBindingLayoutBuilder/GIPathTracing/TestReSTIR_GI_Temporal) | spec sources = Vibe_Coding/50_ReSTIR_GI_Temporal/{finish_2026-07-20, FIX_LOG_2026-08-09, PLAN_MATERIAL_REWORK_2026-08-10, final-state-2026-08-09}.md | both axes returned; spec-side PASS (gates met), standards-side 5 hard + 7 smell findings | ~0 |
+| 23:30 | Round-2 code review of same scope ("review again"); working tree moved in response to round-1 findings (cerr→HLVM_LOG, debug-vis gated, denoiser CVars, layout invariant fatal) | same files | 5/5 hard violations addressed (1 partial — new default-ON HLVM_LOGs); 1/7 smells fixed (overloads), others worsened; spec round-1 #5 (alpha sentinel) FIXED, #1 (SPP loop) + #3 (OutputDirection) still soft drift | ~0 |
+
+## Session: 2026-08-11 15:36
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+
+## Session: 2026-08-11 15:36
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+
+## Session: 2026-08-11 15:36
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|

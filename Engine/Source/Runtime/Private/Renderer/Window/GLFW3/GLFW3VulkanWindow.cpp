@@ -6,6 +6,8 @@
 
 #if HLVM_WINDOW_USE_VULKAN
 
+#include <cstdlib>
+
 FGLFW3VulkanWindow::FGLFW3VulkanWindow(const IWindow::Properties& InProperties)
 	: FGLFW3Window(InProperties)
 {
@@ -16,6 +18,12 @@ FGLFW3VulkanWindow::FGLFW3VulkanWindow(const IWindow::Properties& InProperties)
 
 	glfwInit(); // 初始化图形库框架：Graphics Libraries Framework
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API); // GLFW会默认创建OpenGL的Context，但是，我们使用的是Vulkan，所以需要取消
+	// 2026-08-11: render window is VISIBLE by default (the user requires a
+	// display window). Set HLVM_HIDE_WINDOW=1 for the old headless/offscreen
+	// mode. Floating (always-on-top) keeps it above other windows when shown.
+	const bool bVisible = (std::getenv("HLVM_HIDE_WINDOW") == nullptr);
+	glfwWindowHint(GLFW_VISIBLE, bVisible ? GLFW_TRUE : GLFW_FALSE);
+	glfwWindowHint(GLFW_FLOATING, bVisible ? GLFW_TRUE : GLFW_FALSE);
 	if (InProperties.Resizable)
 	{
 		glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);

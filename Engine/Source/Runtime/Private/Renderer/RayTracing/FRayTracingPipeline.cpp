@@ -122,6 +122,14 @@ void FRayTracingPipeline::SetBindlessLayout(nvrhi::BindingLayoutHandle InBindles
     bHasBindlessLayout = true;
 }
 
+void FRayTracingPipeline::AddBindingLayout(nvrhi::BindingLayoutHandle InLayout)
+{
+    if (InLayout)
+    {
+        AdditionalBindingLayouts.push_back(InLayout);
+    }
+}
+
 bool FRayTracingPipeline::FinalizePipeline(uint32_t MaxPayloadSize, uint32_t MaxAttributeSize)
 {
     if (!bIsInitialized)
@@ -147,6 +155,10 @@ bool FRayTracingPipeline::FinalizePipeline(uint32_t MaxPayloadSize, uint32_t Max
 
     nvrhi::rt::PipelineDesc PipelineDesc;
     PipelineDesc.globalBindingLayouts = { BindingLayout };
+    for (const auto& Layout : AdditionalBindingLayouts)
+    {
+        PipelineDesc.globalBindingLayouts.push_back(Layout);
+    }
     if (bHasBindlessLayout && BindlessLayout)
     {
         PipelineDesc.globalBindingLayouts.push_back(BindlessLayout);
@@ -341,12 +353,53 @@ void FRayTracingPipeline::DispatchRays(nvrhi::ICommandList* CmdList, uint32_t Wi
     DispatchRays(CmdList, Desc, BindingSet, DescriptorTable);
 }
 
+void FRayTracingPipeline::DispatchRays(nvrhi::ICommandList* CmdList, const FDispatchDesc& Desc,
+    nvrhi::BindingSetHandle SRVBindingSet, nvrhi::BindingSetHandle UAVBindingSet)
+{
+    if (!bShaderTableBuilt)
+    {
+        HLVM_LOG(LogRenderer, err, TXT("FRayTracingPipeline: BuildShaderTable() must be called before DispatchRays()"));
+        return;
+    }
+
+    nvrhi::rt::State State;
+    State.setShaderTable(ShaderTable.Get());
+    if (SRVBindingSet)
+    {
+        State.addBindingSet(SRVBindingSet.Get());
+    }
+    if (UAVBindingSet)
+    {
+        State.addBindingSet(UAVBindingSet.Get());
+    }
+
+    CmdList->setRayTracingState(State);
+
+    nvrhi::rt::DispatchRaysArguments Args;
+    Args.width = Desc.Width;
+    Args.height = Desc.Height;
+    Args.depth = Desc.Depth;
+
+    CmdList->dispatchRays(Args);
+}
+
+void FRayTracingPipeline::DispatchRays(nvrhi::ICommandList* CmdList, uint32_t Width, uint32_t Height, uint32_t Depth,
+    nvrhi::BindingSetHandle SRVBindingSet, nvrhi::BindingSetHandle UAVBindingSet)
+{
+    FDispatchDesc Desc{};
+    Desc.Width = Width;
+    Desc.Height = Height;
+    Desc.Depth = Depth;
+    DispatchRays(CmdList, Desc, SRVBindingSet, UAVBindingSet);
+}
+
 void FRayTracingPipeline::Shutdown()
 {
     Pipeline = nullptr;
     ShaderTable = nullptr;
     BindingLayout = nullptr;
     BindlessLayout = nullptr;
+    AdditionalBindingLayouts.clear();
     bHasBindlessLayout = false;
     RayGenShader = nullptr;
     ClosestHitShader = nullptr;

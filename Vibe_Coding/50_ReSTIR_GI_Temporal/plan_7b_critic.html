@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>plan_7b_critic.md</title>
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+       margin: 0; color: #1f2937; }
+body::before { content: ""; display: block; height: 3px;
+                background: linear-gradient(90deg, #dc2626, #2563eb); }
+header { background: #1f2937; color: #fff; padding: 14px 24px;
+          border-bottom: 3px solid #dc2626; }
+header h1 { margin: 0; font-size: 18px; }
+header .crumb { font-size: 12px; opacity: 0.75; }
+header .crumb a { color: #93c5fd; text-decoration: none; }
+header .crumb a:hover { text-decoration: underline; }
+.layout { display: grid; grid-template-columns: 260px 1fr; gap: 0; max-width: 1200px; margin: 0 auto; }
+nav.toc { border-right: 1px solid #e5e7eb; padding: 20px; font-size: 14px; position: sticky; top: 0;
+          max-height: 100vh; overflow-y: auto; box-sizing: border-box; background: #fafafa; }
+nav.toc h2 { font-size: 13px; text-transform: uppercase; color: #6b7280; margin: 0 0 12px;
+              letter-spacing: 0.5px; font-weight: 700; }
+nav.toc ul { list-style: none; padding: 0; margin: 0; }
+nav.toc li { padding: 4px 0; position: relative; padding-left: 14px;
+              transition: background 0.15s; }
+nav.toc li::before { content: ""; position: absolute; left: 0; top: 50%;
+                      transform: translateY(-50%); width: 6px; height: 6px;
+                      border-radius: 50%; background: #dc2626; opacity: 0.55; }
+nav.toc li:hover { background: #fef2f2; }
+nav.toc li:hover::before { opacity: 1; transform: translateY(-50%) scale(1.4); }
+nav.toc li.active { background: #fef2f2; }
+nav.toc li.active::before { background: #dc2626; opacity: 1; transform: translateY(-50%) scale(1.4); }
+nav.toc li.active a { color: #dc2626; font-weight: 600; }
+nav.toc a { color: #2563eb; text-decoration: none; }
+nav.toc a:hover { color: #dc2626; text-decoration: underline; }
+nav.toc .lvl2 { padding-left: 28px; }
+nav.toc .lvl3 { padding-left: 42px; font-size: 13px; }
+nav.toc .lvl3::before { width: 5px; height: 5px; background: #2563eb; opacity: 0.5; }
+nav.toc .empty { color: #9ca3af; font-style: italic; }
+.legend { margin-top: 18px; padding: 10px; background: #fff;
+           border: 1px solid #e5e7eb; border-radius: 6px; font-size: 12px; }
+.legend h2 { font-size: 11px !important; margin: 0 0 6px !important; }
+.legend div { display: flex; align-items: center; gap: 6px; padding: 2px 0; }
+.legend span.swatch { display: inline-block; width: 12px; height: 12px;
+                       border-radius: 3px; flex-shrink: 0; }
+.keywords { margin-top: 14px; padding: 10px; background: #fff;
+             border: 1px solid #e5e7eb; border-radius: 6px; font-size: 12px; }
+.keywords h2 { font-size: 11px !important; margin: 0 0 6px !important; }
+.keywords ul { padding-left: 14px; margin: 0; }
+.keywords li { padding: 1px 0 !important; padding-left: 0 !important;
+                border: 0 !important; background: none !important; }
+.keywords li::before { display: none !important; }
+.keywords a { color: #1f2937 !important; font-size: 12px; }
+.keywords a:hover { color: #dc2626 !important; text-decoration: underline; }
+main { padding: 24px 36px; line-height: 1.6; max-width: 900px; }
+main h1, main h2, main h3 { scroll-margin-top: 16px; }
+main h1 { color: #dc2626; border-bottom: 2px solid #dc2626; padding-bottom: 6px; }
+main h2 { color: #2563eb; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px;
+          margin-top: 32px; padding-left: 10px; border-left: 4px solid #2563eb; }
+main h3 { color: #dc2626; margin-top: 24px; padding-left: 8px;
+          border-left: 3px solid #dc2626; }
+main a { color: #2563eb; text-decoration: none; }
+main a:hover { color: #dc2626; text-decoration: underline; }
+main pre { background: #ffffff; color: #1f2937; padding: 16px; border-radius: 6px;
+            overflow-x: auto; font: 13px/1.5 Menlo, Consolas, monospace;
+            border: 1px solid #e5e7eb; }
+main code { background: #f3f4f6; color: #1f2937; padding: 2px 5px; border-radius: 3px;
+             font: 13px Menlo, Consolas, monospace; }
+main pre code { background: transparent; color: inherit; padding: 0; }
+main table { border-collapse: collapse; }
+main th, main td { border: 1px solid #e5e7eb; padding: 6px 12px; }
+main th { background: #f3f4f6; }
+main blockquote { border-left: 4px solid #d1d5db; margin: 16px 0; padding: 8px 16px;
+                   color: #4b5563; }
+main hr { border: 0; border-top: 1px solid #e5e7eb; margin: 24px 0; }
+main strong.kw { color: #dc2626; font-weight: 700; }
+.summary { background: #eff6ff; border-left: 4px solid #2563eb; padding: 12px 16px;
+            margin: 16px 0 24px; border-radius: 4px; color: #1e3a8a; font-size: 14px;
+            line-height: 1.5; }
+.summary::before { content: "📝 Summary"; display: block; font-weight: 700;
+                    color: #2563eb; font-size: 11px; text-transform: uppercase;
+                    letter-spacing: 0.5px; margin-bottom: 4px; }
+.back { display: inline-block; margin-bottom: 16px; font-size: 0.9em; color: #2563eb;
+         text-decoration: none; }
+.back:hover { color: #dc2626; text-decoration: underline; }
+#topBtn { position: fixed; bottom: 24px; right: 24px; z-index: 100;
+          background: #dc2626; color: #fff; border: 0; border-radius: 50%;
+          width: 44px; height: 44px; font-size: 18px; cursor: pointer;
+          box-shadow: 0 2px 6px rgba(0,0,0,0.2); opacity: 0;
+          transition: opacity 0.2s; pointer-events: none; }
+#topBtn.show { opacity: 1; pointer-events: auto; }
+#topBtn:hover { background: #b91c1c; }
+@media (max-width: 900px) {
+  .layout { grid-template-columns: 1fr; }
+  nav.toc { position: static; max-height: none; border-right: 0;
+             border-bottom: 1px solid #e5e7eb; }
+  main { padding: 16px 20px; }
+}
+@media print {
+  nav.toc, .legend, .keywords, #topBtn { display: none; }
+  .layout { grid-template-columns: 1fr; }
+  body::before { display: none; }
+  header { background: #fff; color: #000; border-bottom: 1px solid #000; }
+  main h1, main h2, main h3 { color: #000; border-color: #000; }
+}
+</style>
+<script>
+(function() {
+  const links = document.querySelectorAll('nav.toc a[href^="#"]');
+  const map = new Map();
+  links.forEach(a => {
+    const id = a.getAttribute('href').slice(1);
+    const li = a.parentElement;
+    map.set(id, li);
+  });
+  const targets = Array.from(map.keys()).map(id => document.getElementById(id)).filter(Boolean);
+  function activate() {
+    if (!targets.length) return;
+    const scrollY = window.scrollY + 80;
+    let current = null;
+    for (const t of targets) {
+      if (t.offsetTop <= scrollY) current = t;
+      else break;
+    }
+    links.forEach(a => a.parentElement.classList.remove('active'));
+    if (current) {
+      const li = map.get(current.id);
+      if (li) li.classList.add('active');
+    }
+  }
+  window.addEventListener('scroll', activate, { passive: true });
+  activate();
+
+  const btn = document.getElementById('topBtn');
+  if (btn) {
+    window.addEventListener('scroll', () => {
+      btn.classList.toggle('show', window.scrollY > 400);
+    }, { passive: true });
+    btn.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+  }
+})();
+</script>
+</head>
+<body>
+<header>
+  <div class="crumb"><a href="./index.html">Vibe_Coding/</a> / <a href="index.html">50_ReSTIR_GI_Temporal</a> / plan_7b_critic.md</div>
+  <h1>📄 plan_7b_critic.md</h1>
+</header>
+<div class="layout">
+  <nav class="toc">
+    <h2>On this page</h2>
+    <ul>
+<li class=""><a href="#critic-review-phase-7b-plan">CRITIC REVIEW — Phase 7b Plan</a></li>
+      <li class="lvl2"><a href="#concerns">Concerns</a></li>
+      <li class="lvl3"><a href="#critical-read-after-write-hazard-in-ping-pong">[CRITICAL] Read-After-Write Hazard in Ping-Pong</a></li>
+      <li class="lvl3"><a href="#major-random-number-quality-for-reservoir-selection">[MAJOR] Random Number Quality for Reservoir Selection</a></li>
+      <li class="lvl3"><a href="#minor-no-visibility-check-for-history-samples">[MINOR] No Visibility Check for History Samples</a></li>
+      <li class="lvl3"><a href="#minor-m-visualization-may-be-too-subtle">[MINOR] M Visualization May Be Too Subtle</a></li>
+      <li class="lvl3"><a href="#nit-dispatchtemporal-vs-separate-class">[NIT] DispatchTemporal vs Separate Class</a></li>
+      <li class="lvl2"><a href="#revised-plan-summary">Revised Plan Summary</a></li>
+    </ul>
+    <div class="legend">
+      <h2>Color Legend</h2>
+      <div><span class="swatch" style="background:#dc2626;"></span> Red = Section / Keyword</div>
+      <div><span class="swatch" style="background:#2563eb;"></span> Blue = Sub-section / Link</div>
+      <div><span class="swatch" style="background:#1f2937;"></span> Black = Body</div>
+    </div>
+<div class="keywords">
+      <h2>Key Terms</h2>
+      <ul>
+      <li>Iteration</li>
+      <li>Reviewer Persona</li>
+      <li>Verdict</li>
+      <li>Dimension</li>
+      <li>Summary</li>
+      <li>on the same command list without a barrier</li>
+      <li>Suggestion</li>
+      <li>separate output texture</li>
+      <li>Add depth-difference validation</li>
+      <li>Use improved hash for random selection</li>
+      <li>Debug M vis</li>
+      <li>Confidence Score</li>
+      </ul>
+    </div>
+  </nav>
+  <main>
+    <a class="back" href="index.html">&larr; Back to 50_ReSTIR_GI_Temporal index</a>
+<div class="summary">Reviewer Persona: Senior Staff Engineer</div>
+<h1 id="critic-review-phase-7b-plan">CRITIC REVIEW — Phase 7b Plan</h1>
+<p><strong>Iteration</strong>: 1<br />
+<strong>Reviewer Persona</strong>: Senior Staff Engineer<br />
+<strong>Verdict</strong>: REVISE (2 issues)</p>
+<hr />
+<h2 id="concerns">Concerns</h2>
+<h3 id="critical-read-after-write-hazard-in-ping-pong">[CRITICAL] Read-After-Write Hazard in Ping-Pong</h3>
+<p><strong>Dimension</strong>: Correctness<br />
+<strong>Summary</strong>: The plan proposes:
+1. Generation writes to <code>Reservoir0</code>
+2. Temporal reads <code>Reservoir0</code> + <code>Reservoir0History</code>
+3. Temporal writes merged back to <code>Reservoir0</code></p>
+<p>Step 3 writes to the same texture that was read in Step 2 <strong>on the same command list without a barrier</strong>. This is a RAW (read-after-write) hazard in NVRHI/Vulkan.<br />
+<strong>Suggestion</strong>: The temporal pass must write to a <strong>separate output texture</strong> (e.g., <code>Reservoir0Merged</code>), then swap <code>Reservoir0Merged</code> with <code>Reservoir0History</code> after the pass.  </p>
+<p>Correct flow:
+1. Generation writes to <code>Reservoir0/1</code>
+2. Temporal reads <code>Reservoir0/1</code> (current) + <code>Reservoir0/1History</code> (history)
+3. Temporal writes to <code>Reservoir0/1Merged</code>
+4. Swap <code>Reservoir0/1Merged</code> &lt;-&gt; <code>Reservoir0/1History</code></p>
+<p>For next frame:
+- <code>Reservoir0/1</code> = fresh generation output
+- <code>Reservoir0/1History</code> = merged result from previous frame</p>
+<p><strong>Verdict</strong>: Must fix.</p>
+<h3 id="major-random-number-quality-for-reservoir-selection">[MAJOR] Random Number Quality for Reservoir Selection</h3>
+<p><strong>Dimension</strong>: Correctness<br />
+<strong>Summary</strong>: The plan uses <code>hash(pixel + frame)</code> for random selection. If the hash has poor distribution or correlation between frames, the reservoir selection will be biased.<br />
+<strong>Suggestion</strong>: Use a better hash:</p>
+<pre><code class="language-hlsl">float hash(uint2 p, uint frame) {
+    uint n = p.x * 15843u + p.y * 23457u + frame * 14325u;
+    n ^= n &gt;&gt; 16; n *= 0x7feb352dU; n ^= n &gt;&gt; 15; n *= 0x846ca68bU;
+    return float(n) / float(0xFFFFFFFFU);
+}
+</code></pre>
+<p><strong>Verdict</strong>: Fix.</p>
+<h3 id="minor-no-visibility-check-for-history-samples">[MINOR] No Visibility Check for History Samples</h3>
+<p><strong>Dimension</strong>: Correctness<br />
+<strong>Summary</strong>: The plan accepts history samples without checking if the reprojected sample is still visible. If an object moves behind another object, the history sample becomes invalid but we still merge it.<br />
+<strong>Suggestion</strong>: For Phase 7b, document this as a known limitation. Add a simple depth difference check:</p>
+<pre><code class="language-hlsl">float histDepth = gDepth.SampleLevel(gPointSampler, historyUv, 0);
+float depthDiff = abs(depth - histDepth);
+bool historyValid = depthDiff &lt; 0.01;
+</code></pre>
+<p>This is cheap and catches major occlusions.</p>
+<p><strong>Verdict</strong>: Add to plan.</p>
+<h3 id="minor-m-visualization-may-be-too-subtle">[MINOR] M Visualization May Be Too Subtle</h3>
+<p><strong>Dimension</strong>: Testing<br />
+<strong>Summary</strong>: M ranges from 1 to 30. Log-scaled visualization might be hard to read. Linear <code>M / MAX_M</code> is clearer.<br />
+<strong>Suggestion</strong>: Use <code>debugGray = M_merged / MAX_M</code> for M visualization.<br />
+<strong>Verdict</strong>: Fix.</p>
+<h3 id="nit-dispatchtemporal-vs-separate-class">[NIT] <code>DispatchTemporal</code> vs Separate Class</h3>
+<p><strong>Dimension</strong>: Architecture<br />
+<strong>Summary</strong>: Extending <code>FReSTIRPass</code> with <code>DispatchTemporal</code> is fine, but if the temporal shader grows complex (spatial reuse in Phase 8), the class becomes bloated.<br />
+<strong>Suggestion</strong>: Keep as <code>DispatchTemporal</code> for now. If Phase 8 adds spatial reuse, consider renaming to <code>DispatchSpatialTemporal</code> or splitting into <code>FReSTIRTemporalPass</code>.<br />
+<strong>Verdict</strong>: Accept.</p>
+<hr />
+<h2 id="revised-plan-summary">Revised Plan Summary</h2>
+<ol>
+<li><strong>Add <code>Reservoir0Merged</code> and <code>Reservoir1Merged</code> textures</strong> (separate from current/history)</li>
+<li><strong>Temporal pass writes to <code>Merged</code>, reads from <code>Current</code> + <code>History</code></strong></li>
+<li><strong>After temporal pass, swap <code>Merged</code> &lt;-&gt; <code>History</code></strong></li>
+<li><strong>Add depth-difference validation</strong> for history samples</li>
+<li><strong>Use improved hash for random selection</strong></li>
+<li><strong>Debug M vis</strong>: linear <code>M / MAX_M</code></li>
+</ol>
+<p><strong>Confidence Score</strong>: 9/10 after revision</p>
+  </main>
+</div>
+<button id="topBtn" title="Back to top">↑</button>
+</body>
+</html>

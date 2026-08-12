@@ -130,6 +130,12 @@ void FDeviceManager::RunMessageLoop()
 		}
 		HLVM_ENSURE(EndFrame());
 		HLVM_ENSURE(Present());
+		// TODO (2026-08-10): removing this waitForIdle() allows frame overlap
+		// (~42 ms/frame in the half-res ReSTIR test) but exposes a real engine
+		// bug: the acquire semaphores are reused before their pending signal
+		// completes (VUID-vkAcquireNextImageKHR-semaphore-01779). Fix the
+		// acquire-semaphore tracking (per-index event query) before enabling
+		// overlap. Keeping the wait for now — correctness first.
 		GetDevice()->waitForIdle(); // TODO : Or frame controller wait for limited amount of time
 		m_bIsRendering = false;
 	}

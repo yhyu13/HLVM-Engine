@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>critic_2026-06-06_snowflower.md</title>
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+       margin: 0; color: #1f2937; }
+body::before { content: ""; display: block; height: 3px;
+                background: linear-gradient(90deg, #dc2626, #2563eb); }
+header { background: #1f2937; color: #fff; padding: 14px 24px;
+          border-bottom: 3px solid #dc2626; }
+header h1 { margin: 0; font-size: 18px; }
+header .crumb { font-size: 12px; opacity: 0.75; }
+header .crumb a { color: #93c5fd; text-decoration: none; }
+header .crumb a:hover { text-decoration: underline; }
+.layout { display: grid; grid-template-columns: 260px 1fr; gap: 0; max-width: 1200px; margin: 0 auto; }
+nav.toc { border-right: 1px solid #e5e7eb; padding: 20px; font-size: 14px; position: sticky; top: 0;
+          max-height: 100vh; overflow-y: auto; box-sizing: border-box; background: #fafafa; }
+nav.toc h2 { font-size: 13px; text-transform: uppercase; color: #6b7280; margin: 0 0 12px;
+              letter-spacing: 0.5px; font-weight: 700; }
+nav.toc ul { list-style: none; padding: 0; margin: 0; }
+nav.toc li { padding: 4px 0; position: relative; padding-left: 14px;
+              transition: background 0.15s; }
+nav.toc li::before { content: ""; position: absolute; left: 0; top: 50%;
+                      transform: translateY(-50%); width: 6px; height: 6px;
+                      border-radius: 50%; background: #dc2626; opacity: 0.55; }
+nav.toc li:hover { background: #fef2f2; }
+nav.toc li:hover::before { opacity: 1; transform: translateY(-50%) scale(1.4); }
+nav.toc li.active { background: #fef2f2; }
+nav.toc li.active::before { background: #dc2626; opacity: 1; transform: translateY(-50%) scale(1.4); }
+nav.toc li.active a { color: #dc2626; font-weight: 600; }
+nav.toc a { color: #2563eb; text-decoration: none; }
+nav.toc a:hover { color: #dc2626; text-decoration: underline; }
+nav.toc .lvl2 { padding-left: 28px; }
+nav.toc .lvl3 { padding-left: 42px; font-size: 13px; }
+nav.toc .lvl3::before { width: 5px; height: 5px; background: #2563eb; opacity: 0.5; }
+nav.toc .empty { color: #9ca3af; font-style: italic; }
+.legend { margin-top: 18px; padding: 10px; background: #fff;
+           border: 1px solid #e5e7eb; border-radius: 6px; font-size: 12px; }
+.legend h2 { font-size: 11px !important; margin: 0 0 6px !important; }
+.legend div { display: flex; align-items: center; gap: 6px; padding: 2px 0; }
+.legend span.swatch { display: inline-block; width: 12px; height: 12px;
+                       border-radius: 3px; flex-shrink: 0; }
+.keywords { margin-top: 14px; padding: 10px; background: #fff;
+             border: 1px solid #e5e7eb; border-radius: 6px; font-size: 12px; }
+.keywords h2 { font-size: 11px !important; margin: 0 0 6px !important; }
+.keywords ul { padding-left: 14px; margin: 0; }
+.keywords li { padding: 1px 0 !important; padding-left: 0 !important;
+                border: 0 !important; background: none !important; }
+.keywords li::before { display: none !important; }
+.keywords a { color: #1f2937 !important; font-size: 12px; }
+.keywords a:hover { color: #dc2626 !important; text-decoration: underline; }
+main { padding: 24px 36px; line-height: 1.6; max-width: 900px; }
+main h1, main h2, main h3 { scroll-margin-top: 16px; }
+main h1 { color: #dc2626; border-bottom: 2px solid #dc2626; padding-bottom: 6px; }
+main h2 { color: #2563eb; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px;
+          margin-top: 32px; padding-left: 10px; border-left: 4px solid #2563eb; }
+main h3 { color: #dc2626; margin-top: 24px; padding-left: 8px;
+          border-left: 3px solid #dc2626; }
+main a { color: #2563eb; text-decoration: none; }
+main a:hover { color: #dc2626; text-decoration: underline; }
+main pre { background: #ffffff; color: #1f2937; padding: 16px; border-radius: 6px;
+            overflow-x: auto; font: 13px/1.5 Menlo, Consolas, monospace;
+            border: 1px solid #e5e7eb; }
+main code { background: #f3f4f6; color: #1f2937; padding: 2px 5px; border-radius: 3px;
+             font: 13px Menlo, Consolas, monospace; }
+main pre code { background: transparent; color: inherit; padding: 0; }
+main table { border-collapse: collapse; }
+main th, main td { border: 1px solid #e5e7eb; padding: 6px 12px; }
+main th { background: #f3f4f6; }
+main blockquote { border-left: 4px solid #d1d5db; margin: 16px 0; padding: 8px 16px;
+                   color: #4b5563; }
+main hr { border: 0; border-top: 1px solid #e5e7eb; margin: 24px 0; }
+main strong.kw { color: #dc2626; font-weight: 700; }
+.summary { background: #eff6ff; border-left: 4px solid #2563eb; padding: 12px 16px;
+            margin: 16px 0 24px; border-radius: 4px; color: #1e3a8a; font-size: 14px;
+            line-height: 1.5; }
+.summary::before { content: "📝 Summary"; display: block; font-weight: 700;
+                    color: #2563eb; font-size: 11px; text-transform: uppercase;
+                    letter-spacing: 0.5px; margin-bottom: 4px; }
+.back { display: inline-block; margin-bottom: 16px; font-size: 0.9em; color: #2563eb;
+         text-decoration: none; }
+.back:hover { color: #dc2626; text-decoration: underline; }
+#topBtn { position: fixed; bottom: 24px; right: 24px; z-index: 100;
+          background: #dc2626; color: #fff; border: 0; border-radius: 50%;
+          width: 44px; height: 44px; font-size: 18px; cursor: pointer;
+          box-shadow: 0 2px 6px rgba(0,0,0,0.2); opacity: 0;
+          transition: opacity 0.2s; pointer-events: none; }
+#topBtn.show { opacity: 1; pointer-events: auto; }
+#topBtn:hover { background: #b91c1c; }
+@media (max-width: 900px) {
+  .layout { grid-template-columns: 1fr; }
+  nav.toc { position: static; max-height: none; border-right: 0;
+             border-bottom: 1px solid #e5e7eb; }
+  main { padding: 16px 20px; }
+}
+@media print {
+  nav.toc, .legend, .keywords, #topBtn { display: none; }
+  .layout { grid-template-columns: 1fr; }
+  body::before { display: none; }
+  header { background: #fff; color: #000; border-bottom: 1px solid #000; }
+  main h1, main h2, main h3 { color: #000; border-color: #000; }
+}
+</style>
+<script>
+(function() {
+  const links = document.querySelectorAll('nav.toc a[href^="#"]');
+  const map = new Map();
+  links.forEach(a => {
+    const id = a.getAttribute('href').slice(1);
+    const li = a.parentElement;
+    map.set(id, li);
+  });
+  const targets = Array.from(map.keys()).map(id => document.getElementById(id)).filter(Boolean);
+  function activate() {
+    if (!targets.length) return;
+    const scrollY = window.scrollY + 80;
+    let current = null;
+    for (const t of targets) {
+      if (t.offsetTop <= scrollY) current = t;
+      else break;
+    }
+    links.forEach(a => a.parentElement.classList.remove('active'));
+    if (current) {
+      const li = map.get(current.id);
+      if (li) li.classList.add('active');
+    }
+  }
+  window.addEventListener('scroll', activate, { passive: true });
+  activate();
+
+  const btn = document.getElementById('topBtn');
+  if (btn) {
+    window.addEventListener('scroll', () => {
+      btn.classList.toggle('show', window.scrollY > 400);
+    }, { passive: true });
+    btn.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+  }
+})();
+</script>
+</head>
+<body>
+<header>
+  <div class="crumb"><a href="./index.html">Vibe_Coding/</a> / <a href="index.html">50_ReSTIR_GI_Temporal</a> / critic_2026-06-06_snowflower.md</div>
+  <h1>📄 critic_2026-06-06_snowflower.md</h1>
+</header>
+<div class="layout">
+  <nav class="toc">
+    <h2>On this page</h2>
+    <ul>
+<li class=""><a href="#restir-gi-few-bounce-critical-diagnostic-2026-06-06">ReSTIR GI Few-Bounce — CRITICAL DIAGNOSTIC (2026-06-06)</a></li>
+      <li class="lvl2"><a href="#0-tldr">0. TL;DR</a></li>
+      <li class="lvl2"><a href="#1-the-4-frame-evidence">1. The 4-Frame Evidence</a></li>
+      <li class="lvl2"><a href="#2-root-cause-1-fewbouncegihlsl-is-a-coin-flip-per-pixel">2. Root Cause #1 — FewBounceGI.hlsl is a coin-flip per pixel</a></li>
+      <li class="lvl3"><a href="#21-one-ray-per-pixel">2.1 One ray per pixel</a></li>
+      <li class="lvl3"><a href="#22-the-normal-is-sv_hitt-not-a-real-normal">2.2 The "normal" is SV_HitT, not a real normal</a></li>
+      <li class="lvl3"><a href="#23-constant-gray-albedo-no-instanceid">2.3 Constant gray albedo, no InstanceID</a></li>
+      <li class="lvl3"><a href="#24-throughput-is-multiplied-by-05-every-bounce">2.4 Throughput is multiplied by 0.5 every bounce</a></li>
+      <li class="lvl3"><a href="#25-miss-path-also-drops-throughput">2.5 Miss path also drops throughput</a></li>
+      <li class="lvl3"><a href="#26-result-of-all-five-issues">2.6 Result of all five issues</a></li>
+      <li class="lvl2"><a href="#3-root-cause-2-restir-is-a-screen-space-resampler-not-a-generator">3. Root Cause #2 — ReSTIR is a screen-space resampler, not a generator</a></li>
+      <li class="lvl3"><a href="#31-generation-pass-tiny-44-neighborhood-no-new-rays">3.1 Generation pass: tiny 4×4 neighborhood, no new rays</a></li>
+      <li class="lvl3"><a href="#32-spatial-pass-neighbors-y-is-from-a-different-surface">3.2 Spatial pass: neighbor's y is from a different surface</a></li>
+      <li class="lvl3"><a href="#33-w-weight-is-computed-but-never-applied">3.3 W weight is computed but never applied</a></li>
+      <li class="lvl3"><a href="#34-frameindex-in-the-hash-causes-per-frame-flicker">3.4 FrameIndex in the hash causes per-frame flicker</a></li>
+      <li class="lvl2"><a href="#4-why-the-previous-critic-2026-06-05-missed-this">4. Why the previous critic (2026-06-05) missed this</a></li>
+      <li class="lvl2"><a href="#5-the-signal-flow-diagram">5. The signal-flow diagram</a></li>
+      <li class="lvl2"><a href="#6-required-fix-order">6. Required fix order</a></li>
+      <li class="lvl3"><a href="#priority-0-must-fix-before-restir-can-ever-look-right">Priority 0 (must fix before ReSTIR can ever look right)</a></li>
+      <li class="lvl3"><a href="#priority-1-improves-restir-quality-on-top-of-fixed-gi">Priority 1 (improves ReSTIR quality on top of fixed GI)</a></li>
+      <li class="lvl3"><a href="#priority-2-clean-up">Priority 2 (clean-up)</a></li>
+      <li class="lvl2"><a href="#7-what-the-user-should-see-vs-what-is-shown">7. What the user should see vs. what is shown</a></li>
+      <li class="lvl2"><a href="#8-verification-plan-after-fixes">8. Verification plan after fixes</a></li>
+      <li class="lvl2"><a href="#9-openwolf-logging-per-protocol">9. OpenWolf logging (per protocol)</a></li>
+    </ul>
+    <div class="legend">
+      <h2>Color Legend</h2>
+      <div><span class="swatch" style="background:#dc2626;"></span> Red = Section / Keyword</div>
+      <div><span class="swatch" style="background:#2563eb;"></span> Blue = Sub-section / Link</div>
+      <div><span class="swatch" style="background:#1f2937;"></span> Black = Body</div>
+    </div>
+<div class="keywords">
+      <h2>Key Terms</h2>
+      <ul>
+      <li>Author</li>
+      <li>Subject</li>
+      <li>Status</li>
+      <li>Reference frame</li>
+      <li>largely wrong</li>
+      <li>1 ray per pixel</li>
+      <li>Constant gray albedo</li>
+      <li>No access to InstanceID/PrimitiveID</li>
+      <li>already in the code</li>
+      <li>high-frequency</li>
+      <li>shifts between frames</li>
+      <li>exactly one</li>
+      <li>Expected behavior of 1-SPP GI</li>
+      <li>ray distance T at the hit</li>
+      <li>Consequence</li>
+      <li>Why this is critical</li>
+      <li>darkens</li>
+      <li>very bright</li>
+      <li>The bilateral denoise can&#x27;t save it</li>
+      <li>at most 4×4 pixels</li>
+      <li>What this does</li>
+      <li>What it does NOT do</li>
+      <li>one of 16 nearby pixels</li>
+      <li>neighbor&#x27;s</li>
+      <li>spreading noise to semantically unrelated pixels</li>
+      <li>W is intentionally discarded</li>
+      <li>WRONG</li>
+      <li>deeper</li>
+      <li>Lesson logged</li>
+      <li>C. Use light-source-based direct lighting</li>
+      </ul>
+    </div>
+  </nav>
+  <main>
+    <a class="back" href="index.html">&larr; Back to 50_ReSTIR_GI_Temporal index</a>
+<div class="summary">Subject:  output is sparse &quot;snow flower&quot; noise, NOT GI</div>
+<h1 id="restir-gi-few-bounce-critical-diagnostic-2026-06-06">ReSTIR GI Few-Bounce — CRITICAL DIAGNOSTIC (2026-06-06)</h1>
+<p><strong>Author</strong>: System Diagnostic (post-2026-06-05 build)
+<strong>Subject</strong>: <code>TestFewBounceGI</code> output is sparse "snow flower" noise, NOT GI
+<strong>Status</strong>: REBUILD REQUIRED — root cause is the few-bounce GI itself, not ReSTIR
+<strong>Reference frame</strong>: <code>Engine/Source/Runtime/Test/TestFewBounceGI_Data/dumps/2026-06-06_03-31-42_063_frame0004.png</code></p>
+<hr />
+<h2 id="0-tldr">0. TL;DR</h2>
+<p>The previous critic (<code>claude.md</code> dated 2026-06-05) was <strong>largely wrong</strong> about ReSTIR. The current ReSTIR code is doing textbook streaming RIS / temporal merge / spatial merge. But it cannot fix the input.</p>
+<p><strong>The real snow-flower source is the few-bounce GI shader</strong> (<code>FewBounceGI.hlsl</code>):</p>
+<ol>
+<li><strong>1 ray per pixel</strong> (no integration) → extreme variance per pixel</li>
+<li><strong><code>SV_HitT</code> is misinterpreted as a 3-component normal</strong> → all hit surfaces share a constant normal <code>(0.577, 0.577, 0.577)</code> after normalize → NdotL is uniform → no shading variation, just a coin-flip per pixel</li>
+<li><strong>Constant gray albedo</strong> → no material variation</li>
+<li><strong>No access to InstanceID/PrimitiveID</strong> → cannot fetch real material/normal</li>
+<li><strong>ReSTIR resamples the noisy input within a 4×4 window</strong> → snow-flower clusters</li>
+<li><strong>Spatial pass uses neighbor's <code>y</code> (a random screen pixel from their local pool)</strong> to read radiance → spreads noise to semantically unrelated pixels</li>
+</ol>
+<p>The previous critic correctly identified the symptoms but mis-attributed them to ReSTIR. The fixes it prescribed (RIS, use y, alpha semantics) are <strong>already in the code</strong>.</p>
+<hr />
+<h2 id="1-the-4-frame-evidence">1. The 4-Frame Evidence</h2>
+<p>Frame dumps: <code>2026-06-06_03-31-4{1,4,7,2}_frame{1..4}.png</code></p>
+<p>Observed:
+- Image is 90%+ black with scattered bluish/grey speckles
+- Speckle pattern is <strong>high-frequency</strong> and <strong>shifts between frames</strong> (flickering)
+- The "sky" gap at the bottom is faintly visible (uniform dark)
+- No coherent geometry visible, no shading, no shadows, no direct light source highlight</p>
+<p>A "snow flower" pattern in GI terms means: noise dominates signal, the underlying illumination is below noise floor, the only visible features are the rare samples that happened to land on a bright source.</p>
+<hr />
+<h2 id="2-root-cause-1-fewbouncegihlsl-is-a-coin-flip-per-pixel">2. Root Cause #1 — <code>FewBounceGI.hlsl</code> is a coin-flip per pixel</h2>
+<h3 id="21-one-ray-per-pixel">2.1 One ray per pixel</h3>
+<pre><code class="language-hlsl">// FewBounceGI.hlsl line 137-140
+float3 rayDir = sampleHemisphereCosine(
+    normal,
+    random(pixelSeed, 0, 0),
+    random(pixelSeed, 0, 1));
+// Single TraceRay, no SPP loop
+</code></pre>
+<p>No <code>for (int s = 0; s &lt; SPP; s++)</code> loop. Each pixel fires <strong>exactly one</strong> ray into the scene. There is no per-pixel integration over the hemisphere, no Russian roulette, no splitting. The output is fundamentally 1-SPP Monte Carlo.</p>
+<p><strong>Expected behavior of 1-SPP GI</strong>: extremely high variance, noise dominated, requires heavy denoising (which we don't have).</p>
+<h3 id="22-the-normal-is-sv_hitt-not-a-real-normal">2.2 The "normal" is <code>SV_HitT</code>, not a real normal</h3>
+<pre><code class="language-hlsl">// FewBounceGI.hlsl line 229
+[shader(&quot;closesthit&quot;)]
+void ClosestHit(inout GIPayload payload : SV_RayPayload, in float3 hitAttr : SV_HitT) {
+    ...
+    // line 239
+    float3 hitNormal = normalize(hitAttr);
+</code></pre>
+<p><code>SV_HitT</code> is the <strong>ray distance T at the hit</strong>, declared by the system as a float scalar. HLSL will accept it being declared as a <code>float3</code>, but the value broadcast is <code>(T, T, T)</code>. After <code>normalize</code>, this is always <code>(0.577, 0.577, 0.577)</code> regardless of surface orientation.</p>
+<p><strong>Consequence</strong>: every surface in bounce 1, 2, 3 has identical shading. <code>NdotL</code> is constant. The hit position determines whether light arrives, but once you hit, the diffuse term is uniform.</p>
+<p><strong>Why this is critical</strong>: the second and third bounces have NO meaningful normal, so the cosine-weighted direction they emit is biased toward <code>(0.577, 0.577, 0.577)</code>. This collapses directional variation in the GI chain.</p>
+<h3 id="23-constant-gray-albedo-no-instanceid">2.3 Constant gray albedo, no InstanceID</h3>
+<pre><code class="language-hlsl">// line 242
+float3 albedo = float3(0.7); // Gray material
+</code></pre>
+<p>Sponza has richly varying materials. The shader ignores <code>GBufferDiffuse</code>, <code>GBufferSpecular</code>, doesn't read InstanceID/PrimitiveID, and hardcodes <code>(0.7, 0.7, 0.7)</code>. Every hit returns the same color × NdotL.</p>
+<h3 id="24-throughput-is-multiplied-by-05-every-bounce">2.4 Throughput is multiplied by 0.5 every bounce</h3>
+<pre><code class="language-hlsl">// line 255
+payload.throughput *= albedo * 0.5; // energy preservation
+</code></pre>
+<p>The <code>* 0.5</code> is an arbitrary energy multiplier that <strong>darkens</strong> the GI output as bounces accumulate. By bounce 3, throughput is <code>0.5^3 ≈ 0.125</code>. For a 3-bounce path to register, the path must hit <strong>very bright</strong> surfaces early. Most don't.</p>
+<h3 id="25-miss-path-also-drops-throughput">2.5 Miss path also drops throughput</h3>
+<pre><code class="language-hlsl">// line 313-318
+[shader(&quot;miss&quot;)]
+void Miss(inout GIPayload payload : SV_RayPayload) {
+    float3 skyRadiance = SampleSky(WorldRayDirection());
+    payload.radiance += payload.throughput * skyRadiance;
+    payload.flags &amp;= ~0x01; // clear hit flag
+}
+</code></pre>
+<p>Sky contribution is <code>throughput * skyColor</code>. With <code>throughput=1.0</code> at bounce 0, this returns the sky color directly. That part is fine. But because <code>flags</code> is cleared and the path terminates, the second bounce never happens for sky-bound paths.</p>
+<h3 id="26-result-of-all-five-issues">2.6 Result of all five issues</h3>
+<p>Each pixel of <code>HDRTexture</code> is essentially:
+- A coin flip on "did the ray hit something that faced the light?"
+- Plus: if it hit, multiply by <code>albedo=0.7</code>, <code>NdotL = dot((0.577,0.577,0.577), lightDir)</code> (constant for all pixels!), <code>0.5^bounce</code>
+- The result has near-zero correlation between neighbors → snow noise</p>
+<p><strong>The bilateral denoise can't save it</strong>: 5×5 Gaussian on 1-SPP noise just spreads the noise. There is no coherent signal to recover.</p>
+<hr />
+<h2 id="3-root-cause-2-restir-is-a-screen-space-resampler-not-a-generator">3. Root Cause #2 — ReSTIR is a screen-space resampler, not a generator</h2>
+<p>Once the input <code>DenoisedHDRTexture</code> is mostly black with sparse hits, the ReSTIR chain does the wrong thing.</p>
+<h3 id="31-generation-pass-tiny-44-neighborhood-no-new-rays">3.1 Generation pass: tiny 4×4 neighborhood, no new rays</h3>
+<pre><code class="language-hlsl">// ReSTIR_Generate_cs.hlsl line 70-71
+int M = int(gConstants.NumCandidates);   // = 8
+float radius = 2.0; // candidate search radius in pixels
+</code></pre>
+<p><code>M=8</code> candidates, each in a 2-pixel tent-distributed offset → search window is <strong>at most 4×4 pixels</strong> around the center.</p>
+<p><strong>What this does</strong>:
+- Reads <code>gRadiance.Load(int3(q, 0))</code> at up to 16 candidate positions
+- Computes <code>p_hat = Luminance(candidate)</code>
+- Selects one via streaming RIS weighted by <code>p_hat</code>
+- Records <code>y = selected pixel position</code> and <code>W = w_sum / (M * p_hat(y))</code></p>
+<p><strong>What it does NOT do</strong>:
+- Cast new rays
+- Sample new directions in world space
+- Reuse any temporal data
+- Re-evaluate the BRDF</p>
+<p>So at frame N, every pixel selects <strong>one of 16 nearby pixels</strong> as its "best radiance". This is screen-space resampling of an already-noisy signal. No new information is created.</p>
+<h3 id="32-spatial-pass-neighbors-y-is-from-a-different-surface">3.2 Spatial pass: neighbor's y is from a different surface</h3>
+<pre><code class="language-hlsl">// ReSTIR_Spatial_cs.hlsl line 86-95
+uint seed = uint(pixel.x * 65537u) + uint(pixel.y * 524287u) + ...;
+float r = frac(float(seed) * 0.6180339887);
+if (r * w_sum &lt; nWsum) {
+    y = nR0.xy;       // &lt;-- adopt neighbor's y
+    selectedPhat = nR1.y;
+}
+</code></pre>
+<p>Each neighbor brings its own <code>y</code> (a pixel in the <strong>neighbor's</strong> local 4×4 window). When this spatial pass adopts the neighbor's <code>y</code>, then samples <code>gRadiance.Load(int3(samplePixel, 0))</code> at the OUTPUT, it reads a pixel that:
+- Was selected by a different pixel's RIS
+- Could be from a completely different surface (different normal, different depth, different material)
+- Has no geometric relationship to the current pixel</p>
+<p>For a 1-SPP noisy input, this is <strong>spreading noise to semantically unrelated pixels</strong>. It cannot produce coherent shading.</p>
+<h3 id="33-w-weight-is-computed-but-never-applied">3.3 <code>W</code> weight is computed but never applied</h3>
+<pre><code class="language-hlsl">// ReSTIR_Spatial_cs.hlsl line 117-130
+float W = 0.0;
+if (selectedPhat &gt; 0.0 &amp;&amp; M &gt; 0.0) {
+    W = w_sum / (M * selectedPhat);
+}
+W = min(W, 10.0);
+
+// Comment: &quot;Without MIS-aware spatial reuse, the unbiased W weight can introduce
+//            high variance. For this test we output raw radiance[y] which is slightly biased
+//            but stable. In production, use pairwise MIS for proper unbiased spatial reuse.&quot;
+gOutput[pixel] = float4(outRadiance, 1.0);
+</code></pre>
+<p><strong>W is intentionally discarded</strong>. The output is <code>outRadiance = gRadiance[y]</code>, unweighted. The author chose to drop the unbiased weight to "be stable". This is a deliberate bias that erases all the calibration work the reservoir was doing.</p>
+<p>For sparse-noise input, this is catastrophic: a rare bright pixel can be picked by many neighbors and propagated, but the weighting that would normalize it is thrown out.</p>
+<h3 id="34-frameindex-in-the-hash-causes-per-frame-flicker">3.4 FrameIndex in the hash causes per-frame flicker</h3>
+<pre><code class="language-hlsl">// ReSTIR_Generate_cs.hlsl line 76
+float2 h = hash22(float2(pixel) + float2(i, gConstants.FrameIndex * 7.0 + i * 13.0));
+</code></pre>
+<p>The <code>FrameIndex</code> term in the hash means every frame, the candidates are different. So even with a static camera, the selected <code>y</code> changes frame-to-frame. The temporal pass's <code>M</code> clamping can prevent the w_sum from exploding, but each frame has a slightly different set of "winning" samples. <strong>This is the literal source of the per-frame flicker observed in the dumps.</strong></p>
+<p>For a static camera, the FrameIndex should NOT contribute to candidate positions. Standard practice: drive a sample-index counter (e.g. <code>i * 17</code>) and let temporal accumulation do the variance reduction.</p>
+<hr />
+<h2 id="4-why-the-previous-critic-2026-06-05-missed-this">4. Why the previous critic (2026-06-05) missed this</h2>
+<p>The previous critic claimed:
+- "ReSTIR Generation doesn't actually sample — it just copies per-pixel data" → <strong>WRONG</strong>: it does streaming RIS with M=8 candidates
+- "Spatial Reuse outputs the center pixel's radiance" → <strong>WRONG</strong>: line 110-113 samples at <code>y</code>, not at center
+- "Alpha channel semantic mismatch" → <strong>WRONG</strong>: line 130 outputs <code>float4(outRadiance, 1.0)</code>, not reservoir W
+- "No Q-sampling" → <strong>WRONG</strong>: tent distribution is Q-sampling</p>
+<p>All four "critical bugs" have been fixed in the current code. The previous build must have been an earlier, more broken state. The current build is the result of those fixes — and now the <strong>deeper</strong> issue (the few-bounce GI itself) is exposed.</p>
+<p><strong>Lesson logged</strong>: A critic that only inspects the ReSTIR passes can never diagnose a problem that originates upstream. The few-bounce GI must be inspected together with the resampler to understand the end-to-end signal.</p>
+<hr />
+<h2 id="5-the-signal-flow-diagram">5. The signal-flow diagram</h2>
+<pre><code>[GBuffer]                  clean, deterministic
+   |
+   v
+[FewBounceGI RayGen]       &lt;-- 1 ray/pixel, cosine sample, no SPP
+   |   \-- TraceRay bounce 0
+   |       \-- ClosestHit: NdotL with WRONG normal (SV_HitT, not real normal)
+   |                 -&gt; throughput *= 0.5
+   |                 \-- TraceRay bounce 1 (same path)
+   |                     \-- ClosestHit: same wrong normal
+   |                               -&gt; throughput *= 0.5
+   |                               \-- TraceRay bounce 2
+   v
+[HDRTexture]               &lt;-- SPARSE NOISE: 1-SPP, garbage normals, gray albedo
+   |
+   v
+[BilateralDenoise 5x5]     &lt;-- 5x5 Gaussian on 1-SPP noise -&gt; smoothed noise
+   |
+   v
+[DenoisedHDRTexture]       &lt;-- smoothed sparse noise
+   |
+   v
+[ReSTIR_Generate]          &lt;-- 4x4 screen-space RIS, picks one of 16 neighbors
+   |                           selected y flickers per frame (FrameIndex in hash)
+   v
+[Reservoir0/1]
+   |
+   v
+[ReSTIR_Temporal]          &lt;-- merges with reprojected history (static cam: same pixel)
+   |                           but M is clamped to 30, so accumulation saturates fast
+   v
+[Reservoir0/1Merged]
+   |
+   v
+[ReSTIR_Spatial]           &lt;-- 3x3 neighbor merge, ADOPTS NEIGHBOR'S y
+   |                           reads gRadiance at neighbor's y, which can be ANY pixel
+   |                           W is computed but DISCARDED -&gt; bias!
+   v
+[ReSTIROutput]             &lt;-- sparse noise spread across more pixels
+   |
+   v
+[Blit -&gt; swapchain]        &lt;-- user sees snow-flower flickering
+</code></pre>
+<hr />
+<h2 id="6-required-fix-order">6. Required fix order</h2>
+<h3 id="priority-0-must-fix-before-restir-can-ever-look-right">Priority 0 (must fix before ReSTIR can ever look right)</h3>
+<p><strong>A. Fix <code>FewBounceGI.hlsl</code> ClosestHit</strong>:
+- Drop <code>in float3 hitAttr : SV_HitT</code> (it's a scalar and is being misinterpreted)
+- Use <code>WorldRayOrigin() + WorldRayDirection() * RayTCurrent()</code> for <code>hitPosition</code>
+- Use the original surface's GBufferNormal as the hit normal (for first bounce); for subsequent bounces, sample GBuffer at reprojected pixel
+- OR: extract <code>InstanceID()</code> / <code>PrimitiveIndex()</code> / <code>GeometryIndex()</code> to fetch per-mesh data from an SSBO
+- Add SPP loop in RayGen: <code>for (int s = 0; s &lt; SPP; s++)</code> accumulating into a per-pixel accumulator</p>
+<p><strong>B. Read GBufferDiffuse / GBufferSpecular in ClosestHit</strong>:
+- The ClosestHit shader needs access to the GBuffer textures. Add bindings for <code>t0=Diffuse, t1=Specular, t2=Normal</code> (or carry them via payload lookup at hitPosition)
+- For Sponza, sampling GBuffer at hit position will give a reasonable proxy for material color, but the right fix is per-mesh data</p>
+<p><strong>C. Use light-source-based direct lighting</strong>:
+- The current <code>NdotL * albedo * g_GI.LightDir.w</code> is NdotL with a directional light. If the light has a position (point/area light), cast a shadow ray and attenuate. Sponza needs a proper light source.</p>
+<h3 id="priority-1-improves-restir-quality-on-top-of-fixed-gi">Priority 1 (improves ReSTIR quality on top of fixed GI)</h3>
+<p><strong>D. ReSTIR_Generate: increase search radius</strong>:
+- <code>radius = 2.0</code> is too small. Increase to <code>5.0-10.0</code> for short-range sharing.
+- But more importantly: drive <code>q</code> from a per-pixel hash (no FrameIndex) so positions are temporally stable.</p>
+<p><strong>E. ReSTIR_Generate: actually evaluate <code>p_hat</code> at world-space candidate directions</strong>:
+- Currently <code>p_hat</code> is "luminance of screen neighbor". Real ReSTIR GI evaluates <code>p_hat = BRDF * cos(theta) * G_term * lightSource</code> at a candidate DIRECTION, not at a candidate PIXEL.
+- This requires the ReSTIR pass to do ray tracing. The current architecture treats the GI as an INPUT and re-spreads it; the real ReSTIR should be the GI generator.</p>
+<p><strong>F. ReSTIR_Spatial: apply W</strong>:
+- Either output <code>outRadiance * W</code> (acceptable bias if W is calibrated) or implement pairwise MIS.
+- Drop the <code>// NOTE: W weight is computed but not applied</code> comment — it should be applied.</p>
+<p><strong>G. Use the FrameIndex only for unbiased path sampling, not for spatial jitter</strong>:
+- The hash inside the RIS loop can have FrameIndex for the selection step (that's fine — it's the "next" sample), but the candidate positions should be stable.</p>
+<h3 id="priority-2-clean-up">Priority 2 (clean-up)</h3>
+<p><strong>H. Remove unused textures</strong>:
+- <code>TemporalRadianceTexture</code>, <code>RadianceHistoryTexture</code> are allocated but never written by a real temporal radiance pass (Temporal pass writes to <code>OutRadiance=TemporalRadianceTexture</code>, but Spatial then writes to <code>ReSTIROutputTexture</code>, ignoring the temporal radiance). Either use them or remove.</p>
+<p><strong>I. Bilateral denoise sigma tuning</strong>:
+- <code>SpatialSigma=2.0</code> is heavy. <code>DepthSigma=0.01, NormalSigma=0.1</code> are tight. With 1-SPP noise and proper depth/normal guides, sigma might be too tight (allowing noisy pixels through). Increase depth/normal tolerance for first pass.</p>
+<hr />
+<h2 id="7-what-the-user-should-see-vs-what-is-shown">7. What the user should see vs. what is shown</h2>
+<p>Expected output of a working few-bounce GI test on Sponza:
+- Coherent shading on walls, columns, ceiling
+- Visible color bleeding (red curtain tints nearby surfaces)
+- Soft shadows in corners and under arches
+- Sky light gradient visible through openings
+- ReSTIR's contribution: smoother gradients, less high-frequency noise</p>
+<p>Actual output:
+- 90% black
+- Sparse high-frequency speckle
+- Geometry barely visible
+- No shading variation across surfaces
+- Flickers per frame</p>
+<p>The user is correct: "no real GI or direct rendering there". It is neither. It is a few-bounce GI with 1-SPP and broken ClosestHit, plus a ReSTIR resampler that cannot synthesize information it does not have.</p>
+<hr />
+<h2 id="8-verification-plan-after-fixes">8. Verification plan after fixes</h2>
+<p>After fixing <code>FewBounceGI.hlsl</code> ClosestHit and adding SPP:</p>
+<ol>
+<li>
+<p><strong>Disable ReSTIR entirely</strong> (<code>bReSTIRInitialized = false</code>). Set <code>DumpTexture = DenoisedHDRTexture</code>. Expect to see a noisy-but-coherent GI image of Sponza with shading and color variation. If this still looks like snow, the bug is still in <code>FewBounceGI.hlsl</code>.</p>
+</li>
+<li>
+<p><strong>Re-enable ReSTIR with <code>DebugVis = 1.0</code> to visualize the selected <code>y</code> per pixel</strong>. Expect to see y locations that are clustered near bright samples (valid RIS) rather than uniformly random (broken RIS).</p>
+</li>
+<li>
+<p><strong>Re-enable ReSTIR with <code>Radius = 8.0</code> and <code>MaxM = 100</code></strong>. Expect visible improvement in smoothness (more sharing) without washing out features (depth/normal guides still reject bad candidates).</p>
+</li>
+<li>
+<p><strong>Add a debug visualize pass for <code>W</code></strong> (output <code>W</code> as grayscale). Expect to see W concentrated at bright sample locations, near zero elsewhere. If W is uniformly 0 or 1, the reservoir math is wrong.</p>
+</li>
+<li>
+<p><strong>Final visual check</strong>: 4-frame dump at 1s intervals. The static camera and static lighting should produce nearly identical frames. Any visible flicker is a sign that FrameIndex is corrupting candidate positions (per the fix in priority 1.D).</p>
+</li>
+</ol>
+<hr />
+<h2 id="9-openwolf-logging-per-protocol">9. OpenWolf logging (per protocol)</h2>
+<p>Bug added to <code>.wolf/buglog.json</code>:</p>
+<pre><code class="language-json">{
+  &quot;id&quot;: &quot;bug-restir-snow-flower-2026-06-06&quot;,
+  &quot;timestamp&quot;: &quot;2026-06-06T03:32:00Z&quot;,
+  &quot;error_message&quot;: &quot;Few-bounce GI output is sparse snow-flower noise, not GI&quot;,
+  &quot;file&quot;: &quot;Engine/Source/Runtime/Test/TestFewBounceGI_Data/FewBounceGI.hlsl&quot;,
+  &quot;root_cause&quot;: &quot;1-SPP + ClosestHit uses SV_HitT (scalar ray distance) as if it were a 3-component normal; constant gray albedo; no GBuffer sampling at hit. ReSTIR resamples an already-sparse 1-SPP input.&quot;,
+  &quot;fix&quot;: &quot;Fix ClosestHit to use WorldRayOrigin/WorldRayDirection/RayTCurrent for hit position, sample GBuffer textures for material/normal, add SPP loop in RayGen. Then tune ReSTIR radius, remove FrameIndex from candidate positions, apply W in spatial output.&quot;,
+  &quot;tags&quot;: [&quot;restir&quot;, &quot;gi&quot;, &quot;raytracing&quot;, &quot;sponza&quot;, &quot;noise&quot;],
+  &quot;related_bugs&quot;: [&quot;restir-2026-06-05-prior-critic-was-wrong&quot;],
+  &quot;occurrences&quot;: 1,
+  &quot;last_seen&quot;: &quot;2026-06-06T03:32:00Z&quot;
+}
+</code></pre>
+<p>Cerebrum entry: prior critic's failure mode — symptom-level diagnosis without inspecting upstream data flow. Future critics on ReSTIR must include a frame-dump histogram + GBuffer / input-radiance correlation check.</p>
+  </main>
+</div>
+<button id="topBtn" title="Back to top">↑</button>
+</body>
+</html>

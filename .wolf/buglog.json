@@ -1032,33 +1032,770 @@
     },
     {
       "id": "bug-060",
-      "timestamp": "2026-06-16T20:04:00.159Z",
-      "error_message": "Wrong reference: float3 should be float4",
-      "file": "Engine/Source/Runtime/Shader/BilateralDenoise_cs.hlsl",
-      "root_cause": "Used \"float3\" instead of \"float4\"",
-      "fix": "Changed float3 → float4",
+      "timestamp": "2026-06-17T00:00:00.000Z",
+      "error_message": "TestFewBounceGI build failed after Day 0 BilateralDenoise float3→float4 fix: 'expected vector<float,3>, got vector<float,4>' at lines 68, 109, 115",
+      "file": "Engine/Source/Runtime/Test/TestFewBounceGI_Data/BilateralDenoise_cs.hlsl (and 2 sibling copies in Engine/Source/Runtime/Shader/ and TestCornellBoxGI_Data/)",
+      "root_cause": "Day 0 changed t_Input/RW u_Output format from float3 to float4 (alpha channel for hitDist propagation) but the shader body still used float3 locals (centerValue, sum, neighborValue). Cascade: signature type change requires body type change.",
+      "fix": "Updated centerValue (line 68), sum (line 70), and neighborValue (line 109) from float3 to float4 in all 3 BilateralDenoise copies. The body is now float4 throughout; final output sum/weightSum naturally produces float4 since weightSum is a scalar.",
+      "tags": [
+        "shaderc-fix",
+        "cascading-type-change",
+        "bilateral-denoise",
+        "float3-to-float4",
+        "sprint-1-day-0-cascade"
+      ],
+      "related_bugs": [
+        "bug-046",
+        "bug-050"
+      ],
+      "occurrences": 1,
+      "last_seen": "2026-06-17T00:00:00.000Z"
+    },
+    {
+      "id": "bug-061",
+      "timestamp": "2026-06-15T15:30:00.000Z",
+      "error_message": "Cornell Box GI path tracing produced 80%+ black pixels and no stable color bleed with SPP>1 / MaxBounces>1",
+      "file": "Engine/Source/Runtime/Test/TestCornellBoxGI_Data/CornellBoxGI.hlsl",
+      "root_cause": "hash() returned float in [0,1]; assigning it to uint payload.seed truncated to 0 after bounce 1, making all subsequent bounces use the same deterministic seed and corrupting the path distribution.",
+      "fix": "Introduced hashUint(uint) -> uint and used it to advance payload.seed; kept hash(uint) -> float for random number generation only. Same bug class as bug-046 (ReSTIR Generate position hash) but in a different shader.",
+      "tags": [
+        "rng",
+        "seed",
+        "float-to-uint-truncation",
+        "hlsl",
+        "cornell-box",
+        "path-tracing"
+      ],
+      "related_bugs": [
+        "bug-046"
+      ],
+      "occurrences": 1,
+      "last_seen": "2026-06-15T15:30:00.000Z"
+    },
+    {
+      "id": "bug-063",
+      "timestamp": "2026-07-16T00:00:00Z",
+      "error_message": "TestPathTraceGI shows 'full white noise' — Display mean luma ~0.80 with no shading variation; image is uniformly pale (looks like white noise)",
+      "file": "Engine/Source/Runtime/Test/TestPathTraceGI.cpp:265 (Exposure init)",
+      "root_cause": "Default exposure=1.0 in FPathTraceGIPass::Initialize. With the configured Cornell area light (intensity=2.0 at distance ~1, 2x2 area) and 4 SPP x 3 bounces, total HDR radiance averages ~1.0 (saturates ACES at >~2.0). ACES compresses all variation into a narrow bright band (p99=0.88, p01=0.72), making the image look uniformly pale / 'white noise'. GBufferMaterial G channel also dropped to 0 in the dumps because saturated R,B dominate the linear→sRGB clamp and G came out ~0 from the same oversaturation.",
+      "fix": "Lowered default Exposure from 1.0f to 0.3f in TestPathTraceGI.cpp. With exposure=0.3: Display mean=(0.50, 0.48, 0.48), p01=0.37, p99=0.65, 0% saturation, dynamic range 0.28 — Cornell box renders correctly. Override still available via HLVM_PT_EXPOSURE env var. Also added sat% / black% percentile stats to DumpRGBA32FTexture log output so future regressions can be diagnosed without dumping PNGs.",
+      "tags": [
+        "path-tracing",
+        "exposure",
+        "tonemap",
+        "aces-saturation",
+        "cvar-default",
+        "test-fix"
+      ],
+      "related_bugs": [
+        "bug-061"
+      ],
+      "occurrences": 1,
+      "last_seen": "2026-07-16T00:00:00Z"
+    },
+    {
+      "id": "bug-062",
+      "timestamp": "2026-07-15T16:01:34.147Z",
+      "error_message": "Significant refactor of ",
+      "file": "Engine/Source/Runtime/Test/TestPathTraceGI.cpp",
+      "root_cause": "2 lines replaced/restructured",
+      "fix": "Rewrote 14→17 lines (2 removed) | Also: TXT(\"Dump [{}] frame {}: min({:.4f},{:.4f},{:.4f}); SumR * Inv, SumG * Inv, SumB * Inv);",
       "tags": [
         "auto-detected",
-        "wrong-reference",
+        "refactor",
+        "cpp"
+      ],
+      "related_bugs": [],
+      "occurrences": 2,
+      "last_seen": "2026-07-15T16:02:58.355Z"
+    },
+    {
+      "id": "bug-064",
+      "timestamp": "2026-07-17T07:39:30Z",
+      "error_message": "User reports snowflake/speckle artifacts in TestPathTraceGI and asks whether the TestPathTraceTriangle RGBA32_FLOAT readback fix can be migrated",
+      "file": "Engine/Source/Runtime/Test/TestPathTraceGI.cpp",
+      "root_cause": "The GI test already uses RGBA32_FLOAT for OutputTexture, AccumTexture, DisplayTexture, and staging readback. The format mismatch is therefore not present; investigation found a separate RT payload-size mismatch (80-byte pipeline limit versus 128-byte GIPayload) as a likely rendering-path cause.",
+      "fix": "Investigation recorded; no source change made in this pass.",
+      "tags": [
+        "path-tracing",
+        "snowflake",
+        "rendering",
+        "payload",
+        "format-audit"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-17T07:39:30Z"
+    },
+    {
+      "id": "bug-065",
+      "timestamp": "2026-07-17T07:39:30Z",
+      "error_message": "Vulkan validation: backbuffer lacks VK_IMAGE_USAGE_TRANSFER_SRC_BIT while TestPathTraceGI DumpBackbuffer transitions it to TRANSFER_SRC_OPTIMAL and copies it",
+      "file": "Engine/Source/Runtime/Test/TestPathTraceGI.cpp:1092-1115",
+      "root_cause": "The swapchain backbuffer is created with TRANSFER_DST, SAMPLED, and COLOR_ATTACHMENT usage flags but DumpBackbuffer requests a transfer-source layout/copy. This affects the optional dump path, not the normal on-screen render.",
+      "fix": "Investigation recorded; no source change made in this pass.",
+      "tags": [
+        "vulkan",
+        "validation",
+        "frame-dump",
+        "backbuffer",
+        "transfer-src"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-17T07:39:30Z"
+    },
+    {
+      "id": "bug-066",
+      "timestamp": "2026-07-17T07:52:00Z",
+      "error_message": "TestPathTraceGI shader build emits three implicit uint-to-bool warnings after ShadowPayload.occluded changed from bool to uint",
+      "file": "Engine/Source/Runtime/Private/Renderer/Shader/GI/GIPathTracing.hlsl:456,623,625",
+      "root_cause": "The new uint payload is still consumed as a boolean in the shadow visibility ternary, and debug flag bitmasks are also used directly as boolean conditions.",
+      "fix": "Resolved: changed the shadow visibility ternary and both debug flag conditions to compare explicitly against 0u. A clean TestPathTraceGI shader rebuild now emits zero warnings, and the test passes twice.",
+      "tags": [
+        "shader-warning",
+        "uint-to-bool",
+        "ray-tracing",
+        "path-tracing"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-17T07:52:00Z"
+    },
+    {
+      "id": "bug-067",
+      "timestamp": "2026-07-19T23:00:16.752Z",
+      "error_message": "Incorrect value in code",
+      "file": ".claude/skills/md-to-html-vibe-folders/compile.py",
+      "root_cause": "Had \".,;:!?()[]{}\"",
+      "fix": "Changed to \".,;:!?()[]{}\\\"",
+      "tags": [
+        "auto-detected",
+        "wrong-value",
+        "py"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-19T23:00:16.752Z"
+    },
+    {
+      "id": "bug-068",
+      "timestamp": "2026-07-21T22:30:05.860Z",
+      "error_message": "Incorrect value in code",
+      "file": "../../../.claude/settings.json",
+      "root_cause": "Had \"model\"",
+      "fix": "Changed to \"enabledPlugins\"",
+      "tags": [
+        "auto-detected",
+        "wrong-value",
+        "json"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-21T22:30:05.860Z"
+    },
+    {
+      "id": "bug-069",
+      "timestamp": "2026-07-23T00:55:00.000Z",
+      "error_message": "Validator exits 0 but latest TestReSTIR_GI_Temporal dumps are mean=0 black; framework state and test state are out of sync",
+      "file": "Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal_Data/validate_restir_gi.py",
+      "root_cause": "validate_restir_gi.py iterates every *.png in dumps/ and computes best per-channel mean across ALL frames. dumps/ contains two generations: 20260721_2256 series with R-dim content (mean R=72-172, passes threshold) and 20260723_0051 + 20260723_0054 series that are 100% black (mean=0, would fail). The 'any file passes' check lets the older content carry the verdict even though the LATEST build is producing black output. final-state-2026-07-22.md reported 'validator exits 0 (relaxed 1/1)' while the GPU run is silently broken.",
+      "fix": "(1) Validator must check the most-recent stamp group only, not 'any file passes'. (2) Prune dumps/ on each Build.sh run, or move them to a per-build subdirectory. (3) Tighten the structural checks to: gbuffer_material mean > 0 AND display p01 > 0.05 AND p99 < 0.95. Recorded in Vibe_Coding/50_ReSTIR_GI_Temporal/claude/50_ReSTIR_GI_Temporal_debug_plan.md Phase 4.1.",
+      "tags": [
+        "validator",
+        "dumps-hygiene",
+        "regression-coverage",
+        "TestReSTIR_GI_Temporal"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-23T00:55:00.000Z"
+    },
+    {
+      "id": "bug-070",
+      "timestamp": "2026-07-22T22:52:19.919Z",
+      "error_message": "Significant refactor of ",
+      "file": "Vibe_Coding/50_ReSTIR_GI_Temporal/claude/50_ReSTIR_GI_Temporal_debug_plan.md",
+      "root_cause": "5 lines replaced/restructured",
+      "fix": "Rewrote 9→21 lines (5 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "md"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-22T22:52:19.919Z"
+    },
+    {
+      "id": "bug-071",
+      "timestamp": "2026-07-22T22:59:48.165Z",
+      "error_message": "Significant refactor of ",
+      "file": "Engine/Source/Runtime/Build/Debug/_deps/nvrhi-src/src/validation/validation-commandlist.cpp",
+      "root_cause": "3 lines replaced/restructured",
+      "fix": "Rewrote 9→11 lines (3 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "cpp"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-22T22:59:48.165Z"
+    },
+    {
+      "id": "bug-072",
+      "timestamp": "2026-07-22T23:06:27.346Z",
+      "error_message": "Significant refactor of ",
+      "file": "Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal_Data/GBufferPT_PS.hlsl",
+      "root_cause": "7 lines replaced/restructured",
+      "fix": "Rewrote 12→8 lines (7 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
         "hlsl"
       ],
       "related_bugs": [],
       "occurrences": 1,
-      "last_seen": "2026-06-16T20:04:00.159Z"
+      "last_seen": "2026-07-22T23:06:27.346Z"
+    },
+    {
+      "id": "bug-073",
+      "timestamp": "2026-07-23T07:10:00.000Z",
+      "error_message": "TestReSTIR_GI_Temporal dumps all-black with no console errors; validator passed because NVRHI's validator was silently swallowing all GPU work after the first immediate-CL collision",
+      "file": "Engine/Source/Runtime/Build/Debug/_deps/nvrhi-src/src/validation/validation-commandlist.cpp",
+      "root_cause": "validation-commandlist.cpp open() — for immediate command lists, when m_NumOpenImmediateCommandLists > 1, the code called error() and `return;` BEFORE m_CommandList->open(). The return skipped open(), so every subsequent setGraphicsState/dispatch/drawIndexed on the wrapper is recorded into a closed/no-op command list. Combined with two IMPLICIT immediate CLs (DeviceManager's and the test's Render()), the immediate counter overflows on frame 1 and silently drops all GPU work for every frame.",
+      "fix": "Patched validation-commandlist.cpp: replaced `error(...) + return` with `warning(...)` (no return) so that m_CommandList->open() still executes after the immediate-counter overflow. Rebuilt libnvrhid.a manually with clang++-17 + llvm-ar-17 (skipping ninja's FetchContent reconfigure that fails on parallel-hashmap network clone) and relinked TestReSTIR_GI_Temporal directly. Post-fix dumps are non-black: display / gi_raw / spatial / denoised produce uniform magenta+pink colors (pipeline is alive but no structured content yet — GBuffer raster / GI integration still has bugs to chase).",
+      "tags": [
+        "silent-failure",
+        "nvrhi-validation",
+        "immediate-command-list",
+        "test-restir-gi-temporal",
+        "manually-patched"
+      ],
+      "related_bugs": [
+        "bug-069"
+      ],
+      "occurrences": 1,
+      "last_seen": "2026-07-23T07:10:00.000Z"
+    },
+    {
+      "id": "bug-074",
+      "timestamp": "2026-07-23T07:10:30.000Z",
+      "error_message": "TestReSTIR_GI_Temporal gbuffer_worldpos/normal/material dumps are all-zero black, even when GBufferPT_PS.hlsl is the sentinel (R=1, G=1, B=1) override — yet gi_raw / display dumps show non-zero colors downstream. Dump utility is reading from the wrong texture or has a layout/readback issue.",
+      "file": "Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal.cpp",
+      "root_cause": "Suspect: DumpRGBA32FTexture / DumpCurrentFrame binds the wrong texture handle, or fails to transition to CopySource before readback. With the sentinel override proven to NOT show in dumps but gi_raw/display containing values, either (a) the readback is reading an unrelated texture (perhaps a per-frame ping-pong or staging backbuffer), or (b) the render-target attachments are being persisted/cleared before the dump frame (frame 8 chosen; may not match the GBuffer MRTs)",
+      "fix": "PENDING — needs investigation of DumpCurrentFrame (TestReSTIR_GI_Temporal.cpp:~1478) and DumpRGBA32FTexture (~1504). Test with frame=1, halo marker flush before each RGBA32F readback to verify copySrc transitions.",
+      "tags": [
+        "dump-utility",
+        "gbuffer-mrt",
+        "readback",
+        "test-restir-gi-temporal",
+        "pending"
+      ],
+      "related_bugs": [
+        "bug-073"
+      ],
+      "occurrences": 1,
+      "last_seen": "2026-07-23T07:10:30.000Z"
+    },
+    {
+      "id": "bug-075",
+      "timestamp": "2026-07-23T07:10:45.000Z",
+      "error_message": "vkCmdDispatch(): Cannot use VkImage [TemporalReservoir0/1] with specific layout SHADER_READ_ONLY_OPTIMAL ... doesn't match previous known layout VK_IMAGE_LAYOUT_GENERAL",
+      "file": "Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal.cpp",
+      "root_cause": "ReSTIR Temporal dispatch binds history reservoirs (TemporalReservoir0/1) as SRV (SHADER_READ_ONLY_OPTIMAL), but they were last used as UAV (GENERAL) by ReSTIR Generate. Tests sets resource states before the temporal dispatch but fails to insert a barrier/transition for the history-read textures.",
+      "fix": "PENDING — needs setTextureState(SHADER_RESOURCE, ...GE_GENERAL_READ/VK_ACCESS_SHADER_READ_BIT) calls on the per-frame history reservoirs before the temporal dispatch (TestReSTIR_GI_Temporal.cpp:~466-477 or wherever the state transitions happen). Note: prior black-output symptom masked this error; now visible because validation no longer drops subsequent commands.",
+      "tags": [
+        "vulkan-validation",
+        "resource-layout",
+        "restir-temporal",
+        "test-restir-gi-temporal",
+        "pending"
+      ],
+      "related_bugs": [
+        "bug-073"
+      ],
+      "occurrences": 1,
+      "last_seen": "2026-07-23T07:10:45.000Z"
+    },
+    {
+      "id": "bug-076",
+      "timestamp": "2026-07-23T07:11:00.000Z",
+      "error_message": "VK_LAYER_KHRONOS_validation is hardcoded on in DeviceManagerVk1_Instance.cpp:138; cannot disable via VK_INSTANCE_LAYERS env var; spams Vulkan log with mostly-false-positive descriptor binding mismatches and resource state complaints",
+      "file": "Engine/Source/Runtime/Private/Renderer/DeviceManagerVk1_Instance.cpp",
+      "root_cause": "Hardcoded `m_EnabledVulkanLayers.push_back(\"VK_LAYER_KHRONOS_validation\")` in Instance creation logic; even when VK_INSTANCE_LAYERS is unset or set to empty, validation stays on. Some Vulkan validation messages (descriptor binding mismatches when binding indices > 256) are likely harmless because NVRHI's binding layout uses register space shifting, but the layer logs them as warnings regardless.",
+      "fix": "PENDING — add a build option / CVar (e.g. r.Vulkan.Validation) to disable validation layer when set to 0; respect existing VK_INSTANCE_LAYERS env var override.",
+      "tags": [
+        "vulkan",
+        "validation-layer",
+        "noise",
+        "dev-loop",
+        "pending"
+      ],
+      "related_bugs": [
+        "bug-073"
+      ],
+      "occurrences": 1,
+      "last_seen": "2026-07-23T07:11:00.000Z"
+    },
+    {
+      "id": "bug-077",
+      "timestamp": "2026-07-22T23:37:53.594Z",
+      "error_message": "Significant refactor of ",
+      "file": "Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal.cpp",
+      "root_cause": "4 lines replaced/restructured",
+      "fix": "Rewrote 9→12 lines (4 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "cpp"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-22T23:37:53.594Z"
+    },
+    {
+      "id": "bug-078",
+      "timestamp": "2026-07-22T23:46:19.923Z",
+      "error_message": "Incorrect value in code",
+      "file": "Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal.cpp",
+      "root_cause": "Had \"Sponza loaded (%u mesh groups)\"",
+      "fix": "Changed to \"Sponza loaded ({} mesh groups)\"",
+      "tags": [
+        "auto-detected",
+        "wrong-value",
+        "cpp"
+      ],
+      "related_bugs": [],
+      "occurrences": 2,
+      "last_seen": "2026-07-22T23:46:28.552Z"
+    },
+    {
+      "id": "bug-079",
+      "timestamp": "2026-07-22T23:48:24.899Z",
+      "error_message": "Significant refactor of ",
+      "file": "Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal_Data/GBufferPT_PS.hlsl",
+      "root_cause": "3 lines replaced/restructured",
+      "fix": "Rewrote 8→10 lines (3 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "hlsl"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-22T23:48:24.899Z"
+    },
+    {
+      "id": "bug-080",
+      "timestamp": "2026-07-22T23:56:07.138Z",
+      "error_message": "Significant refactor of ",
+      "file": "Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal.cpp",
+      "root_cause": "4 lines replaced/restructured",
+      "fix": "Rewrote 14→22 lines (4 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "cpp"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-22T23:56:07.138Z"
+    },
+    {
+      "id": "bug-081",
+      "timestamp": "2026-07-23T00:13:19.831Z",
+      "error_message": "Wrong return value",
+      "file": "Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal.cpp",
+      "root_cause": "Was returning: glm::vec3(  0.0f, 3.0f,  8.0f); }",
+      "fix": "Now returns: glm::vec3(  0.0f, 0.03f, 0.08f); }",
+      "tags": [
+        "auto-detected",
+        "return-value",
+        "cpp"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-23T00:13:19.831Z"
+    },
+    {
+      "id": "bug-082",
+      "timestamp": "2026-07-23T00:13:27.349Z",
+      "error_message": "Significant refactor of ",
+      "file": "Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal.cpp",
+      "root_cause": "2 lines replaced/restructured",
+      "fix": "Rewrote 7→11 lines (2 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "cpp"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-23T00:13:27.349Z"
+    },
+    {
+      "id": "bug-083",
+      "timestamp": "2026-07-23T00:19:53.638Z",
+      "error_message": "Wrong condition in logic",
+      "file": "Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal.cpp",
+      "root_cause": "Condition was: if (false)",
+      "fix": "Changed to: if ((false)",
+      "tags": [
+        "auto-detected",
+        "logic-fix",
+        "cpp"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-23T00:19:53.638Z"
+    },
+    {
+      "id": "bug-084",
+      "timestamp": "2026-07-23T00:23:40.448Z",
+      "error_message": "Significant refactor of ",
+      "file": "Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal.cpp",
+      "root_cause": "2 lines replaced/restructured",
+      "fix": "Rewrote 6→4 lines (2 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "cpp"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-23T00:23:40.448Z"
+    },
+    {
+      "id": "bug-085",
+      "timestamp": "2026-07-23T00:30:08.338Z",
+      "error_message": "Significant refactor of ",
+      "file": "Engine/Source/Runtime/Build/Debug/_deps/nvrhi-src/src/validation/validation-commandlist.cpp",
+      "root_cause": "2 lines replaced/restructured",
+      "fix": "Rewrote 11→16 lines (2 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "cpp"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-23T00:30:08.338Z"
+    },
+    {
+      "id": "bug-086",
+      "timestamp": "2026-07-23T00:33:21.635Z",
+      "error_message": "Significant refactor of ",
+      "file": "Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal.cpp",
+      "root_cause": "2 lines replaced/restructured",
+      "fix": "Rewrote 15→24 lines (2 removed) | Also: // (HLVM-bypass: use a per-frame NON-immediate com; // TestRTShadowsGBuffer does. The persistent immed",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "cpp"
+      ],
+      "related_bugs": [],
+      "occurrences": 2,
+      "last_seen": "2026-07-23T00:33:47.451Z"
+    },
+    {
+      "id": "bug-087",
+      "timestamp": "2026-07-23T00:44:53.192Z",
+      "error_message": "Significant refactor of ",
+      "file": "Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal.cpp",
+      "root_cause": "4 lines replaced/restructured",
+      "fix": "Rewrote 4→3 lines (4 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "cpp"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-23T00:44:53.192Z"
+    },
+    {
+      "id": "bug-088",
+      "timestamp": "2026-07-23T08:50:00.000Z",
+      "error_message": "TestReSTIR_GI_Temporal raster pass silently produces no fragments — smoke PS (1,0,0,1) never overwrites GBuffer sentinel values",
+      "file": "Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal.cpp",
+      "root_cause": "Raster pass GPU commands dropped between nvrhi::setGraphicsState and the draw call. Confirmed via smoke PS (literal (1,0,0,1) red never appears in any dump; sentinel values from WriteGBufferSentinels persist). Suspected: persistent nvrhi immediate CommandList's internal state machine dropping per-frame draw work after a sentinel-write flush. Attempts that did NOT help: (a) switching to non-immediate CommandList, (b) patching nvrhi validation counter-overflow early-return, (c) patching nvrhi CLOSED-state for immediate CL, (d) removing Proj[2][2] Z-flip from glm::perspective.",
+      "fix": "Reverted GBufferPT_PS.hlsl from smoke-PS to real implementation (no functional fix landed). Status: UNRESOLVED. Sentinel writes work, dump pipeline works, but raster pass remains dead. To re-attempt: debug nvrhi::DeviceManagerVk (Vulkan) immediate-CL submission path or rewrite raster pass with full TestRTShadowsGBuffer-style pre-baked pipeline setup.",
+      "tags": [
+        "unresolved",
+        "raster-pass",
+        "gpu-drop",
+        "nvrhi-immediate-cl",
+        "test-restir-gi-temporal"
+      ],
+      "related_bugs": [
+        "bug-085",
+        "bug-086",
+        "bug-087"
+      ],
+      "occurrences": 5,
+      "last_seen": "2026-07-23T08:50:00.000Z",
+      "resolution": "bug-088-fix"
+    },
+    {
+      "id": "bug-088-fix",
+      "timestamp": "2026-07-24T06:50:00.000Z",
+      "error_message": "TestReSTIR_GI_Temporal raster pass silently produces no fragments — fix verified",
+      "file": "Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal.cpp",
+      "root_cause": "Vulkan validation-layer layout error in a LATER pass (the TemporalReservoir0/1 SHADER_READ_ONLY_OPTIMAL vs GENERAL mismatch from bug-075) was retroactively dropping ALL GPU work recorded earlier in the same CommandList submission, including the raster pass. When the raster pass was combined with later passes in one CommandList, all raster setGraphicsState/drawIndexed calls were silently invalidated. Confirmed by diagnostic gradient PS: 16384 unique pixels (worldpos) + 140218 unique pixels (normal) when raster pass was isolated, vs uniform saturated sentinel when combined.",
+      "fix": "In RenderGBuffer (after the per-mesh loop), close+execute the CommandList, waitForIdle, then reopen the CommandList for the remaining passes (FGIPass, denoise, ReSTIR). Removed the duplicate close+execute at the end of Render(). This isolates the raster pass into its own submission so a validation error in a later pass cannot retroactively drop raster work. Also added validation .o files (validation-commandlist.cpp.o, validation-device.cpp.o) to libnvrhid.a (they were missing after yesterday’s patches).",
+      "tags": [
+        "resolved",
+        "raster-pass",
+        "gpu-drop",
+        "commandlist-isolation",
+        "test-restir-gi-temporal",
+        "bug-088-followup"
+      ],
+      "related_bugs": [
+        "bug-075",
+        "bug-088"
+      ],
+      "occurrences": 1,
+      "last_seen": "2026-07-24T06:50:00.000Z"
+    },
+    {
+      "id": "bug-089",
+      "timestamp": "2026-07-23T22:45:51.442Z",
+      "error_message": "Significant refactor of ",
+      "file": "Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal_Data/GBufferPT_PS.hlsl",
+      "root_cause": "2 lines replaced/restructured",
+      "fix": "Rewrote 7→16 lines (2 removed) | Also: // DIAGNOSTIC: write SV_POSITION-based gradient to; // WorldPos is (99,99,99,1) -> saturated PNG (255,",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "hlsl"
+      ],
+      "related_bugs": [],
+      "occurrences": 2,
+      "last_seen": "2026-07-23T22:49:31.967Z"
+    },
+    {
+      "id": "bug-090",
+      "timestamp": "2026-07-23T22:47:21.869Z",
+      "error_message": "Significant refactor of ",
+      "file": "Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal.cpp",
+      "root_cause": "2 lines replaced/restructured",
+      "fix": "Rewrote 8→9 lines (2 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "cpp"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-23T22:47:21.869Z"
+    },
+    {
+      "id": "bug-092",
+      "timestamp": "2026-07-23T23:16:36.971Z",
+      "error_message": "Significant refactor of ",
+      "file": "Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal.cpp",
+      "root_cause": "4 lines replaced/restructured",
+      "fix": "Rewrote 13→22 lines (4 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "cpp"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-23T23:16:36.971Z"
+    },
+    {
+      "id": "bug-093",
+      "timestamp": "2026-08-09T23:30:00.000Z",
+      "error_message": "ReBLUR denoiser was a pass-through: denoised ~= spatial (HF drop 0-2%), SpatialAlpha never sent, NaN weights from uninitialized GBuffer sky texels, broken view-space plane rejection",
+      "file": "Engine/Source/Runtime/Private/Renderer/PostProcess/FReBLURPass.cpp; FReBLURPass.h; ReBLUR_cs.hlsl; TestReSTIR_GI_Temporal.cpp",
+      "root_cause": "Dispatch read Constants.SpatialAlpha (memset 0) instead of BlurParams.SpatialAlpha; GBuffer MRTs never cleared so sky texels held NaN bit patterns poisoning the blur weights; ReconstructViewPos fed linear depth into an NDC projection producing garbage plane distances",
+      "fix": "SpatialAlpha from BlurParams; clear all 4 GBuffer MRTs each frame (worldpos=0, normal=(0,0,0,1), material=0, depth=0); relative-depth bilateral exp(-|dd|/d*PlaneWeight) with saturate/isfinite guards; tuned defaults (BlurRadius 8, NormalWeight 2, PlaneWeight 12, SpatialAlpha 1.0)",
+      "tags": [
+        "TestReSTIR_GI_Temporal",
+        "ReBLUR",
+        "fixed-2026-08-09"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-08-09T23:30:00.000Z"
+    },
+    {
+      "id": "bug-094",
+      "timestamp": "2026-08-09T23:30:00.000Z",
+      "error_message": "Validator blind spots: never inspected spatial/denoised, so a bypass (HLVM_RGI_BYPASS=1) or dead-ReSTIR run passed 4/4",
+      "file": "Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal_Data/validate_restir_gi.py",
+      "root_cause": "Validator was designed around 'non-black structured image' but not 'ReSTIR+denoise stages executed and changed the signal'",
+      "fix": "Added check_restir_alive (spatial/denoised mean > 5) and check_denoise_effective (MAE > 0.5 and HF ratio < 0.99); both skippable via HLVM_VALIDATE_ALLOW_BYPASS=1; display-std threshold recalibrated 30->20 for the new sky background",
+      "tags": [
+        "TestReSTIR_GI_Temporal",
+        "validator",
+        "fixed-2026-08-09"
+      ],
+      "related_bugs": [
+        "bug-069"
+      ],
+      "occurrences": 1,
+      "last_seen": "2026-08-09T23:30:00.000Z"
+    },
+    {
+      "id": "bug-095",
+      "timestamp": "2026-08-09T23:30:00.000Z",
+      "error_message": "Display 56% black: no background for sky pixels; RayGen early-returned (0,0,0,1) and ReBLUR zeroed depth==0 pixels",
+      "file": "Engine/Source/Runtime/Private/Renderer/Shader/GI/GIPathTracing.hlsl; TestReSTIR_GI_Temporal_Data/GIPathTracing.hlsl; ReBLUR_cs.hlsl",
+      "root_cause": "No environment/background term on the primary path; the miss shader already had SampleSky() but primary sky pixels never traced a ray",
+      "fix": "RayGen no-geometry branch unprojects the primary ray (GLM RH-ZO diagonal + mul(vec,view)) and writes SampleSky(primaryDir); ReBLUR passes sky radiance through instead of black; display black% 56% -> 0.0%",
+      "tags": [
+        "TestReSTIR_GI_Temporal",
+        "sky",
+        "fixed-2026-08-09"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-08-09T23:30:00.000Z"
+    },
+    {
+      "id": "bug-096",
+      "timestamp": "2026-08-09T23:30:00.000Z",
+      "error_message": "ReSTIR spatial resolve pass-through: output selectedRadiance*W with W==1 collapsed to gi_raw; absolute-depth rejection over-rejected far surfaces",
+      "file": "Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal_Data/ReSTIR_Spatial_cs.hlsl",
+      "root_cause": "Resolve performed unbiased reservoir selection but never combined accepted neighbors; with homogeneous radiance the selection is a no-op",
+      "fix": "Weighted-average resolve sum(w_i*r_i)/sum(w_i) with w_i = target*W*M; relative-depth rejection |dd|/d > DepthThreshold; spatial HF now below gi_raw on G/B",
+      "tags": [
+        "TestReSTIR_GI_Temporal",
+        "ReSTIR",
+        "spatial",
+        "fixed-2026-08-09"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-08-09T23:30:00.000Z"
+    },
+    {
+      "id": "bug-097",
+      "timestamp": "2026-08-09T23:30:00.000Z",
+      "error_message": "GBufferPT_VS unconsumed vertex attributes (locations 2/3) + duplicate GIPathTracing.hlsl divergence (ninja declares Private copy but ShaderMake compiles the cfg-relative test-data copy)",
+      "file": "Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal_Data/GBufferPT_VS.hlsl; TestReSTIR_GI_Temporal.cpp; ShaderMakeBuild.py",
+      "root_cause": "Input layout declared UV/TANGENT the VS never reads (2 Vulkan warnings); GIPathTracing.hlsl exists in Private + test data + TestPathTraceGI_Data with divergent content and the build dependency graph pointed at a different file than the compiler read",
+      "fix": "Removed the 2 unused attributes; synced all three GIPathTracing.hlsl copies to the ReSTIR variant (OutputDirection u2 is always bound with a dummy in FGIPass); create_restir_gi_temporal_shadermake now declares the test-data source; verified TestPathTraceGI still passes",
+      "tags": [
+        "TestReSTIR_GI_Temporal",
+        "hygiene",
+        "fixed-2026-08-09"
+      ],
+      "related_bugs": [
+        "bug-076"
+      ],
+      "occurrences": 1,
+      "last_seen": "2026-08-09T23:30:00.000Z"
+    },
+    {
+      "id": "bug-098",
+      "timestamp": "2026-08-10T12:20:00.000Z",
+      "error_message": "GBuffer had no depth occlusion: D32 texture created but never attached, depth test/write disabled -> Sponza rendered as 'inside-out mesh' (interior surfaces showing through the facade)",
+      "file": "Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal.cpp",
+      "root_cause": "GBufferDepth (D32) was created but never added to the framebuffer; the GBuffer pipeline disabled depth test/write, so every overlapping mesh fragment wrote the GBuffer and the last-drawn mesh won per pixel",
+      "fix": "Attached GBufferDepth via FBDesc.setDepthAttachment, enabled DepthTest/DepthWrite with ComparisonFunc::Less, clear depth 1.0 per frame; before/after ASCII comparison in SCREENSHOTS_2026-08-10.md shows the interior patchwork gone",
+      "tags": [
+        "TestReSTIR_GI_Temporal",
+        "GBuffer",
+        "depth",
+        "fixed-2026-08-10"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-08-10T12:20:00.000Z"
+    },
+    {
+      "id": "bug-099",
+      "timestamp": "2026-08-10T16:30:00.000Z",
+      "error_message": "validate_restir_gi.py hardcoded to frame8 dumps: glob '*frame8.png' and all per-check filename patterns ignored frame-16/32 runs, so longer accumulation runs could not be validated",
+      "file": "Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal_Data/validate_restir_gi.py",
+      "root_cause": "Frame number was baked into filename filters ('display_frame8', 'spatial_frame8', ...) instead of matching any frameN",
+      "fix": "Glob '*frame*.png' and match 'display_frame' / 'spatial_frame' / 'denoised_frame' substrings; group anchoring uses the newest display of any frame number",
+      "tags": [
+        "validator",
+        "fixed-2026-08-10"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-08-10T16:30:00.000Z"
+    },
+    {
+      "id": "bug-100",
+      "timestamp": "2026-08-10T16:30:00.000Z",
+      "error_message": "Camera was outside Sponza; lighting was flat ambient + interior point lights (no sunlight look)",
+      "file": "Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal.cpp",
+      "root_cause": "Original exterior camera (0,6,24) and v142 AmbientScale=1.5 + point-light fallback washed out the scene",
+      "fix": "Scene rotated 90° around Y (TLAS + raster consistent), camera placed inside the hall (env-tunable), sun-only NEE light buffer (intensity 8) + low sky-tinted ambient 0.35; validator made frame-agnostic",
+      "tags": [
+        "TestReSTIR_GI_Temporal",
+        "camera",
+        "sunlight",
+        "rotation",
+        "fixed-2026-08-10"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-08-10T16:30:00.000Z"
+    },
+    {
+      "id": "bug-101",
+      "timestamp": "2026-08-10T17:20:00.000Z",
+      "error_message": "ReadbackTextureFloats forced alpha=1.0 on every dump: hid the material roughness (GBufferMaterial.a) and made the validator's alpha-sentinel check trivially pass even when the GI dispatch never ran",
+      "file": "Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal.cpp",
+      "root_cause": "OutPixels[DstIdx + 3] = 1.0f hardcoded in the readback loop",
+      "fix": "Copy the source alpha channel; validator alpha check now reflects the real GPU alpha (sentinel still saturates 255 on valid runs)",
+      "tags": [
+        "TestReSTIR_GI_Temporal",
+        "readback",
+        "validator",
+        "fixed-2026-08-10"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-08-10T17:20:00.000Z"
+    },
+    {
+      "id": "bug-102",
+      "timestamp": "2026-08-10T17:20:00.000Z",
+      "error_message": "Sponza materials were fake: palette-hash albedo (neutral materials got arbitrary per-name colors), no textures, no roughness -> 'colored pillars' and wrong GI",
+      "file": "Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal.cpp; GBufferPT_PS.hlsl; GIPathTracing.hlsl",
+      "root_cause": "GetMeshAlbedo hashed mesh names into an 8-color palette; the GBuffer wrote a flat constant; GI bounce used the same palette; roughness ignored",
+      "fix": "Material rework Phases 1-4: UV re-added, per-mesh real KTX2 albedo textures bound and sampled, roughness packed into GBufferMaterial.a and consumed by a roughness lobe, bounce albedo = texture linear average, palette hack removed; see PLAN_MATERIAL_REWORK_2026-08-10.md",
+      "tags": [
+        "TestReSTIR_GI_Temporal",
+        "material",
+        "textures",
+        "fixed-2026-08-10"
+      ],
+      "related_bugs": [
+        "bug-101"
+      ],
+      "occurrences": 1,
+      "last_seen": "2026-08-10T17:20:00.000Z"
+    },
+    {
+      "id": "bug-104",
+      "timestamp": "2026-08-10T22:58:00.000Z",
+      "error_message": "vkAcquireNextImageKHR(): Semaphore must not have any pending operations (VUID-vkAcquireNextImageKHR-semaphore-01779) once the per-frame waitForIdle is removed — acquire semaphores are reused before their pending signal completes",
+      "file": "Engine/Source/Runtime/Private/Renderer/DeviceManagerVk4_LifeCycle.cpp",
+      "root_cause": "m_AcquireSemaphoreIndex cycles faster than the semaphore's queued wait completes when frames overlap (waitForIdle was masking it)",
+      "fix": "TODO: track a per-index event query and wait it before re-acquiring with that semaphore; then the per-frame waitForIdle in RunMessageLoop can be removed (~42 ms/frame in the half-res ReSTIR test vs 64 ms)",
+      "tags": [
+        "DeviceManager",
+        "swapchain",
+        "semaphore",
+        "real-time",
+        "open"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-08-10T22:58:00.000Z"
     }
   ]
 }
-[
-  {
-    "id": "bug-060",
-    "timestamp": "2026-06-17T00:00:00.000Z",
-    "error_message": "TestFewBounceGI build failed after Day 0 BilateralDenoise float3→float4 fix: 'expected vector<float,3>, got vector<float,4>' at lines 68, 109, 115",
-    "file": "Engine/Source/Runtime/Test/TestFewBounceGI_Data/BilateralDenoise_cs.hlsl (and 2 sibling copies in Engine/Source/Runtime/Shader/ and TestCornellBoxGI_Data/)",
-    "root_cause": "Day 0 changed t_Input/RW u_Output format from float3 to float4 (alpha channel for hitDist propagation) but the shader body still used float3 locals (centerValue, sum, neighborValue). Cascade: signature type change requires body type change.",
-    "fix": "Updated centerValue (line 68), sum (line 70), and neighborValue (line 109) from float3 to float4 in all 3 BilateralDenoise copies. The body is now float4 throughout; final output sum/weightSum naturally produces float4 since weightSum is a scalar.",
-    "tags": ["shaderc-fix", "cascading-type-change", "bilateral-denoise", "float3-to-float4", "sprint-1-day-0-cascade"],
-    "related_bugs": ["bug-046", "bug-050"],
-    "occurrences": 1,
-    "last_seen": "2026-06-17T00:00:00.000Z"
-  }
-]

@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>plan_8.md</title>
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+       margin: 0; color: #1f2937; }
+body::before { content: ""; display: block; height: 3px;
+                background: linear-gradient(90deg, #dc2626, #2563eb); }
+header { background: #1f2937; color: #fff; padding: 14px 24px;
+          border-bottom: 3px solid #dc2626; }
+header h1 { margin: 0; font-size: 18px; }
+header .crumb { font-size: 12px; opacity: 0.75; }
+header .crumb a { color: #93c5fd; text-decoration: none; }
+header .crumb a:hover { text-decoration: underline; }
+.layout { display: grid; grid-template-columns: 260px 1fr; gap: 0; max-width: 1200px; margin: 0 auto; }
+nav.toc { border-right: 1px solid #e5e7eb; padding: 20px; font-size: 14px; position: sticky; top: 0;
+          max-height: 100vh; overflow-y: auto; box-sizing: border-box; background: #fafafa; }
+nav.toc h2 { font-size: 13px; text-transform: uppercase; color: #6b7280; margin: 0 0 12px;
+              letter-spacing: 0.5px; font-weight: 700; }
+nav.toc ul { list-style: none; padding: 0; margin: 0; }
+nav.toc li { padding: 4px 0; position: relative; padding-left: 14px;
+              transition: background 0.15s; }
+nav.toc li::before { content: ""; position: absolute; left: 0; top: 50%;
+                      transform: translateY(-50%); width: 6px; height: 6px;
+                      border-radius: 50%; background: #dc2626; opacity: 0.55; }
+nav.toc li:hover { background: #fef2f2; }
+nav.toc li:hover::before { opacity: 1; transform: translateY(-50%) scale(1.4); }
+nav.toc li.active { background: #fef2f2; }
+nav.toc li.active::before { background: #dc2626; opacity: 1; transform: translateY(-50%) scale(1.4); }
+nav.toc li.active a { color: #dc2626; font-weight: 600; }
+nav.toc a { color: #2563eb; text-decoration: none; }
+nav.toc a:hover { color: #dc2626; text-decoration: underline; }
+nav.toc .lvl2 { padding-left: 28px; }
+nav.toc .lvl3 { padding-left: 42px; font-size: 13px; }
+nav.toc .lvl3::before { width: 5px; height: 5px; background: #2563eb; opacity: 0.5; }
+nav.toc .empty { color: #9ca3af; font-style: italic; }
+.legend { margin-top: 18px; padding: 10px; background: #fff;
+           border: 1px solid #e5e7eb; border-radius: 6px; font-size: 12px; }
+.legend h2 { font-size: 11px !important; margin: 0 0 6px !important; }
+.legend div { display: flex; align-items: center; gap: 6px; padding: 2px 0; }
+.legend span.swatch { display: inline-block; width: 12px; height: 12px;
+                       border-radius: 3px; flex-shrink: 0; }
+.keywords { margin-top: 14px; padding: 10px; background: #fff;
+             border: 1px solid #e5e7eb; border-radius: 6px; font-size: 12px; }
+.keywords h2 { font-size: 11px !important; margin: 0 0 6px !important; }
+.keywords ul { padding-left: 14px; margin: 0; }
+.keywords li { padding: 1px 0 !important; padding-left: 0 !important;
+                border: 0 !important; background: none !important; }
+.keywords li::before { display: none !important; }
+.keywords a { color: #1f2937 !important; font-size: 12px; }
+.keywords a:hover { color: #dc2626 !important; text-decoration: underline; }
+main { padding: 24px 36px; line-height: 1.6; max-width: 900px; }
+main h1, main h2, main h3 { scroll-margin-top: 16px; }
+main h1 { color: #dc2626; border-bottom: 2px solid #dc2626; padding-bottom: 6px; }
+main h2 { color: #2563eb; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px;
+          margin-top: 32px; padding-left: 10px; border-left: 4px solid #2563eb; }
+main h3 { color: #dc2626; margin-top: 24px; padding-left: 8px;
+          border-left: 3px solid #dc2626; }
+main a { color: #2563eb; text-decoration: none; }
+main a:hover { color: #dc2626; text-decoration: underline; }
+main pre { background: #ffffff; color: #1f2937; padding: 16px; border-radius: 6px;
+            overflow-x: auto; font: 13px/1.5 Menlo, Consolas, monospace;
+            border: 1px solid #e5e7eb; }
+main code { background: #f3f4f6; color: #1f2937; padding: 2px 5px; border-radius: 3px;
+             font: 13px Menlo, Consolas, monospace; }
+main pre code { background: transparent; color: inherit; padding: 0; }
+main table { border-collapse: collapse; }
+main th, main td { border: 1px solid #e5e7eb; padding: 6px 12px; }
+main th { background: #f3f4f6; }
+main blockquote { border-left: 4px solid #d1d5db; margin: 16px 0; padding: 8px 16px;
+                   color: #4b5563; }
+main hr { border: 0; border-top: 1px solid #e5e7eb; margin: 24px 0; }
+main strong.kw { color: #dc2626; font-weight: 700; }
+.summary { background: #eff6ff; border-left: 4px solid #2563eb; padding: 12px 16px;
+            margin: 16px 0 24px; border-radius: 4px; color: #1e3a8a; font-size: 14px;
+            line-height: 1.5; }
+.summary::before { content: "📝 Summary"; display: block; font-weight: 700;
+                    color: #2563eb; font-size: 11px; text-transform: uppercase;
+                    letter-spacing: 0.5px; margin-bottom: 4px; }
+.back { display: inline-block; margin-bottom: 16px; font-size: 0.9em; color: #2563eb;
+         text-decoration: none; }
+.back:hover { color: #dc2626; text-decoration: underline; }
+#topBtn { position: fixed; bottom: 24px; right: 24px; z-index: 100;
+          background: #dc2626; color: #fff; border: 0; border-radius: 50%;
+          width: 44px; height: 44px; font-size: 18px; cursor: pointer;
+          box-shadow: 0 2px 6px rgba(0,0,0,0.2); opacity: 0;
+          transition: opacity 0.2s; pointer-events: none; }
+#topBtn.show { opacity: 1; pointer-events: auto; }
+#topBtn:hover { background: #b91c1c; }
+@media (max-width: 900px) {
+  .layout { grid-template-columns: 1fr; }
+  nav.toc { position: static; max-height: none; border-right: 0;
+             border-bottom: 1px solid #e5e7eb; }
+  main { padding: 16px 20px; }
+}
+@media print {
+  nav.toc, .legend, .keywords, #topBtn { display: none; }
+  .layout { grid-template-columns: 1fr; }
+  body::before { display: none; }
+  header { background: #fff; color: #000; border-bottom: 1px solid #000; }
+  main h1, main h2, main h3 { color: #000; border-color: #000; }
+}
+</style>
+<script>
+(function() {
+  const links = document.querySelectorAll('nav.toc a[href^="#"]');
+  const map = new Map();
+  links.forEach(a => {
+    const id = a.getAttribute('href').slice(1);
+    const li = a.parentElement;
+    map.set(id, li);
+  });
+  const targets = Array.from(map.keys()).map(id => document.getElementById(id)).filter(Boolean);
+  function activate() {
+    if (!targets.length) return;
+    const scrollY = window.scrollY + 80;
+    let current = null;
+    for (const t of targets) {
+      if (t.offsetTop <= scrollY) current = t;
+      else break;
+    }
+    links.forEach(a => a.parentElement.classList.remove('active'));
+    if (current) {
+      const li = map.get(current.id);
+      if (li) li.classList.add('active');
+    }
+  }
+  window.addEventListener('scroll', activate, { passive: true });
+  activate();
+
+  const btn = document.getElementById('topBtn');
+  if (btn) {
+    window.addEventListener('scroll', () => {
+      btn.classList.toggle('show', window.scrollY > 400);
+    }, { passive: true });
+    btn.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+  }
+})();
+</script>
+</head>
+<body>
+<header>
+  <div class="crumb"><a href="./index.html">Vibe_Coding/</a> / <a href="index.html">50_ReSTIR_GI_Temporal</a> / plan_8.md</div>
+  <h1>📄 plan_8.md</h1>
+</header>
+<div class="layout">
+  <nav class="toc">
+    <h2>On this page</h2>
+    <ul>
+<li class=""><a href="#phase-8-restir-gi-spatial-reuse-shading-evaluation">Phase 8: ReSTIR GI — Spatial Reuse + Shading Evaluation</a></li>
+      <li class="lvl2"><a href="#why-phase-8">Why Phase 8?</a></li>
+      <li class="lvl2"><a href="#architecture">Architecture</a></li>
+      <li class="lvl3"><a href="#new-pipeline">New Pipeline</a></li>
+      <li class="lvl3"><a href="#why-replace-denoisedhdrtexture">Why Replace DenoisedHDRTexture?</a></li>
+      <li class="lvl3"><a href="#spatial-merge-algorithm">Spatial Merge Algorithm</a></li>
+      <li class="lvl3"><a href="#shading-evaluation">Shading Evaluation</a></li>
+      <li class="lvl3"><a href="#alternative-store-radiance-in-reservoir">Alternative: Store Radiance in Reservoir</a></li>
+      <li class="lvl3"><a href="#final-shading-algorithm">Final Shading Algorithm</a></li>
+      <li class="lvl2"><a href="#hlsl-implementation">HLSL Implementation</a></li>
+      <li class="lvl3"><a href="#restir_spatial_cshlsl">ReSTIR_Spatial_cs.hlsl</a></li>
+      <li class="lvl2"><a href="#c-implementation">C++ Implementation</a></li>
+      <li class="lvl3"><a href="#modified-frestirpass">Modified FReSTIRPass</a></li>
+      <li class="lvl3"><a href="#integration-into-testfewbouncegicpp">Integration into TestFewBounceGI.cpp</a></li>
+      <li class="lvl2"><a href="#register-map-spatial-shader">Register Map (Spatial Shader)</a></li>
+      <li class="lvl2"><a href="#build-integration">Build Integration</a></li>
+      <li class="lvl2"><a href="#testing-strategy">Testing Strategy</a></li>
+      <li class="lvl2"><a href="#success-criteria">Success Criteria</a></li>
+      <li class="lvl2"><a href="#risks-mitigations">Risks &amp; Mitigations</a></li>
+      <li class="lvl2"><a href="#future-work-phase-9">Future Work (Phase 9+)</a></li>
+    </ul>
+    <div class="legend">
+      <h2>Color Legend</h2>
+      <div><span class="swatch" style="background:#dc2626;"></span> Red = Section / Keyword</div>
+      <div><span class="swatch" style="background:#2563eb;"></span> Blue = Sub-section / Link</div>
+      <div><span class="swatch" style="background:#1f2937;"></span> Black = Body</div>
+    </div>
+<div class="keywords">
+      <h2>Key Terms</h2>
+      <ul>
+      <li>Goal</li>
+      <li>Spatial stability</li>
+      <li>Visible quality improvement</li>
+      <li>Production-ready pipeline</li>
+      <li>Normal weight</li>
+      <li>Plane weight</li>
+      <li>Depth weight</li>
+      <li>Constants</li>
+      <li>Neighbor kernel</li>
+      <li>Geometric rejection</li>
+      <li>Merge</li>
+      <li>Output</li>
+      <li>Add spatial output texture</li>
+      <li>Create texture</li>
+      <li>In Render()</li>
+      <li>Feed SpatialRadianceTexture into ReBLUR</li>
+      <li>Fallback</li>
+      <li>Compile</li>
+      <li>Run</li>
+      <li>Visual check</li>
+      <li>Edge preservation</li>
+      </ul>
+    </div>
+  </nav>
+  <main>
+    <a class="back" href="index.html">&larr; Back to 50_ReSTIR_GI_Temporal index</a>
+<div class="summary">Phase 7b gave us temporal stability (M accumulates over frames). Phase 8 adds:</div>
+<h1 id="phase-8-restir-gi-spatial-reuse-shading-evaluation">Phase 8: ReSTIR GI — Spatial Reuse + Shading Evaluation</h1>
+<blockquote>
+<p><strong>Goal</strong>: Merge reservoirs spatially from neighboring pixels, then evaluate final shaded output that feeds into ReBLUR.</p>
+</blockquote>
+<h2 id="why-phase-8">Why Phase 8?</h2>
+<p>Phase 7b gave us temporal stability (M accumulates over frames). Phase 8 adds:
+- <strong>Spatial stability</strong>: Merge with 3x3 neighbors to reduce noise in a single frame
+- <strong>Visible quality improvement</strong>: Output actual RGB radiance from merged reservoirs to replace raw GI
+- <strong>Production-ready pipeline</strong>: Spatial + temporal reuse together is the core ReSTIR algorithm</p>
+<h2 id="architecture">Architecture</h2>
+<h3 id="new-pipeline">New Pipeline</h3>
+<pre><code>GBuffer Pass
+    ↓
+GI Ray Trace (3 bounces, untouched)
+    ↓
+Bilateral Denoise (untouched)
+    ↓
+ReSTIR Generation (Phase 7a — writes Current reservoirs)
+    ↓
+ReSTIR Temporal Reuse (Phase 7b — reads Current+History, writes Merged)
+    ↓
+[NEW] ReSTIR Spatial Reuse (reads Merged reservoirs, writes SpatiallyStable radiance)
+    ↓
+ReBLUR (now uses SpatiallyStable radiance instead of DenoisedHDRTexture)
+    ↓
+Blit to screen
+</code></pre>
+<h3 id="why-replace-denoisedhdrtexture">Why Replace DenoisedHDRTexture?</h3>
+<p>The spatially reused output should be significantly less noisy than the bilateral-denoised raw GI. By feeding it into ReBLUR, we get the best of both worlds:
+- ReSTIR spatial reuse reduces single-frame noise
+- ReBLUR temporal denoising further stabilizes over time</p>
+<p>If the spatial reuse output is worse, we can fall back to DenoisedHDRTexture via a toggle.</p>
+<h3 id="spatial-merge-algorithm">Spatial Merge Algorithm</h3>
+<p>For each pixel center:
+1. Read center merged reservoir <code>r_center</code>
+2. For each neighbor in 3x3 kernel (excluding center):
+   a. Read neighbor merged reservoir <code>r_neighbor</code>
+   b. Compute geometric weights:
+      - <strong>Normal weight</strong>: <code>exp(-acos(dot(centerNormal, neighborNormal)) * normalSigma * 10.0)</code>
+      - <strong>Plane weight</strong>: <code>exp(-planeDist * planeSigma * 1000.0)</code>
+      - <strong>Depth weight</strong>: <code>exp(-abs(centerDepth - neighborDepth) * depthSigma * 100.0)</code>
+   c. If all weights &gt; threshold, accept neighbor
+   d. Merge <code>r_center</code> with <code>r_neighbor</code> using same algorithm as temporal
+3. Output final merged reservoir</p>
+<h3 id="shading-evaluation">Shading Evaluation</h3>
+<p>After spatial merge, evaluate the selected sample:</p>
+<pre><code class="language-hlsl">float3 radiance = DenoisedHDRTexture[pixel].rgb;  // Current pixel's radiance
+float W = mergedReservoir.W;
+
+// Since our sample y is the pixel itself, the &quot;shading&quot; is just:
+// If winner is center: use center radiance
+// If winner is neighbor: use neighbor radiance (need to sample from texture)
+</code></pre>
+<p>Wait — our reservoirs store <code>worldPos</code> as the sample, not radiance. For proper ReSTIR shading, we need to evaluate the selected sample's contribution. But since our sample IS the pixel position, the radiance is just the radiance at that pixel.</p>
+<p>Simplified approach for Phase 8:
+- The spatial merge selects a winner pixel (center or neighbor)
+- We read the radiance from the winner's pixel position
+- We scale by <code>W_merged / W_winner</code> to account for the unbiased weight</p>
+<p>Actually, even simpler: since <code>p(y) = 1.0</code> and we're sampling pixels uniformly:
+- <code>W_merged = w_sum_merged / M_merged</code>
+- <code>w_sum_merged = sum of p_hat(y_i)</code> for all merged samples
+- <code>p_hat(y_i) = luminance(radiance_i)</code></p>
+<p>The final shaded output should be proportional to <code>W_merged</code>. But we need RGB, not just luminance.</p>
+<p>For Phase 8, use this approximation:</p>
+<pre><code class="language-hlsl">float3 centerRadiance = DenoisedHDRTexture[pixel].rgb;
+float3 winnerRadiance = DenoisedHDRTexture[neighborPixel].rgb; // if winner is neighbor
+
+// Since W already encodes the average luminance of merged samples,
+// we can approximate the output as:
+float3 output = centerRadiance * (W_merged / max(W_center, 1e-6));
+</code></pre>
+<p>This preserves the center pixel's color but scales it by the merged weight ratio. If the winner is a neighbor with different color, this isn't strictly correct, but it's a reasonable approximation for Phase 8.</p>
+<p>A better approach: store the RGB radiance in the reservoir.
+- Reservoir0: (radiance.R, radiance.G, radiance.B) — but we currently store worldPos!
+- We'd need to change the reservoir format.</p>
+<p>For Phase 8, let's keep the current reservoir format and use the approximation above. In Phase 9, we can redesign the reservoir to store radiance directly.</p>
+<h3 id="alternative-store-radiance-in-reservoir">Alternative: Store Radiance in Reservoir</h3>
+<p>Actually, for proper spatial reuse, we NEED to know the radiance of the selected sample. If we select a neighbor's sample, we need the neighbor's radiance.</p>
+<p>Option: Add a third reservoir texture:
+- <code>Reservoir2</code>: (radiance.R, radiance.G, radiance.B, unused)</p>
+<p>Or repurpose <code>Reservoir0</code>:
+- Phase 7a/7b store worldPos in RGB
+- Phase 8 doesn't actually need worldPos for shading — it needs radiance
+- We can store radiance instead of worldPos</p>
+<p>But changing the reservoir format breaks backward compatibility with Phase 7a/7b debug vis.</p>
+<p>Better option: Keep worldPos in Reservoir0 for now, and sample radiance from <code>DenoisedHDRTexture</code> using the winner's pixel coordinate. The spatial shader already knows which pixel (center or neighbor) won, so it can read the radiance directly.</p>
+<h3 id="final-shading-algorithm">Final Shading Algorithm</h3>
+<pre><code class="language-hlsl">Reservoir spatial = SpatialMerge(centerPixel, neighbors);
+
+float3 outputRadiance;
+if (winnerIsCenter) {
+    outputRadiance = DenoisedHDRTexture[centerPixel].rgb;
+} else {
+    outputRadiance = DenoisedHDRTexture[neighborPixel].rgb;
+}
+
+// Scale by merged weight (optional — if W already incorporates this)
+// For now, just output the winner's radiance
+OutputRadiance[pixel] = float4(outputRadiance, 1.0);
+</code></pre>
+<p>Wait, but if we just output the winner's radiance, we're essentially doing a filtered copy. The real value of ReSTIR is that <code>W</code> encodes the combined importance of all samples. For diffuse surfaces, the output should be:
+<code>L = W * (1/π) * albedo * ...</code></p>
+<p>But since our <code>p_hat</code> was luminance and <code>W = w_sum / M</code>, the output radiance should be approximately:
+<code>output = winnerRadiance * (W_merged / W_winner)</code></p>
+<p>However, <code>W_winner = w_sum_winner / M_winner</code>, and for a single pixel <code>M_winner = 1</code>, <code>w_sum_winner = luminance(winnerRadiance)</code>. So <code>W_winner = luminance(winnerRadiance)</code>.</p>
+<p>And <code>W_merged = (w_sum_center + w_sum_neighbors) / M_merged</code>.</p>
+<p>The ratio <code>W_merged / W_winner</code> tells us how much "better" the merged reservoir is compared to the single sample. If winner is center and center had high luminance, ratio ≈ 1. If winner is a bright neighbor, ratio could be &gt; 1.</p>
+<p>For simplicity, Phase 8 will just output <code>winnerRadiance</code> without scaling. The spatial reuse still provides value by selecting the best sample from the neighborhood. In Phase 9, we can implement proper weight scaling.</p>
+<h2 id="hlsl-implementation">HLSL Implementation</h2>
+<h3 id="restir_spatial_cshlsl">ReSTIR_Spatial_cs.hlsl</h3>
+<pre><code class="language-hlsl">// Inputs:
+//   t0: Merged Reservoir0 (worldPos.xyz, W)
+//   t1: Merged Reservoir1 (w_sum, M, pdf, hitDist)
+//   t2: GBuffer normals
+//   t3: GBuffer depth
+//   t4: Denoised HDR radiance (for winner evaluation)
+// Outputs:
+//   u0: Spatially stable radiance (RGBA16F)
+//   u1: Debug output (M as grayscale, or normal diff)
+</code></pre>
+<p><strong>Constants</strong>:</p>
+<pre><code class="language-hlsl">struct FReSTIRSpatialConstants {
+    float OutputSize[2];
+    float RcpOutputSize[2];
+    float NormalSigma;
+    float PlaneSigma;
+    float DepthSigma;
+    float MaxM;
+    float DebugVis;
+};
+</code></pre>
+<p><strong>Neighbor kernel</strong>: 3x3 (8 neighbors)</p>
+<p><strong>Geometric rejection</strong>:</p>
+<pre><code class="language-hlsl">float normalAngle = acos(saturate(dot(centerNormal, neighborNormal)));
+float nWeight = exp(-normalAngle * NormalSigma * 10.0);
+
+float3 centerViewPos = ReconstructViewPos(centerUv, centerDepth);
+float3 neighborViewPos = ReconstructViewPos(neighborUv, neighborDepth);
+float planeDist = abs(dot(normalize(centerViewPos - neighborViewPos), centerNormal));
+float pWeight = exp(-planeDist * PlaneSigma * 1000.0);
+
+float depthDiff = abs(centerDepth - neighborDepth);
+float dWeight = exp(-depthDiff * DepthSigma * 100.0);
+
+float geomWeight = nWeight * pWeight * dWeight;
+if (geomWeight &lt; 0.01) continue; // Reject neighbor
+</code></pre>
+<p><strong>Merge</strong>: Same as temporal merge, but accumulate all valid neighbors:</p>
+<pre><code class="language-hlsl">Reservoir spatial = center;
+float totalW = center.w_sum;
+
+for each valid neighbor:
+    spatial.M = min(spatial.M + neighbor.M, MaxM);
+    spatial.w_sum += neighbor.w_sum * geomWeight;
+
+    // Select winner
+    if (random() &lt; (neighbor.w_sum * geomWeight) / spatial.w_sum) {
+        spatial.y = neighbor.y;
+        spatial.hitDist = neighbor.hitDist;
+        winnerPixel = neighborPixel;
+    }
+
+spatial.W = spatial.w_sum / max(spatial.M, 1e-6);
+</code></pre>
+<p><strong>Output</strong>:</p>
+<pre><code class="language-hlsl">float3 outputRadiance = DenoisedHDRTexture[winnerPixel].rgb;
+OutputRadiance[pixel] = float4(outputRadiance, spatial.W);
+</code></pre>
+<h2 id="c-implementation">C++ Implementation</h2>
+<h3 id="modified-frestirpass">Modified FReSTIRPass</h3>
+<p>Add <code>DispatchSpatial</code>:</p>
+<pre><code class="language-cpp">struct FSpatialDesc {
+    nvrhi::TextureHandle MergedReservoir0;
+    nvrhi::TextureHandle MergedReservoir1;
+    nvrhi::TextureHandle NormalTexture;
+    nvrhi::TextureHandle DepthTexture;
+    nvrhi::TextureHandle RadianceTexture;  // Denoised HDR
+    nvrhi::TextureHandle OutRadiance;       // Spatially stable output
+    nvrhi::TextureHandle OutDebugTexture;
+    uint32_t OutputWidth, OutputHeight;
+};
+
+struct FReSTIRSpatialConstants {
+    TFP32 OutputSize[2];
+    TFP32 RcpOutputSize[2];
+    TFP32 NormalSigma;
+    TFP32 PlaneSigma;
+    TFP32 DepthSigma;
+    TFP32 MaxM;
+    TFP32 DebugVis;
+    TFP32 Pad;
+};
+
+void DispatchSpatial(nvrhi::ICommandList*, const FSpatialDesc&amp;, const FReSTIRSpatialConstants&amp;);
+</code></pre>
+<h3 id="integration-into-testfewbouncegicpp">Integration into TestFewBounceGI.cpp</h3>
+<ol>
+<li><strong>Add spatial output texture</strong>:</li>
+</ol>
+<pre><code class="language-cpp">nvrhi::TextureHandle SpatialRadianceTexture;  // RGBA16F
+</code></pre>
+<ol>
+<li>
+<p><strong>Create texture</strong> in <code>Initialize()</code>.</p>
+</li>
+<li>
+<p><strong>In Render()</strong>, after temporal pass:</p>
+</li>
+</ol>
+<pre><code class="language-cpp">// ReSTIR Spatial Reuse Pass
+CmdList-&gt;setTextureState(Reservoir0HistoryTexture, ..., ShaderResource);  // Merged from temporal
+CmdList-&gt;setTextureState(Reservoir1HistoryTexture, ..., ShaderResource);
+CmdList-&gt;setTextureState(GBufferNormalsTexture, ..., ShaderResource);
+CmdList-&gt;setTextureState(GBufferDepthTexture, ..., ShaderResource);
+CmdList-&gt;setTextureState(DenoisedHDRTexture, ..., ShaderResource);
+CmdList-&gt;setTextureState(SpatialRadianceTexture, ..., UnorderedAccess);
+
+ReSTIR::FReSTIRPass::FSpatialDesc SpatialDesc;
+SpatialDesc.MergedReservoir0 = Reservoir0HistoryTexture;  // After swap, history holds merged
+SpatialDesc.MergedReservoir1 = Reservoir1HistoryTexture;
+SpatialDesc.NormalTexture = GBufferNormalsTexture;
+SpatialDesc.DepthTexture = GBufferDepthTexture;
+SpatialDesc.RadianceTexture = DenoisedHDRTexture;
+SpatialDesc.OutRadiance = SpatialRadianceTexture;
+SpatialDesc.OutDebugTexture = ReSTIRDebugTexture;
+SpatialDesc.OutputWidth = CurrentFBInfo.width;
+SpatialDesc.OutputHeight = CurrentFBInfo.height;
+
+ReSTIR::FReSTIRSpatialConstants SpatialConstants;
+SpatialConstants.NormalSigma = 0.1f;
+SpatialConstants.PlaneSigma = 100.0f;
+SpatialConstants.DepthSigma = 0.01f;
+SpatialConstants.MaxM = 30.0f;
+SpatialConstants.DebugVis = g_ReSTIRDebugVis ? 1.0f : 0.0f;
+
+ReSTIRPass.DispatchSpatial(CmdList, SpatialDesc, SpatialConstants);
+</code></pre>
+<ol>
+<li><strong>Feed SpatialRadianceTexture into ReBLUR</strong>:</li>
+</ol>
+<pre><code class="language-cpp">ReBLURDesc.CurrentRadianceTexture = SpatialRadianceTexture;
+</code></pre>
+<ol>
+<li><strong>Fallback</strong>: If spatial reuse is disabled, keep using DenoisedHDRTexture.</li>
+</ol>
+<h2 id="register-map-spatial-shader">Register Map (Spatial Shader)</h2>
+<table>
+<thead>
+<tr>
+<th>Register</th>
+<th>Name</th>
+<th>Type</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>b0</td>
+<td><code>gConstants</code></td>
+<td>cbuffer</td>
+<td>Spatial constants</td>
+</tr>
+<tr>
+<td>t0</td>
+<td><code>gMergedReservoir0</code></td>
+<td>Texture2D</td>
+<td>Merged reservoir 0</td>
+</tr>
+<tr>
+<td>t1</td>
+<td><code>gMergedReservoir1</code></td>
+<td>Texture2D</td>
+<td>Merged reservoir 1</td>
+</tr>
+<tr>
+<td>t2</td>
+<td><code>gNormals</code></td>
+<td>Texture2D</td>
+<td>GBuffer normals</td>
+</tr>
+<tr>
+<td>t3</td>
+<td><code>gDepth</code></td>
+<td>Texture2D</td>
+<td>Linear depth</td>
+</tr>
+<tr>
+<td>t4</td>
+<td><code>gRadiance</code></td>
+<td>Texture2D</td>
+<td>Denoised HDR radiance</td>
+</tr>
+<tr>
+<td>u0</td>
+<td><code>gOutRadiance</code></td>
+<td>RWTexture2D</td>
+<td>Spatially stable radiance</td>
+</tr>
+<tr>
+<td>u1</td>
+<td><code>gDebugOutput</code></td>
+<td>RWTexture2D</td>
+<td>Debug visualization</td>
+</tr>
+</tbody>
+</table>
+<h2 id="build-integration">Build Integration</h2>
+<ul>
+<li><code>ShaderMake.cfg</code>: Add <code>ReSTIR_Spatial_cs.hlsl -T cs</code></li>
+<li><code>CMakeLists.txt</code>: Already has <code>FReSTIRPass.cpp</code></li>
+</ul>
+<h2 id="testing-strategy">Testing Strategy</h2>
+<ol>
+<li><strong>Compile</strong>: <code>./Build.sh --Config=Debug --Target=TestFewBounceGI</code></li>
+<li><strong>Run</strong>: <code>./Build.sh --Config=Debug --Target=TestFewBounceGI --Test</code></li>
+<li><strong>Visual check</strong>: Output should be smoother than DenoisedHDRTexture alone</li>
+<li><strong>Edge preservation</strong>: Sharp geometry edges should not blur</li>
+<li><strong>Fallback</strong>: Ensure pipeline works with/without spatial reuse</li>
+</ol>
+<h2 id="success-criteria">Success Criteria</h2>
+<ul>
+<li>[ ] Compiles without errors</li>
+<li>[ ] TestFewBounceGI passes</li>
+<li>[ ] Spatial output is visually smoother than bilateral denoise alone</li>
+<li>[ ] No edge bleeding across geometry boundaries</li>
+<li>[ ] Performance acceptable (3x3 kernel = 9x sample increase, but still cheap)</li>
+</ul>
+<h2 id="risks-mitigations">Risks &amp; Mitigations</h2>
+<table>
+<thead>
+<tr>
+<th>Risk</th>
+<th>Mitigation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Spatial merge over-blurs</td>
+<td>Tune NormalSigma/PlaneSigma; use 3x3 not 5x5</td>
+</tr>
+<tr>
+<td>Geometric weights wrong</td>
+<td>Visualize rejection mask in debug output</td>
+</tr>
+<tr>
+<td>Winner radiance lookup wrong</td>
+<td>Verify winner pixel coords are correct</td>
+</tr>
+<tr>
+<td>ReBLUR input changed → artifacts</td>
+<td>Keep fallback to DenoisedHDRTexture</td>
+</tr>
+</tbody>
+</table>
+<h2 id="future-work-phase-9">Future Work (Phase 9+)</h2>
+<ul>
+<li>Store radiance directly in reservoir (avoid texture lookup)</li>
+<li>5x5 kernel with adaptive radius</li>
+<li>Proper BRDF evaluation for selected samples</li>
+<li>Environment map sampling</li>
+</ul>
+  </main>
+</div>
+<button id="topBtn" title="Back to top">↑</button>
+</body>
+</html>

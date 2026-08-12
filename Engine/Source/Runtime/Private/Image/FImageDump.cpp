@@ -5,6 +5,7 @@
 #include <chrono>
 #include <ctime>
 #include <cstring>
+#include <cstdio>
 #include <algorithm>
 #include <cmath>
 
@@ -16,7 +17,15 @@ bool FImageDump::DumpToPNG(const FString& filename, int width, int height, const
         pixels[idx + 0] = static_cast<uint8_t>(std::clamp(rgbaData[i * 4 + 0] * 255.0f, 0.0f, 255.0f));
         pixels[idx + 1] = static_cast<uint8_t>(std::clamp(rgbaData[i * 4 + 1] * 255.0f, 0.0f, 255.0f));
         pixels[idx + 2] = static_cast<uint8_t>(std::clamp(rgbaData[i * 4 + 2] * 255.0f, 0.0f, 255.0f));
-        pixels[idx + 3] = 255;
+        // v41 (six-role-pipeline, 2026-07-27): write the source alpha channel instead
+        // of hardcoding 255. The hardcoded value was discarding the v28 alpha sentinel
+        // `Output[pixel].w = max(..., 0.99994f)` at GIPathTracing.hlsl:694 — every dump
+        // had alpha=255 regardless of whether the sentinel fired, the dispatch ran, or
+        // the v28 binary was even compiled. Same std::clamp pattern as the R/G/B lines;
+        // NaN/inf source alpha is clamped to 0 (deterministic, slightly worse for invalid
+        // data but correct for valid data). API signature unchanged; all 13+ call sites
+        // get the fix transitively.
+        pixels[idx + 3] = static_cast<uint8_t>(std::clamp(rgbaData[i * 4 + 3] * 255.0f, 0.0f, 255.0f));
     }
 
     int stride = width * 4;

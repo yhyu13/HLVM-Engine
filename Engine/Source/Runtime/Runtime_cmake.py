@@ -122,8 +122,10 @@ nvrhi = FetchContent(name='nvrhi',
                      git_repo_url='https://github.com/yhyu13/NVRHI.git',
                      git_tag='472f99ac68251970dc9e75afa1648c9bc4db7e83',
                      dependant_target_link_libs=[
-                         # link nvrhi_vk before nvrhi otherwise link error
-                         DomainValueModel(domain=DomainEnum.PUBLIC, values=['nvrhi_vk', 'nvrhi'])]
+                         # link nvrhi_vk before nvrhi otherwise link error; force
+                         # extraction of the validation wrapper from the static archive
+                         DomainValueModel(domain=DomainEnum.PUBLIC,
+                                          values=['nvrhi_vk', '$<LINK_LIBRARY:WHOLE_ARCHIVE,nvrhi>'])]
                      )
 
 """

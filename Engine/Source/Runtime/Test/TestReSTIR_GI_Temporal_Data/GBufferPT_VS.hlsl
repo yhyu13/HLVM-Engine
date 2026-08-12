@@ -14,12 +14,11 @@
  *       (no texture bind — this test uses a fallback material color
  *        because Sponza's .ktx texture load is a separate card)
  *
- * Vertex stream layout (matches TestReSTIR_GI_Temporal.cpp FVertex):
- *   POSITION  : float3 (12B)
- *   NORMAL    : float3 (12B)
- *   TEXCOORD0 : float2 (8B)
- *   TANGENT   : float3 (12B)
- *   total stride: 44B
+ * Vertex stream layout (matches TestReSTIR_GI_Temporal.cpp FVertex, but the
+ * shader only consumes POSITION/NORMAL; the input layout still strides the
+ * full sizeof(FVertex)=64 so the offsets 0/16 stay correct):
+ *   POSITION  : float3 (offset 0)
+ *   NORMAL    : float3 (offset 16)
  *
  * Bindings (per-draw CB approach; FInstanceInfo is bound as a single
  * constant buffer b1 by the C++ driver so each mesh-draw sees only its
@@ -52,7 +51,9 @@ cbuffer PerInstanceInfo : register(b1) {
     float3 AlbedoColor;
     uint   AlbedoTextureIndex;
     uint   MaterialFlags;
-    uint3  Padding;
+    float  Roughness;   // gltf roughnessFactor (2026-08-10 Phase 2)
+    float  Metallic;
+    uint   Pad;
 };
 
 // =============================================================================
@@ -63,7 +64,6 @@ struct VSInput {
     float3 Position : POSITION;
     float3 Normal   : NORMAL;
     float2 UV       : TEXCOORD0;
-    float3 Tangent  : TANGENT;
 };
 
 // =============================================================================
@@ -75,6 +75,8 @@ struct PSInput {
     float3 WorldPos  : TEXCOORD0;
     float3 Normal    : TEXCOORD1;
     float3 Albedo    : TEXCOORD2;
+    float  ViewDepth : TEXCOORD3;   // positive view-space depth (-viewPos.z)
+    float2 UV        : TEXCOORD4;   // material albedo UV (2026-08-10 Phase 1)
 };
 
 PSInput main(VSInput input) {
@@ -91,8 +93,13 @@ PSInput main(VSInput input) {
     // World-space normal — Model is identity so just normalize.
     output.Normal = normalize(mul((float3x3)ModelMatrix, input.Normal));
 
+    // Positive view-space depth for the ReSTIR temporal/spatial passes.
+    // Camera looks down -Z, so -viewPos.z is positive in front of the camera.
+    output.ViewDepth = -viewPos.z;
+
     // Per-instance material color — used by PS to populate MRT2 (material).
     output.Albedo = AlbedoColor;
+    output.UV     = input.UV;
 
     return output;
 }

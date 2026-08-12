@@ -1,5 +1,9 @@
 # TestReSTIR_GI_Temporal — final state (2026-07-22)
 
+> **SUPERSEDED** — see `final-state-2026-08-09.md`. This document predates
+> the NVRHI validator patch, the bug-088 command-list fix, and the v151
+> ReSTIR layout split; do not treat its "black output" claims as current.
+
 ## TL;DR
 - **The test build is green.** Validator exits 0 (relaxed 1/1).
   Build passes. Sponza GBuffer pass is wired and committed

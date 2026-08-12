@@ -609,14 +609,23 @@ def create_restir_gi_temporal_shadermake(test_target_name: str) -> ShaderMakeMod
     # Re-use proven sources where possible (GIPathTracing.hlsl inherits the
     # 64-byte compact-fully-used payload fix from session-PathTraceGI_payload_debug.md).
     # Everything else lives in the test data dir.
+    #
+    # 2026-08-09: GIPathTracing.hlsl is declared from the TEST DATA dir, not
+    # gi_shader_dir. ShaderMake resolves the config-relative filename
+    # ("GIPathTracing.hlsl" in Test/..._Data/ShaderMake.cfg) against the
+    # config file's directory, so the file that is actually compiled is the
+    # test-data copy — which carries the ReSTIR-specific OutputDirection UAV
+    # (u2). Declaring gi_shader_dir here made the ninja dependency graph point
+    # at a different file than the compiler reads (silent divergence trap).
     shader_sources = [
-        gi_shader_dir + "/GIPathTracing.hlsl",
+        test_data_dir + "/GIPathTracing.hlsl",
         test_data_dir + "/GIAccumulate_cs.hlsl",
         test_data_dir + "/BilateralDenoise_cs.hlsl",
         test_data_dir + "/ReBLUR_cs.hlsl",
         test_data_dir + "/ReSTIR_Generate_cs.hlsl",
         test_data_dir + "/ReSTIR_Temporal_cs.hlsl",
         test_data_dir + "/ReSTIR_Spatial_cs.hlsl",
+        test_data_dir + "/Resolve_cs.hlsl",
         test_data_dir + "/GBufferSponzaVS.hlsl",
         test_data_dir + "/GBufferSponzaPS.hlsl",
     ]

@@ -22,8 +22,14 @@ Texture2D<float4> gWorldPos : register(t1);
 Texture2D<float4> gNormals : register(t2);
 Texture2D<float> gDepth : register(t3);
 
-RWTexture2D<float4> gReservoir0 : register(u0);
-RWTexture2D<float4> gReservoir1 : register(u1);
+// v151 (six-role-pipeline): match the temporal shader's set-1 placement
+// for the UAVs (register(u0, space1) etc). The C++ side now composes two
+// binding layouts (GenerationLayoutSRV = set 0, GenerationLayoutUAV = set 1)
+// so the SRV reads and UAV writes get unambiguous layouts — the
+// nvrhi-deferred-barrier-ordering fix that already landed on the temporal
+// layout.
+RWTexture2D<float4> gReservoir0 : register(u0, space1);
+RWTexture2D<float4> gReservoir1 : register(u1, space1);
 
 // PCG hash (better quality than simple LCG)
 uint pcg_hash(uint v)

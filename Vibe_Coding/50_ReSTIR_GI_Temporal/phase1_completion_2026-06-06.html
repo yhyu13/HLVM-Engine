@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>phase1_completion_2026-06-06.md</title>
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+       margin: 0; color: #1f2937; }
+body::before { content: ""; display: block; height: 3px;
+                background: linear-gradient(90deg, #dc2626, #2563eb); }
+header { background: #1f2937; color: #fff; padding: 14px 24px;
+          border-bottom: 3px solid #dc2626; }
+header h1 { margin: 0; font-size: 18px; }
+header .crumb { font-size: 12px; opacity: 0.75; }
+header .crumb a { color: #93c5fd; text-decoration: none; }
+header .crumb a:hover { text-decoration: underline; }
+.layout { display: grid; grid-template-columns: 260px 1fr; gap: 0; max-width: 1200px; margin: 0 auto; }
+nav.toc { border-right: 1px solid #e5e7eb; padding: 20px; font-size: 14px; position: sticky; top: 0;
+          max-height: 100vh; overflow-y: auto; box-sizing: border-box; background: #fafafa; }
+nav.toc h2 { font-size: 13px; text-transform: uppercase; color: #6b7280; margin: 0 0 12px;
+              letter-spacing: 0.5px; font-weight: 700; }
+nav.toc ul { list-style: none; padding: 0; margin: 0; }
+nav.toc li { padding: 4px 0; position: relative; padding-left: 14px;
+              transition: background 0.15s; }
+nav.toc li::before { content: ""; position: absolute; left: 0; top: 50%;
+                      transform: translateY(-50%); width: 6px; height: 6px;
+                      border-radius: 50%; background: #dc2626; opacity: 0.55; }
+nav.toc li:hover { background: #fef2f2; }
+nav.toc li:hover::before { opacity: 1; transform: translateY(-50%) scale(1.4); }
+nav.toc li.active { background: #fef2f2; }
+nav.toc li.active::before { background: #dc2626; opacity: 1; transform: translateY(-50%) scale(1.4); }
+nav.toc li.active a { color: #dc2626; font-weight: 600; }
+nav.toc a { color: #2563eb; text-decoration: none; }
+nav.toc a:hover { color: #dc2626; text-decoration: underline; }
+nav.toc .lvl2 { padding-left: 28px; }
+nav.toc .lvl3 { padding-left: 42px; font-size: 13px; }
+nav.toc .lvl3::before { width: 5px; height: 5px; background: #2563eb; opacity: 0.5; }
+nav.toc .empty { color: #9ca3af; font-style: italic; }
+.legend { margin-top: 18px; padding: 10px; background: #fff;
+           border: 1px solid #e5e7eb; border-radius: 6px; font-size: 12px; }
+.legend h2 { font-size: 11px !important; margin: 0 0 6px !important; }
+.legend div { display: flex; align-items: center; gap: 6px; padding: 2px 0; }
+.legend span.swatch { display: inline-block; width: 12px; height: 12px;
+                       border-radius: 3px; flex-shrink: 0; }
+.keywords { margin-top: 14px; padding: 10px; background: #fff;
+             border: 1px solid #e5e7eb; border-radius: 6px; font-size: 12px; }
+.keywords h2 { font-size: 11px !important; margin: 0 0 6px !important; }
+.keywords ul { padding-left: 14px; margin: 0; }
+.keywords li { padding: 1px 0 !important; padding-left: 0 !important;
+                border: 0 !important; background: none !important; }
+.keywords li::before { display: none !important; }
+.keywords a { color: #1f2937 !important; font-size: 12px; }
+.keywords a:hover { color: #dc2626 !important; text-decoration: underline; }
+main { padding: 24px 36px; line-height: 1.6; max-width: 900px; }
+main h1, main h2, main h3 { scroll-margin-top: 16px; }
+main h1 { color: #dc2626; border-bottom: 2px solid #dc2626; padding-bottom: 6px; }
+main h2 { color: #2563eb; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px;
+          margin-top: 32px; padding-left: 10px; border-left: 4px solid #2563eb; }
+main h3 { color: #dc2626; margin-top: 24px; padding-left: 8px;
+          border-left: 3px solid #dc2626; }
+main a { color: #2563eb; text-decoration: none; }
+main a:hover { color: #dc2626; text-decoration: underline; }
+main pre { background: #ffffff; color: #1f2937; padding: 16px; border-radius: 6px;
+            overflow-x: auto; font: 13px/1.5 Menlo, Consolas, monospace;
+            border: 1px solid #e5e7eb; }
+main code { background: #f3f4f6; color: #1f2937; padding: 2px 5px; border-radius: 3px;
+             font: 13px Menlo, Consolas, monospace; }
+main pre code { background: transparent; color: inherit; padding: 0; }
+main table { border-collapse: collapse; }
+main th, main td { border: 1px solid #e5e7eb; padding: 6px 12px; }
+main th { background: #f3f4f6; }
+main blockquote { border-left: 4px solid #d1d5db; margin: 16px 0; padding: 8px 16px;
+                   color: #4b5563; }
+main hr { border: 0; border-top: 1px solid #e5e7eb; margin: 24px 0; }
+main strong.kw { color: #dc2626; font-weight: 700; }
+.summary { background: #eff6ff; border-left: 4px solid #2563eb; padding: 12px 16px;
+            margin: 16px 0 24px; border-radius: 4px; color: #1e3a8a; font-size: 14px;
+            line-height: 1.5; }
+.summary::before { content: "📝 Summary"; display: block; font-weight: 700;
+                    color: #2563eb; font-size: 11px; text-transform: uppercase;
+                    letter-spacing: 0.5px; margin-bottom: 4px; }
+.back { display: inline-block; margin-bottom: 16px; font-size: 0.9em; color: #2563eb;
+         text-decoration: none; }
+.back:hover { color: #dc2626; text-decoration: underline; }
+#topBtn { position: fixed; bottom: 24px; right: 24px; z-index: 100;
+          background: #dc2626; color: #fff; border: 0; border-radius: 50%;
+          width: 44px; height: 44px; font-size: 18px; cursor: pointer;
+          box-shadow: 0 2px 6px rgba(0,0,0,0.2); opacity: 0;
+          transition: opacity 0.2s; pointer-events: none; }
+#topBtn.show { opacity: 1; pointer-events: auto; }
+#topBtn:hover { background: #b91c1c; }
+@media (max-width: 900px) {
+  .layout { grid-template-columns: 1fr; }
+  nav.toc { position: static; max-height: none; border-right: 0;
+             border-bottom: 1px solid #e5e7eb; }
+  main { padding: 16px 20px; }
+}
+@media print {
+  nav.toc, .legend, .keywords, #topBtn { display: none; }
+  .layout { grid-template-columns: 1fr; }
+  body::before { display: none; }
+  header { background: #fff; color: #000; border-bottom: 1px solid #000; }
+  main h1, main h2, main h3 { color: #000; border-color: #000; }
+}
+</style>
+<script>
+(function() {
+  const links = document.querySelectorAll('nav.toc a[href^="#"]');
+  const map = new Map();
+  links.forEach(a => {
+    const id = a.getAttribute('href').slice(1);
+    const li = a.parentElement;
+    map.set(id, li);
+  });
+  const targets = Array.from(map.keys()).map(id => document.getElementById(id)).filter(Boolean);
+  function activate() {
+    if (!targets.length) return;
+    const scrollY = window.scrollY + 80;
+    let current = null;
+    for (const t of targets) {
+      if (t.offsetTop <= scrollY) current = t;
+      else break;
+    }
+    links.forEach(a => a.parentElement.classList.remove('active'));
+    if (current) {
+      const li = map.get(current.id);
+      if (li) li.classList.add('active');
+    }
+  }
+  window.addEventListener('scroll', activate, { passive: true });
+  activate();
+
+  const btn = document.getElementById('topBtn');
+  if (btn) {
+    window.addEventListener('scroll', () => {
+      btn.classList.toggle('show', window.scrollY > 400);
+    }, { passive: true });
+    btn.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+  }
+})();
+</script>
+</head>
+<body>
+<header>
+  <div class="crumb"><a href="./index.html">Vibe_Coding/</a> / <a href="index.html">50_ReSTIR_GI_Temporal</a> / phase1_completion_2026-06-06.md</div>
+  <h1>📄 phase1_completion_2026-06-06.md</h1>
+</header>
+<div class="layout">
+  <nav class="toc">
+    <h2>On this page</h2>
+    <ul>
+<li class=""><a href="#restir-gi-phase-1-completion-report">ReSTIR GI — Phase 1 Completion Report</a></li>
+      <li class="lvl2"><a href="#phase-1-goal">Phase 1 Goal</a></li>
+      <li class="lvl2"><a href="#what-was-broken-root-causes">What Was Broken (Root Causes)</a></li>
+      <li class="lvl3"><a href="#1-gi-ray-tracing-shader-fewbouncegihlsl">1. GI Ray Tracing Shader (FewBounceGI.hlsl)</a></li>
+      <li class="lvl3"><a href="#2-restir-temporal-pass-restir_temporal_cshlsl">2. ReSTIR Temporal Pass (ReSTIR_Temporal_cs.hlsl)</a></li>
+      <li class="lvl3"><a href="#3-restir-spatial-pass-restir_spatial_cshlsl">3. ReSTIR Spatial Pass (ReSTIR_Spatial_cs.hlsl)</a></li>
+      <li class="lvl3"><a href="#4-pipeline-data-flow">4. Pipeline / Data Flow</a></li>
+      <li class="lvl2"><a href="#current-pipeline-architecture-post-fix">Current Pipeline Architecture (Post-Fix)</a></li>
+      <li class="lvl2"><a href="#technical-lessons-restir-specific">Technical Lessons (ReSTIR-Specific)</a></li>
+      <li class="lvl3"><a href="#reservoir-data-layout">Reservoir Data Layout</a></li>
+      <li class="lvl3"><a href="#temporal-merge-math">Temporal Merge Math</a></li>
+      <li class="lvl3"><a href="#spatial-merge-tradeoff">Spatial Merge Tradeoff</a></li>
+      <li class="lvl3"><a href="#deterministic-vs-stochastic-candidates">Deterministic vs Stochastic Candidates</a></li>
+      <li class="lvl2"><a href="#vulkan-hlsl-pitfalls-encountered">Vulkan / HLSL Pitfalls Encountered</a></li>
+      <li class="lvl2"><a href="#metrics-history-for-reference">Metrics History (For Reference)</a></li>
+      <li class="lvl2"><a href="#known-limitations-not-bugs-missing-features">Known Limitations (Not Bugs — Missing Features)</a></li>
+      <li class="lvl3"><a href="#1-no-shadow-rays">1. No Shadow Rays</a></li>
+      <li class="lvl3"><a href="#2-spatial-w-discarded-biased">2. Spatial W Discarded (Biased)</a></li>
+      <li class="lvl3"><a href="#3-secondary-albedo-base-color-only">3. Secondary Albedo = Base Color Only</a></li>
+      <li class="lvl3"><a href="#4-static-scene-only">4. Static Scene Only</a></li>
+      <li class="lvl3"><a href="#5-no-mis-for-direct-lighting">5. No MIS for Direct Lighting</a></li>
+      <li class="lvl2"><a href="#phase-2-proposal">Phase 2 Proposal</a></li>
+      <li class="lvl3"><a href="#option-a-shadow-ray-occlusion-recommended">Option A: Shadow Ray Occlusion (Recommended)</a></li>
+      <li class="lvl3"><a href="#option-b-pairwise-mis-spatial-weights">Option B: Pairwise MIS Spatial Weights</a></li>
+      <li class="lvl3"><a href="#option-c-textured-secondary-bounces">Option C: Textured Secondary Bounces</a></li>
+      <li class="lvl3"><a href="#option-d-dynamic-scene-support">Option D: Dynamic Scene Support</a></li>
+      <li class="lvl2"><a href="#files-modified-in-phase-1">Files Modified in Phase 1</a></li>
+      <li class="lvl2"><a href="#cross-references">Cross-References</a></li>
+    </ul>
+    <div class="legend">
+      <h2>Color Legend</h2>
+      <div><span class="swatch" style="background:#dc2626;"></span> Red = Section / Keyword</div>
+      <div><span class="swatch" style="background:#2563eb;"></span> Blue = Sub-section / Link</div>
+      <div><span class="swatch" style="background:#1f2937;"></span> Black = Body</div>
+    </div>
+<div class="keywords">
+      <h2>Key Terms</h2>
+      <ul>
+      <li>Date</li>
+      <li>Scope</li>
+      <li>Status</li>
+      <li>stable, recognisable image of Sponza</li>
+      <li>Exit criteria achieved</li>
+      <li>Reservoir0</li>
+      <li>Reservoir1</li>
+      <li>intentionally biased</li>
+      <li>Decision</li>
+      <li>static scene + static camera</li>
+      <li>dynamic scenes</li>
+      <li>NVRHI register shifts</li>
+      <li>Vulkan Y-flip</li>
+      <li>intentionally deferred</li>
+      <li>Visual symptom</li>
+      <li>Why first</li>
+      <li>Implementation</li>
+      <li>Why second</li>
+      <li>Why third</li>
+      <li>Why later</li>
+      </ul>
+    </div>
+  </nav>
+  <main>
+    <a class="back" href="index.html">&larr; Back to 50_ReSTIR_GI_Temporal index</a>
+<div class="summary">Scope:  — Sponza scene with few-bounce GI + ReSTIR temporal/spatial reuse</div>
+<h1 id="restir-gi-phase-1-completion-report">ReSTIR GI — Phase 1 Completion Report</h1>
+<p><strong>Date</strong>: 2026-06-06<br />
+<strong>Scope</strong>: <code>TestFewBounceGI</code> — Sponza scene with few-bounce GI + ReSTIR temporal/spatial reuse<br />
+<strong>Status</strong>: ✅ Phase 1 DONE — Stable, recognisable output. Ready for Phase 2.</p>
+<hr />
+<h2 id="phase-1-goal">Phase 1 Goal</h2>
+<p>Make ReSTIR GI produce a <strong>stable, recognisable image of Sponza</strong> without obvious artifacts (flicker, progressive dimming, black screen, snow-flower noise).</p>
+<p><strong>Exit criteria achieved</strong>:
+- Mean RGB ~128 across 4 consecutive frames
+- Black pixels: 7.1% (architectural shadows, not noise)
+- White pixels: 0% (no HDR clipping)
+- Frame-to-frame variation: ~0.4/255 (imperceptible)
+- Image is recognisably Sponza with colour variation</p>
+<hr />
+<h2 id="what-was-broken-root-causes">What Was Broken (Root Causes)</h2>
+<h3 id="1-gi-ray-tracing-shader-fewbouncegihlsl">1. GI Ray Tracing Shader (<code>FewBounceGI.hlsl</code>)</h3>
+<table>
+<thead>
+<tr>
+<th>Bug</th>
+<th>Effect</th>
+<th>Fix</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SV_HitT</code> (scalar float) used as <code>float3</code> normal</td>
+<td><code>normalize(SV_HitT)</code> produced garbage normals → NdotL random → 90% black output</td>
+<td>Changed to <code>SV_IntersectionAttributes</code> with barycentric coords; added RTVertices/RTIndices/RTInstanceInfo buffers</td>
+</tr>
+<tr>
+<td>Hardcoded <code>albedo = 0.7</code></td>
+<td>Entire scene was flat gray, no material differentiation</td>
+<td>Added <code>FInstanceInfo.AlbedoColor</code> populated from <code>PBRMaterial::GetAlbedoColor()</code></td>
+</tr>
+<tr>
+<td>No primary direct lighting</td>
+<td>Base image was pure black except where GI randomly hit light</td>
+<td>Added direct + ambient in <code>RayGen</code> using <code>GBufferDiffuse</code></td>
+</tr>
+<tr>
+<td><code>SPP = 1</code></td>
+<td>Severe salt-and-pepper Monte Carlo noise</td>
+<td>Added <code>SPP = 8</code> loop in <code>RayGen</code></td>
+</tr>
+<tr>
+<td>Light intensity = 3.0 with no tonemap</td>
+<td>~12.6% of pixels clipped to white (255)</td>
+<td>Reduced intensity to 1.0 + added ACES filmic curve + <code>saturate()</code></td>
+</tr>
+<tr>
+<td>Double vertex offset (<code>VertexOffset</code> in C++ AND shader)</td>
+<td>Out-of-bounds reads → zero normals → black</td>
+<td>Removed extra <code>+info.VertexOffset</code> in shader; C++ already offset indices</td>
+</tr>
+</tbody>
+</table>
+<h3 id="2-restir-temporal-pass-restir_temporal_cshlsl">2. ReSTIR Temporal Pass (<code>ReSTIR_Temporal_cs.hlsl</code>)</h3>
+<table>
+<thead>
+<tr>
+<th>Bug</th>
+<th>Effect</th>
+<th>Fix</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>TAA-style <code>lerp(curr, hist, 0.85)</code> inside reservoir merge</td>
+<td>Progressive dimming (~33 → 19 → 14 → 12 mean)</td>
+<td>Removed lerp; pure reservoir merge (accumulate <code>w_sum</code>/<code>M</code>, probabilistic selection)</td>
+</tr>
+<tr>
+<td><code>FrameIndex</code> in candidate-position hash</td>
+<td>Static scene flickered every frame due to candidate jitter</td>
+<td>Removed <code>FrameIndex</code> from <code>hash22</code>; deterministic for static scenes</td>
+</tr>
+</tbody>
+</table>
+<h3 id="3-restir-spatial-pass-restir_spatial_cshlsl">3. ReSTIR Spatial Pass (<code>ReSTIR_Spatial_cs.hlsl</code>)</h3>
+<table>
+<thead>
+<tr>
+<th>Bug</th>
+<th>Effect</th>
+<th>Fix</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Reading from uninitialised <code>TemporalRadianceTexture</code></td>
+<td>Black output from spatial pass</td>
+<td>Changed to read from <code>DenoisedHDRTexture</code></td>
+</tr>
+<tr>
+<td>Passthrough copy shader (34 lines) instead of 3×3 merge</td>
+<td>ReSTIR spatial reuse was completely disabled</td>
+<td>Restored 3×3 neighbour merge with geometric rejection</td>
+</tr>
+</tbody>
+</table>
+<h3 id="4-pipeline-data-flow">4. Pipeline / Data Flow</h3>
+<table>
+<thead>
+<tr>
+<th>Bug</th>
+<th>Effect</th>
+<th>Fix</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Vulkan y-flip not accounted for in reprojection</td>
+<td>History reprojection was vertically mirrored</td>
+<td>Added <code>y = 1.0 - y</code> in temporal reprojection</td>
+</tr>
+<tr>
+<td>Matrix order <code>mul(vector, matrix)</code></td>
+<td>Wrong transform → reprojection off by ~200 pixels</td>
+<td>Changed to <code>mul(matrix, vector)</code> to match GLM column-major</td>
+</tr>
+<tr>
+<td><code>PrevDepthTexture</code> type mismatch for <code>copyTexture</code></td>
+<td>Validation error / potential crash</td>
+<td>Used <code>D32</code> typeless format for copy source</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="current-pipeline-architecture-post-fix">Current Pipeline Architecture (Post-Fix)</h2>
+<pre><code>GBuffer Fill Pass
+    ↓
+RayTrace GI (FewBounceGI.hlsl)
+    - MAX_BOUNCES = 3, SPP = 8
+    - Primary direct + ambient in RayGen
+    - Per-instance albedo from FInstanceInfo
+    - Barycentric normal interpolation in ClosestHit
+    - Output: HDRTexture (raw radiance)
+    ↓
+Bilateral Denoise (SpatialSigma = 4.0)
+    - Input: HDRTexture
+    - Output: DenoisedHDRTexture
+    ↓
+ReSTIR Generate
+    - 8 candidates in 2-pixel radius
+    - Deterministic hash (no FrameIndex)
+    - p_hat = Luminance(radiance)
+    - Output: Reservoir0 (y, w_sum, M), Reservoir1 (W, p_hat)
+    ↓
+ReSTIR Temporal
+    - Reprojects history using PrevViewProj
+    - Validates with depth diff (0.05) + normal dot (0.5)
+    - Merges curr + hist reservoirs
+    - Clamps M to MaxM
+    - Output: TemporalReservoir0/1
+    ↓
+ReSTIR Spatial
+    - 3×3 neighbour merge
+    - Geometric rejection (normal dot, depth diff)
+    - Accumulates w_sum/M, selects winner
+    - Reads radiance at selected y from DenoisedHDRTexture
+    - Output: ReSTIRColorTexture
+    ↓
+Blit to swapchain (with optional tonemap if not done in RayGen)
+</code></pre>
+<hr />
+<h2 id="technical-lessons-restir-specific">Technical Lessons (ReSTIR-Specific)</h2>
+<h3 id="reservoir-data-layout">Reservoir Data Layout</h3>
+<p>We use a split-buffer approach:
+- <strong>Reservoir0</strong> = <code>float4(y.xy, w_sum, M)</code> — pixel position + accumulated weight + sample count
+- <strong>Reservoir1</strong> = <code>float4(W, p_hat, 0, 0)</code> — unbiased weight + target PDF of selected sample</p>
+<p>This fits in two RGBA32F textures and avoids structured buffer complexity.</p>
+<h3 id="temporal-merge-math">Temporal Merge Math</h3>
+<p>The correct temporal merge is NOT a TAA lerp. It is:</p>
+<pre><code class="language-hlsl">combinedWSum = currWSum + histWSum;
+combinedM    = currM    + histM;
+
+// Probabilistically select winner proportional to weight
+if (r * totalWeight &lt; histWSum) {
+    y = histY;
+    p_hat = histPhat;
+}
+
+// Clamp M to prevent stale history dominance
+if (combinedM &gt; maxM) {
+    combinedWSum *= maxM / combinedM;
+    combinedM = maxM;
+}
+
+// Unbiased W
+W = (p_hat &gt; 0.0) ? (combinedWSum / (combinedM * p_hat)) : 0.0;
+</code></pre>
+<h3 id="spatial-merge-tradeoff">Spatial Merge Tradeoff</h3>
+<p>The current spatial pass outputs <code>radiance[y]</code> directly (the radiance at the selected sample position). This is <strong>intentionally biased</strong> but stable.</p>
+<p>The unbiased alternative would be:</p>
+<pre><code class="language-hlsl">outRadiance = W * radiance[y];  // W from reservoir
+</code></pre>
+<p>But with naive spatial merge (no pairwise MIS), this introduces high variance because neighbours may have very different <code>p_hat</code> distributions. Pairwise MIS is the correct fix but adds significant complexity.</p>
+<p><strong>Decision</strong>: Keep biased <code>radiance[y]</code> for Phase 1 baseline. Implement pairwise MIS in Phase 2 or 3.</p>
+<h3 id="deterministic-vs-stochastic-candidates">Deterministic vs Stochastic Candidates</h3>
+<p>For a <strong>static scene + static camera</strong>, deterministic candidate hashing (no <code>FrameIndex</code>) eliminates flicker without quality loss. The temporal pass still accumulates confidence via <code>M</code>.</p>
+<p>For <strong>dynamic scenes</strong> (camera movement, object motion), reintroduce <code>FrameIndex</code> jitter. Temporal validation (depth/normal thresholds) will reject invalid history, and the stochastic candidates will explore new sample positions.</p>
+<hr />
+<h2 id="vulkan-hlsl-pitfalls-encountered">Vulkan / HLSL Pitfalls Encountered</h2>
+<ol>
+<li><strong><code>SV_HitT</code> is scalar float, not a vector</strong>. Do not use it as a normal substitute.</li>
+<li><strong>Barycentric coords come from <code>SV_IntersectionAttributes</code></strong> in Slang/HLSL for triangle geometry. Access as <code>attrib.uv</code> (float2).</li>
+<li><strong><code>ObjectToWorld3x4()</code></strong> returns a 3×4 matrix (rotation + translation). Extract rotation with <code>(float3x3)</code> cast. Remember <code>mul(matrix, vector)</code> for column-major (GLM).</li>
+<li><strong>NVRHI register shifts</strong>: <code>--tRegShift 0 --sRegShift 128 --bRegShift 256 --uRegShift 384</code>. Texture registers start at <code>t0</code>, samplers at <code>s128</code>, etc. Don't overlap.</li>
+<li><strong>Vulkan Y-flip</strong>: NDC y ranges [-1, 1] with +Y up, but texture coords are [0,1] with +Y down. Reprojection needs <code>y = 1.0 - y</code>.</li>
+<li><strong><code>copyTexture</code> format compatibility</strong>: Source and dest must have compatible typeless formats. <code>D32</code> typeless works for depth copy targets.</li>
+</ol>
+<hr />
+<h2 id="metrics-history-for-reference">Metrics History (For Reference)</h2>
+<table>
+<thead>
+<tr>
+<th>Stage</th>
+<th>Mean RGB</th>
+<th>Black %</th>
+<th>White %</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Initial (broken normals)</td>
+<td>~33</td>
+<td>63%</td>
+<td>35%</td>
+<td>Bimodal: black + saturated</td>
+</tr>
+<tr>
+<td>After TAA lerp removed</td>
+<td>~33 stable</td>
+<td>—</td>
+<td>—</td>
+<td>Dimming stopped, still bimodal</td>
+</tr>
+<tr>
+<td>After normal fix</td>
+<td>~45</td>
+<td>~40%</td>
+<td>~15%</td>
+<td>Less black, still clipping</td>
+</tr>
+<tr>
+<td>After albedo + direct light</td>
+<td>~85</td>
+<td>~15%</td>
+<td>~12%</td>
+<td>Recognisable, but clipping</td>
+</tr>
+<tr>
+<td>After ACES + SPP=8</td>
+<td>~128</td>
+<td>7.1%</td>
+<td>0%</td>
+<td>✅ Target achieved</td>
+</tr>
+<tr>
+<td>After deterministic hash</td>
+<td>~128</td>
+<td>7.1%</td>
+<td>0%</td>
+<td>Stable across frames</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="known-limitations-not-bugs-missing-features">Known Limitations (Not Bugs — Missing Features)</h2>
+<p>These are <strong>intentionally deferred</strong> to Phase 2+. They are documented here so future debugging doesn't mistake them for regressions.</p>
+<h3 id="1-no-shadow-rays">1. No Shadow Rays</h3>
+<p>Back-facing surfaces and surfaces behind geometry still receive <code>AmbientColor * 0.5</code> fill. True occlusion requires a shadow ray cast toward the light in <code>ClosestHit</code>.</p>
+<p><strong>Visual symptom</strong>: Some areas that should be in shadow are slightly bright. This is expected.</p>
+<h3 id="2-spatial-w-discarded-biased">2. Spatial W Discarded (Biased)</h3>
+<p>The spatial pass outputs <code>radiance[y]</code> without multiplying by reservoir <code>W</code>. This is stable but slightly biased toward bright samples.</p>
+<p><strong>Visual symptom</strong>: Slight brightness bias in spatially merged regions. Variance is lower than unbiased W would be with naive merge.</p>
+<h3 id="3-secondary-albedo-base-color-only">3. Secondary Albedo = Base Color Only</h3>
+<p>Bounce surfaces use <code>info.AlbedoColor</code> (the material's base RGB tint). True textured materials require UV coordinates + texture sampling in the hit shader.</p>
+<p><strong>Visual symptom</strong>: Secondary bounces are tinted by base color but lack detail (no normal maps, no roughness/metallic influence on bounce direction).</p>
+<h3 id="4-static-scene-only">4. Static Scene Only</h3>
+<p>Deterministic candidate hashing means moving the camera will cause discontinuous sample changes. Temporal validation catches some of this, but the candidate distribution doesn't adapt to motion.</p>
+<p><strong>Visual symptom</strong>: Camera motion will show sliding sample positions rather than smooth temporal accumulation.</p>
+<h3 id="5-no-mis-for-direct-lighting">5. No MIS for Direct Lighting</h3>
+<p>Primary direct light is <code>diffuse * NdotL * lightIntensity</code>. No multiple importance sampling between light sampling and BRDF sampling.</p>
+<p><strong>Visual symptom</strong>: Not a visible issue for this scene, but noisy for small bright lights.</p>
+<hr />
+<h2 id="phase-2-proposal">Phase 2 Proposal</h2>
+<h3 id="option-a-shadow-ray-occlusion-recommended">Option A: Shadow Ray Occlusion (Recommended)</h3>
+<p>Add a visibility ray in <code>ClosestHit</code> toward the directional light. If occluded, remove the direct <code>NdotL</code> term (keep ambient fill or reduce it).</p>
+<p><strong>Why first</strong>: It's the biggest visual improvement for least complexity. Sponza has many arches and columns that should cast shadows.</p>
+<p><strong>Implementation</strong>:
+- Add <code>TraceRay()</code> in <code>ClosestHit</code> with <code>RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH</code>
+- Use a minimal <code>ShadowHit</code> / <code>ShadowMiss</code> shader group
+- Mask direct light by <code>1.0</code> if unoccluded, <code>0.0</code> if occluded
+- Keep ambient at reduced level (e.g., 0.1 instead of 0.5) for occluded</p>
+<h3 id="option-b-pairwise-mis-spatial-weights">Option B: Pairwise MIS Spatial Weights</h3>
+<p>Implement proper unbiased spatial reuse using pairwise MIS weights (as in ReSTIR PT / ReSTIR GI papers).</p>
+<p><strong>Why second</strong>: It reduces variance in spatially merged regions and makes ReSTIR actually better than just bilateral denoise.</p>
+<p><strong>Implementation</strong>:
+- Compute <code>p_hat(y | x_i)</code> for each neighbour <code>x_i</code> at the candidate <code>y</code>
+- Compute MIS weight <code>m_i(y)</code> for each neighbour
+- Final radiance = <code>sum(m_i(y) * W_i * radiance[y])</code>
+- Significantly more shader code and needs careful numerical stability</p>
+<h3 id="option-c-textured-secondary-bounces">Option C: Textured Secondary Bounces</h3>
+<p>Add UVs to <code>FRTVertex</code>, bind material textures (albedo, normal, roughness, metallic) as SRVs, sample in <code>ClosestHit</code>.</p>
+<p><strong>Why third</strong>: Makes secondary bounces look materially correct. Complex because it requires material system integration in hit shaders.</p>
+<p><strong>Implementation</strong>:
+- Extend <code>FRTVertex</code> with <code>float2 UV</code>
+- Add texture SRV array or bindless descriptors
+- Sample albedo in <code>ClosestHit</code> for bounce ≥ 1
+- Optionally sample normal map for bounce normal perturbation</p>
+<h3 id="option-d-dynamic-scene-support">Option D: Dynamic Scene Support</h3>
+<p>Reintroduce <code>FrameIndex</code> jitter for candidate hashing, validate history more aggressively, add motion vectors.</p>
+<p><strong>Why later</strong>: Only needed when camera or objects move. Current test has static camera.</p>
+<hr />
+<h2 id="files-modified-in-phase-1">Files Modified in Phase 1</h2>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Changes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Engine/Source/Runtime/Test/TestFewBounceGI_Data/FewBounceGI.hlsl</code></td>
+<td>SV_HitT→barycentric, per-instance albedo, primary direct light, SPP loop, ACES tonemap</td>
+</tr>
+<tr>
+<td><code>Engine/Source/Runtime/Test/TestFewBounceGI_Data/ReSTIR_Temporal_cs.hlsl</code></td>
+<td>Removed TAA lerp, deterministic hash</td>
+</tr>
+<tr>
+<td><code>Engine/Source/Runtime/Test/TestFewBounceGI_Data/ReSTIR_Spatial_cs.hlsl</code></td>
+<td>Read from DenoisedHDRTexture, restored 3×3 merge</td>
+</tr>
+<tr>
+<td><code>Engine/Source/Runtime/Test/TestFewBounceGI_Data/ReSTIR_Generate_cs.hlsl</code></td>
+<td>Removed FrameIndex from hash</td>
+</tr>
+<tr>
+<td><code>Engine/Source/Runtime/Test/TestFewBounceGI.cpp</code></td>
+<td>FInstanceInfo with AlbedoColor, buffer bindings, y-flip fix, matrix order fix, depth format fix</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="cross-references">Cross-References</h2>
+<ul>
+<li>Debugging process retrospective: <code>retrospective_2026-06-06.md</code></li>
+<li>Pre-fix critic: <code>critic_2026-06-06_snowflower.md</code></li>
+<li>Post-fix critic: <code>critic_2026-06-06_snowflower_v2.md</code></li>
+<li>Bug log: <code>.wolf/buglog.json</code> (bug-045, bug-046)</li>
+<li>Global memory: <code>~/.claude/projects/.../memory/restir-gi-snowflower-flicker.md</code></li>
+</ul>
+  </main>
+</div>
+<button id="topBtn" title="Back to top">↑</button>
+</body>
+</html>

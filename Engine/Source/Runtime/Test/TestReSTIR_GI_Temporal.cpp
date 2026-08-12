@@ -48,6 +48,7 @@
 #include "Renderer/Common/FCommonRenderPasses.h"
 #include "Renderer/Common/FBindingLayoutBuilder.h"
 #include "Renderer/GI/FGIPass.h"
+#include "Renderer/Common/FLight.h"
 #include "Renderer/PostProcess/FBilateralDenoisePass.h"
 #include "Renderer/PostProcess/FReBLURPass.h"
 #include "Renderer/PostProcess/FReSTIRPass.h"
@@ -57,6 +58,7 @@
 #include "Renderer/Scene3D/FCornellBoxScene.h"
 #include "Renderer/Mesh/StaticMesh.h"
 #include "Renderer/Material/PBRMaterial.h"
+#include "Renderer/Texture/AsyncTextureLoader.h"
 #include "Renderer/ShaderMake/ShaderBlob.h"
 #include "Platform/FileSystem/Path.h"
 #include "Image/FImageDump.h"
@@ -65,9 +67,15 @@
 #include <filesystem>
 #include <algorithm>
 #include <fstream>
+#include <iostream>
 #include <thread>
 #include <vector>
 #include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cmath>
+#include <unordered_map>
+#include <GLFW/glfw3.h>
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -119,7 +127,9 @@ struct FInstanceInfo
     float    AlbedoColor[3];
     uint32_t AlbedoTextureIndex;
     uint32_t MaterialFlags;
-    uint32_t Padding[3];
+    float    Roughness;   // gltf roughnessFactor (2026-08-10 Phase 2)
+    float    Metallic;    // gltf metallicFactor
+    uint32_t Padding;
 };
 static_assert(sizeof(FInstanceInfo) == 48, "FInstanceInfo must be 48 bytes");
 
@@ -139,10 +149,58 @@ static_assert(sizeof(FInstanceInfo) == 48, "FInstanceInfo must be 48 bytes");
 // Apply the same scale to the raster ModelMatrix and place the camera at the
 // matching scaled coordinates. Original-scale camera with the un-scaled
 // model matrix produced no rasterized fragments (all verts clipped by far).
-static glm::vec3 GetCameraPos()   { return glm::vec3(  0.0f, 0.03f, 0.08f); }
-static glm::vec3 GetCameraTarget(){ return glm::vec3(  0.0f, 0.02f, 0.00f); }
-static glm::vec3 GetCameraUp()    { return glm::vec3(  0.0f, 1.0f,  0.0f); }
-static float     GetCameraFovDeg(){ return 75.0f; }
+//
+// v-framing (2026-08-01): measured gi_raw/worldpos ranges show the rasterized
+// structure actually spans x[-15,15] y[-12,8] z[-14,0] (Sponza's original units
+// are ~1500, scaled by the 0.01 model matrix). The old camera at (0,0.03,0.08)
+// sat on the floor at the near edge and framed only ~6% of the frame (a thin
+// floor band). Move the camera back (+z, outside z>0), up to mid-height, and
+// look at the scene center so the full structure is framed. FOV 75°.
+//
+// 2026-08-10: horizon camera + rotating scene. The scene spins around Y
+// (TLAS instances AND the raster ModelMatrix use the same per-frame angle
+// `SceneRotationDeg`), while the camera stays fixed in WORLD space looking
+// level at the horizon — so the sun (also world-fixed) lights different
+// facades as Sponza turns.
+static glm::vec3 EnvVec3(const char* Name, const glm::vec3& Fallback)
+{
+    const char* S = std::getenv(Name);
+    if (S && *S)
+    {
+        float X = 0.0f, Y = 0.0f, Z = 0.0f;
+        if (std::sscanf(S, "%f %f %f", &X, &Y, &Z) == 3)
+            return glm::vec3(X, Y, Z);
+    }
+    return Fallback;
+}
+// Horizon framing: eye height ~2.5 m, perfectly level (target y == eye y).
+// Override with HLVM_RGI_CAM_POS / HLVM_RGI_CAM_TARGET (world coords).
+static glm::vec3 GetCameraPos()   { return EnvVec3("HLVM_RGI_CAM_POS",    glm::vec3( 0.0f, 2.5f, 18.0f)); }
+static glm::vec3 GetCameraTarget(){ return EnvVec3("HLVM_RGI_CAM_TARGET", glm::vec3( 0.0f, 2.5f, -10.0f)); }
+static glm::vec3 GetCameraUp()    { return glm::vec3( 0.0f, 1.0f,  0.0f); }
+static float     GetCameraFovDeg(){ return 65.0f; }
+
+// Per-mesh albedo for the multimodal structural judge. Sponza's real colors
+// live in textures which this test does not load (flat white base color), so
+// the picture would be uniformly gray and the CHROMATIC modality of the
+// multimodal validator could never be judged. Assign a deterministic palette
+// color keyed by mesh name when the loaded material carries no chromatic
+// content; keep the material color when it does. Both the RT instance buffer
+// and the GBuffer pass use this, so the GBuffer material texture stays the
+// per-pixel ground truth for the validator.
+static FVec3 GetMeshAlbedo(const FString& MeshName, const FVec3& MaterialAlbedo)
+{
+    // 2026-08-10 (material rework Phase 4): the palette-hash hack is gone.
+    // For untextured meshes the gltf baseColorFactor is used as-is; a neutral
+    // white factor (Sponza's textures carry the color, so the factor is 1,1,1)
+    // falls back to a neutral 0.7 gray instead of an arbitrary per-name color.
+    (void)MeshName;
+    const float MinC = std::min(MaterialAlbedo.x, std::min(MaterialAlbedo.y, MaterialAlbedo.z));
+    const float MaxC = std::max(MaterialAlbedo.x, std::max(MaterialAlbedo.y, MaterialAlbedo.z));
+    if (MaxC - MinC > 0.05f)
+        return MaterialAlbedo;
+    return FVec3(0.7f, 0.7f, 0.7f);
+}
 
 // ============================================================================
 // Helpers
@@ -207,6 +265,28 @@ public:
         const auto DataDir = MakeShaderDataDir();
         HLVM_LOG(LogTest, info, TXT("TestReSTIR_GI_Temporal data dir: {}"), *DataDir);
 
+        // Scene turntable setup (2026-08-10):
+        //   HLVM_RGI_SCENE_YAW="deg"      -> fixed angle, no animation
+        //   HLVM_RGI_SCENE_RPS="r/s"      -> rotation speed (default 0.03)
+        //   HLVM_RGI_SUN_DIR="x y z"      -> world-space sun direction
+        if (const char* Yaw = std::getenv("HLVM_RGI_SCENE_YAW"))
+        {
+            SceneRotationDeg = static_cast<float>(std::atof(Yaw));
+            SceneRotationDegSpeed = 0.0f;
+        }
+        else
+        {
+        const float RPS = std::getenv("HLVM_RGI_SCENE_RPS")
+            ? static_cast<float>(std::atof(std::getenv("HLVM_RGI_SCENE_RPS")))
+            : 0.03f;
+            SceneRotationDegSpeed = RPS * 360.0f;
+        }
+        // 2026-08-11: the render window is visible by default; HLVM_HIDE_WINDOW
+        // opts out (headless). The keep-focus/raise behavior follows.
+        bShowWindow = (std::getenv("HLVM_HIDE_WINDOW") == nullptr);
+        HLVM_LOG(LogTest, info, TXT("Scene turntable: yaw={:.1f} speed={:.1f} deg/s"),
+            SceneRotationDeg, SceneRotationDegSpeed);
+
         // Sampler
         {
             nvrhi::SamplerDesc Desc;
@@ -217,11 +297,205 @@ public:
             LinearSampler = NvrhiDevice->createSampler(Desc);
         }
 
+        // 1x1 white placeholder albedo texture (2026-08-10 Phase 1): meshes
+        // without a loaded albedo texture multiply the white placeholder by
+        // their per-instance AlbedoColor (the old palette fallback).
+        {
+            nvrhi::TextureDesc Desc;
+            Desc.dimension = nvrhi::TextureDimension::Texture2D;
+            Desc.width = 1;
+            Desc.height = 1;
+            Desc.format = nvrhi::Format::RGBA8_UNORM;
+            Desc.isRenderTarget = false;
+            Desc.isUAV = false;
+            Desc.initialState = nvrhi::ResourceStates::ShaderResource;
+            Desc.keepInitialState = true;
+            Desc.debugName = "GBufferPlaceholderTexture";
+            PlaceholderTexture = NvrhiDevice->createTexture(Desc);
+            nvrhi::CommandListHandle TexCmdList = NvrhiDevice->createCommandList();
+            TexCmdList->open();
+            const uint32_t WhitePixel = 0xFFFFFFFFu;
+            TexCmdList->writeTexture(PlaceholderTexture, 0, 0, &WhitePixel, 4);
+            TexCmdList->close();
+            NvrhiDevice->executeCommandList(TexCmdList);
+        }
+
         // Sponza GLTF scene (Samples/Assets/sponza/Sponza01.gltf)
         if (!LoadSponza())
         {
             HLVM_LOG(LogTest, err, TXT("Failed to load Sponza scene"));
             return false;
+        }
+
+        // =====================================================================
+        // Phase 0 diagnostic (2026-08-10, material-system rework): per-mesh
+        // material inventory — gltf baseColor/roughness/metallic factors,
+        // albedo texture path, GPU texture presence, and the CURRENT palette
+        // color the renderer substitutes (the "colored pillars" bug). Also
+        // probes whether the Sponza .ktx albedo textures actually decode
+        // through FAsyncTextureLoader.
+        // =====================================================================
+        {
+            TVector<std::shared_ptr<FPBRMaterial>> Materials;
+            HLVM_LOG(LogTest, info, TXT("Phase-0 material inventory:"));
+            for (auto& Entry : Scene->MeshTree)
+            {
+                auto It = Scene->MeshMultiMaterialMap.find(Entry.second);
+                if (It == Scene->MeshMultiMaterialMap.end() || It->second.empty())
+                {
+                    HLVM_LOG(LogTest, info, TXT("  mesh '{}': NO MATERIAL"), Entry.second->GetName());
+                    continue;
+                }
+                auto M = std::dynamic_pointer_cast<FPBRMaterial>(It->second[0]);
+                if (!M)
+                {
+                    HLVM_LOG(LogTest, info, TXT("  mesh '{}': material is not FPBRMaterial"), Entry.second->GetName());
+                    continue;
+                }
+
+                const FVec3 Factor  = M->GetAlbedoColor();
+                const FVec3 Palette = GetMeshAlbedo(Entry.second->GetName(), Factor);
+                const FString TexPath = M->HasTexture(IMaterial::ETextureType::Albedo)
+                    ? FString(M->GetTexturePath(IMaterial::ETextureType::Albedo).string().c_str())
+                    : FString(TXT("(none)"));
+                HLVM_LOG(LogTest, info,
+                    TXT("  mesh '{}' mat '{}': baseColor=({:.2f},{:.2f},{:.2f}) rough={:.3f} metal={:.3f} albedoTex='{}' gpuTex={} | fallback=({:.2f},{:.2f},{:.2f})"),
+                    Entry.second->GetName(), M->GetName(),
+                    Factor.x, Factor.y, Factor.z,
+                    M->GetRoughness(), M->GetMetallic(),
+                    *TexPath, M->HasGPUTexture(IMaterial::ETextureType::Albedo) ? 1 : 0,
+                    Palette.x, Palette.y, Palette.z);
+                Materials.push_back(M);
+            }
+
+            // Phase-0 probe: can the Sponza .ktx albedo textures actually load?
+            if (!Materials.empty())
+            {
+                const uint32_t Enqueued = FAsyncTextureLoader::LoadMaterialTexturesAsync(
+                    NvrhiDevice, Materials, {IMaterial::ETextureType::Albedo});
+                int Tries = 0;
+                while (FAsyncTextureLoader::HasPendingLoads() && Tries++ < 300)
+                {
+                    FAsyncTextureLoader::Poll(NvrhiDevice);
+                    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                }
+                NvrhiDevice->waitForIdle();
+
+                uint32_t Loaded = 0;
+                for (auto& M : Materials)
+                {
+                    if (M->HasGPUTexture(IMaterial::ETextureType::Albedo))
+                        ++Loaded;
+                }
+                HLVM_LOG(LogTest, info,
+                    TXT("Phase-0 albedo load probe: enqueued={} loaded={}/{} (pending={})"),
+                    Enqueued, Loaded, static_cast<uint32_t>(Materials.size()),
+                    FAsyncTextureLoader::HasPendingLoads() ? 1 : 0);
+            }
+
+            // Phase 3 (2026-08-10): per-mesh AVERAGE albedo from the real
+            // texture (last KTX2 mip, linearized) → RTInstanceInfo.AlbedoColor,
+            // so closest-hit bounce shading uses the material's true color
+            // (gray pillars bounce neutral, red bricks bounce warm) instead of
+            // the palette hash. The GBuffer keeps full per-texel detail via the
+            // texture; this average only feeds the ray-trace bounce side.
+            {
+                size_t InstanceIdx = 0;
+                size_t Patched = 0;
+                std::unordered_map<nvrhi::TextureHandle, uint32_t> TexToIndex;
+                TVector<nvrhi::TextureHandle> UniqueTextures;
+                for (auto& Entry : Scene->MeshTree)
+                {
+                    auto StaticMesh = std::dynamic_pointer_cast<FStaticMesh>(Entry.second);
+                    if (!StaticMesh) continue;
+                    if (StaticMesh->GetVertices().empty() || StaticMesh->GetIndices().empty())
+                        continue;
+                    if (InstanceIdx >= AllInstanceInfos.size())
+                        break;
+
+                    auto It = Scene->MeshMultiMaterialMap.find(Entry.second);
+                    if (It != Scene->MeshMultiMaterialMap.end() && !It->second.empty())
+                    {
+                        auto PBRMat = std::dynamic_pointer_cast<FPBRMaterial>(It->second[0]);
+                        if (PBRMat && PBRMat->HasTexture(IMaterial::ETextureType::Albedo))
+                        {
+                            const FPath TexPath = PBRMat->GetTexturePath(IMaterial::ETextureType::Albedo);
+                            const FPath KTX2Path = TexPath.parent_path() / "ktx2" /
+                                (TexPath.stem().string() + ".ktx2");
+                            const FPath DecodePath = std::filesystem::exists(KTX2Path.string())
+                                ? KTX2Path : TexPath;
+                            const auto Decoded = FAsyncTextureLoader::DecodeKTXTexture(DecodePath);
+                            if (Decoded.bIsValid && !Decoded.Mips.empty())
+                            {
+                                const uint32_t MipLevel = static_cast<uint32_t>(Decoded.Mips.size()) - 1;
+                                const uint32_t MipW = std::max(1u, Decoded.Width >> MipLevel);
+                                const uint32_t MipH = std::max(1u, Decoded.Height >> MipLevel);
+                                const auto& LastMip = Decoded.Mips.back();
+                                const uint8_t* Src = Decoded.PixelData.data() + LastMip.Offset;
+                                double R = 0.0, G = 0.0, B = 0.0;
+                                size_t N = 0;
+                                for (uint32_t y = 0; y < MipH; ++y)
+                                {
+                                    for (uint32_t x = 0; x < MipW; ++x)
+                                    {
+                                        const uint8_t* P = Src + static_cast<size_t>(y) * LastMip.RowPitch + static_cast<size_t>(x) * 4;
+                                        R += P[0] / 255.0; G += P[1] / 255.0; B += P[2] / 255.0;
+                                        ++N;
+                                    }
+                                }
+                                if (N > 0)
+                                {
+                                    R /= static_cast<double>(N); G /= static_cast<double>(N); B /= static_cast<double>(N);
+                                    if (Decoded.Format == nvrhi::Format::SRGBA8_UNORM)
+                                    {
+                                        R = std::pow(R, 2.2); G = std::pow(G, 2.2); B = std::pow(B, 2.2);
+                                    }
+                                    AllInstanceInfos[InstanceIdx].AlbedoColor[0] = static_cast<float>(R);
+                                    AllInstanceInfos[InstanceIdx].AlbedoColor[1] = static_cast<float>(G);
+                                    AllInstanceInfos[InstanceIdx].AlbedoColor[2] = static_cast<float>(B);
+                                    const FVec3 Palette = GetMeshAlbedo(Entry.second->GetName(), PBRMat->GetAlbedoColor());
+                                    HLVM_LOG(LogTest, info,
+                                        TXT("  avg-albedo '{}': linear=({:.3f},{:.3f},{:.3f}) (fallback=({:.2f},{:.2f},{:.2f}))"),
+                                        Entry.second->GetName(),
+                                        static_cast<float>(R), static_cast<float>(G), static_cast<float>(B),
+                                        Palette.x, Palette.y, Palette.z);
+                                    ++Patched;
+                                }
+                            }
+                        }
+                        // Phase 3b: assign the per-texel bounce texture index.
+                        if (PBRMat && PBRMat->HasGPUTexture(IMaterial::ETextureType::Albedo))
+                        {
+                            const nvrhi::TextureHandle H = PBRMat->GetGPUTexture(IMaterial::ETextureType::Albedo).GetTextureHandle();
+                            auto TexIt = TexToIndex.find(H);
+                            if (TexIt == TexToIndex.end())
+                            {
+                                TexIt = TexToIndex.emplace(H, static_cast<uint32_t>(UniqueTextures.size())).first;
+                                UniqueTextures.push_back(H);
+                            }
+                            AllInstanceInfos[InstanceIdx].AlbedoTextureIndex = TexIt->second;
+                        }
+                    }
+                    ++InstanceIdx;
+                }
+                MaterialTextures = UniqueTextures;
+
+                // Re-upload the patched instance info for the RT side.
+                nvrhi::CommandListHandle Cmd = NvrhiDevice->createCommandList();
+                Cmd->open();
+                Cmd->writeBuffer(InstanceInfoBuffer, AllInstanceInfos.data(),
+                    static_cast<uint32_t>(AllInstanceInfos.size() * sizeof(FInstanceInfo)));
+                Cmd->close();
+                NvrhiDevice->executeCommandList(Cmd);
+                NvrhiDevice->waitForIdle();
+                HLVM_LOG(LogTest, info,
+                    TXT("Phase-3 average-albedo patch: {}/{} instances use real texture averages"),
+                    static_cast<uint32_t>(Patched), static_cast<uint32_t>(AllInstanceInfos.size()));
+                HLVM_LOG(LogTest, info,
+                    TXT("Phase-3b per-texel bounce textures: {} unique textures bound (t9..t{})"),
+                    static_cast<uint32_t>(MaterialTextures.size()),
+                    9 + static_cast<uint32_t>(MaterialTextures.size()) - 1);
+            }
         }
 
         // View constants buffer (b1)
@@ -258,7 +532,6 @@ public:
                 *DataDir);
             return false;
         }
-
         // Bilateral denoise, ReSTIR, ReBLUR, GIAccumulate passes
         if (!BilateralDenoisePass.Initialize(NvrhiDevice, DataDir))
         {
@@ -271,9 +544,50 @@ public:
             return false;
         }
 
+        // ReBLUR denoiser (after the ReSTIR resolve). Disable with
+        // HLVM_RGI_REBLUR=0. Pattern from TestCornellBoxGI.
+        bReBLURInitialized = false;
+        if (std::getenv("HLVM_RGI_REBLUR") == nullptr || std::string(std::getenv("HLVM_RGI_REBLUR")) != "0")
+        {
+            if (!ReBLURPass.Initialize(NvrhiDevice, DataDir))
+            {
+                HLVM_LOG(LogTest, warn, TXT("Failed to initialize ReBLURPass; continuing without denoiser"));
+            }
+            else
+            {
+                for (int i = 0; i < 2; ++i)
+                {
+                    nvrhi::TextureDesc Desc;
+                    Desc.dimension = nvrhi::TextureDimension::Texture2D;
+                    Desc.width = WIDTH;
+                    Desc.height = HEIGHT;
+                    Desc.format = nvrhi::Format::RGBA32_FLOAT;
+                    Desc.isUAV = true;
+                    Desc.initialState = nvrhi::ResourceStates::UnorderedAccess;
+                    Desc.keepInitialState = true;
+                    Desc.debugName = i == 0 ? "ReBLURHistory0" : "ReBLURHistory1";
+                    ReBLURHistoryTexture[i] = NvrhiDevice->createTexture(Desc);
+                }
+                nvrhi::CommandListHandle ClearCmd = NvrhiDevice->createCommandList();
+                ClearCmd->open();
+                nvrhi::Color ClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+                ClearCmd->clearTextureFloat(ReBLURHistoryTexture[0], nvrhi::AllSubresources, ClearColor);
+                ClearCmd->clearTextureFloat(ReBLURHistoryTexture[1], nvrhi::AllSubresources, ClearColor);
+                ClearCmd->close();
+                NvrhiDevice->executeCommandList(ClearCmd);
+                bReBLURInitialized = true;
+                HLVM_LOG(LogTest, info, TXT("ReBLUR denoiser initialized"));
+            }
+        }
+
         if (!CreateAccumulationPipeline(DataDir))
         {
             HLVM_LOG(LogTest, err, TXT("Failed to create accumulation pipeline"));
+            return false;
+        }
+        if (!CreateResolvePipeline(DataDir))
+        {
+            HLVM_LOG(LogTest, err, TXT("Failed to create resolve pipeline"));
             return false;
         }
 
@@ -297,6 +611,16 @@ public:
         if (bDumpRequested)
             HLVM_LOG(LogTest, info, TXT("HLVM_DUMP_RGI=1: enabling frame dumps"));
 
+        // Pipeline mode (2026-08-03): the real ReSTIR pipeline (Generate/
+        // Temporal/Spatial, RealEngine-modeled reservoirs) is the DEFAULT.
+        // HLVM_RGI_BYPASS=1 forces the raw gi_raw display path for A/B
+        // debugging of the ReSTIR stages.
+        bBypass = (std::getenv("HLVM_RGI_BYPASS") != nullptr);
+        if (bBypass)
+            HLVM_LOG(LogTest, info, TXT("HLVM_RGI_BYPASS=1: displaying gi_raw directly (ReSTIR skipped)"));
+        else
+            HLVM_LOG(LogTest, info, TXT("ReSTIR pipeline enabled (default)"));
+
         // (HLVM-bypass: non-immediate pattern, like TestRTShadowsGBuffer.
         // The validation-layer's immediate-CL state machine silently
         // dropped setGraphicsState/drawIndexed GPU commands across frames.
@@ -314,6 +638,13 @@ public:
         GIPass.Shutdown();
         BilateralDenoisePass.Shutdown();
         ReSTIRPass.Shutdown();
+        if (bReBLURInitialized)
+        {
+            ReBLURPass.Shutdown();
+            bReBLURInitialized = false;
+        }
+        ReBLURHistoryTexture[0] = nullptr;
+        ReBLURHistoryTexture[1] = nullptr;
 
         LinearSampler           = nullptr;
         ViewConstantsBuffer     = nullptr;
@@ -321,6 +652,10 @@ public:
         GBufferNormal           = nullptr;
         GBufferMaterial         = nullptr;
         GBufferDepth            = nullptr;
+        SunLightBuffer          = nullptr;
+        PlaceholderTexture      = nullptr;
+        AllInstanceInfos.clear();
+        MaterialTextures.clear();
         LinearDepthTexture      = nullptr;
         VertexBuffer            = nullptr;
         IndexBuffer             = nullptr;
@@ -329,11 +664,13 @@ public:
         SceneBLASes.clear();
 
         OutputTexture           = nullptr;
-        DenoisedTexture         = nullptr;
-        ReservoirTex0           = nullptr;
+        DirectionTexture        = nullptr;
+        DenoisedTexture         = nullptr;        ReservoirTex0           = nullptr;
         ReservoirTex1           = nullptr;
         TemporalReservoir0      = nullptr;
         TemporalReservoir1      = nullptr;
+        TemporalReservoir2      = nullptr;
+        TemporalReservoir3      = nullptr;
         SpatialRadiance         = nullptr;
         AccumTexture            = nullptr;
         DisplayTexture          = nullptr;
@@ -360,6 +697,23 @@ public:
     virtual void Animate(float dt) override
     {
         ++FrameCount;
+        // Scene turntable: advance the Y-rotation (degrees per second).
+        PrevSceneRotationDeg = SceneRotationDeg;
+        SceneRotationDeg += SceneRotationDegSpeed * dt;
+        // Visible-window mode: periodically re-focus/raise the window so the
+        // compositor keeps it above other windows (e.g. the IDE) — the swapchain
+        // presents correctly, but a covered window looks like "nothing shows".
+        if (bShowWindow && (FrameCount % 60 == 0))
+        {
+            if (auto* DM = GetDeviceManager())
+            {
+                if (GLFWwindow* W = static_cast<GLFWwindow*>(DM->GetGLFWWindow()))
+                {
+                    glfwRestoreWindow(W);
+                    glfwFocusWindow(W);
+                }
+            }
+        }
         FPSUpdateTimer += dt;
         if (FPSUpdateTimer >= 1.0f)
         {
@@ -377,6 +731,10 @@ public:
     {
         if (!NvrhiDevice || !Framebuffer) return;
         const auto& FB = Framebuffer->getFramebufferInfo();
+        // Remember the swapchain back-buffer for the readback diagnostic.
+        CurrentBackBufferTexture = (Framebuffer->getDesc().colorAttachments.size() > 0)
+            ? Framebuffer->getDesc().colorAttachments[0].texture
+            : nullptr;
         if (FB.width != LastWidth || FB.height != LastHeight)
         {
             LastWidth = FB.width;
@@ -392,7 +750,15 @@ public:
         // (0) GBuffer raster pass — renders Sponza into GBufferWorldPos /
         //     GBufferNormal / GBufferMaterial MRTs. Must run BEFORE FGIPass
         //     so the RT shader sees populated GBuffer inputs.
+        // RenderGBuffer leaves the CommandList OPEN (no mid-frame submit;
+        // the v1-introduced HLVM-bypass close+execute+waitForIdle+open
+        // block was the regression — see NOTE comment near line 1531).
+        // The whole frame submits at end of Render via line 691.
         RenderGBuffer(FB.width, FB.height);
+
+        // Turntable: rebuild the TLAS with the current scene Y-rotation so the
+        // ray tracer and the raster pass always agree (2026-08-10).
+        BuildTLAS(CommandList);
 
         // (1) GI ray trace — produces OutputTexture (HDR rgb + hitDist alpha)
         {
@@ -404,32 +770,63 @@ public:
             Desc.ViewConstants     = ViewConstantsBuffer;
             Desc.SceneTLAS         = SceneTLAS;
             Desc.OutputTexture     = OutputTexture;
+            Desc.OutputDirection   = DirectionTexture;
             Desc.RTVertices        = VertexBuffer;
             Desc.RTIndices         = IndexBuffer;
             Desc.RTInstanceInfo    = InstanceInfoBuffer;
-            Desc.OutputWidth       = FB.width;
-            Desc.OutputHeight      = FB.height;
-            Desc.MaxBounces        = 3;
-            Desc.SamplesPerPixel   = 2;
+            Desc.OutputWidth       = HalfResWidth;    // Phase D: half-res trace
+            Desc.OutputHeight      = HalfResHeight;
+            // ReSTIR-GI sampling: 1 primary ray/pixel. Bounce count tunable
+            // (HLVM_RGI_BOUNCES); 1 = the RealEngine sampling model, 4 = more
+            // indirect depth. Temporal/spatial reuse + ReBLUR recover quality.
+            Desc.MaxBounces        = static_cast<uint32_t>(std::max(
+                1, std::getenv("HLVM_RGI_BOUNCES") ? std::atoi(std::getenv("HLVM_RGI_BOUNCES")) : 4));
+            // Phase A (PLAN_REALTIME_RESTIR_GAP): ReSTIR-native sampling —
+            // exactly ONE primary GI ray per pixel; the reservoir IS that
+            // sample (Generate copies it with M=1/W=1 + the direction is
+            // written to u2). Reuse (temporal/spatial) + ReBLUR replace the
+            // old multi-sample loop.
+            Desc.SamplesPerPixel   = 1;
             Desc.MinRayLength      = 0.001f;
             Desc.EnableRR          = true;
             Desc.FrameIndex        = AccumFrameCount;
-            // Lighting setup. The test has no scene lights, so the "fake"
-            // ambient term is the only illumination. With material=(1, 1, 1)
-            // (the Sponza GLTF in this test loads white materials for the
-            // rendered meshes) and AmbientColor=(1.0, 1.0, 1.0), scale=1.5
-            // gives a primary contribution of (1.5, 1.5, 1.5) which is bright
-            // enough to actually SEE the Sponza geometry. The previous
-            // values (AmbientColor=0.6/0.6/0.65, scale=0.6, intended for a
-            // red material (0.8, 0.2, 0.2) from the now-removed
-            // FillGBufferHardcoded fallback) produced a dim gray image
-            // because the actual Sponza materials are white, not red.
-            Desc.AmbientScale      = 1.5f;
+            // Lighting setup (2026-08-10): sunlight interior. Pass the sun-only
+            // light buffer (intensity 8.0 directional) so NEE is sunlight, and
+            // keep the flat ambient low (~0.35, sky-tinted) so the sun creates
+            // visible shadows while sky GI (path-traced miss) fills the dark
+            // interior. The earlier v142 setup used AmbientScale=1.5 + interior
+            // point lights, which washed out the scene.
+            Desc.LightsBuffer      = SunLightBuffer;
+            Desc.LightCount        = 1;
+            Desc.MaterialTextures  = MaterialTextures;   // Phase 3b per-texel bounce albedo
+            Desc.AmbientScale      = 0.35f;
+            Desc.AmbientColor[0]   = 0.75f;
+            Desc.AmbientColor[1]   = 0.8f;
+            Desc.AmbientColor[2]   = 1.0f;
+            Desc.AmbientColor[3]   = 0.0f;
+
+            // DIAGNOSTIC (v3 — six-role-pipeline): pre/post GIPass logs to
+            // confirm the dispatch call is reached and returns.
+            HLVM_LOG(LogTest, info, TXT("Pre-GIPass: CommandList=0x{:x} OutputTex=0x{:x} Frame={}"),
+                reinterpret_cast<uintptr_t>(CommandList.Get()),
+                reinterpret_cast<uintptr_t>(Desc.OutputTexture.Get()),
+                AccumFrameCount);
 
             GIPass.DispatchRays(CommandList, Desc);
+
+            HLVM_LOG(LogTest, info, TXT("Post-GIPass: returned Frame={}"),
+                AccumFrameCount);
         }
 
-        // (2) Bilateral denoise
+        // (2) Bilateral denoise — kept as a barrier-flushing dispatch between
+        // GIPass and the ReSTIR stages: its execution forces nvrhi to emit
+        // the pending layout transitions (GENERAL -> SHADER_READ_ONLY) for
+        // the GBuffer + reservoir textures BEFORE the ReSTIR binding sets are
+        // created, which the validation layer otherwise reports as
+        // VUID-VkDescriptorImageInfo-imageLayout-00344 at the temporal
+        // dispatch. Its output (DenoisedTexture) is not consumed by ReSTIR
+        // (ReBLUR, step 5.5, is the denoiser).
+        if (!bBypass)
         {
             FBilateralDenoisePass::FDesc Bd{};
             Bd.InputTexture    = OutputTexture;
@@ -444,17 +841,19 @@ public:
             BilateralDenoisePass.Dispatch(CommandList, Bd);
         }
 
-        // (3) ReSTIR Generate
+        // (3) ReSTIR Generate — skipped in HLVM_RGI_BYPASS mode
+        if (!bBypass)
         {
             ReSTIR::FReSTIRPass::FGenerationDesc Gd{};
-            Gd.RadianceTexture  = DenoisedTexture;
+            Gd.RadianceTexture  = OutputTexture;      // gi_raw (radiance.rgb + hitT.a)
+            Gd.DirectionTexture = DirectionTexture;   // Phase B: primary ray direction
             Gd.WorldPosTexture  = GBufferWorldPos;
             Gd.NormalTexture   = GBufferNormal;
             Gd.DepthTexture    = LinearDepthTexture;
             Gd.OutReservoir0   = ReservoirTex0;
             Gd.OutReservoir1   = ReservoirTex1;
-            Gd.OutputWidth     = FB.width;
-            Gd.OutputHeight    = FB.height;
+            Gd.OutputWidth     = HalfResWidth;    // Phase D
+            Gd.OutputHeight    = HalfResHeight;
 
             ReSTIR::FReSTIRConstants C{};
             C.OutputSize[0]      = float(FB.width);
@@ -470,7 +869,8 @@ public:
             ReSTIRPass.DispatchGeneration(CommandList, Gd, C);
         }
 
-        // (4) ReSTIR Temporal (skip first frame — no history)
+        // (4) ReSTIR Temporal (skip first frame — no history) — skipped in bypass
+        if (!bBypass)
         {
             // The temporal pass reads ReservoirTex0/1 as SRV (history merge)
             // and writes TemporalReservoir0/1 as UAV. ReSTIR Generate wrote
@@ -479,33 +879,30 @@ public:
             // get SHADER_READ_ONLY_OPTIMAL — otherwise the Vulkan validation
             // layer flags GENERAL vs SHADER_READ_ONLY_OPTIMAL mismatch.
             //
-            // Note: even with these transitions, the Vulkan validation layer
-            // can still complain with VUID-VkDescriptorImageInfo-imageLayout-
-            // 00344 because nvrhi's setComputeState records the
-            // vk::bindDescriptorSets call BEFORE recording the layout
-            // transition barrier (vulkan-compute.cpp:120-145). The
-            // validation layer inspects the recorded command buffer and
-            // sees the descriptor bound with one layout and the image
-            // still in the previous layout. The proper fix is to split
-            // the temporal pass into a read-only dispatch (SRV only) and
-            // a write-only dispatch (UAV only). Tracked as a follow-up.
-            // The error is non-fatal — the GPU work still happens and the
-            // test produces correct output. The same VUID fires per
-            // dispatch and was documented in final-state-2026-07-23.md
-            // as bug-075.
+            // bug-075 (six-role-pipeline v1) is fixed by splitting the
+            // temporal binding layout into SRV-only (set 0) + UAV-only (set 1)
+            // and dispatching in two phases. The shader was edited to declare
+            // its UAVs at register(u0/u1, space1) so SPIR-V places them in
+            // set 1, matching the split layout. Each dispatch binds only ONE
+            // set, so nvrhi's requireTextureState infers only one state per
+            // dispatch and the descriptor-bind layout is unambiguous.
             CommandList->setTextureState(
                 ReservoirTex0, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
             CommandList->setTextureState(
                 ReservoirTex1, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
-            // On frame > 0 the prev-frame Temporal pass wrote TemporalReservoir0/1
-            // in UnorderedAccess. The temporal pass uses ONE of them as SRV
-            // history and the OTHER as UAV output (ping-pong below). Transition
-            // BOTH to ShaderResource here; nvrhi will auto-transition the UAV-
-            // written one back to GENERAL inside the dispatch.
+            // On frame > 0 the prev-frame Temporal pass wrote the previous
+            // output pair in UnorderedAccess. The temporal pass reads one
+            // PAIR as SRV history and writes the OTHER PAIR as UAV output.
+            // Transition ALL FOUR to ShaderResource; nvrhi auto-transitions
+            // the UAV-written pair back to GENERAL inside the dispatch.
             CommandList->setTextureState(
                 TemporalReservoir0, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
             CommandList->setTextureState(
                 TemporalReservoir1, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+            CommandList->setTextureState(
+                TemporalReservoir2, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+            CommandList->setTextureState(
+                TemporalReservoir3, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
             // Also keep depth SRV in SHADER_READ_ONLY (they remain untouched
             // until temporal writes them).
             CommandList->setTextureState(
@@ -514,36 +911,37 @@ public:
             ReSTIR::FReSTIRPass::FTemporalDesc Td{};
             Td.CurrentReservoir0 = ReservoirTex0;
             Td.CurrentReservoir1 = ReservoirTex1;
-            // Ping-pong History and Output across TemporalReservoir0/1 so the
-            // same texture is never bound as both SRV-read (t2/t3) and UAV-
-            // write (u384/u385) in the same dispatch. Without this the
-            // Vulkan validation layer flags SHADER_READ_ONLY_OPTIMAL vs
-            // GENERAL mismatch and (worse) the dispatch's UAV write invalidates
-            // the read of the same texture (UB). On even frames History is
-            // TemporalReservoir1 and Output is TemporalReservoir0; on odd
-            // frames they swap.
+            // Ping-pong History and Output across TWO texture PAIRS
+            // (0/1 <-> 2/3). The old two-texture ping-pong aliased a history
+            // SRV with an output UAV on the same texture every frame — a
+            // Vulkan layout conflict (SRV needs SHADER_READ_ONLY, UAV needs
+            // GENERAL) that the validation layer reports as
+            // VUID-VkDescriptorImageInfo-imageLayout-00344 at the temporal
+            // dispatch. With four textures the history pair and output pair
+            // never overlap. On even frames History = pair 0/1 and Output =
+            // pair 2/3; on odd frames they swap.
             const bool bPing = (AccumFrameCount % 2) == 0;
-            Td.HistoryReservoir0 = (AccumFrameCount == 0) ? ReservoirTex0 : (bPing ? TemporalReservoir1 : TemporalReservoir0);
-            Td.HistoryReservoir1 = (AccumFrameCount == 0) ? ReservoirTex1 : (bPing ? TemporalReservoir0 : TemporalReservoir1);
-            Td.OutReservoir0     =                                            (bPing ? TemporalReservoir0 : TemporalReservoir1);
-            Td.OutReservoir1     =                                            (bPing ? TemporalReservoir1 : TemporalReservoir0);
-            Td.CurrentRadiance   = DenoisedTexture;
-            Td.HistoryRadiance   = DenoisedTexture;       // no separate history radiance texture
+            Td.HistoryReservoir0 = (AccumFrameCount == 0) ? ReservoirTex0 : (bPing ? TemporalReservoir0 : TemporalReservoir2);
+            Td.HistoryReservoir1 = (AccumFrameCount == 0) ? ReservoirTex1 : (bPing ? TemporalReservoir1 : TemporalReservoir3);
+            Td.OutReservoir0     =                                            (bPing ? TemporalReservoir2 : TemporalReservoir0);
+            Td.OutReservoir1     =                                            (bPing ? TemporalReservoir3 : TemporalReservoir1);
+            Td.CurrentRadiance   = OutputTexture;       // gi_raw (radiance source)
+            Td.HistoryRadiance   = OutputTexture;       // no separate history radiance texture
             Td.DepthTexture      = LinearDepthTexture;
             Td.NormalTexture     = GBufferNormal;
             Td.PrevDepthTexture  = LinearDepthTexture;
             Td.PrevNormalTexture = GBufferNormal;
             Td.OutRadiance       = SpatialRadiance;       // output radiance directly
-            Td.OutputWidth       = FB.width;
-            Td.OutputHeight      = FB.height;
+            Td.OutputWidth       = HalfResWidth;    // Phase D
+            Td.OutputHeight      = HalfResHeight;
 
             ReSTIR::FReSTIRTemporalConstants TC{};
-            std::memset(TC.InverseCurrViewProj, 0, sizeof(TC.InverseCurrViewProj));
-            TC.InverseCurrViewProj[0]  = 1.0f; TC.InverseCurrViewProj[5]  = 1.0f;
-            TC.InverseCurrViewProj[10] = 1.0f; TC.InverseCurrViewProj[15] = 1.0f;
-            std::memset(TC.PrevViewProj, 0, sizeof(TC.PrevViewProj));
-            TC.PrevViewProj[0]  = 1.0f; TC.PrevViewProj[5]  = 1.0f;
-            TC.PrevViewProj[10] = 1.0f; TC.PrevViewProj[15] = 1.0f;
+            // Real reprojection matrices: inverse current view-proj and the
+            // previous frame's view-proj. GLM is column-major, matching the
+            // HLSL mul(matrix, vector) convention in ReSTIR_Temporal_cs.hlsl.
+            glm::mat4 InvCurr = glm::inverse(CurrViewProj);
+            memcpy(TC.InverseCurrViewProj, glm::value_ptr(InvCurr), sizeof(TC.InverseCurrViewProj));
+            memcpy(TC.PrevViewProj, glm::value_ptr(PrevViewProj), sizeof(TC.PrevViewProj));
             TC.OutputSize[0]    = float(FB.width);
             TC.OutputSize[1]    = float(FB.height);
             TC.RcpOutputSize[0] = 1.0f / float(FB.width);
@@ -553,13 +951,22 @@ public:
             TC.DepthThreshold   = 0.05f;
             TC.NormalThreshold  = 0.5f;
             TC.DebugVis         = 0.0f;
+            // Phase C: object-aware temporal reprojection (turntable).
+            TC.SceneYaw         = SceneRotationDeg;
+            TC.PrevSceneYaw     = PrevSceneRotationDeg;
+            // Near/far planes (must match UpdateViewConstants perspective).
+            // The temporal shader reconstructs the exact NDC z from the
+            // linear view-space depth using these.
+            TC.Pad[0]           = 0.001f;
+            TC.Pad[1]           = 50.0f;
 
             ReSTIRPass.DispatchTemporal(CommandList, Td, TC);
         }
 
-        // (5) ReSTIR Spatial (using merged reservoirs)
+        // (5) ReSTIR Spatial (using merged reservoirs) — skipped in bypass
+        if (!bBypass)
         {
-            // Temporal wrote TemporalReservoir0/1 in UnorderedAccess state.
+            // Temporal wrote the output pair in UnorderedAccess state.
             // Transition them to ShaderResource so Spatial's SRV reads don't
             // hit the GENERAL vs SHADER_READ_ONLY_OPTIMAL validation error.
             CommandList->setTextureState(
@@ -567,23 +974,32 @@ public:
             CommandList->setTextureState(
                 TemporalReservoir1, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
             CommandList->setTextureState(
+                TemporalReservoir2, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+            CommandList->setTextureState(
+                TemporalReservoir3, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+            CommandList->setTextureState(
                 DenoisedTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
 
             ReSTIR::FReSTIRPass::FSpatialDesc Sd{};
-            Sd.RadianceTexture  = DenoisedTexture;
-            Sd.Reservoir0       = TemporalReservoir0;
-            Sd.Reservoir1       = TemporalReservoir1;
+            Sd.RadianceTexture  = OutputTexture;        // gi_raw (unused in v1 reservoir math)
+            // The temporal pass ping-pongs its reservoir output pair by frame
+            // parity: on even AccumFrameCount the sample radiance lands in the
+            // 2/3 pair (M/W in 3/2); on odd frames it lands in the 0/1 pair.
+            // The spatial pass must read the pair with the SAME parity.
+            const bool bSpatialPing = (AccumFrameCount % 2) == 0;
+            Sd.Reservoir0       = bSpatialPing ? TemporalReservoir2 : TemporalReservoir0;
+            Sd.Reservoir1       = bSpatialPing ? TemporalReservoir3 : TemporalReservoir1;
             Sd.NormalTexture    = GBufferNormal;
             Sd.DepthTexture     = LinearDepthTexture;
             Sd.OutRadiance      = SpatialRadiance;
-            Sd.OutputWidth      = FB.width;
-            Sd.OutputHeight     = FB.height;
+            Sd.OutputWidth      = HalfResWidth;    // Phase D
+            Sd.OutputHeight     = HalfResHeight;
 
             ReSTIR::FReSTIRSpatialConstants SC{};
-            SC.OutputSize[0]    = float(FB.width);
-            SC.OutputSize[1]    = float(FB.height);
-            SC.RcpOutputSize[0] = 1.0f / float(FB.width);
-            SC.RcpOutputSize[1] = 1.0f / float(FB.height);
+            SC.OutputSize[0]    = float(HalfResWidth);   // Phase D
+            SC.OutputSize[1]    = float(HalfResHeight);
+            SC.RcpOutputSize[0] = 1.0f / float(HalfResWidth);
+            SC.RcpOutputSize[1] = 1.0f / float(HalfResHeight);
             SC.NormalThreshold  = 0.9f;
             SC.DepthThreshold   = 0.05f;
             SC.MaxM             = 30.0f;
@@ -593,14 +1009,126 @@ public:
             ReSTIRPass.DispatchSpatial(CommandList, Sd, SC);
         }
 
-        // (6) Temporal accumulation (ACES tonemap + gamma)
+        // (5.4) Phase D: depth/normal-weighted half-res → full-res resolve.
         {
+            struct FResolveC
+            {
+                float HalfW, HalfH;
+                float RcpHalfW, RcpHalfH;
+                float RcpFullW, RcpFullH;
+                float DepthSigma, NormalSigma;
+            };
+            FResolveC RC{};
+            RC.HalfW = static_cast<float>(HalfResWidth);
+            RC.HalfH = static_cast<float>(HalfResHeight);
+            RC.RcpHalfW = 1.0f / static_cast<float>(HalfResWidth);
+            RC.RcpHalfH = 1.0f / static_cast<float>(HalfResHeight);
+            RC.RcpFullW = 1.0f / static_cast<float>(FB.width);
+            RC.RcpFullH = 1.0f / static_cast<float>(FB.height);
+            RC.DepthSigma = 8.0f;
+            RC.NormalSigma = 32.0f;
+            CommandList->writeBuffer(ResolveConstantsBuffer, &RC, sizeof(RC));
+
+            auto DispatchResolve = [&](nvrhi::TextureHandle HalfTex, nvrhi::TextureHandle OutTex)
+            {
+                CommandList->setTextureState(HalfTex, nvrhi::AllSubresources,
+                    nvrhi::ResourceStates::ShaderResource);
+                CommandList->setTextureState(LinearDepthTexture, nvrhi::AllSubresources,
+                    nvrhi::ResourceStates::ShaderResource);
+                CommandList->setTextureState(GBufferNormal, nvrhi::AllSubresources,
+                    nvrhi::ResourceStates::ShaderResource);
+                CommandList->setTextureState(OutTex, nvrhi::AllSubresources,
+                    nvrhi::ResourceStates::UnorderedAccess);
+
+                FBindingSetBuilder SB;
+                SB.SetConstantBuffer(0, ResolveConstantsBuffer)
+                  .SetTextureSRV(0, HalfTex)
+                  .SetTextureSRV(1, LinearDepthTexture)
+                  .SetTextureSRV(2, GBufferNormal)
+                  .SetTextureUAV(0, OutTex);
+                nvrhi::BindingSetHandle BS = NvrhiDevice->createBindingSet(
+                    SB.Build(), ResolveBindingLayout);
+                nvrhi::ComputeState CS;
+                CS.setPipeline(ResolvePipeline);
+                CS.addBindingSet(BS);
+                CommandList->setComputeState(CS);
+                CommandList->dispatch((FB.width + 7) / 8, (FB.height + 7) / 8, 1);
+            };
+
+            DispatchResolve(OutputTexture, FullResGIRaw);       // gi_raw dump
+            DispatchResolve(SpatialRadiance, FullResSpatial);   // ReBLUR input
+        }
+
+        // (5.5) ReBLUR denoise on the ReSTIR resolve output (RESTIR mode only)
+        {
+            nvrhi::TextureHandle AccumInput = bBypass ? FullResGIRaw : FullResSpatial;
+            if (bReBLURInitialized && !bBypass)
+            {
+                CommandList->setTextureState(
+                    FullResSpatial, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+                CommandList->setTextureState(
+                    DenoisedTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
+                CommandList->setTextureState(
+                    ReBLURHistoryTexture[0], nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+                CommandList->setTextureState(
+                    ReBLURHistoryTexture[1], nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+
+                ReBLUR::FReBLURConstants ReBLURConstants;
+                std::memset(&ReBLURConstants, 0, sizeof(ReBLURConstants));
+                glm::mat4 InvCurr = glm::inverse(CurrViewProj);
+                memcpy(ReBLURConstants.InverseCurrViewProj, glm::value_ptr(InvCurr), 64);
+                memcpy(ReBLURConstants.PrevViewProj, glm::value_ptr(PrevViewProj), 64);
+                ReBLURConstants.OutputSize[0] = static_cast<float>(FB.width);
+                ReBLURConstants.OutputSize[1] = static_cast<float>(FB.height);
+                ReBLURConstants.RcpOutputSize[0] = 1.0f / static_cast<float>(FB.width);
+                ReBLURConstants.RcpOutputSize[1] = 1.0f / static_cast<float>(FB.height);
+                ReBLURConstants.HitDistParams[0] = 3.0f;
+                ReBLURConstants.HitDistParams[1] = 0.1f;
+                ReBLURConstants.HitDistParams[2] = 20.0f;
+                ReBLURConstants.HitDistParams[3] = -25.0f;
+                ReBLURConstants.FrameIndex = static_cast<float>(AccumFrameCount);
+                ReBLURConstants.HistoryFadeIn = 8.0f;
+                ReBLURConstants.ConfidenceScale = 1.0f;
+                ReBLURConstants.PassIndex = 0.0f;
+
+                ReBLUR::FPooledBlurParams BlurParams = ReBLUR::FReBLURPass::GetDefaultBlurParams();
+
+                ReBLUR::FReBLURPass::FDesc ReBLURDesc;
+                ReBLURDesc.CurrentRadianceTexture = FullResSpatial;
+                ReBLURDesc.HistoryTexture = ReBLURHistoryTexture[0];
+                ReBLURDesc.DepthTexture = LinearDepthTexture;
+                ReBLURDesc.NormalRoughnessTexture = GBufferNormal;
+                ReBLURDesc.OutputTexture = DenoisedTexture;
+                ReBLURDesc.OutputWidth = FB.width;
+                ReBLURDesc.OutputHeight = FB.height;
+                // nvrhi binds descriptor sets BEFORE pending barriers land, so
+                // the descriptors capture the stale image layout and reads
+                // return garbage (VUID-VkDescriptorImageInfo-imageLayout-00344,
+                // "A command list should be executed before it is reopened"
+                // class). Flush the transitions above before the binding set is
+                // created inside Dispatch.
+                CommandList->commitBarriers();
+                ReBLURPass.Dispatch(CommandList, ReBLURDesc, ReBLURConstants, BlurParams);
+
+                // Copy denoised output to history for the next frame.
+                CommandList->setTextureState(
+                    DenoisedTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::CopySource);
+                CommandList->setTextureState(
+                    ReBLURHistoryTexture[0], nvrhi::AllSubresources, nvrhi::ResourceStates::CopyDest);
+                CommandList->copyTexture(
+                    ReBLURHistoryTexture[0], nvrhi::TextureSlice(), DenoisedTexture, nvrhi::TextureSlice());
+
+                AccumInput = DenoisedTexture;
+            }
             CommandList->setTextureState(
-                SpatialRadiance, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+                FullResSpatial, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
             CommandList->setTextureState(
                 AccumTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
             CommandList->setTextureState(
                 DisplayTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
+            if (bBypass)
+                CommandList->setTextureState(
+                    AccumInput, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
 
             ++AccumFrameCount;
             struct FAccumC { uint32_t FrameCount; uint32_t Width; uint32_t Height; float Exposure; };
@@ -613,7 +1141,7 @@ public:
 
             FBindingSetBuilder SetBuilder;
             SetBuilder.SetConstantBuffer(0, AccumulateConstants)
-                      .SetTextureSRV(0, SpatialRadiance)
+                      .SetTextureSRV(0, AccumInput)
                       .SetTextureUAV(0, AccumTexture)
                       .SetTextureUAV(1, DisplayTexture);
             nvrhi::BindingSetHandle AccumBS = NvrhiDevice->createBindingSet(
@@ -640,15 +1168,56 @@ public:
                 &BindingCache, FB.width, FB.height, BlitParams);
         }
 
-        // Note: CommandList was already closed+executed at the end of
-        // RenderGBuffer (HLVM-bypass to isolate raster pass from later-pass
-        // validation errors). The blit above recorded into a fresh open CL.
+        // The blit above recorded into the same open CommandList that
+        // RenderGBuffer + FGIPass + denoise + ReSTIR + accumulate all wrote
+        // into. The whole frame submits at end of Render via line 691.
 
+        // bug-088 (six-role-pipeline v1, root-caused 2026-07-27): the per-frame
+        // CommandList was closed at end of Render() but never submitted. The
+        // next frame's open() discarded the recorded GPU work (GIPass, denoise,
+        // ReSTIR, accumulate, blit). Symptoms in the log: "A command list
+        // should be executed before it is reopened" every frame (informational)
+        // and vkQueueSubmit validation errors reading DisplayTexture in layout
+        // VK_IMAGE_LAYOUT_UNDEFINED (because the accumulate UAV write was
+        // never submitted).
+        //
+        // Note: v5 (six-role-pipeline, 2026-07-27) removed the v1-introduced
+        // HLVM-bypass `close+execute+waitForIdle+open` block at the end of
+        // RenderGBuffer. That bypass was the regression (gi_raw became 0,0,0
+        // after it landed). The v5 NOTE comment near line 1531 documents the
+        // rationale.
+        //
+        // Fix: explicitly execute the per-frame CL after closing it. This
+        // submits the post-raster work and lets DeviceManager::EndFrame() open
+        // its own immediate CL without colliding with this one. The next
+        // frame's Render() then opens a fresh CL (lines 388/399) and no work
+        // is lost. (Previously the plan described this as an "open vs close"
+        // collision with DeviceManager::EndFrame(); that was wrong — the real
+        // bug was the missing executeCommandList, which dropped ~90% of the
+        // pipeline's recorded GPU work every frame.)
         const bool bLastFrame = (AccumFrameCount >= AccumTargetFrames);
+        if (CommandList)
+        {
+            CommandList->close();
+            NvrhiDevice->executeCommandList(CommandList);
+        }
+
+        // Dump AFTER the per-frame CL executes. DumpCurrentFrame creates its
+        // own CL and submits via executeCommandList — Vulkan's FIFO queue
+        // order guarantees the dump sees the post-accumulate state.
         if (bDumpRequested && bLastFrame)
         {
             DumpCurrentFrame();
         }
+
+        // End-of-run numerical summary — always logged on the last frame so
+        // the pipeline claims (reservoir M/W, grayscale error, display range)
+        // are verifiable from a plain run's log without HLVM_DUMP_RGI.
+        if (bLastFrame)
+        {
+            LogFinalFrameStats();
+        }
+
         if (bLastFrame)
         {
             if (auto* DM = GetDeviceManager()) DM->StopMessageLoop();
@@ -701,23 +1270,35 @@ private:
             Info.VertexCount  = static_cast<uint32_t>(Verts.size());
             Info.IndexCount   = static_cast<uint32_t>(Indices.size());
             Info.AlbedoTextureIndex = 0;
+            Info.Roughness = 0.9f;
+            Info.Metallic  = 0.0f;
 
             // Pull material albedo for this mesh if available
             auto MatIt = Scene->MeshMultiMaterialMap.find(Entry.second);
             if (MatIt != Scene->MeshMultiMaterialMap.end() && !MatIt->second.empty())
             {
                 const auto& M = MatIt->second[0];
-                Info.AlbedoColor[0] = M->AlbedoColor.x;
-                Info.AlbedoColor[1] = M->AlbedoColor.y;
-                Info.AlbedoColor[2] = M->AlbedoColor.z;
+                const FVec3 A = GetMeshAlbedo(Entry.second->GetName(), M->AlbedoColor);
+                Info.AlbedoColor[0] = A.x;
+                Info.AlbedoColor[1] = A.y;
+                Info.AlbedoColor[2] = A.z;
+                // 2026-08-10 Phase 1: flag meshes with a real albedo texture so
+                // GBufferPT_PS samples it instead of the palette color.
+                if (auto PBRMat = std::dynamic_pointer_cast<FPBRMaterial>(M))
+                {
+                    if (PBRMat->HasTexture(IMaterial::ETextureType::Albedo))
+                        Info.MaterialFlags |= 1u;
+                    Info.Roughness = PBRMat->GetRoughness();
+                    Info.Metallic  = PBRMat->GetMetallic();
+                }
             }
             else
             {
-                Info.AlbedoColor[0] = 0.7f;
-                Info.AlbedoColor[1] = 0.7f;
-                Info.AlbedoColor[2] = 0.7f;
+                const FVec3 A = GetMeshAlbedo(Entry.second->GetName(), FVec3(0.7f, 0.7f, 0.7f));
+                Info.AlbedoColor[0] = A.x;
+                Info.AlbedoColor[1] = A.y;
+                Info.AlbedoColor[2] = A.z;
             }
-            Info.MaterialFlags = 0;
 
             InstanceInfos.push_back(Info);
             for (const auto& V : Verts)
@@ -744,6 +1325,9 @@ private:
             HLVM_LOG(LogTest, err, TXT("Sponza scene produced no geometry"));
             return false;
         }
+        // Phase 3: keep the instance array so the init-time material pass can
+        // patch per-mesh average albedo (RT bounce shading) and re-upload.
+        AllInstanceInfos = InstanceInfos;
 
         nvrhi::CommandListHandle InitCmd = NvrhiDevice->createCommandList();
         InitCmd->open();
@@ -813,33 +1397,17 @@ private:
             SceneBLASes.push_back(BLAS);
         }
 
-        // TLAS — Sponza is large; scale by 0.01 (same as TestRTDispatch).
-        // Identity rotation, translation 0.
+        // TLAS — Sponza is large; scale by 0.01 (same as TestRTDispatch) and
+        // rotate around Y by the turntable angle. The rotation must match the
+        // raster ModelMatrix in UpdateViewConstants exactly: v' = S * Ry * v
+        // (row-major 3x4, translation in the 4th column). Rebuilt per frame
+        // with the current SceneRotationDeg (see Render).
         {
             nvrhi::rt::AccelStructDesc TlasDesc{};
             TlasDesc.isTopLevel = true;
             TlasDesc.topLevelMaxInstances = static_cast<uint32_t>(SceneBLASes.size());
             SceneTLAS = NvrhiDevice->createAccelStruct(TlasDesc);
-
-            float Transform[12] = {
-                0.01f, 0.00f, 0.00f, 0.00f,
-                0.00f, 0.01f, 0.00f, 0.00f,
-                0.00f, 0.00f, 0.01f, 0.00f
-            };
-
-            std::vector<nvrhi::rt::InstanceDesc> InstanceDescs;
-            for (nvrhi::rt::AccelStructHandle BLAS : SceneBLASes)
-            {
-                nvrhi::rt::InstanceDesc InstanceDesc{};
-                InstanceDesc.bottomLevelAS = BLAS;
-                InstanceDesc.instanceMask  = 1;
-                InstanceDesc.flags         = nvrhi::rt::InstanceFlags::TriangleFrontCounterclockwise;
-                memcpy(InstanceDesc.transform, Transform, sizeof(Transform));
-                InstanceDescs.push_back(InstanceDesc);
-            }
-            InitCmd->buildTopLevelAccelStruct(
-                SceneTLAS, InstanceDescs.data(),
-                static_cast<uint32_t>(InstanceDescs.size()));
+            BuildTLAS(InitCmd);
         }
 
         InitCmd->setBufferState(VertexBuffer, nvrhi::ResourceStates::ShaderResource);
@@ -848,6 +1416,39 @@ private:
         InitCmd->close();
         NvrhiDevice->executeCommandList(InitCmd);
         NvrhiDevice->waitForIdle();
+        return true;
+    }
+
+    // Rebuild the TLAS with the current SceneRotationDeg (turntable). All
+    // instances share the same scale(0.01)*Ry(angle) transform. Called at init
+    // and once per frame so the ray tracer follows the rotating scene.
+    bool BuildTLAS(nvrhi::ICommandList* Cmd)
+    {
+        if (!Cmd || !SceneTLAS || SceneBLASes.empty())
+            return false;
+
+        const float RotCos = glm::cos(glm::radians(SceneRotationDeg));
+        const float RotSin = glm::sin(glm::radians(SceneRotationDeg));
+        float Transform[12] = {
+            0.01f * RotCos,  0.0f,          0.01f * RotSin, 0.0f,
+            0.0f,            0.01f,         0.0f,           0.0f,
+           -0.01f * RotSin,  0.0f,          0.01f * RotCos, 0.0f
+        };
+
+        std::vector<nvrhi::rt::InstanceDesc> InstanceDescs;
+        InstanceDescs.reserve(SceneBLASes.size());
+        for (nvrhi::rt::AccelStructHandle BLAS : SceneBLASes)
+        {
+            nvrhi::rt::InstanceDesc InstanceDesc{};
+            InstanceDesc.bottomLevelAS = BLAS;
+            InstanceDesc.instanceMask  = 1;
+            InstanceDesc.flags         = nvrhi::rt::InstanceFlags::TriangleFrontCounterclockwise;
+            memcpy(InstanceDesc.transform, Transform, sizeof(Transform));
+            InstanceDescs.push_back(InstanceDesc);
+        }
+        Cmd->buildTopLevelAccelStruct(
+            SceneTLAS, InstanceDescs.data(),
+            static_cast<uint32_t>(InstanceDescs.size()));
         return true;
     }
 
@@ -874,34 +1475,84 @@ private:
         MtDesc.debugName = "GBufferMaterial";
         GBufferMaterial = NvrhiDevice->createTexture(MtDesc);
 
-        nvrhi::TextureDesc DpDesc = WpDesc;
+        // Depth attachment (D32) — was created but NEVER attached to the
+        // framebuffer, and depth test/write were disabled (fixed 2026-08-10).
+        // Without occlusion every overlapping Sponza mesh fragment wrote the
+        // GBuffer and the last-drawn mesh won per pixel — a patchwork of front
+        // AND back faces ("inside-out mesh" look).
+        nvrhi::TextureDesc DpDesc;
+        DpDesc.dimension = nvrhi::TextureDimension::Texture2D;
+        DpDesc.width = W; DpDesc.height = H;
         DpDesc.format = nvrhi::Format::D32;
+        DpDesc.isRenderTarget = true;
+        DpDesc.isUAV = false;
+        DpDesc.isTypeless = true;
+        DpDesc.initialState = nvrhi::ResourceStates::DepthWrite;
+        DpDesc.keepInitialState = true;
         DpDesc.debugName = "GBufferDepth";
         GBufferDepth = NvrhiDevice->createTexture(DpDesc);
 
+        // MRT3 — linear view-space depth (R32F), written by GBufferPT_PS.
+        // isRenderTarget=true so it can be attached to the GBuffer framebuffer.
         LinearDepthTexture = CreateTexture2D(
             NvrhiDevice, W, H, nvrhi::Format::R32_FLOAT,
-            nvrhi::ResourceStates::ShaderResource, "LinearDepth");
+            nvrhi::ResourceStates::RenderTarget, "LinearDepth");
+        {
+            nvrhi::TextureDesc LtDesc = LinearDepthTexture->getDesc();
+            LtDesc.isRenderTarget = true;
+            LtDesc.initialState = nvrhi::ResourceStates::RenderTarget;
+            LtDesc.keepInitialState = true;
+            LtDesc.debugName = "LinearDepth";
+            LinearDepthTexture = NvrhiDevice->createTexture(LtDesc);
+        }
 
         // Pipeline color/depth outputs for the GBuffer pass
+        // Phase D (PLAN_REALTIME_RESTIR_GAP): ReSTIR GI traces and reuses at
+        // HALF resolution; a depth/normal-weighted resolve pass upsamples the
+        // result to full res for ReBLUR/accumulate/display.
+        const uint32_t HalfW = W / 2;
+        const uint32_t HalfH = H / 2;
+        HalfResWidth = HalfW;
+        HalfResHeight = HalfH;
         OutputTexture = CreateTexture2D(
-            NvrhiDevice, W, H, nvrhi::Format::RGBA32_FLOAT,
+            NvrhiDevice, HalfW, HalfH, nvrhi::Format::RGBA32_FLOAT,
             nvrhi::ResourceStates::UnorderedAccess, "GIRawHDR");
+        DirectionTexture = CreateTexture2D(
+            NvrhiDevice, HalfW, HalfH, nvrhi::Format::RGBA32_FLOAT,
+            nvrhi::ResourceStates::UnorderedAccess, "GIPrimaryDirection");
         DenoisedTexture = CreateTexture2D(
             NvrhiDevice, W, H, nvrhi::Format::RGBA32_FLOAT,
             nvrhi::ResourceStates::UnorderedAccess, "DenoisedHDR");
 
         // ReSTIR reservoirs
-        ReservoirTex0 = CreateTexture2D(NvrhiDevice, W, H, nvrhi::Format::RGBA32_FLOAT,
+        ReservoirTex0 = CreateTexture2D(NvrhiDevice, HalfW, HalfH, nvrhi::Format::RGBA32_FLOAT,
             nvrhi::ResourceStates::UnorderedAccess, "Reservoir0");
-        ReservoirTex1 = CreateTexture2D(NvrhiDevice, W, H, nvrhi::Format::RGBA32_FLOAT,
+        ReservoirTex1 = CreateTexture2D(NvrhiDevice, HalfW, HalfH, nvrhi::Format::RGBA32_FLOAT,
             nvrhi::ResourceStates::UnorderedAccess, "Reservoir1");
-        TemporalReservoir0 = CreateTexture2D(NvrhiDevice, W, H, nvrhi::Format::RGBA32_FLOAT,
+        TemporalReservoir0 = CreateTexture2D(NvrhiDevice, HalfW, HalfH, nvrhi::Format::RGBA32_FLOAT,
             nvrhi::ResourceStates::UnorderedAccess, "TemporalReservoir0");
-        TemporalReservoir1 = CreateTexture2D(NvrhiDevice, W, H, nvrhi::Format::RGBA32_FLOAT,
+        TemporalReservoir1 = CreateTexture2D(NvrhiDevice, HalfW, HalfH, nvrhi::Format::RGBA32_FLOAT,
             nvrhi::ResourceStates::UnorderedAccess, "TemporalReservoir1");
-        SpatialRadiance = CreateTexture2D(NvrhiDevice, W, H, nvrhi::Format::RGBA32_FLOAT,
+        // Second temporal pair (2/3): the temporal pass ping-pongs between
+        // the two PAIRS (0/1 <-> 2/3) instead of aliasing a single pair, so
+        // no texture is ever bound as both SRV history and UAV output in the
+        // same dispatch (that alias is a Vulkan layout conflict — the SRV
+        // descriptor says SHADER_READ_ONLY while the UAV binding needs
+        // GENERAL for the same image).
+        TemporalReservoir2 = CreateTexture2D(NvrhiDevice, HalfW, HalfH, nvrhi::Format::RGBA32_FLOAT,
+            nvrhi::ResourceStates::UnorderedAccess, "TemporalReservoir2");
+        TemporalReservoir3 = CreateTexture2D(NvrhiDevice, HalfW, HalfH, nvrhi::Format::RGBA32_FLOAT,
+            nvrhi::ResourceStates::UnorderedAccess, "TemporalReservoir3");
+        SpatialRadiance = CreateTexture2D(NvrhiDevice, HalfW, HalfH, nvrhi::Format::RGBA32_FLOAT,
             nvrhi::ResourceStates::UnorderedAccess, "SpatialRadiance");
+
+        // Phase D: full-res resolve outputs (upscaled from the half-res trace).
+        FullResGIRaw = CreateTexture2D(
+            NvrhiDevice, W, H, nvrhi::Format::RGBA32_FLOAT,
+            nvrhi::ResourceStates::UnorderedAccess, "FullResGIRaw");
+        FullResSpatial = CreateTexture2D(
+            NvrhiDevice, W, H, nvrhi::Format::RGBA32_FLOAT,
+            nvrhi::ResourceStates::UnorderedAccess, "FullResSpatial");
 
         AccumTexture  = CreateTexture2D(NvrhiDevice, W, H, nvrhi::Format::RGBA32_FLOAT,
             nvrhi::ResourceStates::UnorderedAccess, "Accum");
@@ -1144,17 +1795,19 @@ private:
         //   UV       FVec2  -> offset 32  (8B)
         //   Tangent  FVec3  -> offset 40  (16B: xyz + 4B pad, ends at 56)
         //   elementStride = 64 (sizeof(FVertex) = 64 on aligned build)
-        nvrhi::VertexAttributeDesc Attrs[4];
+        // 2026-08-09: only POSITION/NORMAL were consumed (UV/TANGENT removed,
+        // killing two Vulkan warnings). 2026-08-10 Phase 1 (material rework)
+        // re-adds TEXCOORD0 — the GBuffer PS samples the Sponza albedo texture.
+        // TANGENT stays out until normal mapping.
+        nvrhi::VertexAttributeDesc Attrs[3];
         Attrs[0].setName("POSITION").setFormat(nvrhi::Format::RGB32_FLOAT)
             .setOffset(0).setElementStride(sizeof(FVertex));
         Attrs[1].setName("NORMAL").setFormat(nvrhi::Format::RGB32_FLOAT)
             .setOffset(16).setElementStride(sizeof(FVertex));
         Attrs[2].setName("TEXCOORD0").setFormat(nvrhi::Format::RG32_FLOAT)
             .setOffset(32).setElementStride(sizeof(FVertex));
-        Attrs[3].setName("TANGENT").setFormat(nvrhi::Format::RGB32_FLOAT)
-            .setOffset(40).setElementStride(sizeof(FVertex));
         GBufferInputLayout = NvrhiDevice->createInputLayout(
-            Attrs, 4, GBufferVS);
+            Attrs, 3, GBufferVS);
         HLVM_LOG(LogTest, info, TXT("GBufferInputLayout={} stride={} sizeof(FVertex)={}"),
             GBufferInputLayout ? 1 : 0,
             static_cast<uint32_t>(sizeof(FVertex)), static_cast<uint32_t>(sizeof(FVertex)));
@@ -1165,7 +1818,9 @@ private:
         FBindingLayoutBuilder BLB;
         BLB.SetVisibility(nvrhi::ShaderType::Vertex | nvrhi::ShaderType::Pixel)
            .AddConstantBuffer(0)
-           .AddConstantBuffer(1);
+           .AddConstantBuffer(1)
+           .AddTextureSRV(0)   // t0 - material albedo (2026-08-10 Phase 1)
+           .AddSampler(0);     // s0 - linear sampler
 
         nvrhi::VulkanBindingOffsets Offsets;
         Offsets.setConstantBufferOffset(0)
@@ -1187,16 +1842,20 @@ private:
             GBufferPerInstanceCB = NvrhiDevice->createBuffer(Desc);
         }
 
-        // ---- GBuffer framebuffer (3 color attachments, no depth) ----------
+        // ---- GBuffer framebuffer (4 color attachments + D32 depth) --------
         {
             nvrhi::FramebufferDesc FBDesc;
-            nvrhi::FramebufferAttachment Wp, Nm, Mt;
+            nvrhi::FramebufferAttachment Wp, Nm, Mt, Ld, D;
             Wp.setTexture(GBufferWorldPos);
             Nm.setTexture(GBufferNormal);
             Mt.setTexture(GBufferMaterial);
+            Ld.setTexture(LinearDepthTexture);
+            D.setTexture(GBufferDepth);
             FBDesc.addColorAttachment(Wp);
             FBDesc.addColorAttachment(Nm);
             FBDesc.addColorAttachment(Mt);
+            FBDesc.addColorAttachment(Ld);
+            FBDesc.setDepthAttachment(D);
             GBufferFrameBuffer = NvrhiDevice->createFramebuffer(FBDesc);
             if (!GBufferFrameBuffer)
             {
@@ -1204,7 +1863,7 @@ private:
                 return false;
             }
         }
-        HLVM_LOG(LogTest, info, TXT("GBuffer framebuffer created (3 MRTs, no depth)"));
+        HLVM_LOG(LogTest, info, TXT("GBuffer framebuffer created (4 MRTs + D32 depth)"));
 
         // ---- Graphics pipeline -------------------------------------------
         {
@@ -1217,8 +1876,9 @@ private:
             PipelineDesc.renderState.setRasterState(
                 nvrhi::RasterState().setCullNone());
             PipelineDesc.renderState.depthStencilState
-                .setDepthTestEnable(false)
-                .setDepthWriteEnable(false);
+                .setDepthTestEnable(true)
+                .setDepthWriteEnable(true)
+                .setDepthFunc(nvrhi::ComparisonFunc::Less);
 
             GBufferPipeline = NvrhiDevice->createGraphicsPipeline(
                 PipelineDesc, GBufferFrameBuffer->getFramebufferInfo());
@@ -1289,6 +1949,40 @@ private:
         InitCmd->writeBuffer(GBufferIndexBuffer, AllGBufferIndices.data(),
             static_cast<uint32_t>(AllGBufferIndices.size() * sizeof(uint32_t)));
         InitCmd->setPermanentBufferState(GBufferIndexBuffer, nvrhi::ResourceStates::IndexBuffer);
+
+        // Sun-only NEE light buffer for the "GI under sunlight" interior look
+        // (2026-08-10). Passed via FGIPassDesc::LightsBuffer so it replaces the
+        // default fallback lights (1 dim sun + 3 interior point lights uploaded
+        // by FGIPass::UploadLights) — sunlight + sky GI drive the interior.
+        {
+            Renderer::FLight SunLight{};
+            SunLight.type = static_cast<uint32_t>(Renderer::ELightType::Directional);
+            // World-space sun direction; stays fixed while the scene rotates,
+            // so the sunlit facade changes as Sponza turns. Override with
+            // HLVM_RGI_SUN_DIR="x y z".
+            const glm::vec3 SunDir = glm::normalize(
+                EnvVec3("HLVM_RGI_SUN_DIR", glm::vec3(-0.55f, 0.75f, 0.35f)));
+            SunLight.direction[0] = SunDir.x;
+            SunLight.direction[1] = SunDir.y;
+            SunLight.direction[2] = SunDir.z;
+            SunLight.intensity = 8.0f;
+            SunLight.color[0] = 1.0f;
+            SunLight.color[1] = 0.98f;
+            SunLight.color[2] = 0.92f;
+            SunLight.range = 1e20f;
+            SunLight.flags = Renderer::kLightFlag_CastShadow;
+            SunLight.shadowMapIndex = Renderer::kNoShadowMap;
+
+            nvrhi::BufferDesc SunDesc;
+            SunDesc.byteSize = sizeof(Renderer::FLight);
+            SunDesc.structStride = sizeof(Renderer::FLight);
+            SunDesc.initialState = nvrhi::ResourceStates::ShaderResource;
+            SunDesc.keepInitialState = true;
+            SunDesc.debugName = "SunLightBuffer";
+            SunLightBuffer = NvrhiDevice->createBuffer(SunDesc);
+            InitCmd->writeBuffer(SunLightBuffer, &SunLight, sizeof(SunLight));
+        }
+
         InitCmd->close();
         NvrhiDevice->executeCommandList(InitCmd);
         NvrhiDevice->waitForIdle();
@@ -1313,6 +2007,20 @@ private:
     {
         if (!GBufferPipeline || !GBufferFrameBuffer) return;
         if (!Scene) return;
+
+        // Clear the 4 GBuffer MRTs BEFORE the raster draws (fixed 2026-08-09).
+        // Without this, un-rasterized sky texels keep uninitialized GPU memory
+        // (NaN bit patterns in RGBA32F), which ReBLUR's neighbor gather then
+        // turned into NaN weights → the blur fell back to pass-through. The
+        // clears define sky as: worldpos=(0,0,0,0), normal=(0,0,0,1) (decodes
+        // to a finite -1,-1,-1), material=0, linear depth=0.
+        nvrhi::Color ClearBlack(0.f, 0.f, 0.f, 0.f);
+        nvrhi::Color ClearNormal(0.f, 0.f, 0.f, 1.f);
+        nvrhi::utils::ClearColorAttachment(CommandList, GBufferFrameBuffer, 0, ClearBlack);   // WorldPos
+        nvrhi::utils::ClearColorAttachment(CommandList, GBufferFrameBuffer, 1, ClearNormal);  // Normal
+        nvrhi::utils::ClearColorAttachment(CommandList, GBufferFrameBuffer, 2, ClearBlack);   // Material
+        nvrhi::utils::ClearColorAttachment(CommandList, GBufferFrameBuffer, 3, ClearBlack);   // LinearDepth
+        nvrhi::utils::ClearDepthStencilAttachment(CommandList, GBufferFrameBuffer, 1.0f, 0u); // Depth
 
         // (a) Constant-sentinel writes BEFORE the GBuffer pass. Any pixel the
         // raster pass does not write keeps the sentinel; any pixel it DOES
@@ -1388,22 +2096,33 @@ private:
                         ThisInfo.VertexCount  = static_cast<uint32_t>(M2->GetVertices().size());
                         ThisInfo.IndexCount   = static_cast<uint32_t>(M2->GetIndices().size());
                         ThisInfo.AlbedoTextureIndex = 0;
+                        ThisInfo.Roughness = 0.9f;
+                        ThisInfo.Metallic  = 0.0f;
                         // Pull material color if available
                         auto MatIt = Scene->MeshMultiMaterialMap.find(E2.second);
                         if (MatIt != Scene->MeshMultiMaterialMap.end() && !MatIt->second.empty())
                         {
                             const auto& M = MatIt->second[0];
-                            ThisInfo.AlbedoColor[0] = M->AlbedoColor.x;
-                            ThisInfo.AlbedoColor[1] = M->AlbedoColor.y;
-                            ThisInfo.AlbedoColor[2] = M->AlbedoColor.z;
+                            const FVec3 A = GetMeshAlbedo(E2.second->GetName(), M->AlbedoColor);
+                            ThisInfo.AlbedoColor[0] = A.x;
+                            ThisInfo.AlbedoColor[1] = A.y;
+                            ThisInfo.AlbedoColor[2] = A.z;
+                            // Mirror LoadSponza's textured-mesh flag.
+                            if (auto PBRMat = std::dynamic_pointer_cast<FPBRMaterial>(M))
+                            {
+                                if (PBRMat->HasTexture(IMaterial::ETextureType::Albedo))
+                                    ThisInfo.MaterialFlags |= 1u;
+                                ThisInfo.Roughness = PBRMat->GetRoughness();
+                                ThisInfo.Metallic  = PBRMat->GetMetallic();
+                            }
                         }
                         else
                         {
-                            ThisInfo.AlbedoColor[0] = 0.7f;
-                            ThisInfo.AlbedoColor[1] = 0.7f;
-                            ThisInfo.AlbedoColor[2] = 0.7f;
+                            const FVec3 A = GetMeshAlbedo(E2.second->GetName(), FVec3(0.7f, 0.7f, 0.7f));
+                            ThisInfo.AlbedoColor[0] = A.x;
+                            ThisInfo.AlbedoColor[1] = A.y;
+                            ThisInfo.AlbedoColor[2] = A.z;
                         }
-                        ThisInfo.MaterialFlags = 0;
                         Found = true;
                         break;
                     }
@@ -1419,10 +2138,28 @@ private:
             // Upload this mesh's FInstanceInfo to the per-instance CB.
             CommandList->writeBuffer(GBufferPerInstanceCB, &ThisInfo, sizeof(ThisInfo));
 
+            // 2026-08-10 Phase 1: bind this mesh's real Sponza albedo texture
+            // (loaded by FAsyncTextureLoader at Initialize). Falls back to the
+            // white placeholder when the mesh has no texture / failed to load.
+            nvrhi::TextureHandle AlbedoTex = PlaceholderTexture;
+            {
+                auto TexIt = Scene->MeshMultiMaterialMap.find(StaticMesh);
+                if (TexIt != Scene->MeshMultiMaterialMap.end() && !TexIt->second.empty())
+                {
+                    if (auto PBRMat = std::dynamic_pointer_cast<FPBRMaterial>(TexIt->second[0]))
+                    {
+                        if (PBRMat->HasGPUTexture(IMaterial::ETextureType::Albedo))
+                            AlbedoTex = PBRMat->GetGPUTexture(IMaterial::ETextureType::Albedo).GetTextureHandle();
+                    }
+                }
+            }
+
             // Build the per-draw binding set.
             FBindingSetBuilder SetBuilder;
             SetBuilder.SetConstantBuffer(0, ViewConstantsBuffer)
-                      .SetConstantBuffer(1, GBufferPerInstanceCB);
+                      .SetConstantBuffer(1, GBufferPerInstanceCB)
+                      .SetTextureSRV(0, AlbedoTex)
+                      .SetSampler(0, LinearSampler);
             nvrhi::BindingSetHandle BS = NvrhiDevice->createBindingSet(
                 SetBuilder.Build(), GBufferBindingLayout);
 
@@ -1477,17 +2214,30 @@ private:
             nvrhi::ResourceStates::ShaderResource);
         CommandList->setTextureState(GBufferMaterial, nvrhi::AllSubresources,
             nvrhi::ResourceStates::ShaderResource);
+        CommandList->setTextureState(LinearDepthTexture, nvrhi::AllSubresources,
+            nvrhi::ResourceStates::ShaderResource);
 
-        // HLVM-bypass: close+execute the raster pass in its own CommandList
-        // so a Vulkan validation error in a later pass (e.g. the temporal-
-        // reservoir layout mismatch from bug-075) cannot retroactively drop
-        // all raster work recorded earlier in the same submission.
-        CommandList->close();
-        NvrhiDevice->executeCommandList(CommandList);
-        NvrhiDevice->waitForIdle();
+        // v128 (six-role-pipeline, tick 113, 2026-07-30): handle-identity probe.
+        // Log the texture handles the GBuffer raster pass just transitioned.
+        // Compare with FGIPass::DispatchRays's log line at FGIPass.cpp:533 to
+        // discriminate "handles differ between passes" (binding issue) vs
+        // "handles match but binding is wrong at descriptor level". Frame-rate
+        // gated to once-per-N-frames to avoid log spam; FrameCount < 4 already
+        // triggers the unconditional log below.
+        if (FrameCount < 4 || FrameCount % 120 == 0)
+        {
+            HLVM_LOG(LogTest, info, TXT("[handle-id] RenderGBuffer: GBufferMaterial={:#x} WorldPos={:#x} Normal={:#x}"),
+                reinterpret_cast<uintptr_t>(GBufferMaterial.Get()), reinterpret_cast<uintptr_t>(GBufferWorldPos.Get()), reinterpret_cast<uintptr_t>(GBufferNormal.Get()));
+        }
 
-        // Reopen for the remaining passes (FGIPass, denoise, ReSTIR, etc.).
-        CommandList->open();
+        // NOTE (v5 — six-role-pipeline): the prior v1 HLVM-bypass
+        // `close+execute+waitForIdle+open` block was the regression
+        // (gi_raw became 0,0,0 after it landed). The 2026-07-25 working
+        // shape had RenderGBuffer just leave the CommandList open so the
+        // post-raster work (FGIPass/bilateral/ReSTIR/accumulate/blit)
+        // appends into the same submission. End-of-Render
+        // `executeCommandList` at line 691 then submits the whole frame.
+        // Do NOT add a mid-frame execute here.
 
         if (MeshCount == 0)
         {
@@ -1510,15 +2260,24 @@ private:
 
         // Sponza vertices live in the original GLTF coord space (±hundreds).
         // Apply the 0.01 scale used by the TLAS so rasterized worldPos matches
-        // what FGIPass sees. Without this, all vertices are clipped by the
-        // far plane (vertices are at distance ~500 from the camera at z=8).
-        glm::mat4 Model = glm::scale(glm::mat4(1.0f), glm::vec3(0.01f));
+        // what FGIPass sees, and the same 90° Y-rotation as the TLAS instances
+        // (2026-08-10). Without this, all vertices are clipped by the far
+        // plane (vertices are at distance ~500 from the camera at z=8).
+        // Same Y-rotation as the per-frame TLAS rebuild (turntable).
+        const glm::mat4 SceneRot = glm::rotate(
+            glm::mat4(1.0f), glm::radians(SceneRotationDeg), glm::vec3(0.0f, 1.0f, 0.0f));
+        glm::mat4 Model = SceneRot * glm::scale(glm::mat4(1.0f), glm::vec3(0.01f));
         glm::mat4 View  = glm::lookAt(CamPos, CamTarget, CamUp);
         // Use RH-ZO perspective WITHOUT Z flip. glm::perspective already
         // produces [-1, 1] Z (OpenGL convention). Don't flip — flipping moves
         // geometry away from the viewer when the view matrix expects -Z forward.
         glm::mat4 Proj  = glm::perspective(
             glm::radians(Fov), float(W) / float(H), 0.001f, 50.0f);
+
+        // Remember view-proj for the ReSTIR temporal pass (real reprojection
+        // matrices — the old identity hardcode made temporal reuse a no-op).
+        PrevViewProj = CurrViewProj;
+        CurrViewProj = Proj * View;
 
         struct FVC { glm::mat4 Model; glm::mat4 View; glm::mat4 Proj; glm::vec2 Size; float FrameIndex; float Pad; };
         FVC VC{Model, View, Proj, {float(W), float(H)}, float(AccumFrameCount), 0.0f};
@@ -1580,6 +2339,58 @@ private:
         return true;
     }
 
+    // Phase D: half-res -> full-res depth/normal-weighted upscale.
+    bool CreateResolvePipeline(const FString& DataDir)
+    {
+        const std::string SblobPath = FPath::Combine(DataDir, TXT("Resolve_cs.sblob")).string();
+        auto Blob = ReadBinaryFile(SblobPath);
+        if (Blob.empty())
+        {
+            HLVM_LOG(LogTest, err, TXT("Failed to read Resolve_cs.sblob at {}"), *FString(SblobPath.c_str()));
+            return false;
+        }
+        const void* Bin = nullptr; size_t BinSize = 0;
+        if (!ShaderMake::FindPermutationInBlob(Blob.data(), Blob.size(), nullptr, 0, &Bin, &BinSize))
+        {
+            HLVM_LOG(LogTest, err, TXT("Failed to extract Resolve_cs compute shader"));
+            return false;
+        }
+        nvrhi::ShaderDesc CSDesc;
+        CSDesc.setShaderType(nvrhi::ShaderType::Compute);
+        nvrhi::ShaderHandle ResolveCS = NvrhiDevice->createShader(CSDesc, Bin, BinSize);
+        if (!ResolveCS) return false;
+
+        FBindingLayoutBuilder BLB;
+        BLB.SetVisibility(nvrhi::ShaderType::Compute)
+           .AddConstantBuffer(0)
+           .AddTextureSRV(0)   // t0 half-res radiance
+           .AddTextureSRV(1)   // t1 full-res depth
+           .AddTextureSRV(2)   // t2 full-res normal
+           .AddTextureUAV(0);  // u0 full-res output
+        nvrhi::VulkanBindingOffsets Offsets;
+        Offsets.setConstantBufferOffset(0)
+               .setShaderResourceOffset(0)
+               .setSamplerOffset(0)
+               .setUnorderedAccessViewOffset(0);
+        BLB.SetBindingOffsets(Offsets);
+        ResolveBindingLayout = NvrhiDevice->createBindingLayout(BLB.Build());
+
+        nvrhi::ComputePipelineDesc CPDesc;
+        CPDesc.setComputeShader(ResolveCS)
+              .addBindingLayout(ResolveBindingLayout);
+        ResolvePipeline = NvrhiDevice->createComputePipeline(CPDesc);
+        if (!ResolvePipeline) return false;
+
+        nvrhi::BufferDesc CD;
+        CD.byteSize = 32;
+        CD.isConstantBuffer = true;
+        CD.initialState = nvrhi::ResourceStates::ConstantBuffer;
+        CD.keepInitialState = true;
+        CD.debugName = "ResolveConstants";
+        ResolveConstantsBuffer = NvrhiDevice->createBuffer(CD);
+        return ResolveConstantsBuffer != nullptr;
+    }
+
     // ---- Dump last-frame textures -----------------------------------------
     // Reads back the displayed final frame to CPU, then writes to PNG via
     // FImageDump::DumpToPNG. Following the pattern in TestPathTraceGI.
@@ -1591,11 +2402,79 @@ private:
         std::string dir = DumpDir.string();
         std::filesystem::create_directories(dir);
 
+        // DIAGNOSTIC (2026-08-10): read back the swapchain back-buffer after the
+        // frame CL executed — proves whether the blit actually wrote the image
+        // that gets presented (the visible window otherwise shows black).
+        // Gate: HLVM_DUMP_SWAPCHAIN=1.
+        if (std::getenv("HLVM_DUMP_SWAPCHAIN") && CurrentBackBufferTexture)
+        {
+            // The swapchain back-buffer is 8-bit (B8G8R8A8); read it with a
+            // matching staging texture and average the bytes per channel.
+            const nvrhi::TextureDesc TexDesc = CurrentBackBufferTexture->getDesc();
+            nvrhi::TextureDesc StageDesc = TexDesc;
+            StageDesc.isRenderTarget = false;
+            StageDesc.isUAV = false;
+            StageDesc.isTypeless = false;
+            StageDesc.initialState = nvrhi::ResourceStates::CopyDest;
+            StageDesc.keepInitialState = false;
+            StageDesc.debugName = "SwapchainReadbackStaging";
+            nvrhi::StagingTextureHandle Staging = NvrhiDevice->createStagingTexture(
+                StageDesc, nvrhi::CpuAccessMode::Read);
+            if (Staging)
+            {
+                nvrhi::CommandListHandle Cmd = NvrhiDevice->createCommandList();
+                Cmd->open();
+                Cmd->setTextureState(CurrentBackBufferTexture, nvrhi::AllSubresources,
+                    nvrhi::ResourceStates::CopySource);
+                nvrhi::TextureSlice Slice;
+                Slice.width = TexDesc.width;
+                Slice.height = TexDesc.height;
+                Slice.depth = 1;
+                Cmd->copyTexture(Staging.Get(), Slice, CurrentBackBufferTexture, Slice);
+                Cmd->close();
+                NvrhiDevice->executeCommandList(Cmd);
+                NvrhiDevice->waitForIdle();
+
+                size_t RowPitch = 0;
+                void* Mapped = NvrhiDevice->mapStagingTexture(
+                    Staging.Get(), Slice, nvrhi::CpuAccessMode::Read, &RowPitch);
+                if (Mapped)
+                {
+                    const bool bBGR = (TexDesc.format == nvrhi::Format::BGRA8_UNORM ||
+                                       TexDesc.format == nvrhi::Format::SBGRA8_UNORM);
+                    double R = 0, G = 0, B = 0;
+                    const uint8_t* SrcRow = static_cast<const uint8_t*>(Mapped);
+                    const size_t NPix = static_cast<size_t>(TexDesc.width) * TexDesc.height;
+                    for (uint32_t y = 0; y < TexDesc.height; ++y)
+                    {
+                        const uint8_t* Src = SrcRow + static_cast<size_t>(y) * RowPitch;
+                        for (uint32_t x = 0; x < TexDesc.width; ++x)
+                        {
+                            const uint8_t C0 = Src[x*4 + 0];
+                            const uint8_t C1 = Src[x*4 + 1];
+                            const uint8_t C2 = Src[x*4 + 2];
+                            R += bBGR ? C2 : C0;
+                            G += C1;
+                            B += bBGR ? C0 : C2;
+                        }
+                    }
+                    HLVM_LOG(LogTest, info, TXT("SWAPCHAIN readback (8-bit): mean=({:.1f},{:.1f},{:.1f}) fmt={}"),
+                        R / static_cast<double>(NPix), G / static_cast<double>(NPix), B / static_cast<double>(NPix),
+                        static_cast<int>(TexDesc.format));
+                }
+                NvrhiDevice->unmapStagingTexture(Staging.Get());
+            }
+        }
+
         // Final-image dump is what validate_restir_gi.py actually inspects.
         DumpRGBA32FTexture(DisplayTexture, TXT("display"), dir);
-        DumpRGBA32FTexture(SpatialRadiance, TXT("spatial"), dir);
+        DumpRGBA32FTexture(FullResSpatial, TXT("spatial"), dir);
         DumpRGBA32FTexture(DenoisedTexture, TXT("denoised"), dir);
-        DumpRGBA32FTexture(OutputTexture, TXT("gi_raw"), dir);
+        // bug-075 followup: gi_raw is HDR (radiance * exposure); per-channel
+        // normalization surfaces the real distribution even when values are
+        // small (e.g. (0.9, 0.9, 0.97)) which would otherwise dump as nearly
+        // uniform (0.9*255=229, almost the same color).
+        DumpRGBA32FTexture(FullResGIRaw, TXT("gi_raw"), dir, /*bNormalizePerChannel=*/true);
         // GBuffer channel dumps (per-frame sentinel + post-pass values).
         // Same HLVM_DUMP_RGI gate; same dir; same naming convention
         // (timestamp_channel_frameN.png) so the validator can consume them
@@ -1606,7 +2485,190 @@ private:
         DumpRGBA32FTexture(GBufferWorldPos, TXT("gbuffer_worldpos"), dir, /*bNormalizePerChannel=*/true);
         DumpRGBA32FTexture(GBufferNormal,   TXT("gbuffer_normal"),   dir);
         DumpRGBA32FTexture(GBufferMaterial, TXT("gbuffer_material"), dir);
+        DumpRGBA32FTexture(LinearDepthTexture, TXT("gbuffer_depth"), dir);
         HLVM_LOG(LogTest, info, TXT("Dumped frames to {}"), *FString(dir));
+    }
+
+    // CPU readback of one RGBA32F texture into a float RGBA vector.
+    // Creates a one-shot staging texture, copies, maps, unmaps.
+    bool ReadbackTextureFloats(nvrhi::TextureHandle Texture, std::vector<float>& OutPixels)
+    {
+        if (!Texture || !NvrhiDevice)
+            return false;
+        // Phase D: use the texture's real size (ReSTIR reservoirs/traces are
+        // half-res now; the old hardcoded WIDTH×HEIGHT readback hung on them).
+        const nvrhi::TextureDesc TexDesc = Texture->getDesc();
+        const uint32_t TW = TexDesc.width;
+        const uint32_t TH = TexDesc.height;
+
+        nvrhi::TextureDesc StagingDesc;
+        StagingDesc.dimension = nvrhi::TextureDimension::Texture2D;
+        StagingDesc.width     = TW;
+        StagingDesc.height    = TH;
+        StagingDesc.format    = nvrhi::Format::RGBA32_FLOAT;
+        StagingDesc.isRenderTarget = false;
+        StagingDesc.isUAV     = false;
+        StagingDesc.isTypeless = false;
+        StagingDesc.initialState = nvrhi::ResourceStates::CopyDest;
+        StagingDesc.keepInitialState = false;
+        StagingDesc.debugName = "ReadbackStaging";
+        nvrhi::StagingTextureHandle Staging = NvrhiDevice->createStagingTexture(
+            StagingDesc, nvrhi::CpuAccessMode::Read);
+        if (!Staging)
+            return false;
+
+        nvrhi::CommandListHandle Cmd = NvrhiDevice->createCommandList();
+        Cmd->open();
+        Cmd->setTextureState(Texture, nvrhi::AllSubresources, nvrhi::ResourceStates::CopySource);
+        nvrhi::TextureSlice Slice;
+        Slice.width  = TW;
+        Slice.height = TH;
+        Slice.depth  = 1;
+        Cmd->copyTexture(Staging.Get(), Slice, Texture.Get(), Slice);
+        Cmd->close();
+        NvrhiDevice->executeCommandList(Cmd);
+        NvrhiDevice->waitForIdle();
+
+        size_t RowPitch = 0;
+        void* Mapped = NvrhiDevice->mapStagingTexture(
+            Staging.Get(), Slice, nvrhi::CpuAccessMode::Read, &RowPitch);
+        if (!Mapped)
+            return false;
+
+        OutPixels.assign(static_cast<size_t>(TW) * TH * 4, 0.0f);
+        const uint8_t* SrcRow = reinterpret_cast<const uint8_t*>(Mapped);
+        for (uint32_t y = 0; y < TH; ++y)
+        {
+            const float* Src = reinterpret_cast<const float*>(SrcRow + static_cast<size_t>(y) * RowPitch);
+            for (uint32_t x = 0; x < TW; ++x)
+            {
+                size_t SrcIdx = x * 4;
+                size_t DstIdx = (static_cast<size_t>(y) * TW + x) * 4;
+                OutPixels[DstIdx + 0] = Src[SrcIdx + 0];
+                OutPixels[DstIdx + 1] = Src[SrcIdx + 1];
+                OutPixels[DstIdx + 2] = Src[SrcIdx + 2];
+                // 2026-08-10: copy the real alpha instead of forcing 1.0.
+                // The old hardcode hid the material roughness (GBufferMaterial.a)
+                // and made the validator's alpha-sentinel check trivially pass
+                // even when the dispatch never ran.
+                OutPixels[DstIdx + 3] = Src[SrcIdx + 3];
+            }
+        }
+        NvrhiDevice->unmapStagingTexture(Staging.Get());
+        return true;
+    }
+
+    // Per-channel min/max/mean/std of a float RGBA buffer — the only
+    // unambiguous way to validate HDR values (byte-clamped PNGs saturate
+    // >= 1.0, hiding e.g. reservoir M up to MaxM=30).
+    void LogFloatStats(const FString& Name, const std::vector<float>& Pixels)
+    {
+        float MinC[3] = {1e30f, 1e30f, 1e30f}, MaxC[3] = {-1e30f, -1e30f, -1e30f};
+        double SumC[3] = {0.0, 0.0, 0.0}, SumSq[3] = {0.0, 0.0, 0.0};
+        const size_t NPix = Pixels.size() / 4;
+        for (size_t i = 0; i < NPix; ++i)
+        {
+            for (size_t c = 0; c < 3; ++c)
+            {
+                const float v = Pixels[i*4 + c];
+                MinC[c] = std::min(MinC[c], v);
+                MaxC[c] = std::max(MaxC[c], v);
+                SumC[c] += static_cast<double>(v);
+                SumSq[c] += static_cast<double>(v) * static_cast<double>(v);
+            }
+        }
+        HLVM_LOG(LogTest, info, TXT("stats {} floats: R[{:.4f},{:.4f}] G[{:.4f},{:.4f}] B[{:.4f},{:.4f}] mean=[{:.4f},{:.4f},{:.4f}] std=[{:.4f},{:.4f},{:.4f}]"),
+            *Name, MinC[0], MaxC[0], MinC[1], MaxC[1], MinC[2], MaxC[2],
+            SumC[0]/static_cast<double>(NPix), SumC[1]/static_cast<double>(NPix), SumC[2]/static_cast<double>(NPix),
+            std::sqrt(std::max(0.0, SumSq[0]/static_cast<double>(NPix) - (SumC[0]/static_cast<double>(NPix))*(SumC[0]/static_cast<double>(NPix)))),
+            std::sqrt(std::max(0.0, SumSq[1]/static_cast<double>(NPix) - (SumC[1]/static_cast<double>(NPix))*(SumC[1]/static_cast<double>(NPix)))),
+            std::sqrt(std::max(0.0, SumSq[2]/static_cast<double>(NPix) - (SumC[2]/static_cast<double>(NPix))*(SumC[2]/static_cast<double>(NPix)))));
+    }
+
+    // End-of-run numerical summary, always logged (no env gate): readback of
+    // the key pipeline outputs + temporal reservoirs, plus derived metrics:
+    //   - reservoir M (mean/max across the active M/W pair) and W mean
+    //   - spatial grayscale channel error over lit pixels
+    // This makes the pipeline claims (M accumulation, W, grayscale, display
+    // range) verifiable from a plain run's log without HLVM_DUMP_RGI.
+    void LogFinalFrameStats()
+    {
+        if (AccumFrameCount < AccumTargetFrames || bFinalStatsLogged)
+            return;
+        bFinalStatsLogged = true;
+
+        std::vector<float> Px;
+        const struct { const char* Tag; nvrhi::TextureHandle Tex; } Items[] = {
+            { "display",          DisplayTexture },
+            { "spatial",          FullResSpatial },
+            { "denoised",         DenoisedTexture },
+            { "gi_raw",           FullResGIRaw },
+            { "reservoir_radA",   TemporalReservoir0 },
+            { "reservoir_MW_A",   TemporalReservoir1 },
+            { "reservoir_radB",   TemporalReservoir2 },
+            { "reservoir_MW_B",   TemporalReservoir3 },
+        };
+        for (const auto& It : Items)
+        {
+            if (It.Tex && ReadbackTextureFloats(It.Tex, Px))
+                LogFloatStats(FString(It.Tag), Px);
+        }
+
+        // Derived: spatial grayscale channel error over lit pixels.
+        float GrayErr = 0.0f;
+        {
+            float ErrSum = 0.0f;
+            size_t ErrCount = 0;
+            if (ReadbackTextureFloats(FullResSpatial, Px))
+            {
+                const size_t NPix = Px.size() / 4;
+                for (size_t i = 0; i < NPix; ++i)
+                {
+                    const float R = Px[i*4 + 0];
+                    const float B = Px[i*4 + 2];
+                    if (R > 1e-3f)
+                    {
+                        ErrSum += std::abs(R - B) / R;
+                        ++ErrCount;
+                    }
+                }
+                if (ErrCount > 0)
+                    GrayErr = ErrSum / static_cast<float>(ErrCount);
+            }
+        }
+
+        // Derived: reservoir M/W — the active pair is the one with the larger
+        // M sum; M mean/max are reported across both pairs.
+        float MMax = 0.0f, MSum = 0.0f, WMean = 0.0f;
+        const nvrhi::TextureHandle MWTexs[2] = { TemporalReservoir1, TemporalReservoir3 };
+        {
+            float BestPairMSum = -1.0f;
+            size_t NPixPerTex = 0;
+            for (int p = 0; p < 2; ++p)
+            {
+                if (!MWTexs[p] || !ReadbackTextureFloats(MWTexs[p], Px))
+                    continue;
+                NPixPerTex = Px.size() / 4;
+                float PairMSum = 0.0f, PairWSum = 0.0f;
+                for (size_t i = 0; i < NPixPerTex; ++i)
+                {
+                    const float M = Px[i*4 + 0];
+                    PairMSum += M;
+                    PairWSum += Px[i*4 + 1];
+                    if (M > MMax) MMax = M;
+                }
+                MSum += PairMSum;
+                if (PairMSum > BestPairMSum)
+                {
+                    BestPairMSum = PairMSum;
+                    WMean = PairWSum / static_cast<float>(NPixPerTex);
+                }
+            }
+            const float TotalPix = static_cast<float>(NPixPerTex * 2);
+            const float MMean = TotalPix > 0.0f ? static_cast<float>(MSum) / TotalPix : 0.0f;
+            HLVM_LOG(LogTest, info, TXT("ReSTIR summary: reservoir M mean={:.2f} max={:.1f} (MaxM=30) | W mean={:.3f} | spatial grayscale err={:.4f}"),
+                MMean, MMax, WMean, GrayErr);
+        }
     }
 
     // CPU-readback then PNG for one RGBA32F texture. Creates a one-shot
@@ -1622,56 +2684,15 @@ private:
     {
         if (!Texture || !NvrhiDevice) return;
 
-        // 1x1 unused, actual size is supplied via the slice
-        nvrhi::TextureDesc StagingDesc;
-        StagingDesc.dimension = nvrhi::TextureDimension::Texture2D;
-        StagingDesc.width     = WIDTH;
-        StagingDesc.height    = HEIGHT;
-        StagingDesc.format    = nvrhi::Format::RGBA32_FLOAT;
-        StagingDesc.isRenderTarget = false;
-        StagingDesc.isUAV     = false;
-        StagingDesc.isTypeless = false;
-        StagingDesc.initialState = nvrhi::ResourceStates::CopyDest;
-        StagingDesc.keepInitialState = false;
-        StagingDesc.debugName = "DumpStaging";
-        nvrhi::StagingTextureHandle Staging = NvrhiDevice->createStagingTexture(
-            StagingDesc, nvrhi::CpuAccessMode::Read);
-        if (!Staging) return;
+        std::vector<float> Pixels;
+        if (!ReadbackTextureFloats(Texture, Pixels))
+            return;
+        const nvrhi::TextureDesc TexDesc = Texture->getDesc();
+        const int TW = static_cast<int>(TexDesc.width);
+        const int TH = static_cast<int>(TexDesc.height);
 
-        nvrhi::CommandListHandle Cmd = NvrhiDevice->createCommandList();
-        Cmd->open();
-        Cmd->setTextureState(Texture, nvrhi::AllSubresources, nvrhi::ResourceStates::CopySource);
-
-        nvrhi::TextureSlice Slice;
-        Slice.width = WIDTH;
-        Slice.height = HEIGHT;
-        Slice.depth = 1;
-        Cmd->copyTexture(Staging.Get(), Slice, Texture.Get(), Slice);
-        Cmd->close();
-        NvrhiDevice->executeCommandList(Cmd);
-        NvrhiDevice->waitForIdle();
-
-        size_t RowPitch = 0;
-        void* Mapped = NvrhiDevice->mapStagingTexture(
-            Staging.Get(), Slice, nvrhi::CpuAccessMode::Read, &RowPitch);
-        if (!Mapped) { return; }
-
-        std::vector<float> Pixels(static_cast<size_t>(WIDTH) * HEIGHT * 4);
-        const uint8_t* SrcRow = reinterpret_cast<const uint8_t*>(Mapped);
-        for (uint32_t y = 0; y < HEIGHT; ++y)
-        {
-            const float* Src = reinterpret_cast<const float*>(SrcRow + static_cast<size_t>(y) * RowPitch);
-            for (uint32_t x = 0; x < WIDTH; ++x)
-            {
-                size_t SrcIdx = x * 4;
-                size_t DstIdx = (static_cast<size_t>(y) * WIDTH + x) * 4;
-                Pixels[DstIdx + 0] = Src[SrcIdx + 0];
-                Pixels[DstIdx + 1] = Src[SrcIdx + 1];
-                Pixels[DstIdx + 2] = Src[SrcIdx + 2];
-                Pixels[DstIdx + 3] = 1.0f;
-            }
-        }
-        NvrhiDevice->unmapStagingTexture(Staging.Get());
+        const std::string Filename = dir + "/" + MakeTimestampPrefix() + "_" +
+            std::string(Name.begin(), Name.end()) + "_frame" + std::to_string(AccumFrameCount) + ".png";
 
         if (bNormalizePerChannel)
         {
@@ -1683,7 +2704,7 @@ private:
             float MinR = Pixels[0], MaxR = Pixels[0];
             float MinG = Pixels[1], MaxG = Pixels[1];
             float MinB = Pixels[2], MaxB = Pixels[2];
-            const size_t NPix = static_cast<size_t>(WIDTH) * HEIGHT;
+            const size_t NPix = Pixels.size() / 4;
             for (size_t i = 0; i < NPix; ++i)
             {
                 const float r = Pixels[i*4 + 0];
@@ -1707,12 +2728,13 @@ private:
                 *Name, MinR, MaxR, MinG, MaxG, MinB, MaxB);
         }
 
-        const std::string Filename = dir + "/" + MakeTimestampPrefix() + "_" +
-            std::string(Name.begin(), Name.end()) + "_frame" + std::to_string(AccumFrameCount) + ".png";
-        if (FImageDump::DumpToPNG(FString(Filename.c_str()), static_cast<int>(WIDTH), static_cast<int>(HEIGHT), Pixels.data()))
+        if (FImageDump::DumpToPNG(FString(Filename.c_str()), TW, TH, Pixels.data()))
         {
             HLVM_LOG(LogTest, info, TXT("Dumped {} ({})"), *Name, *FString(Filename));
         }
+        // Raw float stats (the PNG is byte-clamped; values >= 1.0 saturate to
+        // 255 and cannot be distinguished, e.g. reservoir M up to MaxM=30).
+        LogFloatStats(Name, Pixels);
     }
 
 private:
@@ -1731,6 +2753,18 @@ private:
     nvrhi::TextureHandle          GBufferNormal;
     nvrhi::TextureHandle          GBufferMaterial;
     nvrhi::TextureHandle          GBufferDepth;
+    nvrhi::BufferHandle           SunLightBuffer;
+    nvrhi::TextureHandle          PlaceholderTexture;
+    std::vector<FInstanceInfo>    AllInstanceInfos;   // Phase 3: patched averages
+    TVector<nvrhi::TextureHandle> MaterialTextures;   // Phase 3b: per-texel bounce albedo
+    nvrhi::ITexture*              CurrentBackBufferTexture = nullptr; // swapchain diag
+    uint32_t                      HalfResWidth = 0;    // Phase D
+    uint32_t                      HalfResHeight = 0;
+    nvrhi::TextureHandle          FullResGIRaw;        // Phase D: upscaled gi_raw dump
+    nvrhi::TextureHandle          FullResSpatial;      // Phase D: upscaled spatial -> ReBLUR
+    nvrhi::ComputePipelineHandle  ResolvePipeline;
+    nvrhi::BindingLayoutHandle    ResolveBindingLayout;
+    nvrhi::BufferHandle           ResolveConstantsBuffer;
     nvrhi::TextureHandle          LinearDepthTexture;
     nvrhi::BufferHandle           VertexBuffer;
     nvrhi::BufferHandle           IndexBuffer;
@@ -1743,17 +2777,20 @@ private:
     GI::FGIPass                   GIPass;
     FBilateralDenoisePass         BilateralDenoisePass;
     ReSTIR::FReSTIRPass           ReSTIRPass;
-    // ReBLUR is intentionally skipped in v1 to keep the test focused on
-    // the path-trace-debug fixes (payload, camera, lights). Adding ReBLUR
-    // here is a follow-up commit; see TestCornellBoxGI for the ReBLUR pattern.
+    ReBLUR::FReBLURPass           ReBLURPass;
+    nvrhi::TextureHandle          ReBLURHistoryTexture[2];
+    bool                          bReBLURInitialized = false;
 
     // Per-frame intermediate textures
     nvrhi::TextureHandle          OutputTexture;
+    nvrhi::TextureHandle          DirectionTexture;
     nvrhi::TextureHandle          DenoisedTexture;
     nvrhi::TextureHandle          ReservoirTex0;
     nvrhi::TextureHandle          ReservoirTex1;
     nvrhi::TextureHandle          TemporalReservoir0;
     nvrhi::TextureHandle          TemporalReservoir1;
+    nvrhi::TextureHandle          TemporalReservoir2;
+    nvrhi::TextureHandle          TemporalReservoir3;
     nvrhi::TextureHandle          SpatialRadiance;
     nvrhi::TextureHandle          AccumTexture;
     nvrhi::TextureHandle          DisplayTexture;
@@ -1783,8 +2820,17 @@ private:
     uint32_t  AccumTargetFrames = DEFAULT_ACCUM_TARGET_FRAMES;
     float     Exposure = 1.0f;
     bool      bDumpRequested = false;
+    bool      bFinalStatsLogged = false;
+    bool      bBypass = false;
     uint32_t  FrameCount = 0;
     float     FPSUpdateTimer = 0.0f;
+    float     SceneRotationDeg = 90.0f;        // scene Y-rotation (turntable)
+    float     PrevSceneRotationDeg = 90.0f;    // previous frame (Phase C reprojection)
+    float     SceneRotationDegSpeed = 0.0f;    // degrees/second (0 = still)
+    bool      bShowWindow = false;             // HLVM_SHOW_WINDOW=1
+    // View-proj history for the ReSTIR temporal pass (real reprojection).
+    glm::mat4 CurrViewProj = glm::mat4(1.0f);
+    glm::mat4 PrevViewProj = glm::mat4(1.0f);
 };
 
 // ============================================================================
@@ -1801,32 +2847,31 @@ RECORD_BOOL(test_ReSTIR_GI_Temporal)
         WindowProps.Title    = WINDOW_TITLE;
         WindowProps.Extent   = { WIDTH, HEIGHT };
         WindowProps.Resizable = true;
-        WindowProps.StartMinimized = true;  // headless CI: don't require real display
+        // Default: show the window (a real display must be present). Headless
+        // CI can opt in to a minimized window with HLVM_RGI_MINIMIZED=1.
+        WindowProps.StartMinimized = (std::getenv("HLVM_RGI_MINIMIZED") != nullptr);
         WindowProps.VSync    = IWindow::EVsync::Off;
 
         auto DeviceManager = FDeviceManager::Create(nvrhi::GraphicsAPI::VULKAN);
         if (!DeviceManager) throw std::runtime_error("Failed to create DeviceManager");
 
-        // Critical: enable RT extensions BEFORE creating the device,
-        // otherwise nvrhi Vulkan won't enable VK_KHR_ray_tracing_pipeline
-        // and FGIPass cannot create its RT pipeline.
-        {
-            auto& Params0 = const_cast<FDeviceCreationParameters&>(DeviceManager->GetDeviceParams());
-            Params0.bEnableRayTracingExtensions = true;
-        }
+        // Match the proven TestPathTraceGI device setup: every option consumed
+        // during instance/device creation must be configured before that call.
+        FDeviceCreationParameters& DeviceParams = const_cast<FDeviceCreationParameters&>(
+            DeviceManager->GetDeviceParams());
+        DeviceParams.BackBufferWidth = WIDTH;
+        DeviceParams.BackBufferHeight = HEIGHT;
+        DeviceParams.SwapChainBufferCount = 2;
+        DeviceParams.VSyncMode = 0;
+        DeviceParams.bEnableDebugRuntime = true;
+        DeviceParams.bEnableNVRHIValidationLayer = true;
+        DeviceParams.bEnableRayTracingExtensions = true;
 
         if (!DeviceManager->CreateWindowDeviceAndSwapChain(WindowProps))
         {
             throw std::runtime_error("Failed to create window, device and swap chain");
         }
         HLVM_LOG(LogTest, info, TXT("Device created with ray tracing enabled"));
-
-        auto& Params = const_cast<FDeviceCreationParameters&>(DeviceManager->GetDeviceParams());
-        Params.BackBufferWidth   = WIDTH;
-        Params.BackBufferHeight  = HEIGHT;
-        Params.SwapChainBufferCount = 2;
-        Params.VSyncMode = 0;
-        Params.bEnableDebugRuntime = true;
 
         nvrhi::IDevice* NvrhiDevice = DeviceManager->GetDevice();
         if (!NvrhiDevice->queryFeatureSupport(nvrhi::Feature::RayTracingPipeline))

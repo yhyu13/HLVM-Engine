@@ -54,14 +54,6 @@ float GetNormHitDist(float hitDist, float viewZ, float roughness)
     return saturate(hitDist / f);
 }
 
-float3 ReconstructViewPos(float2 uv, float depth)
-{
-    // LH_ZO projection: NDC z is already in [0,1], do not remap to [-1,1]
-    float4 clipPos = float4(uv * 2.0 - 1.0, depth, 1.0);
-    float4 viewPos = mul(gConstants.InverseCurrViewProj, clipPos);
-    return viewPos.xyz / viewPos.w;
-}
-
 bool IsHistoryValid(float2 historyUv)
 {
     return all(historyUv > 0.0) && all(historyUv < 1.0);
@@ -97,8 +89,14 @@ float ComputeAntiLagScale(DiffSH current, DiffSH history)
     return scale;
 }
 
-// 3x3 bilateral spatial blur with normal/depth rejection
-float3 SpatialBlur(int2 centerPixel, float3 centerPos, float3 centerNormal, float centerDepth, float3 temporalRadiance)
+// NxN bilateral spatial blur with normal + linear-depth rejection.
+// 2026-08-09: the old plane-distance rejection reconstructed a view-space
+// position from the linear-depth texture as if it were NDC z, which produced
+// garbage positions, huge plane distances, near-zero neighbor weights, and
+// therefore an identity blur. Replaced with a relative-depth bilateral weight
+// |d_n - d_c| / d_c, which is well-defined for the R32F linear-depth GBuffer
+// and perspective-correct for far surfaces.
+float3 SpatialBlur(int2 centerPixel, float3 centerNormal, float centerDepth, float3 temporalRadiance)
 {
     float3 sum = float3(0.0);
     float weightSum = 0.0;
@@ -118,23 +116,23 @@ float3 SpatialBlur(int2 centerPixel, float3 centerPos, float3 centerNormal, floa
             float4 sampleNormalRoughness = gNormalRoughness.Load(int3(samplePixel, 0));
             float3 sampleNormal = sampleNormalRoughness.xyz * 2.0 - 1.0;
 
-            // Skip empty samples
-            if (sampleDepth == 0.0)
+            // Skip empty / non-finite samples (sky or uninitialized texels).
+            if (sampleDepth == 0.0 || !isfinite(sampleDepth) || !all(isfinite(sampleNormal)))
                 continue;
-
-            float3 samplePos = ReconstructViewPos(
-                (samplePixel + 0.5) * gConstants.RcpOutputSize, sampleDepth);
 
             // Spatial weight (Gaussian)
             float distSq = float(x * x + y * y);
             float spatialW = exp(-distSq * rcpRadius * rcpRadius * 0.5);
 
-            // Normal rejection
-            float normalW = pow(max(dot(centerNormal, sampleNormal), 0.0), gConstants.NormalWeight);
+            // Normal rejection — saturate keeps the exponent base in [0,1] so
+            // pow() is always finite (pow(0, 0) is NaN on some compilers).
+            float normalW = pow(saturate(dot(centerNormal, sampleNormal)), gConstants.NormalWeight);
 
-            // Plane distance rejection
-            float planeDist = abs(dot(centerPos - samplePos, centerNormal));
-            float planeW = exp(-planeDist * gConstants.PlaneWeight);
+            // Linear-depth rejection: normalize by the center depth so far
+            // surfaces (large absolute deltas, small relative deltas) are not
+            // over-rejected — the standard perspective bilateral formulation.
+            float depthDelta = abs(sampleDepth - centerDepth) / max(centerDepth, 1e-3);
+            float planeW = isfinite(depthDelta) ? exp(-depthDelta * gConstants.PlaneWeight) : 0.0;
 
             float w = spatialW * normalW * planeW;
 
@@ -143,7 +141,11 @@ float3 SpatialBlur(int2 centerPixel, float3 centerPos, float3 centerNormal, floa
         }
     }
 
-    return weightSum > 0.001 ? sum / weightSum : temporalRadiance;
+    // Finite-guarded weighted average; fall back to the temporal result if
+    // no valid neighbors contributed (sky pixels, all samples rejected).
+    if (weightSum > 1e-3 && isfinite(weightSum) && all(isfinite(sum)))
+        return sum / weightSum;
+    return temporalRadiance;
 }
 
 [numthreads(8, 8, 1)]
@@ -155,7 +157,11 @@ void main(uint3 dispatchThreadID : SV_DispatchThreadID)
     float depth = gDepth.Load(int3(dispatchThreadID.xy, 0)).r;
     if (depth == 0.0)
     {
-        gOutput[dispatchThreadID.xy] = float4(0.0, 0.0, 0.0, 0.0);
+        // Sky pixels have no GBuffer geometry; RayGen now fills gi_raw with
+        // SampleSky(primary ray). Pass that through so the swapchain shows a
+        // non-black sky instead of zeroing it here (fixed 2026-08-09).
+        float4 sky = gCurrentRadiance.Load(int3(dispatchThreadID.xy, 0));
+        gOutput[dispatchThreadID.xy] = float4(sky.rgb, 1.0);
         return;
     }
 
@@ -173,8 +179,7 @@ void main(uint3 dispatchThreadID : SV_DispatchThreadID)
     float3 normal = normalRoughness.xyz * 2.0 - 1.0;
     float roughness = normalRoughness.w;
 
-    float3 viewPos = ReconstructViewPos(pixelUv, depth);
-    float viewZ = viewPos.z;
+    float viewZ = depth; // linear depth == positive view-space distance for LH camera
     float normHitDist = GetNormHitDist(hitDist, abs(viewZ), roughness);
 
     DiffSH current = { radiance, normHitDist };
@@ -204,10 +209,10 @@ void main(uint3 dispatchThreadID : SV_DispatchThreadID)
     if (gConstants.BlurRadius > 0.5 && gConstants.PassIndex < 0.5)
     {
         float3 blurred = SpatialBlur(
-            dispatchThreadID.xy, viewPos, normal, depth, temporal.radiance);
-        // Blend spatial blur with temporal result instead of overwriting
+            dispatchThreadID.xy, normal, depth, temporal.radiance);
         temporal.radiance = lerp(temporal.radiance, blurred, gConstants.SpatialAlpha);
     }
 
     gOutput[dispatchThreadID.xy] = float4(temporal.radiance, temporal.hitDist);
+    return;
 }

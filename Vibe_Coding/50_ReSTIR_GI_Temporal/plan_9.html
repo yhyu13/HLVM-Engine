@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>plan_9.md</title>
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+       margin: 0; color: #1f2937; }
+body::before { content: ""; display: block; height: 3px;
+                background: linear-gradient(90deg, #dc2626, #2563eb); }
+header { background: #1f2937; color: #fff; padding: 14px 24px;
+          border-bottom: 3px solid #dc2626; }
+header h1 { margin: 0; font-size: 18px; }
+header .crumb { font-size: 12px; opacity: 0.75; }
+header .crumb a { color: #93c5fd; text-decoration: none; }
+header .crumb a:hover { text-decoration: underline; }
+.layout { display: grid; grid-template-columns: 260px 1fr; gap: 0; max-width: 1200px; margin: 0 auto; }
+nav.toc { border-right: 1px solid #e5e7eb; padding: 20px; font-size: 14px; position: sticky; top: 0;
+          max-height: 100vh; overflow-y: auto; box-sizing: border-box; background: #fafafa; }
+nav.toc h2 { font-size: 13px; text-transform: uppercase; color: #6b7280; margin: 0 0 12px;
+              letter-spacing: 0.5px; font-weight: 700; }
+nav.toc ul { list-style: none; padding: 0; margin: 0; }
+nav.toc li { padding: 4px 0; position: relative; padding-left: 14px;
+              transition: background 0.15s; }
+nav.toc li::before { content: ""; position: absolute; left: 0; top: 50%;
+                      transform: translateY(-50%); width: 6px; height: 6px;
+                      border-radius: 50%; background: #dc2626; opacity: 0.55; }
+nav.toc li:hover { background: #fef2f2; }
+nav.toc li:hover::before { opacity: 1; transform: translateY(-50%) scale(1.4); }
+nav.toc li.active { background: #fef2f2; }
+nav.toc li.active::before { background: #dc2626; opacity: 1; transform: translateY(-50%) scale(1.4); }
+nav.toc li.active a { color: #dc2626; font-weight: 600; }
+nav.toc a { color: #2563eb; text-decoration: none; }
+nav.toc a:hover { color: #dc2626; text-decoration: underline; }
+nav.toc .lvl2 { padding-left: 28px; }
+nav.toc .lvl3 { padding-left: 42px; font-size: 13px; }
+nav.toc .lvl3::before { width: 5px; height: 5px; background: #2563eb; opacity: 0.5; }
+nav.toc .empty { color: #9ca3af; font-style: italic; }
+.legend { margin-top: 18px; padding: 10px; background: #fff;
+           border: 1px solid #e5e7eb; border-radius: 6px; font-size: 12px; }
+.legend h2 { font-size: 11px !important; margin: 0 0 6px !important; }
+.legend div { display: flex; align-items: center; gap: 6px; padding: 2px 0; }
+.legend span.swatch { display: inline-block; width: 12px; height: 12px;
+                       border-radius: 3px; flex-shrink: 0; }
+.keywords { margin-top: 14px; padding: 10px; background: #fff;
+             border: 1px solid #e5e7eb; border-radius: 6px; font-size: 12px; }
+.keywords h2 { font-size: 11px !important; margin: 0 0 6px !important; }
+.keywords ul { padding-left: 14px; margin: 0; }
+.keywords li { padding: 1px 0 !important; padding-left: 0 !important;
+                border: 0 !important; background: none !important; }
+.keywords li::before { display: none !important; }
+.keywords a { color: #1f2937 !important; font-size: 12px; }
+.keywords a:hover { color: #dc2626 !important; text-decoration: underline; }
+main { padding: 24px 36px; line-height: 1.6; max-width: 900px; }
+main h1, main h2, main h3 { scroll-margin-top: 16px; }
+main h1 { color: #dc2626; border-bottom: 2px solid #dc2626; padding-bottom: 6px; }
+main h2 { color: #2563eb; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px;
+          margin-top: 32px; padding-left: 10px; border-left: 4px solid #2563eb; }
+main h3 { color: #dc2626; margin-top: 24px; padding-left: 8px;
+          border-left: 3px solid #dc2626; }
+main a { color: #2563eb; text-decoration: none; }
+main a:hover { color: #dc2626; text-decoration: underline; }
+main pre { background: #ffffff; color: #1f2937; padding: 16px; border-radius: 6px;
+            overflow-x: auto; font: 13px/1.5 Menlo, Consolas, monospace;
+            border: 1px solid #e5e7eb; }
+main code { background: #f3f4f6; color: #1f2937; padding: 2px 5px; border-radius: 3px;
+             font: 13px Menlo, Consolas, monospace; }
+main pre code { background: transparent; color: inherit; padding: 0; }
+main table { border-collapse: collapse; }
+main th, main td { border: 1px solid #e5e7eb; padding: 6px 12px; }
+main th { background: #f3f4f6; }
+main blockquote { border-left: 4px solid #d1d5db; margin: 16px 0; padding: 8px 16px;
+                   color: #4b5563; }
+main hr { border: 0; border-top: 1px solid #e5e7eb; margin: 24px 0; }
+main strong.kw { color: #dc2626; font-weight: 700; }
+.summary { background: #eff6ff; border-left: 4px solid #2563eb; padding: 12px 16px;
+            margin: 16px 0 24px; border-radius: 4px; color: #1e3a8a; font-size: 14px;
+            line-height: 1.5; }
+.summary::before { content: "📝 Summary"; display: block; font-weight: 700;
+                    color: #2563eb; font-size: 11px; text-transform: uppercase;
+                    letter-spacing: 0.5px; margin-bottom: 4px; }
+.back { display: inline-block; margin-bottom: 16px; font-size: 0.9em; color: #2563eb;
+         text-decoration: none; }
+.back:hover { color: #dc2626; text-decoration: underline; }
+#topBtn { position: fixed; bottom: 24px; right: 24px; z-index: 100;
+          background: #dc2626; color: #fff; border: 0; border-radius: 50%;
+          width: 44px; height: 44px; font-size: 18px; cursor: pointer;
+          box-shadow: 0 2px 6px rgba(0,0,0,0.2); opacity: 0;
+          transition: opacity 0.2s; pointer-events: none; }
+#topBtn.show { opacity: 1; pointer-events: auto; }
+#topBtn:hover { background: #b91c1c; }
+@media (max-width: 900px) {
+  .layout { grid-template-columns: 1fr; }
+  nav.toc { position: static; max-height: none; border-right: 0;
+             border-bottom: 1px solid #e5e7eb; }
+  main { padding: 16px 20px; }
+}
+@media print {
+  nav.toc, .legend, .keywords, #topBtn { display: none; }
+  .layout { grid-template-columns: 1fr; }
+  body::before { display: none; }
+  header { background: #fff; color: #000; border-bottom: 1px solid #000; }
+  main h1, main h2, main h3 { color: #000; border-color: #000; }
+}
+</style>
+<script>
+(function() {
+  const links = document.querySelectorAll('nav.toc a[href^="#"]');
+  const map = new Map();
+  links.forEach(a => {
+    const id = a.getAttribute('href').slice(1);
+    const li = a.parentElement;
+    map.set(id, li);
+  });
+  const targets = Array.from(map.keys()).map(id => document.getElementById(id)).filter(Boolean);
+  function activate() {
+    if (!targets.length) return;
+    const scrollY = window.scrollY + 80;
+    let current = null;
+    for (const t of targets) {
+      if (t.offsetTop <= scrollY) current = t;
+      else break;
+    }
+    links.forEach(a => a.parentElement.classList.remove('active'));
+    if (current) {
+      const li = map.get(current.id);
+      if (li) li.classList.add('active');
+    }
+  }
+  window.addEventListener('scroll', activate, { passive: true });
+  activate();
+
+  const btn = document.getElementById('topBtn');
+  if (btn) {
+    window.addEventListener('scroll', () => {
+      btn.classList.toggle('show', window.scrollY > 400);
+    }, { passive: true });
+    btn.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+  }
+})();
+</script>
+</head>
+<body>
+<header>
+  <div class="crumb"><a href="./index.html">Vibe_Coding/</a> / <a href="index.html">50_ReSTIR_GI_Temporal</a> / plan_9.md</div>
+  <h1>📄 plan_9.md</h1>
+</header>
+<div class="layout">
+  <nav class="toc">
+    <h2>On this page</h2>
+    <ul>
+<li class=""><a href="#phase-9-restir-gi-advanced-features">Phase 9: ReSTIR GI — Advanced Features</a></li>
+      <li class="lvl2"><a href="#goal">Goal</a></li>
+      <li class="lvl2"><a href="#1-environment-map-sampling">1. Environment Map Sampling</a></li>
+      <li class="lvl3"><a href="#why">Why</a></li>
+      <li class="lvl3"><a href="#approach">Approach</a></li>
+      <li class="lvl3"><a href="#procedural-sky-model">Procedural Sky Model</a></li>
+      <li class="lvl3"><a href="#integration">Integration</a></li>
+      <li class="lvl3"><a href="#test-impact">Test Impact</a></li>
+      <li class="lvl2"><a href="#2-5x5-poisson-disk-spatial-kernel">2. 5x5 Poisson Disk Spatial Kernel</a></li>
+      <li class="lvl3"><a href="#why_1">Why</a></li>
+      <li class="lvl3"><a href="#approach_1">Approach</a></li>
+      <li class="lvl3"><a href="#parameters">Parameters</a></li>
+      <li class="lvl2"><a href="#files-to-createmodify">Files to Create/Modify</a></li>
+      <li class="lvl3"><a href="#create-none">Create: None</a></li>
+      <li class="lvl3"><a href="#modify">Modify:</a></li>
+      <li class="lvl2"><a href="#testing-strategy">Testing Strategy</a></li>
+      <li class="lvl2"><a href="#success-criteria">Success Criteria</a></li>
+      <li class="lvl2"><a href="#risks">Risks</a></li>
+    </ul>
+    <div class="legend">
+      <h2>Color Legend</h2>
+      <div><span class="swatch" style="background:#dc2626;"></span> Red = Section / Keyword</div>
+      <div><span class="swatch" style="background:#2563eb;"></span> Blue = Sub-section / Link</div>
+      <div><span class="swatch" style="background:#1f2937;"></span> Black = Body</div>
+    </div>
+<div class="keywords">
+      <h2>Key Terms</h2>
+      <ul>
+      <li>Environment map sampling</li>
+      <li>5x5 Poisson disk spatial kernel</li>
+      <li>Option A: Procedural sky gradient</li>
+      <li>Option B: Cubemap texture</li>
+      <li>Decision</li>
+      <li>Compile</li>
+      <li>Run</li>
+      <li>Visual check</li>
+      <li>Frame dump</li>
+      </ul>
+    </div>
+  </nav>
+  <main>
+    <a class="back" href="index.html">&larr; Back to 50_ReSTIR_GI_Temporal index</a>
+<div class="summary">1. Environment map sampling — Replace black miss with sky/environment lighting 2. 5x5 Poisson disk spatial kernel — Better spatial sample distribution than 3x3 grid</div>
+<h1 id="phase-9-restir-gi-advanced-features">Phase 9: ReSTIR GI — Advanced Features</h1>
+<h2 id="goal">Goal</h2>
+<p>Add two major improvements:
+1. <strong>Environment map sampling</strong> — Replace black miss with sky/environment lighting
+2. <strong>5x5 Poisson disk spatial kernel</strong> — Better spatial sample distribution than 3x3 grid</p>
+<h2 id="1-environment-map-sampling">1. Environment Map Sampling</h2>
+<h3 id="why">Why</h3>
+<p>Current miss shader returns black:</p>
+<pre><code class="language-hlsl">void Miss(inout GIPayload payload) {
+    payload.flags &amp;= ~0x01;
+}
+</code></pre>
+<p>This means any ray that escapes the scene contributes nothing. Real scenes have sky light, which is essential for:
+- Outdoor scenes (Sponza has open ceiling)
+- Realistic bounce lighting
+- Better image quality overall</p>
+<h3 id="approach">Approach</h3>
+<p><strong>Option A: Procedural sky gradient</strong> (simpler)
+- Use a simple analytical sky model (Hosek-Wilkie simplified, or just a gradient)
+- No texture assets needed
+- Works immediately</p>
+<p><strong>Option B: Cubemap texture</strong> (better quality)
+- Load an HDR cubemap
+- Sample in miss shader
+- Requires texture loading + binding</p>
+<p><strong>Decision</strong>: Option A (procedural sky). No asset dependencies, trivial to implement, still provides huge visual improvement over black.</p>
+<h3 id="procedural-sky-model">Procedural Sky Model</h3>
+<p>Simple physically-inspired sky:</p>
+<pre><code class="language-hlsl">float3 SampleSky(float3 direction) {
+    float3 sunDir = normalize(g_GI.LightDir.xyz);
+    float sunDot = dot(direction, sunDir);
+
+    // Horizon gradient
+    float horizon = 1.0 - abs(direction.y);
+    float3 skyColor = lerp(float3(0.5, 0.7, 1.0), float3(0.8, 0.9, 1.0), direction.y * 0.5 + 0.5);
+
+    // Sun disk
+    float sunDisk = pow(max(sunDot, 0.0), 256.0);
+    float3 sunColor = float3(1.0, 0.9, 0.7) * g_GI.LightDir.w;
+
+    // Sun glow
+    float sunGlow = pow(max(sunDot, 0.0), 8.0) * 0.3;
+
+    return skyColor + sunColor * sunDisk + sunColor * sunGlow;
+}
+</code></pre>
+<h3 id="integration">Integration</h3>
+<p>Modify <code>FewBounceGI.hlsl</code> miss shader:</p>
+<pre><code class="language-hlsl">[shader(&quot;miss&quot;)]
+void Miss(inout GIPayload payload) {
+    float3 skyRadiance = SampleSky(WorldRayDirection());
+    payload.radiance += payload.throughput * skyRadiance;
+    payload.flags &amp;= ~0x01;
+}
+</code></pre>
+<p>Also modify closest hit to include sky bounce on final miss:
+Currently closest hit adds direct lighting. On the final bounce miss, the sky contribution is added via the miss shader. This is correct.</p>
+<p>But wait — the current payload accumulates radiance in closest hit, and miss just clears the hit flag. We need to change the architecture so that miss can contribute radiance.</p>
+<p>Looking at the current code:
+- <code>RayGen</code> initializes <code>payload.radiance = 0</code>
+- <code>ClosestHit</code> adds: <code>payload.radiance += payload.throughput * albedo * NdotL * intensity</code>
+- <code>Miss</code> does nothing to radiance</p>
+<p>For environment sampling, we need:
+- <code>Miss</code> to add: <code>payload.radiance += payload.throughput * skyRadiance</code></p>
+<p>This is a minimal change. The miss shader can safely add to <code>payload.radiance</code> because <code>throughput</code> already contains the attenuation from all previous bounces.</p>
+<p>However, there's a subtlety: the current code checks <code>payload.flags &amp; 0x01</code> to determine if we hit. After miss, the flag is cleared. Then <code>RayGen</code> outputs <code>payload.radiance</code> regardless. So adding sky radiance in miss will work correctly — the radiance is accumulated and output.</p>
+<p>But wait, the RayGen code does:</p>
+<pre><code class="language-hlsl">if (payload.flags &amp; 0x01) {
+    // bounce logic
+}
+Output[pixel] = float4(payload.radiance, 1.0);
+</code></pre>
+<p>So even if miss occurs (flags cleared), the radiance is still output. Adding sky radiance in miss will just increase the output. Good.</p>
+<h3 id="test-impact">Test Impact</h3>
+<p>Adding sky light will change the output image. The test might fail if it does pixel-perfect comparison. But looking at the test framework, it likely just checks that the test runs without crashing (it's a rendering test, not an image comparison test).</p>
+<p>Let me verify by checking what <code>RECORD_BOOL(test_FewBounceGI)</code> does... Actually, from the AGENTS.md, tests use <code>CheckCondition()</code> for assertions. The rendering test probably just runs for a few frames and dumps images, without strict pixel comparison.</p>
+<p>If the test does compare images, we'll need to update the reference images. But since the user hasn't mentioned reference images, I'll assume it just checks for successful execution.</p>
+<h2 id="2-5x5-poisson-disk-spatial-kernel">2. 5x5 Poisson Disk Spatial Kernel</h2>
+<h3 id="why_1">Why</h3>
+<p>Current 3x3 grid has issues:
+- Fixed grid pattern causes structured artifacts
+- Only 8 neighbors (small sample count)
+- No distance-based falloff</p>
+<p>Poisson disk sampling gives:
+- Better distribution (no clustering)
+- Adjustable radius
+- More samples (12-16 instead of 8)
+- Rotated pattern per pixel (decorrelation)</p>
+<h3 id="approach_1">Approach</h3>
+<p>Replace the 3x3 nested loops with a Poisson disk pattern:</p>
+<pre><code class="language-hlsl">static const float2 PoissonDisk[12] = {
+    float2(-0.326, -0.406),
+    float2(-0.840, -0.074),
+    float2(-0.696,  0.457),
+    float2(-0.203,  0.621),
+    float2( 0.962, -0.195),
+    float2( 0.473, -0.480),
+    float2( 0.519,  0.767),
+    float2( 0.185, -0.893),
+    float2( 0.507,  0.064),
+    float2( 0.896,  0.412),
+    float2(-0.322, -0.933),
+    float2(-0.792, -0.598)
+};
+</code></pre>
+<p>In the spatial shader:</p>
+<pre><code class="language-hlsl">float rotAngle = hash(pixel, 7u) * 6.2831853;
+float sinRot, cosRot;
+sincos(rotAngle, sinRot, cosRot);
+float2x2 rotator = float2x2(cosRot, -sinRot, sinRot, cosRot);
+
+for (int i = 0; i &lt; 12; i++) {
+    float2 offset = mul(PoissonDisk[i], rotator) * spatialRadius;
+    int2 neighborPixel = centerPixel + int2(offset + 0.5);
+    // ... rest same as before
+}
+</code></pre>
+<h3 id="parameters">Parameters</h3>
+<p>Add to <code>FReSTIRSpatialConstants</code>:</p>
+<pre><code class="language-cpp">float SpatialRadius;   // Pixel radius for Poisson disk (default 3.0)
+</code></pre>
+<h2 id="files-to-createmodify">Files to Create/Modify</h2>
+<h3 id="create-none">Create: None</h3>
+<h3 id="modify">Modify:</h3>
+<ul>
+<li><code>FewBounceGI.hlsl</code> — Add <code>SampleSky()</code> to miss shader</li>
+<li><code>ReSTIR_Spatial_cs.hlsl</code> — Replace 3x3 with Poisson disk, add <code>SpatialRadius</code></li>
+<li><code>FReSTIRPass.h</code> — Add <code>SpatialRadius</code> to <code>FReSTIRSpatialConstants</code></li>
+<li><code>FReSTIRPass.cpp</code> — Pass <code>SpatialRadius</code> constant</li>
+<li><code>TestFewBounceGI.cpp</code> — Set <code>SpatialRadius</code> value</li>
+</ul>
+<h2 id="testing-strategy">Testing Strategy</h2>
+<ol>
+<li><strong>Compile</strong>: <code>./Build.sh --Config=Debug --Target=TestFewBounceGI</code></li>
+<li><strong>Run</strong>: <code>./Build.sh --Config=Debug --Target=TestFewBounceGI --Test</code></li>
+<li><strong>Visual check</strong>: Sky should be visible in Sponza open ceiling areas</li>
+<li><strong>Frame dump</strong>: <code>HLVM_DUMP_GI=1</code> and inspect — sky should be blue/white gradient, not black</li>
+</ol>
+<h2 id="success-criteria">Success Criteria</h2>
+<ul>
+<li>[ ] TestFewBounceGI passes</li>
+<li>[ ] Sky visible in frame dumps (not black)</li>
+<li>[ ] No structured artifacts from spatial kernel</li>
+<li>[ ] Performance maintained (~9s)</li>
+</ul>
+<h2 id="risks">Risks</h2>
+<table>
+<thead>
+<tr>
+<th>Risk</th>
+<th>Mitigation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Sky changes test reference images</td>
+<td>Verify test doesn't do pixel-perfect comparison</td>
+</tr>
+<tr>
+<td>Poisson disk causes sampling artifacts</td>
+<td>Use established disk pattern from literature</td>
+</tr>
+<tr>
+<td>Performance regression with 12 samples vs 8</td>
+<td>12 samples is still very cheap for compute</td>
+</tr>
+</tbody>
+</table>
+  </main>
+</div>
+<button id="topBtn" title="Back to top">↑</button>
+</body>
+</html>

@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>finish_2026-07-20.md</title>
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+       margin: 0; color: #1f2937; }
+body::before { content: ""; display: block; height: 3px;
+                background: linear-gradient(90deg, #dc2626, #2563eb); }
+header { background: #1f2937; color: #fff; padding: 14px 24px;
+          border-bottom: 3px solid #dc2626; }
+header h1 { margin: 0; font-size: 18px; }
+header .crumb { font-size: 12px; opacity: 0.75; }
+header .crumb a { color: #93c5fd; text-decoration: none; }
+header .crumb a:hover { text-decoration: underline; }
+.layout { display: grid; grid-template-columns: 260px 1fr; gap: 0; max-width: 1200px; margin: 0 auto; }
+nav.toc { border-right: 1px solid #e5e7eb; padding: 20px; font-size: 14px; position: sticky; top: 0;
+          max-height: 100vh; overflow-y: auto; box-sizing: border-box; background: #fafafa; }
+nav.toc h2 { font-size: 13px; text-transform: uppercase; color: #6b7280; margin: 0 0 12px;
+              letter-spacing: 0.5px; font-weight: 700; }
+nav.toc ul { list-style: none; padding: 0; margin: 0; }
+nav.toc li { padding: 4px 0; position: relative; padding-left: 14px;
+              transition: background 0.15s; }
+nav.toc li::before { content: ""; position: absolute; left: 0; top: 50%;
+                      transform: translateY(-50%); width: 6px; height: 6px;
+                      border-radius: 50%; background: #dc2626; opacity: 0.55; }
+nav.toc li:hover { background: #fef2f2; }
+nav.toc li:hover::before { opacity: 1; transform: translateY(-50%) scale(1.4); }
+nav.toc li.active { background: #fef2f2; }
+nav.toc li.active::before { background: #dc2626; opacity: 1; transform: translateY(-50%) scale(1.4); }
+nav.toc li.active a { color: #dc2626; font-weight: 600; }
+nav.toc a { color: #2563eb; text-decoration: none; }
+nav.toc a:hover { color: #dc2626; text-decoration: underline; }
+nav.toc .lvl2 { padding-left: 28px; }
+nav.toc .lvl3 { padding-left: 42px; font-size: 13px; }
+nav.toc .lvl3::before { width: 5px; height: 5px; background: #2563eb; opacity: 0.5; }
+nav.toc .empty { color: #9ca3af; font-style: italic; }
+.legend { margin-top: 18px; padding: 10px; background: #fff;
+           border: 1px solid #e5e7eb; border-radius: 6px; font-size: 12px; }
+.legend h2 { font-size: 11px !important; margin: 0 0 6px !important; }
+.legend div { display: flex; align-items: center; gap: 6px; padding: 2px 0; }
+.legend span.swatch { display: inline-block; width: 12px; height: 12px;
+                       border-radius: 3px; flex-shrink: 0; }
+.keywords { margin-top: 14px; padding: 10px; background: #fff;
+             border: 1px solid #e5e7eb; border-radius: 6px; font-size: 12px; }
+.keywords h2 { font-size: 11px !important; margin: 0 0 6px !important; }
+.keywords ul { padding-left: 14px; margin: 0; }
+.keywords li { padding: 1px 0 !important; padding-left: 0 !important;
+                border: 0 !important; background: none !important; }
+.keywords li::before { display: none !important; }
+.keywords a { color: #1f2937 !important; font-size: 12px; }
+.keywords a:hover { color: #dc2626 !important; text-decoration: underline; }
+main { padding: 24px 36px; line-height: 1.6; max-width: 900px; }
+main h1, main h2, main h3 { scroll-margin-top: 16px; }
+main h1 { color: #dc2626; border-bottom: 2px solid #dc2626; padding-bottom: 6px; }
+main h2 { color: #2563eb; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px;
+          margin-top: 32px; padding-left: 10px; border-left: 4px solid #2563eb; }
+main h3 { color: #dc2626; margin-top: 24px; padding-left: 8px;
+          border-left: 3px solid #dc2626; }
+main a { color: #2563eb; text-decoration: none; }
+main a:hover { color: #dc2626; text-decoration: underline; }
+main pre { background: #ffffff; color: #1f2937; padding: 16px; border-radius: 6px;
+            overflow-x: auto; font: 13px/1.5 Menlo, Consolas, monospace;
+            border: 1px solid #e5e7eb; }
+main code { background: #f3f4f6; color: #1f2937; padding: 2px 5px; border-radius: 3px;
+             font: 13px Menlo, Consolas, monospace; }
+main pre code { background: transparent; color: inherit; padding: 0; }
+main table { border-collapse: collapse; }
+main th, main td { border: 1px solid #e5e7eb; padding: 6px 12px; }
+main th { background: #f3f4f6; }
+main blockquote { border-left: 4px solid #d1d5db; margin: 16px 0; padding: 8px 16px;
+                   color: #4b5563; }
+main hr { border: 0; border-top: 1px solid #e5e7eb; margin: 24px 0; }
+main strong.kw { color: #dc2626; font-weight: 700; }
+.summary { background: #eff6ff; border-left: 4px solid #2563eb; padding: 12px 16px;
+            margin: 16px 0 24px; border-radius: 4px; color: #1e3a8a; font-size: 14px;
+            line-height: 1.5; }
+.summary::before { content: "📝 Summary"; display: block; font-weight: 700;
+                    color: #2563eb; font-size: 11px; text-transform: uppercase;
+                    letter-spacing: 0.5px; margin-bottom: 4px; }
+.back { display: inline-block; margin-bottom: 16px; font-size: 0.9em; color: #2563eb;
+         text-decoration: none; }
+.back:hover { color: #dc2626; text-decoration: underline; }
+#topBtn { position: fixed; bottom: 24px; right: 24px; z-index: 100;
+          background: #dc2626; color: #fff; border: 0; border-radius: 50%;
+          width: 44px; height: 44px; font-size: 18px; cursor: pointer;
+          box-shadow: 0 2px 6px rgba(0,0,0,0.2); opacity: 0;
+          transition: opacity 0.2s; pointer-events: none; }
+#topBtn.show { opacity: 1; pointer-events: auto; }
+#topBtn:hover { background: #b91c1c; }
+@media (max-width: 900px) {
+  .layout { grid-template-columns: 1fr; }
+  nav.toc { position: static; max-height: none; border-right: 0;
+             border-bottom: 1px solid #e5e7eb; }
+  main { padding: 16px 20px; }
+}
+@media print {
+  nav.toc, .legend, .keywords, #topBtn { display: none; }
+  .layout { grid-template-columns: 1fr; }
+  body::before { display: none; }
+  header { background: #fff; color: #000; border-bottom: 1px solid #000; }
+  main h1, main h2, main h3 { color: #000; border-color: #000; }
+}
+</style>
+<script>
+(function() {
+  const links = document.querySelectorAll('nav.toc a[href^="#"]');
+  const map = new Map();
+  links.forEach(a => {
+    const id = a.getAttribute('href').slice(1);
+    const li = a.parentElement;
+    map.set(id, li);
+  });
+  const targets = Array.from(map.keys()).map(id => document.getElementById(id)).filter(Boolean);
+  function activate() {
+    if (!targets.length) return;
+    const scrollY = window.scrollY + 80;
+    let current = null;
+    for (const t of targets) {
+      if (t.offsetTop <= scrollY) current = t;
+      else break;
+    }
+    links.forEach(a => a.parentElement.classList.remove('active'));
+    if (current) {
+      const li = map.get(current.id);
+      if (li) li.classList.add('active');
+    }
+  }
+  window.addEventListener('scroll', activate, { passive: true });
+  activate();
+
+  const btn = document.getElementById('topBtn');
+  if (btn) {
+    window.addEventListener('scroll', () => {
+      btn.classList.toggle('show', window.scrollY > 400);
+    }, { passive: true });
+    btn.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+  }
+})();
+</script>
+</head>
+<body>
+<header>
+  <div class="crumb"><a href="./index.html">Vibe_Coding/</a> / <a href="index.html">50_ReSTIR_GI_Temporal</a> / finish_2026-07-20.md</div>
+  <h1>📄 finish_2026-07-20.md</h1>
+</header>
+<div class="layout">
+  <nav class="toc">
+    <h2>On this page</h2>
+    <ul>
+<li class=""><a href="#50_restir_gi_temporal-finish-plan-2026-07-20">50_ReSTIR_GI_Temporal — Finish Plan (2026-07-20)</a></li>
+      <li class="lvl2"><a href="#context">Context</a></li>
+      <li class="lvl2"><a href="#architecture">Architecture</a></li>
+      <li class="lvl2"><a href="#steps">Steps</a></li>
+      <li class="lvl2"><a href="#estimated-subagent-topology">Estimated Subagent topology</a></li>
+      <li class="lvl2"><a href="#risk-register">Risk register</a></li>
+      <li class="lvl2"><a href="#cross-references">Cross-references</a></li>
+    </ul>
+    <div class="legend">
+      <h2>Color Legend</h2>
+      <div><span class="swatch" style="background:#dc2626;"></span> Red = Section / Keyword</div>
+      <div><span class="swatch" style="background:#2563eb;"></span> Blue = Sub-section / Link</div>
+      <div><span class="swatch" style="background:#1f2937;"></span> Black = Body</div>
+    </div>
+<div class="keywords">
+      <h2>Key Terms</h2>
+      <ul>
+      <li>DID succeed</li>
+      <li>earlier</li>
+      <li>the test harness</li>
+      <li>No NEE-light coplanar with ceiling</li>
+      <li>CPU reference</li>
+      <li>Wire ShaderMakeBuild.py</li>
+      <li>Build target.</li>
+      <li>Run with debug dumps.</li>
+      <li>Visual validation + Python validator.</li>
+      <li>Iterate</li>
+      <li>Commit</li>
+      </ul>
+    </div>
+  </nav>
+  <main>
+    <a class="back" href="index.html">&larr; Back to 50_ReSTIR_GI_Temporal index</a>
+<div class="summary">The phase-1 work in this directory (2026-05-29 → 2026-06-15) DID succeed at correcting the ReSTIR shaders (Generate/Temporal/Spatial + BilateralDenoise + ReBLUR). The legacy critic at  (REBUILD FROM ASH verdict, 2026-06-05) described the earlier version of those shaders. Inspecting the current</div>
+<h1 id="50_restir_gi_temporal-finish-plan-2026-07-20">50_ReSTIR_GI_Temporal — Finish Plan (2026-07-20)</h1>
+<h2 id="context">Context</h2>
+<p>The phase-1 work in this directory (2026-05-29 → 2026-06-15) <strong>DID succeed</strong> at
+correcting the ReSTIR shaders (Generate/Temporal/Spatial + BilateralDenoise +
+ReBLUR). The legacy critic at <code>claude.md</code> (REBUILD FROM ASH verdict, 2026-06-05)
+described the <strong>earlier</strong> version of those shaders. Inspecting the current
+sources on disk (<code>mtime 2026-06-15 14:08</code>):</p>
+<ul>
+<li><code>ReSTIR_Generate_cs.hlsl</code> — actually does streaming RIS (M tent-distributed
+  candidates per pixel, p_hat = luminance of radiance, deterministic hash, no
+  FrameIndex in offset). Bug #1 (pass-through) is gone.</li>
+<li><code>ReSTIR_Temporal_cs.hlsl</code> — does pure reservoir merge (combinedWSum/M,
+  probabilistic selection, depth+normal validation, M clamp). Bug (TAA lerp)
+  is gone.</li>
+<li><code>ReSTIR_Spatial_cs.hlsl</code> — reads reservoir.y as the selected pixel, reads
+  radiance at THAT pixel, and combines neighbors with pairwise MIS. Bug #2
+  (output center radiance) is gone.</li>
+</ul>
+<p>What was lost is <strong>the test harness</strong>. Commit <code>2216e71 (2026-07-16)</code> renamed
+<code>TestFewBounceGI.cpp</code> -&gt; <code>TestCornellBoxGI.cpp</code> and replaced the Sponza + ReSTIR
+pipeline with a Cornell-box path tracer that only uses FGIPass. The ReSTIR
+shader blobs were re-compiled into <code>TestCornellBoxGI_Data/</code> for archive, but
+nothing exercises them.</p>
+<p>The <code>51_PathTraceGI_Debug</code> session (2026-07-19) completed the same class of
+bug fix on the Cornell-box pipeline (compact 64-byte fully-used payload;
+camera; CPU reference; area-light coplanar). The lessons from that session
+are applied directly here:</p>
+<ol>
+<li><strong>GIPayload must be 64 bytes, fully used on both sides of TraceRay.</strong>
+   We wire the modern <code>Engine/Source/Runtime/Private/Renderer/Shader/GI/
+   GIPathTracing.hlsl</code> (which is 64-byte and proven) through FGIPass — we
+   do NOT use the legacy <code>TestCornellBoxGI_Data/FewBounceGI.hlsl</code> (128-byte
+   with debug-only fields, would re-trigger the slangc dead-strip bug).</li>
+<li><strong>No NEE-light coplanar with ceiling</strong> in the Cornell box fixture —
+   but Sponza has its own light setup through <code>FSceneResourceManager</code>
+   / <code>FLightBuilder</code>. We build a single directional light and verify it
+   is not coplanar with any large occluder.</li>
+<li><strong class="kw">Camera rig:</strong> outside the box, in front of the visible scene, FOV 90,
+   -Z unprojection.</li>
+<li><strong>CPU reference</strong> isn't strictly required (we have TestPathTraceGI as a
+   working sibling) but the validator must check structurally (not just
+   mean luma).</li>
+</ol>
+<h2 id="architecture">Architecture</h2>
+<pre><code>glTF Sponza (Samples/Assets/sponza/Sponza01.gltf)
+   ↓
+BLAS / TLAS / RT buffers (FInstanceInfo.AlbedoColor; ktx-&gt;bindless for textures)
+   ↓
+GBuffer pass (GBufferSponzaVS/PS) → WorldPos/Normal/Material/Depth
+   ↓
+GI Ray Trace (FGIPass -&gt; GIPathTracing.hlsl, 64-byte payload)
+   ↓ OutputTexture (HDR rgb + hitDist alpha)
+Bilateral Denoise (FBilateralDenoisePass)
+   ↓ DenoisedHDR
+ReSTIR Generate (FReSTIRPass::DispatchGeneration)
+   ↓ Reservoir0/1 (selected pixel + W + p_hat)
+ReSTIR Temporal (FReSTIRPass::DispatchTemporal, reproject + merge)
+   ↓ TemporalReservoir0/1 + TemporalRadiance
+ReSTIR Spatial (FReSTIRPass::DispatchSpatial, 3x3 + MIS)
+   ↓ SpatialRadiance
+ReBLUR temporal accumulator (FReBLURPass::Dispatch)
+   ↓ FinalRadiance
+Accumulate (FAccumulationPass if present) → tonemap → blit to swapchain
+</code></pre>
+<h2 id="steps">Steps</h2>
+<ol>
+<li>
+<p><strong>Wire ShaderMakeBuild.py</strong>: add <code>create_restir_gi_temporal_shadermake()</code>
+   factory. Source files: GIPathTracing, ReSTIR_Generate/Temporal/Spatial,
+   ReBLUR, BilateralDenoise, GBufferSponzaVS/PS.</p>
+</li>
+<li>
+<p><strong>Copy/adapt shader sources into <code>TestReSTIR_GI_Temporal_Data/</code>.</strong> For
+   GIPathTracing we re-include the proven source via CMake path config so
+   we don't maintain a copy. For legacy Compute passes (ReSTIR/ReBLUR/Bilateral/
+   GBufferSponza) we copy from <code>TestCornellBoxGI_Data/</code> into the new data
+   dir because those blobs must be self-contained per test.</p>
+</li>
+<li>
+<p><strong>Write <code>TestReSTIR_GI_Temporal.cpp</code>.</strong> Modeled on <code>TestPathTraceGI.cpp</code>
+   (clean FGIPass pattern) plus a Sponza scene loading block. Re-uses
+   <code>FBilateralDenoisePass</code>, <code>FReSTIRPass</code>, <code>FReBLURPass</code>. Drops
+   <code>FAccumulationPass</code> for v1 (single-frame result is OK for verification).</p>
+</li>
+<li>
+<p><strong>Build target.</strong> Wire cmake auto-discovery (<code>./Build.sh
+   --Config=Debug --Target=TestReSTIR_GI_Temporal</code>).</p>
+</li>
+<li>
+<p><strong>Run with debug dumps.</strong> Add <code>HLVM_DUMP_RGI=1</code> env var following the
+   <code>TestPathTraceGI</code> pattern so we can inspect intermediate buffers if
+   the output is wrong.</p>
+</li>
+<li>
+<p><strong>Visual validation + Python validator.</strong> Validator checks black%
+   &lt; 5%, color variance over the Sponza region, frame-to-frame stability.</p>
+</li>
+<li>
+<p><strong>Iterate</strong> until the validator passes and the dump looks recognizably
+   like Sponza with GI color-bleed.</p>
+</li>
+<li>
+<p><strong>Commit</strong> in logical chunks:</p>
+</li>
+<li><code>feat: TestReSTIR_GI_Temporal shader data + ShaderMake wiring</code></li>
+<li><code>feat: TestReSTIR_GI_Temporal.cpp — Sponza + FGIPass +
+     Bilateral + ReSTIR + ReBLUR pipeline</code></li>
+<li>
+<p><code>feat: Sponza+ReSTIR validator + visual sanity dump</code></p>
+</li>
+<li>
+<p><strong>Set up <code>kanban-cron-overseer</code> style cron.</strong> The single profile is
+   <code>default</code>. We adapt the skill template into a cron that:</p>
+</li>
+<li>Re-runs TestReSTIR_GI_Temporal + validator every 15 min</li>
+<li>Detects regression (validator pass→fail)</li>
+<li>Posts a one-line status to the chat</li>
+<li>Self-pauses after 3 consecutive failures with a state file</li>
+</ol>
+<h2 id="estimated-subagent-topology">Estimated Subagent topology</h2>
+<p>None. Only the <code>default</code> profile is registered. Subagent delegation on
+this host routes to the same model. We do the work directly in this
+session and use the cron for <em>future</em> babysitting, not for collaboration.</p>
+<h2 id="risk-register">Risk register</h2>
+<table>
+<thead>
+<tr>
+<th>Risk</th>
+<th>Mitigation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GIPathTracing.hlsl hard-codes a Cornell box light</td>
+<td>Use the Params2.AmbientScale wiring (already in FGIPass)</td>
+</tr>
+<tr>
+<td>FReBLUR expects RGBA16F history (texture format mismatch)</td>
+<td>Match formats in test cpp</td>
+</tr>
+<tr>
+<td>VertexOffset unit mismatch in older Cornell-loader code</td>
+<td>The Vibe_Coding/51 lesson was: nvrhi uses bytes; the new test uses bytes</td>
+</tr>
+<tr>
+<td>Spurious FrameIndex in temporal merge</td>
+<td>Already removed in current ReSTIR_Temporal</td>
+</tr>
+<tr>
+<td>ReSTIR_Spatial output bound at t9 but ShaderMake expects u0</td>
+<td>Confirm compile-time binding layout matches</td>
+</tr>
+</tbody>
+</table>
+<h2 id="cross-references">Cross-references</h2>
+<ul>
+<li><code>Vibe_Coding/51_PathTraceGI_Debug/session-PathTraceGI_payload_debug.md</code>
+  — 4 root causes fixed, payload rules to inherit</li>
+<li><code>Vibe_Coding/50_ReSTIR_GI_Temporal/claude.md</code> — original REBUILD FROM ASH
+  verdict describing the earlier broken state (now superseded)</li>
+<li><code>Vibe_Coding/50_ReSTIR_GI_Temporal/phase1_completion_2026-06-06.md</code> —
+  phase 1 report (true completion: shaders were fixed)</li>
+<li><code>~/.claude/projects/.../memory/restir-gi-snowflower-flicker.md</code> —
+  cache note on the 6 root causes from 2026-06-06</li>
+<li><code>Engine/Source/Runtime/Test/ReSTIR_Implementation.md</code> — pipeline overview</li>
+<li><code>Engine/Source/Runtime/Public/Renderer/GI/FGIPass.h</code> — FGIPass API</li>
+<li><code>Engine/Source/Runtime/Public/Renderer/PostProcess/FReSTIRPass.h</code> —
+  ReSTIR API</li>
+</ul>
+  </main>
+</div>
+<button id="topBtn" title="Back to top">↑</button>
+</body>
+</html>

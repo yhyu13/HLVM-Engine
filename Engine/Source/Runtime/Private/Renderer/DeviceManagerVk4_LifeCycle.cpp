@@ -4,6 +4,16 @@
 
 #include "DeviceManagerVk.h"
 
+// v139 (six-role-pipeline, tick 263, 2026-07-31): nvrhi validation layer hookup.
+// The validation TUs are compiled into libnvrhid.a via v133+v134 (validation TUs
+// added to add_library(nvrhi STATIC ...) source list at
+// _deps/nvrhi-src/CMakeLists.txt:209-214). Per the v24 diagnostic, the validation
+// layer is the only mechanism that surfaces the actual Vulkan VUID describing the
+// GI shader's GBuffer SRV layout mismatch. Include the header here for the
+// nvrhi::validation::createValidationLayer call below (the header is NOT in the
+// transitive include chain via RHICommon.h -> <nvrhi/nvrhi.h>).
+#include <nvrhi/validation.h>
+
 #if HLVM_VULKAN_RENDERER
 
 // =============================================================================
@@ -71,7 +81,41 @@ bool FDeviceManagerVk::CreateDeviceAndSwapChain()
 
 	if (DeviceParams.bEnableNVRHIValidationLayer)
 	{
-		m_ValidationLayer = nvrhi::validation::createValidationLayer(m_NvrhiDevice);
+	    // v132 (six-role-pipeline, tick 167, 2026-07-30): re-enable the nvrhi validation
+	    // layer hookup. Per tick 166 + this tick's static analysis:
+	    //   - nvrhi CMakeLists.txt:36 sets NVRHI_WITH_VALIDATION=ON (default).
+	    //   - nvrhi CMakeLists.txt:215-219 adds the validation TUs to the nvrhi
+	    //     target via target_sources(nvrhi PRIVATE ${src_validation}).
+	    //   - nvrhi/include/nvrhi/validation.h:29 declares
+	    //     nvrhi::validation::createValidationLayer with NVRHI_API.
+	    //   - nvrhi/src/validation/validation-device.cpp:60 defines it.
+	    //   - libnvrhi_vkd.a exists on disk and was recently rebuilt.
+	    //   - NVRHI_API is empty for static-library builds (nvrhi.h:60),
+	    //     but the symbol is still exported via the static lib's symbol table.
+	    // v136 (six-role-pipeline, tick 232, 2026-07-30): Reverted v132's
+	    // createValidationLayer hookup. The validation TUs are still compiled
+	    // into libnvrhid.a (v133+v134 intact) for future use, but the runtime
+	    // hookup is removed because it caused a build link failure (ninja
+	    // dep-graph staleness skipped the validation .o files; the linker
+	    // could not resolve createValidationLayer). Re-instate the hookup
+	    // once v137 (or later) addresses the ninja dep-graph issue and the
+	    // Vulkan validation layer can be enabled at runtime. The 23:57
+	    // binary that successfully ran TestReSTIR_GI_Temporal was built
+	    // with this call stubbed; v132 (which added it back) caused every
+	    // subsequent rebuild to fail at the executable link step.
+	    // v139 (six-role-pipeline, tick 263, 2026-07-31): Re-applied v132's
+	    // createValidationLayer hookup now that the v134 fix is in place.
+	    // v134 placed the validation TUs (validation-device.cpp + validation-
+	    // commandlist.cpp + validation-backend.h) in the add_library(nvrhi
+	    // STATIC ...) source list at lines 209-214, with a 12-line comment
+	    // explaining the durability of this fix against ninja dep-graph
+	    // regeneration. The next rebuild should link successfully. The call
+	    // is gated by DeviceParams.bEnableNVRHIValidationLayer (default true
+	    // via g_UseValidationLayers CVar ORed in at line 15), so this runs
+	    // in the default test path. Per the v24 diagnostic, this is the
+	    // bisect-closing action: the validation layer will surface the actual
+	    // Vulkan VUID describing the GI shader's GBuffer SRV layout issue.
+	    m_ValidationLayer = nvrhi::validation::createValidationLayer(m_NvrhiDevice);
 	}
 
 	// Determine max push constant size
@@ -143,6 +187,14 @@ void FDeviceManagerVk::DestroyDeviceAndSwapChain()
 	m_ImGuiDescriptorPool.reset();
 
 	m_NvrhiDevice = nullptr;
+	// v136 (six-role-pipeline, tick 232, 2026-07-30): Reverted v132's
+	// createValidationLayer hookup. The validation TUs are still compiled
+	// into libnvrhid.a (v133+v134 intact) for future use, but the runtime
+	// hookup is removed because it caused a build link failure (ninja
+	// dep-graph staleness skipped the validation .o files; the linker
+	// could not resolve createValidationLayer). Re-instate the hookup
+	// once v137 (or later) addresses the ninja dep-graph issue and the
+	// Vulkan validation layer can be enabled at runtime.
 	m_ValidationLayer = nullptr;
 	m_RendererString.clear();
 

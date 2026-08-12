@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>plan_critic.md</title>
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+       margin: 0; color: #1f2937; }
+body::before { content: ""; display: block; height: 3px;
+                background: linear-gradient(90deg, #dc2626, #2563eb); }
+header { background: #1f2937; color: #fff; padding: 14px 24px;
+          border-bottom: 3px solid #dc2626; }
+header h1 { margin: 0; font-size: 18px; }
+header .crumb { font-size: 12px; opacity: 0.75; }
+header .crumb a { color: #93c5fd; text-decoration: none; }
+header .crumb a:hover { text-decoration: underline; }
+.layout { display: grid; grid-template-columns: 260px 1fr; gap: 0; max-width: 1200px; margin: 0 auto; }
+nav.toc { border-right: 1px solid #e5e7eb; padding: 20px; font-size: 14px; position: sticky; top: 0;
+          max-height: 100vh; overflow-y: auto; box-sizing: border-box; background: #fafafa; }
+nav.toc h2 { font-size: 13px; text-transform: uppercase; color: #6b7280; margin: 0 0 12px;
+              letter-spacing: 0.5px; font-weight: 700; }
+nav.toc ul { list-style: none; padding: 0; margin: 0; }
+nav.toc li { padding: 4px 0; position: relative; padding-left: 14px;
+              transition: background 0.15s; }
+nav.toc li::before { content: ""; position: absolute; left: 0; top: 50%;
+                      transform: translateY(-50%); width: 6px; height: 6px;
+                      border-radius: 50%; background: #dc2626; opacity: 0.55; }
+nav.toc li:hover { background: #fef2f2; }
+nav.toc li:hover::before { opacity: 1; transform: translateY(-50%) scale(1.4); }
+nav.toc li.active { background: #fef2f2; }
+nav.toc li.active::before { background: #dc2626; opacity: 1; transform: translateY(-50%) scale(1.4); }
+nav.toc li.active a { color: #dc2626; font-weight: 600; }
+nav.toc a { color: #2563eb; text-decoration: none; }
+nav.toc a:hover { color: #dc2626; text-decoration: underline; }
+nav.toc .lvl2 { padding-left: 28px; }
+nav.toc .lvl3 { padding-left: 42px; font-size: 13px; }
+nav.toc .lvl3::before { width: 5px; height: 5px; background: #2563eb; opacity: 0.5; }
+nav.toc .empty { color: #9ca3af; font-style: italic; }
+.legend { margin-top: 18px; padding: 10px; background: #fff;
+           border: 1px solid #e5e7eb; border-radius: 6px; font-size: 12px; }
+.legend h2 { font-size: 11px !important; margin: 0 0 6px !important; }
+.legend div { display: flex; align-items: center; gap: 6px; padding: 2px 0; }
+.legend span.swatch { display: inline-block; width: 12px; height: 12px;
+                       border-radius: 3px; flex-shrink: 0; }
+.keywords { margin-top: 14px; padding: 10px; background: #fff;
+             border: 1px solid #e5e7eb; border-radius: 6px; font-size: 12px; }
+.keywords h2 { font-size: 11px !important; margin: 0 0 6px !important; }
+.keywords ul { padding-left: 14px; margin: 0; }
+.keywords li { padding: 1px 0 !important; padding-left: 0 !important;
+                border: 0 !important; background: none !important; }
+.keywords li::before { display: none !important; }
+.keywords a { color: #1f2937 !important; font-size: 12px; }
+.keywords a:hover { color: #dc2626 !important; text-decoration: underline; }
+main { padding: 24px 36px; line-height: 1.6; max-width: 900px; }
+main h1, main h2, main h3 { scroll-margin-top: 16px; }
+main h1 { color: #dc2626; border-bottom: 2px solid #dc2626; padding-bottom: 6px; }
+main h2 { color: #2563eb; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px;
+          margin-top: 32px; padding-left: 10px; border-left: 4px solid #2563eb; }
+main h3 { color: #dc2626; margin-top: 24px; padding-left: 8px;
+          border-left: 3px solid #dc2626; }
+main a { color: #2563eb; text-decoration: none; }
+main a:hover { color: #dc2626; text-decoration: underline; }
+main pre { background: #ffffff; color: #1f2937; padding: 16px; border-radius: 6px;
+            overflow-x: auto; font: 13px/1.5 Menlo, Consolas, monospace;
+            border: 1px solid #e5e7eb; }
+main code { background: #f3f4f6; color: #1f2937; padding: 2px 5px; border-radius: 3px;
+             font: 13px Menlo, Consolas, monospace; }
+main pre code { background: transparent; color: inherit; padding: 0; }
+main table { border-collapse: collapse; }
+main th, main td { border: 1px solid #e5e7eb; padding: 6px 12px; }
+main th { background: #f3f4f6; }
+main blockquote { border-left: 4px solid #d1d5db; margin: 16px 0; padding: 8px 16px;
+                   color: #4b5563; }
+main hr { border: 0; border-top: 1px solid #e5e7eb; margin: 24px 0; }
+main strong.kw { color: #dc2626; font-weight: 700; }
+.summary { background: #eff6ff; border-left: 4px solid #2563eb; padding: 12px 16px;
+            margin: 16px 0 24px; border-radius: 4px; color: #1e3a8a; font-size: 14px;
+            line-height: 1.5; }
+.summary::before { content: "📝 Summary"; display: block; font-weight: 700;
+                    color: #2563eb; font-size: 11px; text-transform: uppercase;
+                    letter-spacing: 0.5px; margin-bottom: 4px; }
+.back { display: inline-block; margin-bottom: 16px; font-size: 0.9em; color: #2563eb;
+         text-decoration: none; }
+.back:hover { color: #dc2626; text-decoration: underline; }
+#topBtn { position: fixed; bottom: 24px; right: 24px; z-index: 100;
+          background: #dc2626; color: #fff; border: 0; border-radius: 50%;
+          width: 44px; height: 44px; font-size: 18px; cursor: pointer;
+          box-shadow: 0 2px 6px rgba(0,0,0,0.2); opacity: 0;
+          transition: opacity 0.2s; pointer-events: none; }
+#topBtn.show { opacity: 1; pointer-events: auto; }
+#topBtn:hover { background: #b91c1c; }
+@media (max-width: 900px) {
+  .layout { grid-template-columns: 1fr; }
+  nav.toc { position: static; max-height: none; border-right: 0;
+             border-bottom: 1px solid #e5e7eb; }
+  main { padding: 16px 20px; }
+}
+@media print {
+  nav.toc, .legend, .keywords, #topBtn { display: none; }
+  .layout { grid-template-columns: 1fr; }
+  body::before { display: none; }
+  header { background: #fff; color: #000; border-bottom: 1px solid #000; }
+  main h1, main h2, main h3 { color: #000; border-color: #000; }
+}
+</style>
+<script>
+(function() {
+  const links = document.querySelectorAll('nav.toc a[href^="#"]');
+  const map = new Map();
+  links.forEach(a => {
+    const id = a.getAttribute('href').slice(1);
+    const li = a.parentElement;
+    map.set(id, li);
+  });
+  const targets = Array.from(map.keys()).map(id => document.getElementById(id)).filter(Boolean);
+  function activate() {
+    if (!targets.length) return;
+    const scrollY = window.scrollY + 80;
+    let current = null;
+    for (const t of targets) {
+      if (t.offsetTop <= scrollY) current = t;
+      else break;
+    }
+    links.forEach(a => a.parentElement.classList.remove('active'));
+    if (current) {
+      const li = map.get(current.id);
+      if (li) li.classList.add('active');
+    }
+  }
+  window.addEventListener('scroll', activate, { passive: true });
+  activate();
+
+  const btn = document.getElementById('topBtn');
+  if (btn) {
+    window.addEventListener('scroll', () => {
+      btn.classList.toggle('show', window.scrollY > 400);
+    }, { passive: true });
+    btn.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+  }
+})();
+</script>
+</head>
+<body>
+<header>
+  <div class="crumb"><a href="./index.html">Vibe_Coding/</a> / <a href="index.html">50_ReSTIR_GI_Temporal</a> / plan_critic.md</div>
+  <h1>📄 plan_critic.md</h1>
+</header>
+<div class="layout">
+  <nav class="toc">
+    <h2>On this page</h2>
+    <ul>
+<li class=""><a href="#critic-review-phase-7-restir-gi-plan">CRITIC REVIEW — Phase 7: ReSTIR GI Plan</a></li>
+      <li class="lvl2"><a href="#concerns">Concerns</a></li>
+      <li class="lvl3"><a href="#critical-risk-ray-tracing-shader-uav-expansion-breaks-binding-layout">[CRITICAL] Risk: Ray Tracing Shader UAV Expansion Breaks Binding Layout</a></li>
+      <li class="lvl3"><a href="#critical-scope-too-large-for-single-phase">[CRITICAL] Scope Too Large for Single Phase</a></li>
+      <li class="lvl3"><a href="#major-missing-motion-vector-buffer">[MAJOR] Missing Motion Vector Buffer</a></li>
+      <li class="lvl3"><a href="#major-reservoir-target-pdf-is-ill-defined">[MAJOR] Reservoir Target PDF is Ill-Defined</a></li>
+      <li class="lvl3"><a href="#major-no-visibility-check-for-temporal-samples">[MAJOR] No Visibility Check for Temporal Samples</a></li>
+      <li class="lvl3"><a href="#minor-double-ping-pong-confusion">[MINOR] Double Ping-Pong Confusion</a></li>
+      <li class="lvl3"><a href="#minor-missing-register-layout-documentation">[MINOR] Missing Register Layout Documentation</a></li>
+      <li class="lvl3"><a href="#nit-naming-convention">[NIT] Naming Convention</a></li>
+      <li class="lvl2"><a href="#revised-plan-summary">Revised Plan Summary</a></li>
+    </ul>
+    <div class="legend">
+      <h2>Color Legend</h2>
+      <div><span class="swatch" style="background:#dc2626;"></span> Red = Section / Keyword</div>
+      <div><span class="swatch" style="background:#2563eb;"></span> Blue = Sub-section / Link</div>
+      <div><span class="swatch" style="background:#1f2937;"></span> Black = Body</div>
+    </div>
+<div class="keywords">
+      <h2>Key Terms</h2>
+      <ul>
+      <li>Iteration</li>
+      <li>Reviewer Persona</li>
+      <li>Verdict</li>
+      <li>Dimension</li>
+      <li>Summary</li>
+      <li>Suggestion</li>
+      <li>two sub-phases</li>
+      <li>Phase 7a</li>
+      <li>Phase 7b</li>
+      <li>already-traced</li>
+      <li>Phase 7a: Reservoir Generation Compute Pass</li>
+      <li>Phase 7b: Temporal Reuse</li>
+      <li>Confidence Score</li>
+      </ul>
+    </div>
+  </nav>
+  <main>
+    <a class="back" href="index.html">&larr; Back to 50_ReSTIR_GI_Temporal index</a>
+<div class="summary">Reviewer Persona: Senior Staff Engineer reviewing a junior AI agent&#x27;s plan Verdict: REVISE (Major issues found)</div>
+<h1 id="critic-review-phase-7-restir-gi-plan">CRITIC REVIEW — Phase 7: ReSTIR GI Plan</h1>
+<p><strong>Iteration</strong>: 1<br />
+<strong>Reviewer Persona</strong>: Senior Staff Engineer reviewing a junior AI agent's plan<br />
+<strong>Verdict</strong>: REVISE (Major issues found)</p>
+<hr />
+<h2 id="concerns">Concerns</h2>
+<h3 id="critical-risk-ray-tracing-shader-uav-expansion-breaks-binding-layout">[CRITICAL] Risk: Ray Tracing Shader UAV Expansion Breaks Binding Layout</h3>
+<p><strong>Dimension</strong>: Correctness / Architecture<br />
+<strong>Summary</strong>: Adding <code>u1</code> and <code>u2</code> UAVs to <code>FewBounceGI.hlsl</code> requires updating the RT binding layout in C++, which is complex and error-prone. The current RT pipeline has a carefully constructed binding set.<br />
+<strong>Suggestion</strong>: Instead of modifying the RT shader to output reservoirs, <strong>generate reservoirs in a separate compute pass that reads the existing GI output and GBuffer</strong>. This avoids touching the RT pipeline entirely.<br />
+<strong>Verdict</strong>: Must fix.</p>
+<h3 id="critical-scope-too-large-for-single-phase">[CRITICAL] Scope Too Large for Single Phase</h3>
+<p><strong>Dimension</strong>: Minimalism<br />
+<strong>Summary</strong>: The plan tries to do: (1) reservoir generation, (2) temporal merge, (3) shading evaluation, (4) RT shader modification, (5) new C++ pass — all in one go. If any piece fails, debugging is extremely hard.<br />
+<strong>Suggestion</strong>: Split into <strong>two sub-phases</strong>:
+- <strong>Phase 7a</strong>: Reservoir generation compute pass (read GI output + GBuffer, build reservoirs)
+- <strong>Phase 7b</strong>: Temporal reuse compute pass (merge reservoirs with history)<br />
+Do 7a first, verify it works, then 7b.</p>
+<p><strong>Verdict</strong>: Must fix. Scope down to 7a only for this session.</p>
+<h3 id="major-missing-motion-vector-buffer">[MAJOR] Missing Motion Vector Buffer</h3>
+<p><strong>Dimension</strong>: Correctness<br />
+<strong>Summary</strong>: The plan mentions "reprojection using PrevViewProj + depth" but depth-based reprojection alone cannot track moving objects. Without motion vectors, temporal reuse will ghost on camera movement.<br />
+<strong>Suggestion</strong>: For Phase 7a, skip temporal reuse entirely. Just build the reservoir generation pass and output reservoirs as debug colors. Temporal reuse (7b) requires either motion vectors or accepting ghosting as a known limitation.</p>
+<p><strong>Verdict</strong>: Accept for now, but document clearly.</p>
+<h3 id="major-reservoir-target-pdf-is-ill-defined">[MAJOR] Reservoir Target PDF is Ill-Defined</h3>
+<p><strong>Dimension</strong>: Correctness<br />
+<strong>Summary</strong>: The plan says "target PDF p(y) = cos(theta)/PI" and "w = radiance" but ReSTIR requires the target function p̂(y) to be proportional to the integrand. For diffuse GI: p̂(y) = f_s(x,ω_i,y) * L_e(y) * G(x↔y). Using just radiance as weight without knowing the PDF at generation time breaks the unbiased weight calculation W = w_sum / (M * p(y)).<br />
+<strong>Suggestion</strong>: Simplify. Since we're reading the <strong>already-traced</strong> GI output, treat each pixel's path as a sample with:
+- <code>y</code> = primary hit direction (or just store pixel index as sample ID)
+- <code>p̂(y)</code> = the radiance value already computed by the GI shader
+- <code>p(y)</code> = 1.0 (since we're treating each pixel as 1 uniform sample)
+- <code>W = w_sum / M</code> (since p(y) = 1)</p>
+<p>This is technically "resampled importance resampling on a grid" rather than true ReSTIR, but it's the correct stepping stone.</p>
+<p><strong>Verdict</strong>: Revise math.</p>
+<h3 id="major-no-visibility-check-for-temporal-samples">[MAJOR] No Visibility Check for Temporal Samples</h3>
+<p><strong>Dimension</strong>: Correctness<br />
+<strong>Summary</strong>: The plan says "skip visibility ray for simplicity" but temporal reuse without visibility checks causes severe ghosting when objects move.<br />
+<strong>Suggestion</strong>: For Phase 7a (no temporal yet), this is N/A. For 7b, add a note that temporal reuse MUST have visibility validation before production.</p>
+<p><strong>Verdict</strong>: Deferred to Phase 7b.</p>
+<h3 id="minor-double-ping-pong-confusion">[MINOR] Double Ping-Pong Confusion</h3>
+<p><strong>Dimension</strong>: Architecture<br />
+<strong>Summary</strong>: The plan proposes ping-pong for both GI output AND reservoir data. That's 4 textures to manage.<br />
+<strong>Suggestion</strong>: For Phase 7a, reservoir data is write-once (no ping-pong needed). Only introduce ping-pong in 7b.</p>
+<p><strong>Verdict</strong>: Acknowledge.</p>
+<h3 id="minor-missing-register-layout-documentation">[MINOR] Missing Register Layout Documentation</h3>
+<p><strong>Dimension</strong>: Idiomatics<br />
+<strong>Summary</strong>: The HLSL register assignments need to be carefully documented to match NVRHI binding layout offsets (constantBufferOffset=0).<br />
+<strong>Suggestion</strong>: Add a register map table to the plan.</p>
+<p><strong>Verdict</strong>: Nit, fix in implementation.</p>
+<h3 id="nit-naming-convention">[NIT] Naming Convention</h3>
+<p><strong>Dimension</strong>: Idiomatics<br />
+<strong>Summary</strong>: <code>FReSTIRPass</code> is okay, but per AGENTS.md classes use PascalCase without namespace prefix in names. <code>ReSTIR::FPass</code> might be cleaner.<br />
+<strong>Suggestion</strong>: Keep <code>ReSTIR::FReSTIRPass</code> for clarity, but ensure file names match.</p>
+<p><strong>Verdict</strong>: Accept as-is.</p>
+<hr />
+<h2 id="revised-plan-summary">Revised Plan Summary</h2>
+<p><strong>Phase 7a: Reservoir Generation Compute Pass</strong> (This Session)</p>
+<p>Instead of modifying the RT shader, create a compute shader that:
+1. Reads the existing <code>DenoisedHDRTexture</code> (or <code>HDRTexture</code>) — this is our "sample contribution"
+2. Reads GBuffer (world pos, normal, depth)
+3. Builds a per-pixel reservoir where:
+   - <code>y</code> = GBuffer world position + primary ray direction (derived from normal)
+   - <code>p̂(y)</code> = radiance from GI output
+   - <code>p(y)</code> = 1.0 (uniform over pixel grid)
+   - <code>W = radiance</code> (since p(y)=1, w_sum = radiance, M=1)
+4. Outputs:
+   - <code>Reservoir0</code>: <code>float4(worldPos, W)</code>
+   - <code>Reservoir1</code>: <code>float4(w_sum, M=1, pdf=1, hitT)</code>
+   - <code>DebugOutput</code>: <code>float4(W, W, W, 1)</code> for visual verification</p>
+<p>C++ pass: <code>FReSTIRPass</code> that wraps this compute shader.</p>
+<p>Integration:</p>
+<pre><code>GI Ray Trace → Bilateral Denoise → ReSTIR Generation → Debug Blit → ReBLUR → Blit
+</code></pre>
+<p>Temporarily add a CVAR <code>r_ReSTIRDebugVis</code> to output reservoir weight as grayscale.</p>
+<p><strong>Phase 7b: Temporal Reuse</strong> (Future Session)
+- Add history reservoir textures (ping-pong)
+- Reproject and merge
+- Add visibility validation</p>
+<hr />
+<p><strong>Confidence Score</strong>: 7/10 after revision (was 4/10 before)</p>
+  </main>
+</div>
+<button id="topBtn" title="Back to top">↑</button>
+</body>
+</html>

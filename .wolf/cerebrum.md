@@ -2,7 +2,7 @@
 
 > OpenWolf's learning memory. Updated automatically as the AI learns from interactions.
 > Do not edit manually unless correcting an error.
-> Last updated: 2026-06-14
+> Last updated: 2026-06-27
 
 ## User Preferences
 
@@ -20,6 +20,8 @@
 
 ## Key Learnings
 
+- **Dump-directory + validator hygiene** (2026-07-23): `Test/<Name>_Data/dumps/` accumulates frames across builds. `validate_restir_gi.py` showed that "any file passes the threshold" can silently pass a validator while the latest build is producing all-black output, because older "good" frames still exist in the dir. Rule: validator must check the most-recent stamp group only, OR Build.sh must prune dumps/ before each run. Source: bug-069. See `Vibe_Coding/50_ReSTIR_GI_Temporal/claude/50_ReSTIR_GI_Temporal_debug_plan.md` Phase 4.1.
+- **GI algorithm correctness vs. visual plausibility** (2026-06-13): The Cornell Box test passes visually, but the path tracer is not physically correct. Per-bounce shadow rays implement NEE without MIS, emissive material data is ignored, and color bleed is faked by sunlight bouncing off colored walls. RealEngine reference requires BRDF+light PDF sampling, MIS, and proper material evaluation. See `Document/VibeCoding/GI_Algorithm_Correctness_Audit.md`.
 - **Project**: HLVM-Engine — UE5-inspired personal game engine, focused on memory management, rendering, telemetry. Linux dev toolchain + C++20. Not focused on rendering/content workflows.
 - **NVRHI integration**: Uses forked NVRHI from `https://github.com/yhyu13/NVRHI.git` — never blame NVRHI itself for bugs.
 - **ShaderMake**: HLSL → SPIR-V compilation. Config in `Test/<Name>_Data/ShaderMake.cfg`. Entrypoint: `ShaderMake::FindPermutationInBlob()`.
@@ -42,6 +44,7 @@
 - **Scene loading**: GLTF via Assimp (`AssimpSceneObject`, `Scene3DLoader`). Sponza test scene commonly used.
 - **Texture loading**: STB (PNG/JPG) and KTX2 (GPU-compressed) loaders available.
 - **KTX1 vs KTX2**: Sponza KTX files are KTX1+ASTC, not KTX2. `supercompressionScheme` is KTX2-only field — reading from KTX1 gives garbage. `ktxTexture2_TranscodeBasis()` only handles Basis formats, not ASTC. PNG/JPG Sponza works via stb_image.
+- Sentinel write + dump is the cheapest end-to-end smoke test for a render test. If sentinels appear but a smoke PS does NOT, the GPU commands between sentinel write and PS are being dropped — focus debugging there, not on the dump/readback path.
 
 ### Verified Vibe_Coding Learnings (2026-05-07)
 
@@ -71,8 +74,9 @@
 - **Debug visualisations must not survive the iteration**: Adding `gOutRadiance = red/green` for `historyValid` and leaving it in the build is a footgun. Use `#ifdef DEBUG_VIS` and turn it off, or remove before the next iteration. The build pipeline will compile your debug output and confuse the next debug session.
 - **Tonemap whiplash pattern**: `Reinhard x/(1+x)` → too dark; raw `Exposure=2` → clipping; ACES filmic → correct. Sequence is wrong — the first question should be "is the input HDR legal? what's the max luminance?" If max > 1.0, you need a tonemap before you adjust exposure. Pick ACES first if scene radiance is unbounded.
 - **Drop dead bindings**: If `CurrentRadiance`/`HistoryRadiance`/`OutRadiance` are bound to a shader that doesn't read or write them, they are misleading. Either implement the feature (TAA radiance blending) or remove the binding. Don't leave descriptor set slots full of unwired slots — they imply capability that doesn't exist.
-
 ## Do-Not-Repeat
+
+- 2026-07-24: When nvrhi CommandList mixes passes and a later pass has a Vulkan validation error (e.g. image layout mismatch), the error can retroactively drop ALL earlier-recorded GPU work in the same submission. Fix: split the CommandList submission around the failing/fragile pass — close+execute+waitForIdle, then reopen. This is the root cause of bug-088's raster-pass silent drop; the temporal-reservoir layout error (bug-075) was poisoning the entire submission. Diagnostic pattern that worked: write gl_FragCoord-based gradient to MRT0 — any non-sentinel pixel proves rasterizer reached the PS; uniform saturated sentinel proves GPU work was dropped upstream of the PS.
 
 - [2026-05-05] **Don't use `ctest -j N`** — causes mallocator errors. Use `./Build.sh --Test` instead.
 - [2026-05-05] **Don't blame NVRHI** for rendering bugs. HLVM bug likely in binding, descriptor set, or shader layout mismatch.
@@ -126,6 +130,17 @@
 - [2026-06-14] **FrameIndex must be part of the GI pixel seed for temporal denoising** — Per-sample/per-bounce seed independence (R0) is necessary but not sufficient. If `pixelSeed` depends only on `(x, y)`, every frame traces identical paths and temporal accumulators (ReBLUR, TAA, etc.) see identical input. The symptom is byte-identical frame dumps even with the denoiser enabled. Fix: add `TemporalFrameCount` to the seed via an unused constant-buffer slot (ViewConstants padding). Source: bug-057, `FewBounceGI.hlsl:142`.
 - [2026-06-14] **Denoiser correctness before parameter tuning** — ReBLUR was tuned for ~50 iterations while the real bugs were (1) wrong LH_ZO depth remapping in `ReconstructViewPos`, (2) black fallback in `SpatialBlur`, (3) overwrite of temporal result, and (4) deterministic GI input. After those four fixes the defaults produce stable output; parameter sweeps only matter once the math is correct. Source: bugs R1-R3, bug-057-059.
 - [2026-06-14] **Expose denoiser blend factors as CVars** — The spatial/temporal blend alpha should be CVar-driven. Rebuilding shaders for every parameter sweep is process waste. `r_ReBLUR_SpatialAlpha` now exists and maps through `FReBLURConstants` without shader recompilation.
+- [2026-06-27] **When linking `mcp-framework` via `file:../mcp-framework`, re-export `z` from the framework's barrel** — npm installs a separate `zod` copy inside `mcp-framework/node_modules/`. Consumer tools that `import { z } from "zod"` create schemas with a *different* `zod` instance than the framework's `instanceof z.ZodObject` check, causing `Cannot read properties of null (reading 'type')` during tool validation. Fix: add `export { z } from 'zod';` to `Engine/Source/Plugin/mcp-framework/src/index.ts` and have consumer tools `import { z } from "mcp-framework"`. This guarantees schema objects and validators use the same zod prototype.
+
+- **TestPathTraceGI format and payload audit (2026-07-17)**: The triangle readback fix is already present in TestPathTraceGI: OutputTexture, AccumTexture, DisplayTexture, and staging are all RGBA32_FLOAT, and float* readback is format-correct. Snowflake/speckle artifacts are therefore not caused by the prior RGBA16/float32 reinterpretation bug. The current FGIPass pipeline declares MaxPayloadSize=80 bytes while GIPathTracing.hlsl's padded GIPayload occupies 128 bytes; treat this mismatch as the first rendering-path A/B fix before tuning SPP/exposure. The optional backbuffer PNG dump also triggers Vulkan validation because the swapchain image lacks TRANSFER_SRC usage; this dump-only error does not explain on-screen speckle.
+
+- **TestPathTraceGI post-fix verification (2026-07-17)**: Raising FGIPass MaxPayloadSize to 128 and changing ShadowPayload.occluded to uint are structurally correct, and the swapchain transfer-source usage removes the observed dump validation error on the RTX 3090. The GI test still passes twice with unchanged raw/display statistics, so these fixes are not the remaining snowflake cause. After uint conversion, slangc reports three explicit-conversion sites (shadow visibility ternary plus two debug flag branches); compare against 0u. Swapchain eTransferSrc should be requested only when surface capabilities advertise it for portability.
+
+- **TestPathTraceGI snowflake diagnosis confirmed (2026-07-17)**: Accumulation sweep converges as expected: Display max 0.8800 at 1 frame, 0.7422 at 16, and 0.6733 at 128 while mean stabilizes near 0.506. Debug modes isolate clean diffuse and normals (modes 1/2) from noisy direct and sparse indirect lighting (modes 3/4). Therefore residual bright speckles are Monte Carlo lighting variance, not geometry, material, payload, readback, or tonemap corruption. Keep raw HDR values >1 legal; judge convergence on Display output and frame-count trend rather than raw Output saturation alone.
+- 2026-07-23: TestReSTIR_GI_Temporal raster pass silently drops GPU work — smoke PS red never appears in dumps, only WriteGBufferSentinels values persist. nvrhi's persistent immediate CommandList likely drops per-frame draw work after a flush. Switching to non-immediate CL alone did NOT fix it. Don't keep guessing at minor CL/vulkan tweaks — debug the Vulkan submission path in DeviceManagerVk.cpp next time, or rewrite raster pass matching TestRTShadowsGBuffer's pre-baked pipeline setup exactly.
+
+- Per-pass CommandList isolation (close+execute+waitForIdle between passes) is a strong debugging tool for Vulkan validation errors that retroactively invalidate earlier GPU work. Useful even when the per-pass validation error is benign (e.g. layout mismatches).
+- When `ar t libnvrhid.a | grep validation` returns empty but the linker demands `nvrhi::validation::createValidationLayer`, the validation .o files exist in `_deps/nvrhi-build/CMakeFiles/nvrhi.dir/src/validation/` but were never added to the static lib. Re-add with `llvm-ar-17 qc libnvrhid.a validation-commandlist.cpp.o validation-device.cpp.o && llvm-ranlib-17 libnvrhid.a`.
 
 ## Decision Log
 
@@ -140,6 +155,7 @@
 - **Bloom Post-Processing (2026-05-18)**: Added reusable `FBloomPass` engine class with dual-filter Gaussian bloom (threshold + downsample → separable blur → upsample). Integrated into `TestSponzaDeferred` tone mapping pipeline. Key details: (1) Shared binding layout across 3 shaders (t0=input, u0=output, only bound handles change), (2) Ping-pong half-res textures with explicit state transitions between dispatches, (3) Tone mapping shader reads `t_Bloom` at `t1` and adds before tone curve, (4) Constant buffer 32 bytes (8 floats) — `Exposure, Gamma, Mode, BloomIntensity, TextureSize`.
 - **Deferred Lighting + Tone Mapping Extraction (2026-05-10)**: Extracted inline deferred lighting and tone mapping compute passes from `TestSponzaDeferred.cpp` into reusable engine passes. `FDeferredLightingPass` (rewrite): PBR Cook-Torrance lighting with shadow mapping (PCF 2x2) + SSAO integration, 13-register constant buffer (InvViewProj, LightDir, CameraPos, ShadowHardness, AmbientColor, MinAO, ScreenSize, LightViewProj, ShadowMapSize, ShadowBias). `FToneMappingPass` (new): ACES/Reinhard/none tone curves with bloom composite, 2-register constant buffer (Exposure, Gamma, Mode, BloomIntensity, TextureSize). Both follow `FBloomPass` pattern: `Initialize(Device, ShaderDir)` → `Dispatch(CmdList, Desc, Constants)` → `Shutdown()`. Removed ~120 lines of inline test code. Test passes Debug x2 and RelWithDebInfo x2.
 - **GI Pipeline Validation via Cornell Box (2026-06-15)**: TestCornellBoxGI is now the canonical regression test for the few-bounce GI + ReBLUR + ReSTIR spatial-MIS pipeline. Validates: 0% black pixels, temporal mean drift ≤5%, per-pixel temporal std ≤20% of mean, high/low intensity ratio ≤5, red+green color bleed on floor. Validating pass confirms engine pipeline is correct; remaining Sponza quality gap is scene authoring, not engine bugs. Run with `HLVM_DUMP_GI=1 ./Binary/Debug/TestCornellBoxGI && python3 validate_cornell.py`. Keep this test green; regressions in the same class (RNG seed, temporal accumulation, denoiser wiring) will trip it.
+- **HLVM MCP Server v1 scoped to Runtime tests only (2026-06-27)**: Built MCP server at `Engine/Source/Plugin/hlvm-engine-mcp/` with tools `list_hlvm_tests`, `run_hlvm_test`, `run_hlvm_tests_by_module`. Common tests excluded from v1 because `Engine/Source/Common/Binary/Debug/` contains only `libCommond.a` — no standalone `Test*` executables. Common's CMake likely registers tests as a single driver binary linked against `libCommond.a`. Adding Common test support requires CMake work, deferred to a future iteration.
 
 ## 2026-06-07 — P0 Execution Session
 

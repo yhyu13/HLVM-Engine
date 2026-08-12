@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>plan_7b.md</title>
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+       margin: 0; color: #1f2937; }
+body::before { content: ""; display: block; height: 3px;
+                background: linear-gradient(90deg, #dc2626, #2563eb); }
+header { background: #1f2937; color: #fff; padding: 14px 24px;
+          border-bottom: 3px solid #dc2626; }
+header h1 { margin: 0; font-size: 18px; }
+header .crumb { font-size: 12px; opacity: 0.75; }
+header .crumb a { color: #93c5fd; text-decoration: none; }
+header .crumb a:hover { text-decoration: underline; }
+.layout { display: grid; grid-template-columns: 260px 1fr; gap: 0; max-width: 1200px; margin: 0 auto; }
+nav.toc { border-right: 1px solid #e5e7eb; padding: 20px; font-size: 14px; position: sticky; top: 0;
+          max-height: 100vh; overflow-y: auto; box-sizing: border-box; background: #fafafa; }
+nav.toc h2 { font-size: 13px; text-transform: uppercase; color: #6b7280; margin: 0 0 12px;
+              letter-spacing: 0.5px; font-weight: 700; }
+nav.toc ul { list-style: none; padding: 0; margin: 0; }
+nav.toc li { padding: 4px 0; position: relative; padding-left: 14px;
+              transition: background 0.15s; }
+nav.toc li::before { content: ""; position: absolute; left: 0; top: 50%;
+                      transform: translateY(-50%); width: 6px; height: 6px;
+                      border-radius: 50%; background: #dc2626; opacity: 0.55; }
+nav.toc li:hover { background: #fef2f2; }
+nav.toc li:hover::before { opacity: 1; transform: translateY(-50%) scale(1.4); }
+nav.toc li.active { background: #fef2f2; }
+nav.toc li.active::before { background: #dc2626; opacity: 1; transform: translateY(-50%) scale(1.4); }
+nav.toc li.active a { color: #dc2626; font-weight: 600; }
+nav.toc a { color: #2563eb; text-decoration: none; }
+nav.toc a:hover { color: #dc2626; text-decoration: underline; }
+nav.toc .lvl2 { padding-left: 28px; }
+nav.toc .lvl3 { padding-left: 42px; font-size: 13px; }
+nav.toc .lvl3::before { width: 5px; height: 5px; background: #2563eb; opacity: 0.5; }
+nav.toc .empty { color: #9ca3af; font-style: italic; }
+.legend { margin-top: 18px; padding: 10px; background: #fff;
+           border: 1px solid #e5e7eb; border-radius: 6px; font-size: 12px; }
+.legend h2 { font-size: 11px !important; margin: 0 0 6px !important; }
+.legend div { display: flex; align-items: center; gap: 6px; padding: 2px 0; }
+.legend span.swatch { display: inline-block; width: 12px; height: 12px;
+                       border-radius: 3px; flex-shrink: 0; }
+.keywords { margin-top: 14px; padding: 10px; background: #fff;
+             border: 1px solid #e5e7eb; border-radius: 6px; font-size: 12px; }
+.keywords h2 { font-size: 11px !important; margin: 0 0 6px !important; }
+.keywords ul { padding-left: 14px; margin: 0; }
+.keywords li { padding: 1px 0 !important; padding-left: 0 !important;
+                border: 0 !important; background: none !important; }
+.keywords li::before { display: none !important; }
+.keywords a { color: #1f2937 !important; font-size: 12px; }
+.keywords a:hover { color: #dc2626 !important; text-decoration: underline; }
+main { padding: 24px 36px; line-height: 1.6; max-width: 900px; }
+main h1, main h2, main h3 { scroll-margin-top: 16px; }
+main h1 { color: #dc2626; border-bottom: 2px solid #dc2626; padding-bottom: 6px; }
+main h2 { color: #2563eb; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px;
+          margin-top: 32px; padding-left: 10px; border-left: 4px solid #2563eb; }
+main h3 { color: #dc2626; margin-top: 24px; padding-left: 8px;
+          border-left: 3px solid #dc2626; }
+main a { color: #2563eb; text-decoration: none; }
+main a:hover { color: #dc2626; text-decoration: underline; }
+main pre { background: #ffffff; color: #1f2937; padding: 16px; border-radius: 6px;
+            overflow-x: auto; font: 13px/1.5 Menlo, Consolas, monospace;
+            border: 1px solid #e5e7eb; }
+main code { background: #f3f4f6; color: #1f2937; padding: 2px 5px; border-radius: 3px;
+             font: 13px Menlo, Consolas, monospace; }
+main pre code { background: transparent; color: inherit; padding: 0; }
+main table { border-collapse: collapse; }
+main th, main td { border: 1px solid #e5e7eb; padding: 6px 12px; }
+main th { background: #f3f4f6; }
+main blockquote { border-left: 4px solid #d1d5db; margin: 16px 0; padding: 8px 16px;
+                   color: #4b5563; }
+main hr { border: 0; border-top: 1px solid #e5e7eb; margin: 24px 0; }
+main strong.kw { color: #dc2626; font-weight: 700; }
+.summary { background: #eff6ff; border-left: 4px solid #2563eb; padding: 12px 16px;
+            margin: 16px 0 24px; border-radius: 4px; color: #1e3a8a; font-size: 14px;
+            line-height: 1.5; }
+.summary::before { content: "📝 Summary"; display: block; font-weight: 700;
+                    color: #2563eb; font-size: 11px; text-transform: uppercase;
+                    letter-spacing: 0.5px; margin-bottom: 4px; }
+.back { display: inline-block; margin-bottom: 16px; font-size: 0.9em; color: #2563eb;
+         text-decoration: none; }
+.back:hover { color: #dc2626; text-decoration: underline; }
+#topBtn { position: fixed; bottom: 24px; right: 24px; z-index: 100;
+          background: #dc2626; color: #fff; border: 0; border-radius: 50%;
+          width: 44px; height: 44px; font-size: 18px; cursor: pointer;
+          box-shadow: 0 2px 6px rgba(0,0,0,0.2); opacity: 0;
+          transition: opacity 0.2s; pointer-events: none; }
+#topBtn.show { opacity: 1; pointer-events: auto; }
+#topBtn:hover { background: #b91c1c; }
+@media (max-width: 900px) {
+  .layout { grid-template-columns: 1fr; }
+  nav.toc { position: static; max-height: none; border-right: 0;
+             border-bottom: 1px solid #e5e7eb; }
+  main { padding: 16px 20px; }
+}
+@media print {
+  nav.toc, .legend, .keywords, #topBtn { display: none; }
+  .layout { grid-template-columns: 1fr; }
+  body::before { display: none; }
+  header { background: #fff; color: #000; border-bottom: 1px solid #000; }
+  main h1, main h2, main h3 { color: #000; border-color: #000; }
+}
+</style>
+<script>
+(function() {
+  const links = document.querySelectorAll('nav.toc a[href^="#"]');
+  const map = new Map();
+  links.forEach(a => {
+    const id = a.getAttribute('href').slice(1);
+    const li = a.parentElement;
+    map.set(id, li);
+  });
+  const targets = Array.from(map.keys()).map(id => document.getElementById(id)).filter(Boolean);
+  function activate() {
+    if (!targets.length) return;
+    const scrollY = window.scrollY + 80;
+    let current = null;
+    for (const t of targets) {
+      if (t.offsetTop <= scrollY) current = t;
+      else break;
+    }
+    links.forEach(a => a.parentElement.classList.remove('active'));
+    if (current) {
+      const li = map.get(current.id);
+      if (li) li.classList.add('active');
+    }
+  }
+  window.addEventListener('scroll', activate, { passive: true });
+  activate();
+
+  const btn = document.getElementById('topBtn');
+  if (btn) {
+    window.addEventListener('scroll', () => {
+      btn.classList.toggle('show', window.scrollY > 400);
+    }, { passive: true });
+    btn.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+  }
+})();
+</script>
+</head>
+<body>
+<header>
+  <div class="crumb"><a href="./index.html">Vibe_Coding/</a> / <a href="index.html">50_ReSTIR_GI_Temporal</a> / plan_7b.md</div>
+  <h1>📄 plan_7b.md</h1>
+</header>
+<div class="layout">
+  <nav class="toc">
+    <h2>On this page</h2>
+    <ul>
+<li class=""><a href="#phase-7b-restir-gi-temporal-reservoir-reuse">Phase 7b: ReSTIR GI — Temporal Reservoir Reuse</a></li>
+      <li class="lvl2"><a href="#goal">Goal</a></li>
+      <li class="lvl2"><a href="#architecture">Architecture</a></li>
+      <li class="lvl3"><a href="#pipeline">Pipeline</a></li>
+      <li class="lvl3"><a href="#why-no-shading-change-yet">Why No Shading Change Yet?</a></li>
+      <li class="lvl3"><a href="#ping-pong-reservoirs">Ping-Pong Reservoirs</a></li>
+      <li class="lvl3"><a href="#reservoir-merge-algorithm">Reservoir Merge Algorithm</a></li>
+      <li class="lvl3"><a href="#random-number-generation">Random Number Generation</a></li>
+      <li class="lvl2"><a href="#hlsl-implementation">HLSL Implementation</a></li>
+      <li class="lvl3"><a href="#restir_temporal_cshlsl">ReSTIR_Temporal_cs.hlsl</a></li>
+      <li class="lvl2"><a href="#c-implementation">C++ Implementation</a></li>
+      <li class="lvl3"><a href="#modified-frestirpass">Modified FReSTIRPass</a></li>
+      <li class="lvl3"><a href="#integration-into-testfewbouncegicpp">Integration into TestFewBounceGI.cpp</a></li>
+      <li class="lvl2"><a href="#shader-register-map">Shader Register Map</a></li>
+      <li class="lvl2"><a href="#build-integration">Build Integration</a></li>
+      <li class="lvl2"><a href="#testing-strategy">Testing Strategy</a></li>
+      <li class="lvl2"><a href="#success-criteria">Success Criteria</a></li>
+      <li class="lvl2"><a href="#risks-mitigations">Risks &amp; Mitigations</a></li>
+      <li class="lvl2"><a href="#phase-8-preview">Phase 8 Preview</a></li>
+    </ul>
+    <div class="legend">
+      <h2>Color Legend</h2>
+      <div><span class="swatch" style="background:#dc2626;"></span> Red = Section / Keyword</div>
+      <div><span class="swatch" style="background:#2563eb;"></span> Blue = Sub-section / Link</div>
+      <div><span class="swatch" style="background:#1f2937;"></span> Black = Body</div>
+    </div>
+<div class="keywords">
+      <h2>Key Terms</h2>
+      <ul>
+      <li>CRITIC REVIEW APPLIED</li>
+      <li>Merge</li>
+      <li>Constants</li>
+      <li>Reprojection</li>
+      <li>Validation</li>
+      <li>Decision</li>
+      <li>Add history textures</li>
+      <li>Create history textures</li>
+      <li>In Render()</li>
+      <li>current</li>
+      <li>history</li>
+      <li>NVRHI Binding Offsets</li>
+      <li>Compile</li>
+      <li>Run</li>
+      <li>Debug vis M</li>
+      <li>Debug vis W</li>
+      </ul>
+    </div>
+  </nav>
+  <main>
+    <a class="back" href="index.html">&larr; Back to 50_ReSTIR_GI_Temporal index</a>
+<div class="summary">Merge per-pixel reservoirs temporally across frames using reprojection. Each pixel combines its current reservoir with the reprojected previous frame&#x27;s reservoir.</div>
+<h1 id="phase-7b-restir-gi-temporal-reservoir-reuse">Phase 7b: ReSTIR GI — Temporal Reservoir Reuse</h1>
+<blockquote>
+<p><strong>CRITIC REVIEW APPLIED</strong>: Scope focused on temporal merge only. No shading changes. Debug visualization of M/W verifies correctness.</p>
+</blockquote>
+<h2 id="goal">Goal</h2>
+<p>Merge per-pixel reservoirs temporally across frames using reprojection. Each pixel combines its current reservoir with the reprojected previous frame's reservoir.</p>
+<h2 id="architecture">Architecture</h2>
+<h3 id="pipeline">Pipeline</h3>
+<pre><code>GBuffer Pass
+    ↓
+GI Ray Trace (3 bounces, untouched)
+    ↓
+Bilateral Denoise (untouched)
+    ↓
+ReSTIR Generation (Phase 7a — writes Reservoir0/1)
+    ↓
+[NEW] ReSTIR Temporal Reuse (reads current + history, writes merged + new history)
+    ↓
+ReBLUR (untouched — still uses DenoisedHDRTexture)
+    ↓
+Blit to screen
+</code></pre>
+<h3 id="why-no-shading-change-yet">Why No Shading Change Yet?</h3>
+<p>Phase 7b only builds and verifies the temporal merge infrastructure. The merged reservoir is not yet used for final shading — that comes in Phase 8 (spatial reuse + evaluation). This prevents visual regressions and makes debugging easier.</p>
+<h3 id="ping-pong-reservoirs">Ping-Pong Reservoirs</h3>
+<table>
+<thead>
+<tr>
+<th>Frame N</th>
+<th>Current Reservoirs</th>
+<th>History Reservoirs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Even</td>
+<td>Reservoir0/1</td>
+<td>Reservoir0History/1History</td>
+</tr>
+<tr>
+<td>Odd</td>
+<td>Reservoir0History/1History</td>
+<td>Reservoir0/1</td>
+</tr>
+</tbody>
+</table>
+<p>After temporal pass, swap pointers.</p>
+<h3 id="reservoir-merge-algorithm">Reservoir Merge Algorithm</h3>
+<p>For each pixel:
+1. Read current reservoir <code>r_c</code> (worldPos_c, W_c, w_sum_c, M_c)
+2. Reproject pixel to previous frame UV using <code>PrevViewProj</code> + depth
+3. If reprojected UV is valid, read history reservoir <code>r_h</code>
+4. <strong>Merge</strong>:
+   ```
+   M_merged = min(M_c + M_h, MAX_M)  // MAX_M = 30
+   w_sum_merged = w_sum_c + w_sum_h  // p(y)=1 simplifies Jacobian to 1.0</p>
+<p>// Select winner proportional to weights
+   if random() &lt; w_sum_h / w_sum_merged:
+       y_merged = y_h
+   else:
+       y_merged = y_c</p>
+<p>W_merged = w_sum_merged / max(M_merged, 1e-6)
+   ```
+5. Write merged reservoir to output (becomes next frame's history)</p>
+<h3 id="random-number-generation">Random Number Generation</h3>
+<p>Use a simple hash based on pixel coord + frame index:</p>
+<pre><code class="language-hlsl">float hash(uint2 pixel, uint frame)
+</code></pre>
+<h2 id="hlsl-implementation">HLSL Implementation</h2>
+<h3 id="restir_temporal_cshlsl">ReSTIR_Temporal_cs.hlsl</h3>
+<pre><code class="language-hlsl">// Inputs:
+//   t0: Current Reservoir0 (worldPos.xyz, W)
+//   t1: Current Reservoir1 (w_sum, M, pdf, hitDist)
+//   t2: History Reservoir0
+//   t3: History Reservoir1
+//   t4: Depth texture
+// Outputs:
+//   u0: Merged Reservoir0 (for next frame's history)
+//   u1: Merged Reservoir1
+//   u2: Debug output (M as grayscale, or W)
+</code></pre>
+<p><strong>Constants</strong>:</p>
+<pre><code class="language-hlsl">struct FReSTIRTemporalConstants {
+    float4x4 InverseCurrViewProj;
+    float4x4 PrevViewProj;
+    float2 OutputSize;
+    float2 RcpOutputSize;
+    float FrameIndex;
+    float MaxM;
+    float DebugVis;  // 1.0 = show M, 2.0 = show W
+    float Pad;
+};
+</code></pre>
+<p><strong>Reprojection</strong>:</p>
+<pre><code class="language-hlsl">float2 ReprojectUV(float2 uv, float depth) {
+    float4 clipPos = float4(uv * 2 - 1, depth * 2 - 1, 1);
+    float4 worldPos = mul(InverseCurrViewProj, clipPos);
+    worldPos /= worldPos.w;
+    float4 prevClip = mul(PrevViewProj, worldPos);
+    prevClip /= prevClip.w;
+    return prevClip.xy * 0.5 + 0.5;
+}
+</code></pre>
+<p><strong>Validation</strong>:
+- Reprojected UV must be in [0, 1]
+- History reservoir must have M &gt; 0 (not sky/invalid)</p>
+<h2 id="c-implementation">C++ Implementation</h2>
+<h3 id="modified-frestirpass">Modified FReSTIRPass</h3>
+<p>Extend <code>FReSTIRPass</code> with a second dispatch method, or create <code>FReSTIRTemporalPass</code>.</p>
+<p><strong>Decision</strong>: Extend <code>FReSTIRPass</code> with a <code>DispatchTemporal</code> method. Keeps all ReSTIR logic in one class.</p>
+<pre><code class="language-cpp">namespace ReSTIR {
+    struct FReSTIRTemporalConstants {
+        TFP32 InverseCurrViewProj[16];
+        TFP32 PrevViewProj[16];
+        TFP32 OutputSize[2];
+        TFP32 RcpOutputSize[2];
+        TFP32 FrameIndex;
+        TFP32 MaxM;
+        TFP32 DebugVis;
+        TFP32 Pad;
+    };
+
+    class FReSTIRPass {
+    public:
+        // Phase 7a: Generation
+        void Dispatch(nvrhi::ICommandList*, const FDesc&amp;, const FReSTIRConstants&amp;);
+
+        // Phase 7b: Temporal
+        struct FTemporalDesc {
+            nvrhi::TextureHandle CurrentReservoir0;
+            nvrhi::TextureHandle CurrentReservoir1;
+            nvrhi::TextureHandle HistoryReservoir0;
+            nvrhi::TextureHandle HistoryReservoir1;
+            nvrhi::TextureHandle DepthTexture;
+            nvrhi::TextureHandle OutReservoir0;
+            nvrhi::TextureHandle OutReservoir1;
+            nvrhi::TextureHandle OutDebugTexture;
+            uint32_t OutputWidth, OutputHeight;
+        };
+        void DispatchTemporal(nvrhi::ICommandList*, const FTemporalDesc&amp;, const FReSTIRTemporalConstants&amp;);
+    };
+}
+</code></pre>
+<h3 id="integration-into-testfewbouncegicpp">Integration into TestFewBounceGI.cpp</h3>
+<ol>
+<li><strong>Add history textures</strong>:</li>
+</ol>
+<pre><code class="language-cpp">nvrhi::TextureHandle Reservoir0History;
+nvrhi::TextureHandle Reservoir1History;
+</code></pre>
+<ol>
+<li>
+<p><strong>Create history textures</strong> alongside current reservoirs in <code>Initialize()</code>.</p>
+</li>
+<li>
+<p><strong>In Render()</strong>, after Generation pass:</p>
+</li>
+</ol>
+<pre><code class="language-cpp">// ReSTIR Temporal Reuse
+CmdList-&gt;setTextureState(Reservoir0Texture, ..., ShaderResource);
+CmdList-&gt;setTextureState(Reservoir1Texture, ..., ShaderResource);
+CmdList-&gt;setTextureState(Reservoir0History, ..., ShaderResource);
+CmdList-&gt;setTextureState(Reservoir1History, ..., ShaderResource);
+CmdList-&gt;setTextureState(GBufferDepthTexture, ..., ShaderResource);
+CmdList-&gt;setTextureState(Reservoir0Texture, ..., UnorderedAccess);  // Reuse as output
+CmdList-&gt;setTextureState(Reservoir1Texture, ..., UnorderedAccess);
+
+ReSTIR::FReSTIRPass::FTemporalDesc TemporalDesc;
+// ... bind textures ...
+
+ReSTIR::FReSTIRTemporalConstants TemporalConstants;
+// ... fill matrices ...
+TemporalConstants.MaxM = 30.0f;
+
+ReSTIRPass.DispatchTemporal(CmdList, TemporalDesc, TemporalConstants);
+
+// Swap: merged output becomes next frame's history
+std::swap(Reservoir0Texture, Reservoir0History);
+std::swap(Reservoir1Texture, Reservoir1History);
+</code></pre>
+<p><strong>Note</strong>: We swap the <strong>current</strong> and <strong>history</strong> pointers. The merged output is written to what was previously the current reservoir texture, and then we swap so it becomes the history for next frame.</p>
+<p>Wait, actually we need to be careful. The generation pass writes to <code>Reservoir0Texture</code>. Then the temporal pass reads from <code>Reservoir0Texture</code> (current) and <code>Reservoir0History</code> (history), and writes to... where?</p>
+<p>Option A: Write back to <code>Reservoir0Texture</code> (overwriting generation output). Then swap.
+Option B: Write to a separate <code>MergedReservoir0</code> texture. Then swap.</p>
+<p>Option A is simpler and saves texture memory:
+1. Generation writes to <code>Reservoir0/1</code>
+2. Temporal reads <code>Reservoir0/1</code> (current) + <code>Reservoir0/1History</code> (history)
+3. Temporal writes to <code>Reservoir0/1</code> (overwriting current with merged)
+4. Swap <code>Reservoir0/1</code> &lt;-&gt; <code>Reservoir0/1History</code></p>
+<p>For next frame:
+- <code>Reservoir0/1</code> now contains the merged data (from step 3)
+- <code>Reservoir0/1History</code> now contains the old current (unmerged, from before step 3)</p>
+<p>Wait, that's wrong. After step 3, <code>Reservoir0</code> contains merged. After swap, <code>Reservoir0History</code> contains merged, and <code>Reservoir0</code> contains the old unmerged current. Then next frame's generation pass overwrites <code>Reservoir0</code> with new current. That works!</p>
+<p>Actually no — next frame needs the merged data as history. Let's trace carefully:</p>
+<p>Frame N:
+1. Generation writes to <code>Reservoir0</code> (current)
+2. Temporal reads <code>Reservoir0</code> (current) + <code>Reservoir0History</code> (history from N-1)
+3. Temporal writes merged to <code>Reservoir0</code> (overwriting current)
+4. Swap: <code>Reservoir0</code> &lt;-&gt; <code>Reservoir0History</code>
+   - Now <code>Reservoir0History</code> = merged (for frame N+1 history)
+   - Now <code>Reservoir0</code> = old history from N-1 (will be overwritten by generation in N+1)</p>
+<p>Frame N+1:
+1. Generation writes to <code>Reservoir0</code> (overwriting old N-1 history)
+2. Temporal reads <code>Reservoir0</code> (current N+1) + <code>Reservoir0History</code> (merged N)
+3. Temporal writes merged N+1 to <code>Reservoir0</code>
+4. Swap</p>
+<p>Yes, this works! The merged result from frame N becomes the history for frame N+1.</p>
+<h2 id="shader-register-map">Shader Register Map</h2>
+<table>
+<thead>
+<tr>
+<th>Register</th>
+<th>Name</th>
+<th>Type</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>b0</td>
+<td><code>gConstants</code></td>
+<td>cbuffer</td>
+<td>Temporal constants</td>
+</tr>
+<tr>
+<td>t0</td>
+<td><code>gCurrReservoir0</code></td>
+<td>Texture2D</td>
+<td>Current reservoir 0</td>
+</tr>
+<tr>
+<td>t1</td>
+<td><code>gCurrReservoir1</code></td>
+<td>Texture2D</td>
+<td>Current reservoir 1</td>
+</tr>
+<tr>
+<td>t2</td>
+<td><code>gHistReservoir0</code></td>
+<td>Texture2D</td>
+<td>History reservoir 0</td>
+</tr>
+<tr>
+<td>t3</td>
+<td><code>gHistReservoir1</code></td>
+<td>Texture2D</td>
+<td>History reservoir 1</td>
+</tr>
+<tr>
+<td>t4</td>
+<td><code>gDepth</code></td>
+<td>Texture2D</td>
+<td>Linear depth</td>
+</tr>
+<tr>
+<td>u0</td>
+<td><code>gOutReservoir0</code></td>
+<td>RWTexture2D</td>
+<td>Merged reservoir 0</td>
+</tr>
+<tr>
+<td>u1</td>
+<td><code>gOutReservoir1</code></td>
+<td>RWTexture2D</td>
+<td>Merged reservoir 1</td>
+</tr>
+<tr>
+<td>u2</td>
+<td><code>gDebugOutput</code></td>
+<td>RWTexture2D</td>
+<td>Debug visualization</td>
+</tr>
+</tbody>
+</table>
+<p><strong>NVRHI Binding Offsets</strong>: <code>constantBufferOffset = 0</code>
+- b0 → 256
+- t0-t4 → 0-4
+- u0-u2 → 384-386</p>
+<h2 id="build-integration">Build Integration</h2>
+<ul>
+<li><code>ShaderMake.cfg</code>: Add <code>ReSTIR_Temporal_cs.hlsl -T cs</code></li>
+<li><code>CMakeLists.txt</code>: Already has <code>FReSTIRPass.cpp</code></li>
+</ul>
+<h2 id="testing-strategy">Testing Strategy</h2>
+<ol>
+<li><strong>Compile</strong>: <code>./Build.sh --Config=Debug --Target=TestFewBounceGI</code></li>
+<li><strong>Run</strong>: <code>./Build.sh --Config=Debug --Target=TestFewBounceGI --Test</code></li>
+<li><strong>Debug vis M</strong>: <code>g_ReSTIRDebugVis = true</code> — static scenes should show M increasing over first 30 frames (saturates at MAX_M=30). Moving camera should show M resetting at edges.</li>
+<li><strong>Debug vis W</strong>: Show merged W as grayscale — should be smoother than single-frame W.</li>
+</ol>
+<h2 id="success-criteria">Success Criteria</h2>
+<ul>
+<li>[ ] Compiles without errors</li>
+<li>[ ] TestFewBounceGI passes</li>
+<li>[ ] Debug M visualization shows increasing values on static pixels (up to MAX_M)</li>
+<li>[ ] Debug M visualization shows low values at screen edges / during camera motion</li>
+<li>[ ] No performance regression</li>
+<li>[ ] Ping-pong swap works correctly across frames</li>
+</ul>
+<h2 id="risks-mitigations">Risks &amp; Mitigations</h2>
+<table>
+<thead>
+<tr>
+<th>Risk</th>
+<th>Mitigation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Reprojection math wrong → M doesn't accumulate</td>
+<td>Visualize M; static pixels should reach MAX_M</td>
+</tr>
+<tr>
+<td>Reservoir merge corrupts data</td>
+<td>Visualize W; should be stable and non-zero</td>
+</tr>
+<tr>
+<td>Ping-pong swap wrong → feedback loop</td>
+<td>Log frame 0 vs frame 10 M values</td>
+</tr>
+<tr>
+<td>Read-after-write hazard</td>
+<td>Ensure proper texture state transitions</td>
+</tr>
+</tbody>
+</table>
+<h2 id="phase-8-preview">Phase 8 Preview</h2>
+<ul>
+<li>Spatial reuse: 3x3 neighbor merge on merged reservoirs</li>
+<li>Shading evaluation: proper RGB output from selected samples</li>
+<li>Integration with ReBLUR: feed spatially-reused output into temporal denoiser</li>
+</ul>
+  </main>
+</div>
+<button id="topBtn" title="Back to top">↑</button>
+</body>
+</html>
