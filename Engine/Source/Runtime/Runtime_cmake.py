@@ -1,5 +1,30 @@
 from PyCMake.cmakecpp import *
 
+# v168 (six-role-pipeline, 2026-08-14): PyCMake 0.4.0's FetchContent.dump
+# hardcodes the FetchContent_Declare body and cannot emit PATCH_COMMAND.
+# Monkey-patch the dump so every regeneration of CMakeLists.txt re-adds the
+# nvrhi patch step (engine workarounds in ThirdParty/NVRHI/nvrhi-rhi2.patch:
+# validation-TU build fix, immediate-CL reopen bypass, and the
+# VUID-vkCmdTraceRaysKHR-None-08608 VVL 1.3.280 workaround).
+import io
+_PyCMakeFetchContent = FetchContent
+_PyCMakeFetchContent_orig_dump = _PyCMakeFetchContent.dump
+
+def _FetchContent_dump_with_nvrhi_patch(self, fp):
+    buf = io.StringIO()
+    _PyCMakeFetchContent_orig_dump(self, buf)
+    text = buf.getvalue()
+    if self.name == 'nvrhi' and 'PATCH_COMMAND' not in text:
+        tag_line = 'GIT_TAG {}'.format(self.git_tag)
+        patch_cmd = ('PATCH_COMMAND ${CMAKE_COMMAND} '
+                     '-DHLVM_NVRHI_PATCH_DIR=${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/NVRHI '
+                     '-P ${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/NVRHI/apply_nvrhi_patch.cmake')
+        if tag_line in text:
+            text = text.replace(tag_line, tag_line + '\n' + patch_cmd, 1)
+    fp.write(text)
+
+_PyCMakeFetchContent.dump = _FetchContent_dump_with_nvrhi_patch
+
 # Create a VcpkgContext object with the specified path for vcpkg root and version
 vcpkg_ctx_runtime = VcpkgContenxt(vcpkg_root_path='../Dependency/vcpkg',
                                   vcpkg_config=VcpkgConfigModel(name='Runtime',

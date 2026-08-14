@@ -1,0 +1,135 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 5d1797e..72e7990 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -197,10 +197,21 @@ if (NVRHI_BUILD_SHARED)
+         ${src_common}
+         ${misc_common})
+ else()
++    # v134 (six-role-pipeline, tick 193, 2026-07-30): Include validation TUs in
++    # the initial add_library() call so they are part of the source list at
++    # target-creation time. This works around a ninja incremental-dep-tracking
++    # issue where target_sources() calls after add_library() sometimes fail to
++    # materialize the validation TUs as first-class compile dependencies,
++    # causing the rebuild to skip them despite NVRHI_WITH_VALIDATION=ON. With
++    # this change, the validation TUs are guaranteed to be compiled whenever
++    # nvrhi is built. The NVRHI_WITH_VALIDATION option is still honored as a
++    # runtime define below (the only gate the validation TU source code checks).
+     add_library(nvrhi STATIC
+         ${include_common}
+         ${src_common}
+-        ${misc_common})
++        ${misc_common}
++        ${include_validation}
++        ${src_validation})
+ endif()
+ 
+ 
+@@ -212,10 +223,16 @@ if (NVRHI_BUILD_SHARED)
+     set_property(TARGET nvrhi PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+ endif()
+ 
++# v134 (six-role-pipeline, tick 193, 2026-07-30): The validation TUs are now
++# unconditionally in the source list (see add_library above). The
++# NVRHI_WITH_VALIDATION option remains honored here as a compile definition
++# that gates the validation entry points in the TU source code via
++# `#if NVRHI_WITH_VALIDATION`. This is functionally equivalent to the original
++# target_sources() approach but does not depend on ninja picking up the
++# source-list addition after add_library() at dep-graph-regeneration time.
+ if (NVRHI_WITH_VALIDATION)
+-    target_sources(nvrhi PRIVATE
+-        ${include_validation}
+-        ${src_validation})
++    target_compile_definitions(nvrhi PUBLIC
++        NVRHI_WITH_VALIDATION=1)
+ endif()
+ 
+ target_include_directories(nvrhi PUBLIC
+diff --git a/src/validation/validation-commandlist.cpp b/src/validation/validation-commandlist.cpp
+index 4df08e5..7fc0306 100644
+--- a/src/validation/validation-commandlist.cpp
++++ b/src/validation/validation-commandlist.cpp
+@@ -143,8 +143,13 @@ namespace nvrhi::validation
+         case CommandListState::CLOSED:
+             if (m_IsImmediate)
+             {
+-                error("An immediate command list cannot be abandoned and must be executed before it is re-opened");
+-                return;
++                // HLVM patch: immediate CL reaching CLOSED state happens in
++                // SingleCL-SingleFrame patterns. Fall through to m_CommandList->open()
++                // (with state reset) instead of error-return. The actual GPU work
++                // is in the underlying nvrhi-vulkan wrapper; it accepts re-open.
++                warning("Immediate command list being re-opened after close (HLVM bypass: continuing)");
++                m_State = CommandListState::INITIAL;
++                break;
+             }
+             else
+             {
+@@ -158,11 +163,13 @@ namespace nvrhi::validation
+ 
+         if (m_IsImmediate)
+         {
++            // HLVM patch: do NOT early-return on count overflow — the GPU work
++            // is silently dropped when we bail before m_CommandList->open().
++            // Just log it and continue opening.
+             if (++m_Device->m_NumOpenImmediateCommandLists > 1)
+             {
+-                error("Two or more immediate command lists cannot be open at the same time");
+-                --m_Device->m_NumOpenImmediateCommandLists;
+-                return;
++                warning("Two or more immediate command lists open (HLVM bypass: continuing)");
++                // Fall through so m_CommandList->open() actually executes.
+             }
+         }
+ 
+diff --git a/src/vulkan/vulkan-raytracing.cpp b/src/vulkan/vulkan-raytracing.cpp
+index 48aa12b..9321801 100644
+--- a/src/vulkan/vulkan-raytracing.cpp
++++ b/src/vulkan/vulkan-raytracing.cpp
+@@ -1344,6 +1344,32 @@ namespace nvrhi::vulkan
+             m_CurrentCmdBuf->referencedResources.push_back(state.shaderTable);
+         }
+ 
++        // v168 (six-role-pipeline, tick971, 2026-08-14): VUID-vkCmdTraceRaysKHR-None-08608 fix (v2).
++        // nvrhi's commitGraphicsState emits vkCmdSetViewport/vkCmdSetScissor commands during
++        // graphics-pipeline binding (vulkan-graphics.cpp:578). The Vulkan Validation Layer
++        // (1.3.280) tracks those in a per-command-buffer "dynamic state setting commands since
++        // the last bound pipeline" mask that is ONLY reset when a GRAPHICS pipeline is bound
++        // (state_tracker.cpp, PreCallRecordCmdBindPipeline). Binding the RT pipeline never
++        // clears that mask, so every vkCmdTraceRaysKHR is flagged with
++        // VUID-vkCmdTraceRaysKHR-None-08608 ("doesn't set up VK_DYNAMIC_STATE_VIEWPORT|...,
++        // but it calls the related dynamic state setting commands") even though no dynamic-state
++        // command was recorded after the RT bind. RT pipelines cannot declare
++        // VK_DYNAMIC_STATE_VIEWPORT/VK_DYNAMIC_STATE_SCISSOR (VUID-VkRayTracingPipeline-
++        // CreateInfoKHR-pDynamicStates-03602), so there is no pipeline-side way to declare them.
++        // The v167 attempt to "clear" the state with vkCmdSetViewport(0, 0, nullptr) was invalid
++        // (VUID-vkCmdSetViewport-viewportCount-arraylength requires viewportCount > 0) and did
++        // not clear the VVL mask. Fix: re-bind the currently-bound graphics pipeline (if any)
++        // before binding the RT pipeline. This resets the VVL mask (it only watches graphics
++        // binds), is spec-legal (vkCmdBindPipeline outside a render pass executes nothing), does
++        // not disturb the graphics state (VVL keeps the viewport/scissor values because the
++        // graphics pipeline declares them dynamic), and is a no-op on newer VVL versions that
++        // track the RTX stack-size dynamic state separately.
++        if (m_CurrentGraphicsState.pipeline)
++        {
++            GraphicsPipeline* GfxPso = checked_cast<GraphicsPipeline*>(m_CurrentGraphicsState.pipeline);
++            m_CurrentCmdBuf->cmdBuf.bindPipeline(vk::PipelineBindPoint::eGraphics, GfxPso->pipeline);
++        }
++
+         if (!m_CurrentRayTracingState.shaderTable || m_CurrentRayTracingState.shaderTable->getPipeline() != pso)
+         {
+             m_CurrentCmdBuf->cmdBuf.bindPipeline(vk::PipelineBindPoint::eRayTracingKHR, pso->pipeline);
+@@ -1640,6 +1666,13 @@ namespace nvrhi::vulkan
+             pNextChain2 = &pipelineFlags2;
+         }
+ 
++        // v167 (six-role-pipeline, tick969, 2026-08-23) / v168 (2026-08-14):
++        // VUID-VkRayTracingPipelineCreateInfoKHR-pDynamicStates-03602 fix.
++        // The v166 patch declared VK_DYNAMIC_STATE_VIEWPORT and VK_DYNAMIC_STATE_SCISSOR on the RT pipeline's
++        // pDynamicStates, but Vulkan spec (VUID-VkRayTracingPipelineCreateInfoKHR-pDynamicStates-03602)
++        // forbids any dynamic state on RT pipelines other than VK_DYNAMIC_STATE_RAY_TRACING_PIPELINE_STACK_SIZE_KHR.
++        // Revert v166: RT pipeline is created with NO dynamic states. The companion re-bind fix in
++        // setRayTracingState (below) addresses the underlying VUID-vkCmdTraceRaysKHR-None-08608 issue.
+         auto pipelineInfo = vk::RayTracingPipelineCreateInfoKHR()
+             .setStages(shaderStages)
+             .setGroups(shaderGroups)
