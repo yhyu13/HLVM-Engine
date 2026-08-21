@@ -443,25 +443,21 @@ void main(uint3 dispatchThreadID : SV_DispatchThreadID)
     }
 
     // ---- Reproject to the previous frame (matrix + turntable yaw) ----
-    float2 uv = (float2(pixel) + 0.5f) * gConstants.RcpOutputSize;
-    float2 ndc = float2(uv.x * 2.0f - 1.0f, 1.0f - uv.y * 2.0f);
-
-    float nearP = gConstants.NearPlane;
-    float farP = gConstants.FarPlane;
-    float ndcZ = 0.0f;
-    if (viewZ > 1e-6f)
-        ndcZ = (farP + nearP) / (farP - nearP) - (2.0f * farP * nearP) / ((farP - nearP) * viewZ);
-
-    float4 worldClip = mul(gConstants.InverseCurrViewProj, float4(ndc.x, ndc.y, ndcZ, 1.0f));
-    worldClip.xyz /= worldClip.w;
-
+    // v213: reproject from the GBuffer world position DIRECTLY instead of
+    // unprojecting the half-res pixel centre. The old path mixed the pixel
+    // centre (ndc from (pixel+0.5)) with the GBuffer texel (GB() = p*s+s/2,
+    // i.e. the lower-right full-res texel) — a ~0.5px systematic offset that
+    // made the reprojected prevPixel land on the wrong surface once rotation
+    // shifted candidates by more than ~1px (M collapsed from ~9 to ~1.2 at
+    // >= 0.18 deg/frame). Using posW (the exact surface point the reservoir
+    // and validation read) is precise and removes the ndcZ reconstruction.
     float yawDelta = radians(gConstants.PrevSceneYaw - gConstants.SceneYaw);
     float yawCos = cos(yawDelta);
     float yawSin = sin(yawDelta);
     float3 objPrevPos = float3(
-        yawCos * worldClip.x + yawSin * worldClip.z,
-        worldClip.y,
-        -yawSin * worldClip.x + yawCos * worldClip.z);
+        yawCos * worldPos.x + yawSin * worldPos.z,
+        worldPos.y,
+        -yawSin * worldPos.x + yawCos * worldPos.z);
 
     float4 prevClip = mul(gConstants.PrevViewProj, float4(objPrevPos, 1.0f));
     prevClip.xyz /= prevClip.w;

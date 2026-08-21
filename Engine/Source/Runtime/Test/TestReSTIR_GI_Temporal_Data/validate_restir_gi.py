@@ -153,6 +153,66 @@ def check_cell_variance(arr: "np.ndarray", n: int = CELL_GRID_N) -> Tuple[bool, 
     return cell_std > CELL_VARIANCE_MIN, cell_std
 
 
+def _coefficient_of_variation(arr: "np.ndarray") -> Optional[float]:
+    """Luminance CV (std/mean) over pixels above the dark threshold."""
+    if not HAS_NUMPY:
+        return None
+    lum = np.average(arr[..., :3], axis=2)
+    lit = lum > PIXEL_DARK_THRESH / 255.0
+    if lit.sum() < 100:
+        return None
+    vals = lum[lit]
+    mean = float(vals.mean())
+    if mean <= 1e-6:
+        return None
+    return float(vals.std()) / mean
+
+
+def check_noise_reduction(dump_dir: Path, frame_n: int) -> Tuple[bool, Optional[float]]:
+    """v213: ReSTIR reuse must reduce relative variance vs the raw samples.
+
+    Coefficient of variation (std/mean luminance over lit pixels) of the
+    spatial (ReSTIR output) dump must be BELOW the gi_raw (single-sample Lo)
+    dump — temporal/spatial reuse is what turns noisy candidates into a
+    denoised estimate.
+    """
+    spatial_ts = find_group_for_frame(dump_dir, frame_n, "spatial")
+    giraw_ts = find_group_for_frame(dump_dir, frame_n, "gi_raw")
+    if spatial_ts is None or giraw_ts is None:
+        return False, None
+    spatial = _load_png_as_float(find_dump_file(dump_dir, spatial_ts, "spatial"))
+    giraw = _load_png_as_float(find_dump_file(dump_dir, giraw_ts, "gi_raw"))
+    if spatial is None or giraw is None:
+        return False, None
+    cv_s = _coefficient_of_variation(spatial)
+    cv_g = _coefficient_of_variation(giraw)
+    if cv_s is None or cv_g is None or cv_g <= 1e-6:
+        return False, None
+    return (cv_s < cv_g), cv_s / cv_g
+
+
+def check_log_metrics(log_path: Optional[Path]) -> Tuple[Optional[float], Optional[float]]:
+    """v213: parse the run log for the ReSTIR M summary and the frame-time line.
+
+    Returns (M_mean, frame_time_ms); None when absent.
+    """
+    m_mean: Optional[float] = None
+    frame_ms: Optional[float] = None
+    if log_path is None or not log_path.is_file():
+        return m_mean, frame_ms
+    try:
+        text = log_path.read_text(errors="ignore")
+    except OSError:
+        return m_mean, frame_ms
+    m = re.search(r"reservoir M mean=([0-9.]+)", text)
+    if m:
+        m_mean = float(m.group(1))
+    m = re.search(r"frame time: ([0-9.]+) ms/frame", text)
+    if m:
+        frame_ms = float(m.group(1))
+    return m_mean, frame_ms
+
+
 def find_dump_file(dump_dir: Path, ts: str, name: str) -> Optional[Path]:
     """Find <ts>_<name>_frame*.png (typically returns the last/highest-frame)."""
     pattern = re.compile(rf"^{re.escape(ts)}_{re.escape(name)}_frame(\d+)\.png$")
@@ -201,7 +261,8 @@ def find_group_for_frame(dump_dir: Path, frame_n: int, name: str) -> Optional[st
     return best
 
 
-def validate(dump_dir: Path, verbose: bool = False, display_only: bool = False) -> int:
+def validate(dump_dir: Path, verbose: bool = False, display_only: bool = False,
+             log_path: Optional[Path] = None) -> int:
     """Run the 4-check validator on the newest dump group.
 
     Returns 0 on PASS, non-zero on FAIL/USAGE/MISS.
@@ -264,6 +325,18 @@ def validate(dump_dir: Path, verbose: bool = False, display_only: bool = False) 
     ok, val = check_cell_variance(display)
     results.append(("cell_variance > floor", ok, val))
 
+    # v213 (Phase 5b): ReSTIR-specific gates.
+    ok, val = check_noise_reduction(dump_dir, newest_frame)
+    results.append(("noise_reduction (spatial CV < gi_raw CV)", ok, val))
+
+    m_mean, frame_ms = check_log_metrics(log_path)
+    if m_mean is not None:
+        ok = m_mean > 3.0
+        results.append(("reservoir_M_accumulates (mean > 3)", ok, m_mean))
+    if frame_ms is not None:
+        ok = frame_ms < 60.0
+        results.append(("frame_time < 60 ms (real-time gate)", ok, frame_ms))
+
     all_pass = all(r[1] for r in results)
     print(f"=== validate_restir_gi: {newest} (n_frames={nframes}) ===")
     for name, ok, val in results:
@@ -278,8 +351,9 @@ def main() -> int:
     parser.add_argument("dump_dir", type=Path, help="Directory containing dump PNGs (typically .../TestReSTIR_GI_Temporal_Data/dumps)")
     parser.add_argument("--verbose", action="store_true", help="Verbose output")
     parser.add_argument("--display-only", action="store_true", help="Only validate the display.png (skip spatial/gi_raw/gbuffer_material requirement)")
+    parser.add_argument("--log", type=Path, default=None, help="Run log for ReSTIR M + frame-time gates (v213)")
     args = parser.parse_args()
-    return validate(args.dump_dir, verbose=args.verbose, display_only=args.display_only)
+    return validate(args.dump_dir, verbose=args.verbose, display_only=args.display_only, log_path=args.log)
 
 
 if __name__ == "__main__":
