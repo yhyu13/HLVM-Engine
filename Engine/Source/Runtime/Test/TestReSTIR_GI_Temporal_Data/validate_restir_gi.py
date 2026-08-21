@@ -213,6 +213,33 @@ def check_log_metrics(log_path: Optional[Path]) -> Tuple[Optional[float], Option
     return m_mean, frame_ms
 
 
+def check_fireflies(log_path: Optional[Path]) -> Tuple[bool, Optional[float]]:
+    """v214: the ReSTIR indirect output must be outlier-bounded.
+
+    Parses the run log's `stats spatial floats` line (true HDR values — the PNG
+    clamps >1) and requires max/mean < 50 per channel. A single-sample path
+    tracer's fireflies routinely exceed 100x the mean; reservoir reuse +
+    outlier suppression should keep the ReSTIR estimate well below that.
+    """
+    if log_path is None or not log_path.is_file():
+        return False, None
+    try:
+        text = log_path.read_text(errors="ignore")
+    except OSError:
+        return False, None
+    m = re.search(r"stats spatial floats: R\[[0-9.]+,[0-9.]+\] G\[[0-9.]+,[0-9.]+\] B\[[0-9.]+,[0-9.]+\] mean=\[([0-9.]+),([0-9.]+),([0-9.]+)\]", text)
+    if not m:
+        return False, None
+    mean_r, mean_g, mean_b = (float(v) for v in m.groups())
+    mean_lum = max(mean_r, mean_g, mean_b, 1e-6)
+    mm = re.search(r"stats spatial floats: R\[[0-9.]+,([0-9.]+)\] G\[[0-9.]+,([0-9.]+)\] B\[[0-9.]+,([0-9.]+)\]", text)
+    if not mm:
+        return False, None
+    max_lum = max(float(v) for v in mm.groups())
+    ratio = max_lum / mean_lum
+    return ratio < 50.0, ratio
+
+
 def find_dump_file(dump_dir: Path, ts: str, name: str) -> Optional[Path]:
     """Find <ts>_<name>_frame*.png (typically returns the last/highest-frame)."""
     pattern = re.compile(rf"^{re.escape(ts)}_{re.escape(name)}_frame(\d+)\.png$")
@@ -336,6 +363,8 @@ def validate(dump_dir: Path, verbose: bool = False, display_only: bool = False,
     if frame_ms is not None:
         ok = frame_ms < 60.0
         results.append(("frame_time < 60 ms (real-time gate)", ok, frame_ms))
+    ok, val = check_fireflies(log_path)
+    results.append(("firefly bound (spatial max/mean < 50)", ok, val))
 
     all_pass = all(r[1] for r in results)
     print(f"=== validate_restir_gi: {newest} (n_frames={nframes}) ===")

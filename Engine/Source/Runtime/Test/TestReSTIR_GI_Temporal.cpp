@@ -728,6 +728,9 @@ public:
     virtual void Animate(float dt) override
     {
         ++FrameCount;
+        // v214: run-average frame time (used by the last-frame gate below).
+        TotalFrameTimeSec += static_cast<double>(dt);
+        TotalFramesAnimated += 1.0;
         // Scene turntable: advance the Y-rotation (degrees per second).
         PrevSceneRotationDeg = SceneRotationDeg;
         SceneRotationDeg += SceneRotationDegSpeed * dt;
@@ -1532,6 +1535,19 @@ public:
         if (bLastFrame)
         {
             LogFinalFrameStats();
+        }
+        // v214: frame-time gate must fire even for short runs — the FPS block
+        // above only logs after >=1s of frames, so an 8-16 frame CI run never
+        // emits the line and the validator's gate is skipped. Log the run
+        // average on the last frame instead.
+        if (bLastFrame && std::getenv("HLVM_RGI_LOG_FRAMETIME"))
+        {
+            if (TotalFramesAnimated > 0.0 && TotalFrameTimeSec > 0.0)
+            {
+                HLVM_LOG(LogTest, info, TXT("frame time: {:.2f} ms/frame ({:.1f} fps) [run avg]"),
+                    TotalFrameTimeSec * 1000.0 / TotalFramesAnimated,
+                    1.0 / (TotalFrameTimeSec / TotalFramesAnimated));
+            }
         }
 
         if (bLastFrame)
@@ -3280,6 +3296,8 @@ private:
     bool      bBypass = false;
     uint32_t  FrameCount = 0;
     float     FPSUpdateTimer = 0.0f;
+    double    TotalFrameTimeSec = 0.0;    // v214: run-average frame time
+    double    TotalFramesAnimated = 0.0;
     float     SceneRotationDeg = 90.0f;        // scene Y-rotation (turntable)
     float     PrevSceneRotationDeg = 90.0f;    // previous frame (Phase C reprojection)
     float     SceneRotationDegSpeed = 0.0f;    // degrees/second (0 = still)
