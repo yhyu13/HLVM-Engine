@@ -403,7 +403,7 @@ void main(uint3 dispatchThreadID : SV_DispatchThreadID)
     }
 
     pairwiseMIS.k = float(k);
-    float rng = Hash01(uint2(pixel), uint(gConstants.OutputSize.x) * 31u + uint(gConstants.OutputSize.y));
+    uint rngBase = uint(gConstants.OutputSize.x) * 31u + uint(gConstants.OutputSize.y);
 
     [unroll]
     for (int j = 0; j < 2; j++)
@@ -413,11 +413,14 @@ void main(uint3 dispatchThreadID : SV_DispatchThreadID)
         FReservoir neighbor = LoadReservoir(samplePosSS[j]);
         if (neighbor.ID == 0xFFFFFFFFu)
             continue;
+        // ZetaRay advances the RNG per reservoir update.
+        float rng = Hash01(uint2(pixel), rngBase + uint(j) * 7u);
         Stream(pairwiseMIS, r, worldPos, normal, albedo, neighbor,
                samplePosW[j], sampleNormal[j], sampleAlbedo[j], rng);
     }
 
-    End(pairwiseMIS, r, worldPos, rng);
+    float endRng = Hash01(uint2(pixel), rngBase + 13u);
+    End(pairwiseMIS, r, worldPos, endRng);
     r = pairwiseMIS.r_s;
     r.M = min(r.M, gConstants.MaxM);
 

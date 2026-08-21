@@ -332,7 +332,7 @@ float TargetLumAtTemporalPixel(FReservoir r, FCandidate candidate, float3 albedo
 // ---- ZetaRay: TemporalResample2 (2 candidates, pairwise MIS) ----------------------
 void TemporalResample2(FReservoir r, float3 posW, float3 normal, float3 albedo,
                        FCandidate candidate[2], inout FReservoir r_prev[2],
-                       inout float rng, inout float M_new)
+                       uint2 pixel, uint frame, inout float M_new)
 {
     // Target at temporal pixel with current pixel's sample
     {
@@ -391,7 +391,10 @@ void TemporalResample2(FReservoir r, float3 posW, float3 normal, float3 albedo,
             // Reservoir stream (ZetaRay Reservoir::Update)
             r.w_sum += w_prev;
             r.M += 1.0f;
-            if (rng < w_prev / max(1e-6f, r.w_sum))
+            // ZetaRay advances the RNG per reservoir update; derive a fresh
+            // hash per candidate so the selections stay decorrelated.
+            float rng_i = Hash01(uint2(pixel), frame + uint(i) + 0x9E3779B9u);
+            if (rng_i < w_prev / max(1e-6f, r.w_sum))
             {
                 r.pos = r_prev[i].pos;
                 r.normal = r_prev[i].normal;
@@ -483,11 +486,11 @@ void main(uint3 dispatchThreadID : SV_DispatchThreadID)
             M_new += r_prev[k].M;
     }
 
-    float rng = Hash01(uint2(pixel), uint(gConstants.FrameIndex));
+    const uint frame = uint(gConstants.FrameIndex);
 
     if (candidate[1].valid && roughness > 0.05f)
     {
-        TemporalResample2(r, worldPos, normal, albedo, candidate, r_prev, rng, M_new);
+        TemporalResample2(r, worldPos, normal, albedo, candidate, r_prev, uint2(pixel), frame, M_new);
     }
     else if (candidate[0].valid)
     {
@@ -530,7 +533,8 @@ void main(uint3 dispatchThreadID : SV_DispatchThreadID)
 
                 r.w_sum += w_prev;
                 r.M += 1.0f;
-                if (rng < w_prev / max(1e-6f, r.w_sum))
+                float rng1 = Hash01(uint2(pixel), frame + 5u);
+                if (rng1 < w_prev / max(1e-6f, r.w_sum))
                 {
                     r.pos = r_prev[0].pos;
                     r.normal = r_prev[0].normal;
