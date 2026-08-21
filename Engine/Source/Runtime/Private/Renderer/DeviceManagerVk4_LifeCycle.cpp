@@ -22,6 +22,16 @@
 
 bool FDeviceManagerVk::CreateDeviceAndSwapChain()
 {
+	// v212 (real-time pass): HLVM_DISABLE_VALIDATION=1 turns off BOTH the
+	// Vulkan instance validation layer and the nvrhi command-list validation
+	// wrapper (the wrapper adds significant per-frame CPU cost — measured
+	// GPU util ~1% while frames take ~74ms). Dev default stays ON; CI/perf
+	// runs opt out explicitly.
+	if (const char* Env = std::getenv("HLVM_DISABLE_VALIDATION"))
+	{
+		if (std::atoi(Env) != 0)
+			g_UseValidationLayers = false;
+	}
 	DeviceParams.bEnableNVRHIValidationLayer |= g_UseValidationLayers;
 	DeviceParams.bEnableDebugRuntime |= g_UseDebugRuntime;
 

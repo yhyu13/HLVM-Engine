@@ -63,6 +63,9 @@
 #include "Renderer/ShaderMake/ShaderBlob.h"
 #include "Platform/FileSystem/Path.h"
 #include "Image/FImageDump.h"
+#include <chrono>
+#include <numeric>
+#include <parallel_hashmap/phmap.h>
 
 #include <nvrhi/utils.h>
 #include <filesystem>
@@ -705,6 +708,9 @@ public:
         AccumulateCS            = nullptr;
         AccumulateConstants     = nullptr;
         CommandList             = nullptr;
+        // v212: release per-mesh GBuffer binding sets BEFORE device teardown
+        // (a static cache here tripped VUID-vkDestroyDevice-device-05137).
+        GBufferDrawCache.clear();
 
         // GBuffer PT pass resources
         GBufferVS               = nullptr;
@@ -761,6 +767,10 @@ public:
     virtual void Render(nvrhi::IFramebuffer* Framebuffer) override
     {
         if (!NvrhiDevice || !Framebuffer) return;
+        // v212: per-phase CPU timing (HLVM_RGI_LOG_FRAMETIME=1) for the
+        // real-time pass.
+        const bool bProfile = (std::getenv("HLVM_RGI_LOG_FRAMETIME") != nullptr);
+        auto T0 = std::chrono::steady_clock::now();
         const auto& FB = Framebuffer->getFramebufferInfo();
         // Remember the swapchain back-buffer for the readback diagnostic.
         CurrentBackBufferTexture = (Framebuffer->getDesc().colorAttachments.size() > 0)
@@ -808,6 +818,7 @@ public:
         // v197: no arguments — the raster extent is a property of the target,
         // not of the caller. See the note on RenderGBuffer's definition.
         RenderGBuffer();
+        auto T1 = std::chrono::steady_clock::now();
 
         // Turntable: rebuild the TLAS with the current scene Y-rotation so the
         // ray tracer and the raster pass always agree (2026-08-10).
@@ -845,6 +856,10 @@ public:
             Desc.SamplesPerPixel   = 1;
             Desc.MinRayLength      = 0.001f;
             Desc.EnableRR          = true;
+            // v212: NEE toggle (HLVM_RGI_NEE=0) — isolates the shadow-ray cost
+            // in the tracer for the real-time budget pass.
+            if (const char* Nee = std::getenv("HLVM_RGI_NEE"))
+                CVar_r_GI_EnableNEE.SetValue(std::atoi(Nee) != 0);
             Desc.FrameIndex        = AccumFrameCount;
             // Lighting setup (2026-08-10): sunlight interior. Pass the sun-only
             // light buffer (intensity 8.0 directional) so NEE is sunlight, and
@@ -873,6 +888,7 @@ public:
             HLVM_LOG(LogTest, info, TXT("Post-GIPass: returned Frame={}"),
                 AccumFrameCount);
         }
+        auto T2 = std::chrono::steady_clock::now();
 
         // (2) Bilateral denoise — VESTIGIAL. Output dead; retained on a false
         // premise. The old comment claimed this dispatch is what forces nvrhi
@@ -916,6 +932,7 @@ public:
         }
 
         // (3) ReSTIR Generate — skipped in HLVM_RGI_BYPASS mode
+        auto T3 = T2, T4 = T2, T5 = T2;
         if (!bBypass)
         {
             ReSTIR::FReSTIRPass::FGenerationDesc Gd{};
@@ -951,6 +968,7 @@ public:
             C.DebugVis           = 0.0f;
 
             ReSTIRPass.DispatchGeneration(CommandList, Gd, C);
+            T3 = std::chrono::steady_clock::now();
         }
 
         // (4) ReSTIR Temporal (skip first frame — no history) — skipped in bypass
@@ -1108,6 +1126,7 @@ public:
             TC.GBufferScale     = static_cast<float>(WIDTH / std::max(HalfResWidth, 1u));
 
             ReSTIRPass.DispatchTemporal(CommandList, Td, TC);
+            T4 = std::chrono::steady_clock::now();
         }
 
         // (5) ReSTIR Spatial (using merged reservoirs) — skipped in bypass
@@ -1168,6 +1187,7 @@ public:
             SC.DebugVis         = 0.0f;
 
             ReSTIRPass.DispatchSpatial(CommandList, Sd, SC);
+            T5 = std::chrono::steady_clock::now();
         }
 
         // (5.4) Phase D: depth/normal-weighted half-res → full-res resolve.
@@ -1240,6 +1260,7 @@ public:
             // recombine it with the ReSTIR indirect estimate.
             DispatchResolve(DirectTexture, FullResDirect);
         }
+        auto T6 = std::chrono::steady_clock::now();
 
         // (5.5) ReBLUR denoise on the ReSTIR resolve output (RESTIR mode only)
         {
@@ -1374,6 +1395,7 @@ public:
             // v193: grid covers the fixed UAV extent, matching the constants above.
             CommandList->dispatch((WIDTH + 7) / 8, (HEIGHT + 7) / 8, 1);
         }
+        auto T7 = std::chrono::steady_clock::now();
 
         // (7) Blit the accumulated display to the swapchain
         {
@@ -1395,6 +1417,26 @@ public:
         // LAST frame at the reprojected pixels. Under the turntable the current
         // frame's GBuffer at those pixels holds different geometry.
         CopyGBufferToPrev();
+
+        if (bProfile)
+        {
+            static std::vector<double> PG, PR, PI, PD, PB, PA;
+            PG.push_back(std::chrono::duration<double, std::milli>(T1 - T0).count());
+            PR.push_back(std::chrono::duration<double, std::milli>(T2 - T1).count());
+            PI.push_back(std::chrono::duration<double, std::milli>(T5 - T2).count());
+            PD.push_back(std::chrono::duration<double, std::milli>(T6 - T5).count());
+            PB.push_back(std::chrono::duration<double, std::milli>(T7 - T6).count());
+            PA.push_back(std::chrono::duration<double, std::milli>(T7 - T0).count());
+            if (PG.size() % 8 == 0)
+            {
+                auto Avg8 = [](const std::vector<double>& V) {
+                    return std::accumulate(V.end() - 8, V.end(), 0.0) / 8.0;
+                };
+                HLVM_LOG(LogTest, info,
+                    TXT("phase ms (avg 8): GBuffer={:.2f} RayTrace={:.2f} ReSTIR={:.2f} Resolve={:.2f} BlitAccum={:.2f} total={:.2f}"),
+                    Avg8(PG), Avg8(PR), Avg8(PI), Avg8(PD), Avg8(PB), Avg8(PA));
+            }
+        }
 
         // The blit above recorded into the same open CommandList that
         // RenderGBuffer + FGIPass + denoise + ReSTIR + accumulate all wrote
@@ -2273,7 +2315,7 @@ private:
     //
     // After the loop, transitions the 3 GBuffer MRTs to ShaderResource so
     // FGIPass's Texture2D<float4> SRV reads find the correct layout.
-    // v197 (card K): takes NO extent parameters. It rasterises into
+        // v197 (card K): takes NO extent parameters. It rasterises into
     // GBufferFrameBuffer, whose MRTs come from `const uint32_t W = WIDTH` and
     // are never recreated on resize — so the extent belongs to the target, not
     // the caller. v195 pinned the viewport below to WIDTH/HEIGHT but left the
@@ -2286,6 +2328,14 @@ private:
     {
         if (!GBufferPipeline || !GBufferFrameBuffer) return;
         if (!Scene) return;
+
+        // v212 (real-time pass): per-mesh FInstanceInfo + binding-set cache
+        // (member — a static here outlived the device and tripped
+        // VUID-vkDestroyDevice-device-05137 at teardown). The old loop
+        // re-derived the info with an O(N^2) mesh scan and called
+        // NvrhiDevice->createBindingSet once PER MESH PER FRAME — the measured
+        // GBuffer phase was ~18ms of the ~31ms frame. The binding set only
+        // changes when the async-loaded albedo texture handle appears.
 
         // Clear the 4 GBuffer MRTs BEFORE the raster draws (fixed 2026-08-09).
         // Without this, un-rasterized sky texels keep uninitialized GPU memory
@@ -2350,69 +2400,64 @@ private:
 
             // Locate matching FInstanceInfo by mesh pointer — same loop order
             // as LoadSponza uses.
-            // (We could cache this during LoadSponza; the linear scan here is
-            //  small (27 Sponza meshes) and keeps the two structures decoupled.)
-            FInstanceInfo ThisInfo{};
-            bool Found = false;
-            // Use the same MeshMultiMaterialMap key — but that needs a mesh
-            // shared_ptr. We have it; just look up Info by matching vertex
-            // count via the offsets baked at LoadSponza.
-            // Simpler: re-walk LoadSponza's order and pair by mesh identity.
-            // (See parallel arrays in LoadSponza; for now we scan SceneBLASes
-            //  and rely on consistent mesh ordering between init and render.)
-            // For correctness we re-derive Info inline here matching LoadSponza.
-            // This mirrors LoadSponza's logic exactly.
+            auto& Cache = GBufferDrawCache[StaticMesh.get()];
+            if (Cache.Info.VertexCount == 0)
             {
-                uint32_t VOff = 0, IOff = 0;
-                for (auto& E2 : Scene->MeshTree)
+                // First encounter: derive the info once (O(N^2) at init only).
+                FInstanceInfo ThisInfo{};
+                bool Found = false;
                 {
-                    auto M2 = std::dynamic_pointer_cast<FStaticMesh>(E2.second);
-                    if (!M2) continue;
-                    if (M2 == StaticMesh)
+                    uint32_t VOff = 0, IOff = 0;
+                    for (auto& E2 : Scene->MeshTree)
                     {
-                        ThisInfo.VertexOffset = VOff;
-                        ThisInfo.IndexOffset  = IOff;
-                        ThisInfo.VertexCount  = static_cast<uint32_t>(M2->GetVertices().size());
-                        ThisInfo.IndexCount   = static_cast<uint32_t>(M2->GetIndices().size());
-                        ThisInfo.AlbedoTextureIndex = 0;
-                        ThisInfo.Roughness = 0.9f;
-                        ThisInfo.Metallic  = 0.0f;
-                        // Pull material color if available
-                        auto MatIt = Scene->MeshMultiMaterialMap.find(E2.second);
-                        if (MatIt != Scene->MeshMultiMaterialMap.end() && !MatIt->second.empty())
+                        auto M2 = std::dynamic_pointer_cast<FStaticMesh>(E2.second);
+                        if (!M2) continue;
+                        if (M2 == StaticMesh)
                         {
-                            const auto& M = MatIt->second[0];
-                            const FVec3 A = GetMeshAlbedo(E2.second->GetName(), M->AlbedoColor);
-                            ThisInfo.AlbedoColor[0] = A.x;
-                            ThisInfo.AlbedoColor[1] = A.y;
-                            ThisInfo.AlbedoColor[2] = A.z;
-                            // Mirror LoadSponza's textured-mesh flag.
-                            if (auto PBRMat = std::dynamic_pointer_cast<FPBRMaterial>(M))
+                            ThisInfo.VertexOffset = VOff;
+                            ThisInfo.IndexOffset  = IOff;
+                            ThisInfo.VertexCount  = static_cast<uint32_t>(M2->GetVertices().size());
+                            ThisInfo.IndexCount   = static_cast<uint32_t>(M2->GetIndices().size());
+                            ThisInfo.AlbedoTextureIndex = 0;
+                            ThisInfo.Roughness = 0.9f;
+                            ThisInfo.Metallic  = 0.0f;
+                            // Pull material color if available
+                            auto MatIt = Scene->MeshMultiMaterialMap.find(E2.second);
+                            if (MatIt != Scene->MeshMultiMaterialMap.end() && !MatIt->second.empty())
                             {
-                                if (PBRMat->HasTexture(IMaterial::ETextureType::Albedo))
-                                    ThisInfo.MaterialFlags |= 1u;
-                                ThisInfo.Roughness = PBRMat->GetRoughness();
-                                ThisInfo.Metallic  = PBRMat->GetMetallic();
+                                const auto& M = MatIt->second[0];
+                                const FVec3 A = GetMeshAlbedo(E2.second->GetName(), M->AlbedoColor);
+                                ThisInfo.AlbedoColor[0] = A.x;
+                                ThisInfo.AlbedoColor[1] = A.y;
+                                ThisInfo.AlbedoColor[2] = A.z;
+                                // Mirror LoadSponza's textured-mesh flag.
+                                if (auto PBRMat = std::dynamic_pointer_cast<FPBRMaterial>(M))
+                                {
+                                    if (PBRMat->HasTexture(IMaterial::ETextureType::Albedo))
+                                        ThisInfo.MaterialFlags |= 1u;
+                                    ThisInfo.Roughness = PBRMat->GetRoughness();
+                                    ThisInfo.Metallic  = PBRMat->GetMetallic();
+                                }
                             }
+                            else
+                            {
+                                const FVec3 A = GetMeshAlbedo(E2.second->GetName(), FVec3(0.7f, 0.7f, 0.7f));
+                                ThisInfo.AlbedoColor[0] = A.x;
+                                ThisInfo.AlbedoColor[1] = A.y;
+                                ThisInfo.AlbedoColor[2] = A.z;
+                            }
+                            Found = true;
+                            break;
                         }
-                        else
-                        {
-                            const FVec3 A = GetMeshAlbedo(E2.second->GetName(), FVec3(0.7f, 0.7f, 0.7f));
-                            ThisInfo.AlbedoColor[0] = A.x;
-                            ThisInfo.AlbedoColor[1] = A.y;
-                            ThisInfo.AlbedoColor[2] = A.z;
-                        }
-                        Found = true;
-                        break;
+                        VOff += static_cast<uint32_t>(M2->GetVertices().size());
+                        IOff += static_cast<uint32_t>(M2->GetIndices().size());
                     }
-                    VOff += static_cast<uint32_t>(M2->GetVertices().size());
-                    IOff += static_cast<uint32_t>(M2->GetIndices().size());
                 }
+                if (!Found)
+                    continue;
+                Cache.Info = ThisInfo;
             }
-            if (!Found)
-            {
-                continue;
-            }
+            const FInstanceInfo& ThisInfo = Cache.Info;
 
             // Upload this mesh's FInstanceInfo to the per-instance CB.
             CommandList->writeBuffer(GBufferPerInstanceCB, &ThisInfo, sizeof(ThisInfo));
@@ -2433,14 +2478,20 @@ private:
                 }
             }
 
-            // Build the per-draw binding set.
-            FBindingSetBuilder SetBuilder;
-            SetBuilder.SetConstantBuffer(0, ViewConstantsBuffer)
-                      .SetConstantBuffer(1, GBufferPerInstanceCB)
-                      .SetTextureSRV(0, AlbedoTex)
-                      .SetSampler(0, LinearSampler);
-            nvrhi::BindingSetHandle BS = NvrhiDevice->createBindingSet(
-                SetBuilder.Build(), GBufferBindingLayout);
+            // v212: reuse the cached binding set unless the async-loaded
+            // albedo texture handle changed (happens only during startup).
+            if (!Cache.BS || Cache.Tex != AlbedoTex)
+            {
+                FBindingSetBuilder SetBuilder;
+                SetBuilder.SetConstantBuffer(0, ViewConstantsBuffer)
+                          .SetConstantBuffer(1, GBufferPerInstanceCB)
+                          .SetTextureSRV(0, AlbedoTex)
+                          .SetSampler(0, LinearSampler);
+                Cache.BS = NvrhiDevice->createBindingSet(
+                    SetBuilder.Build(), GBufferBindingLayout);
+                Cache.Tex = AlbedoTex;
+            }
+            nvrhi::BindingSetHandle BS = Cache.BS;
 
             nvrhi::GraphicsState State;
             State.setPipeline(GBufferPipeline);
@@ -3120,6 +3171,9 @@ private:
     bool                          bReBLURInitialized = false;
 
     // Per-frame intermediate textures
+    // v212: per-mesh GBuffer draw cache (FInstanceInfo + binding set).
+    struct FMeshDrawCacheEntry { FInstanceInfo Info; nvrhi::TextureHandle Tex; nvrhi::BindingSetHandle BS; };
+    phmap::node_hash_map<const FStaticMesh*, FMeshDrawCacheEntry> GBufferDrawCache;
     nvrhi::TextureHandle          OutputTexture;
     nvrhi::TextureHandle          DirectionTexture;
     nvrhi::TextureHandle          SampleInfoTexture;   // v210: x2 normal + pdf (FGIPass u3)
