@@ -33,6 +33,27 @@ namespace GI
         nvrhi::TextureHandle OutputTexture;     // u0 (radiance)
         nvrhi::TextureHandle DebugStatsTexture; // u1 (optional, see FGIPassStats)
         nvrhi::TextureHandle OutputDirection;   // u2 (optional; primary sample ray direction for ReSTIR GI reservoirs)
+        // v210+ (2026-08-21, ZetaRay ground-truth port, Phase 1): ReSTIR GI
+        // candidate-sample state. Both optional — absent -> 1x1 dummy UAVs so
+        // TestPathTraceGI / TestCornellBoxGI keep working unchanged.
+        //   u3 = SampleInfo: float4(x2Normal.xyz, samplePdf)
+        //   u4 = DirectTexture: float4(primaryDirect + primaryAmbient + skyOnPrimaryMiss, 0)
+        nvrhi::TextureHandle SampleInfoTexture; // u3 (optional; x2 normal + primary sample PDF)
+        nvrhi::TextureHandle DirectTexture;     // u4 (optional; primary direct+ambient, for the display combine)
+
+        // UAV EXTENT CONTRACT (v207). OutputTexture is mandatory and MUST be
+        // sized to OutputWidth x OutputHeight: the ray-generation shader stores
+        // to u0 and u2 at the raw dispatch coordinate, with no extent guard.
+        //   - u2 (OutputDirection) is optional; when absent it falls back to
+        //     OutputTexture, so the requirement above is what keeps that write
+        //     in bounds. A supplied OutputDirection must itself be at least the
+        //     dispatch extent.
+        //   - u1 (DebugStatsTexture) is exempt: its shader write is guarded by
+        //     the DebugBounceStats flag, so a 1x1 dummy is never written.
+        // Note this is the OPPOSITE arrangement to the guide SRVs (t1..t3),
+        // which are read through gbScale and therefore need NOT match the
+        // dispatch extent — that scale exists precisely so a half-res dispatch
+        // can read a full-res GBuffer. Writes are pinned; reads are scaled.
 
         // Lights array for Next Event Estimation (NEE)
         nvrhi::BufferHandle LightsBuffer;
@@ -114,15 +135,19 @@ namespace GI
 
         nvrhi::ShaderLibraryHandle ShaderLibrary;
         FRayTracingPipeline RTPipeline;          // RT pipeline wrapper (owns shader table + binding layout)
-        nvrhi::BindingLayoutHandle BindingLayout; // cached from RTPipeline for per-frame binding set creation (SRV-only; v22 split)
-        nvrhi::BindingLayoutHandle UAVBindingLayout; // v22 split: separate layout for u0/u1 UAVs (avoids nvrhi-deferred-barrier-ordering)
+        nvrhi::BindingLayoutHandle BindingLayout; // cached from RTPipeline for per-frame binding set creation
+        // 2026-08-16 (six-role-pipeline v2): v22 split reverted. SRV + UAV
+        // share a single binding set. UAVBindingLayout is removed.
         nvrhi::BufferHandle ConstantBuffer;
         nvrhi::BufferHandle LightsBuffer;      // internal lights buffer (synthesized if Desc.LightsBuffer is null)
         uint32_t            LightsCount = 0;
 
         nvrhi::TextureHandle OutputTexture; // last output (for debugging / test exposure)
         nvrhi::TextureHandle DummyDebugStatsTexture; // 1x1 fallback when debug UAV not requested
-        nvrhi::TextureHandle DummyDirectionTexture;  // 1x1 fallback when direction UAV not requested
+        nvrhi::TextureHandle DummySampleInfoTexture; // 1x1 fallback when u3 not supplied (v210)
+        nvrhi::TextureHandle DummyDirectTexture;     // 1x1 fallback when u4 not supplied (v210)
+        // No u2 counterpart: per the UAV extent contract above, u2 falls back to
+        // OutputTexture, not to a 1x1 dummy. Do not add one back by symmetry.
         nvrhi::TextureHandle MaterialPlaceholderTexture; // 1x1 white (Phase 3b)
 
         FGIPassStats LastFrameStats{};

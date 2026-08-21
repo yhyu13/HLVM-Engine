@@ -1,6 +1,6 @@
-// GIAccumulate_cs.hlsl - Temporal accumulation + ACES tonemap + sRGB gamma for TestPathTraceGI.
+// GIAccumulate_cs.hlsl - Temporal accumulation + ACES tonemap + sRGB gamma.
 //
-// Input:    one raw HDR radiance sample per frame (from GIPathTracing.hlsl Output)
+// Input:    ReSTIR indirect estimate (t0) + primary direct/ambient (t1, v210)
 // Accum:    running sum of raw samples (RGBA32_FLOAT)
 // Output:   tonemapped, gamma-corrected sRGB average ready for the swapchain
 //
@@ -25,6 +25,7 @@ cbuffer AccumConstants : register(b0)
 // =============================================================================
 
 Texture2D<float4>   InputTexture  : register(t0);
+Texture2D<float4>   DirectTexture : register(t1);
 RWTexture2D<float4> AccumTexture  : register(u0);
 RWTexture2D<float4> DisplayTexture : register(u1);
 
@@ -63,10 +64,8 @@ void main(uint2 dispatchThreadId : SV_DispatchThreadID)
     if (pixel.x >= Width || pixel.y >= Height)
         return;
 
-    // GIPathTracing.hlsl outputs raw HDR radiance; accumulate raw samples,
-    // then apply ACES tonemapping and sRGB gamma so the result looks correct
-    // on an sRGB swapchain.
-    float3 sample = InputTexture[pixel].rgb;
+    // ReSTIR indirect estimate + primary direct/ambient (v210 split).
+    float3 sample = InputTexture[pixel].rgb + DirectTexture[pixel].rgb;
 
     // FrameCount is 1-based. On the first frame there is no previous accumulation.
     float3 accum = (FrameCount <= 1u) ? sample : (AccumTexture[pixel].rgb + sample);

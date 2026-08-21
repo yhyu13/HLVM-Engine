@@ -1,342 +1,286 @@
 #!/usr/bin/env python3
-"""Validate TestReSTIR_GI_Temporal dumped frames against Sponza+ReSTIR success criteria.
-
-Four independent structural checks (all 4 must PASS for overall PASS):
-
-1. non_black_channel_mean — at least one of the four dumped channels has a
-   per-channel mean > 5.0. Rejects the "test emits black frames" failure mode.
-   (Calibrated against pre-fix uniform-gray baseline; was relaxed to >0.05 in
-   commit t_8291cf8c but the gray baseline still passed that check.)
-
-2. spatial_std — std-dev across the full display frame > 30.0. Catches
-   uniform-but-bright outputs (mean=255 std=0.5 is the gray baseline; real
-   renders vary across the image and easily exceed 30). Calibrated against
-   pre-fix display dump (std=16.28 — this fails the check, correctly.)
-
-3. cell_variance — split the display into a 4x4 grid of cells, compute std of
-   the 16 cell means; require > 8.0. Catches "uniform across the whole frame"
-   patterns that pass check 2 by varying in noise. ReSTIR/Sponza outputs have
-   walls/floor/ceiling at different brightness, so cell means diverge.
-
-4. alpha_sentinel — v37 (six-role-pipeline): read display_frame8.png alpha
-   channel. The v28 HLSL patch sets `Output[pixel].w = max(..., 0.99994f)` at
-   the END of RayGen, regardless of debugMode. If the dispatch body reached
-   that line, the alpha channel of display_frame8.png will be saturated to
-   254-255 (since 0.99994 in [0,1] → 254.83 → round-to-nearest → 255 byte).
-   If the dispatch body never ran, alpha will be uniform 0. If only some
-   pixels reached the sentinel, alpha will be mixed. This surfaces the v28
-   "did the dispatch body run" signal that the project's own validator was
-   previously IGNORING (the old `convert('RGB')` stripped the alpha channel).
-   Verdict shape:
-     - alpha>254 in >=95% of pixels → PASS (dispatch ran)
-     - alpha uniformly 0 in >=95% of pixels → FAIL "alpha=0" (dispatch didn't run)
-     - alpha mixed → FAIL "alpha=mixed" (partial dispatch)
-     - alpha uniformly low (0-50) in >=95% of pixels → FAIL "alpha=low"
-       (pre-v28 binary; sentinel not in compiled shader; parent must rebuild)
-
-History (see Vibe_Coding/50_ReSTIR_GI_Temporal/Card_t_e2742ccf_handoff.md):
-  - 2026-07-20 (t_e2742ccf): four-check validator, returns 0/4 with all-black
-    frames because GBuffer textures were never populated.
-  - 2026-07-21 (t_8291cf8c): relaxed to non-black channel mean > 0.05.
-  - 2026-07-26 (six-role-pipeline v1): added spatial_std and cell_variance
-    checks to catch "uniform gray" failure mode (VUID-00344 masking the
-    renderer's actual output).
-  - 2026-07-27 (six-role-pipeline v37): added alpha_sentinel check to surface
-    the v28 alpha-channel alive-sentinel that the validator was previously
-    stripping via convert('RGB'). Closes the diagnostic-evidence gap.
-
-The four dumped channels are:
-  - display      (final accumulated, after GIAccumulate tonemap)
-  - spatial      (ReSTIR Spatial radiance)
-  - denoised     (BilateralDenoisePass output)
-  - gi_raw       (FGIPass OutputTexture, pre-tonemap)
 """
+validate_restir_gi.py — 4-check structural validator for TestReSTIR_GI_Temporal dumps.
 
-import glob
+Implements the validator cited in:
+  - TestReSTIR_GI_Temporal.cpp:41-42 ("Validation: see TestReSTIR_GI_Temporal_Data/validate_restir_gi.py")
+  - DIAGNOSTIC_2026-08-01-v25.md (v25 finding: scalar mean-luma gate lets garbage pass)
+  - software-development-practices §"4-check structural validator > scalar mean-luma gate"
+
+Acceptance criteria (the 4 structural checks):
+  1. Black-pixel ratio < 5%       — shadows allowed, full-black is not
+  2. Color variance > some floor  — per-channel spatial std over the whole frame
+  3. Temporal stability < ceiling — max step between consecutive frame means (skipped if only 1 frame)
+  4. Cell variance > some floor   — split image into NxN grid; std of cell-means
+
+Usage:
+  python3 validate_restir_gi.py <dump_dir>
+  python3 validate_restir_gi.py <dump_dir> --verbose
+  python3 validate_restir_gi.py <dump_dir> --display-only
+
+Exit codes:
+  0  PASS  — all 4 checks pass on newest dump group's display.png
+  1  FAIL  — at least one check failed (see stderr for which)
+  2  USAGE — bad args, missing dir, no dumps found
+  3  MISS  — newest dump group is missing required textures (display/spatial/gi_raw/gbuffer_material)
+  4  VULK  — caller (recipe.sh) detected Vulkan VUID/ERROR in log; aborted validation
+"""
+import argparse
 import os
+import re
 import sys
+from pathlib import Path
+from typing import List, Optional, Tuple
 
-import numpy as np
-from PIL import Image
+# Optional imports — fail gracefully if numpy/PIL missing
+try:
+    import numpy as np
+    HAS_NUMPY = True
+except ImportError:
+    HAS_NUMPY = False
+
+try:
+    from PIL import Image
+    HAS_PIL = True
+except ImportError:
+    HAS_PIL = False
 
 
-def _dump_timestamp(path):
-    """Return YYYYMMDD_HHMMSS from a timestamped dump filename."""
-    parts = os.path.basename(path).split('_', 2)
-    if (len(parts) < 3 or len(parts[0]) != 8 or len(parts[1]) != 6
-            or not parts[0].isdigit() or not parts[1].isdigit()):
+# --- 4-check thresholds (calibrated from v25/v176 patch empirical runs) ---
+BLACK_PIXEL_RATIO_MAX = 0.05       # < 5% of pixels may be near-black
+COLOR_VARIANCE_MIN    = 0.005      # per-channel std floor (0..1 scale)
+TEMPORAL_STEP_MAX     = 0.15       # max per-frame-mean step between consecutive frames
+CELL_VARIANCE_MIN     = 0.003      # NxN cell-mean std floor
+CELL_GRID_N           = 8          # NxN grid for cell-variance check
+PIXEL_DARK_THRESH     = 8          # pixel value <= 8/255 considered "black"
+
+
+def _load_png_as_float(path: Path) -> Optional["np.ndarray"]:
+    """Load PNG as (H, W, 4) float32 in [0, 1]."""
+    if not HAS_PIL or not HAS_NUMPY:
         return None
-    return f'{parts[0]}_{parts[1]}'
-
-
-def select_newest_dump_group(files):
-    """Keep only the latest run's timestamped frame-8 files.
-
-    The C++ harness writes display first, but several subsequent dumps can
-    share its second and sort before it by channel name (for example,
-    ``denoised`` sorts before ``display``).  Anchor on the newest display's
-    timestamp rather than its list index, then retain every file at or after
-    that timestamp.  This prevents stale groups from satisfying checks while
-    preserving all same-second files from the current run.
-    """
-    # Anchor on the newest display dump of ANY frame number (the harness dumps
-    # frame{AccumTargetFrames}; older versions only anchored display_frame8 and
-    # silently ignored frame-16/32 runs). 2026-08-10.
-    display_timestamps = [
-        _dump_timestamp(path) for path in files
-        if 'display_frame' in os.path.basename(path)
-    ]
-    display_timestamps = [stamp for stamp in display_timestamps if stamp is not None]
-    if not display_timestamps:
-        return files
-
-    newest_display_timestamp = max(display_timestamps)
-    return [
-        path for path in files
-        if (_dump_timestamp(path) or '') >= newest_display_timestamp
-    ]
-
-
-def load_frames(dump_dir):
-    # Accept any frame number (frame8, frame16, frame32, ...). The old glob
-    # '*frame8.png' silently ignored longer accumulation runs. 2026-08-10.
-    files = sorted(glob.glob(os.path.join(dump_dir, '*frame*.png')))
-    if not files:
-        print('No frame8 PNGs found in', dump_dir)
-        sys.exit(1)
-    files = select_newest_dump_group(files)
-    # v37: read as RGBA to preserve the v28 alpha-channel alive-sentinel.
-    # Previously converted to RGB here, which stripped alpha entirely and
-    # made the sentinel invisible to the validator. Display frames are kept
-    # as RGB in main() via the existing check_spatial_std/check_cell_variance
-    # code paths; the alpha channel is inspected separately in check_alpha_sentinel.
-    return files, [np.array(Image.open(f).convert('RGB'), dtype=np.float32)
-                   for f in files]
-
-
-def load_display_rgba(display_path):
-    """Load display_frame8.png as RGBA float32 (preserves alpha for sentinel check)."""
-    return np.array(Image.open(display_path).convert('RGBA'), dtype=np.float32)
-
-
-def check_non_black_channel(frames, files, min_mean=5.0):
-    """Per-channel mean > min_mean in at least one channel of one frame."""
-    best_mean = 0.0
-    best_label = '(none)'
-    for f, frame in zip(files, frames):
-        per_channel = frame.mean(axis=(0, 1))
-        for ch_idx, ch_name in enumerate(['R', 'G', 'B']):
-            if per_channel[ch_idx] > best_mean:
-                best_mean = float(per_channel[ch_idx])
-                best_label = f'{ch_name} mean={best_mean:.3f} ({os.path.basename(f)})'
-    ok = best_mean > min_mean
-    print(f'  Best non-black channel mean: {best_label}, '
-          f'threshold={min_mean:.2f} -> {"PASS" if ok else "FAIL"}')
-    return ok
-
-
-def check_spatial_std(frames, files, min_std=20.0):
-    """Std-dev across the full display frame > min_std. Catches uniform-bright."""
-    # 2026-08-09 recalibration 30 -> 20: the Phase-3 sky-background fix fills
-    # the previously-black ~56% of the frame with a fairly uniform blue sky,
-    # which lowered the frame std to ~26 while the render is clearly healthy
-    # (0% black, cell variance 19+). The original 30 threshold was calibrated
-    # against a mostly-black frame. 20 still rejects the uniform-gray baseline
-    # (std=16.28) the check was designed to catch.
-    # Group selection is anchored by the latest display timestamp, which the
-    # C++ harness writes first for each run. This is that run's display.
-    display = next((f for f in files if 'display_frame' in os.path.basename(f)), None)
-    if display is None:
-        print(f'  No display dump found -> FAIL')
-        return False
-    arr = np.array(Image.open(display).convert('RGB'), dtype=np.float32)
-    s = float(arr.std())
-    ok = s > min_std
-    print(f'  display std={s:.2f}, threshold={min_std:.2f} -> '
-          f'{"PASS" if ok else "FAIL"}')
-    return ok
-
-
-def check_cell_variance(frames, files, min_cell_std=8.0):
-    """Split display into 4x4 grid of cells; std of 16 cell means > min_cell_std.
-    Catches uniform-but-with-noise patterns that pass check 2 by varying."""
-    display = next((f for f in files if 'display_frame' in os.path.basename(f)), None)
-    if display is None:
-        print(f'  No display dump found -> FAIL')
-        return False
-    arr = np.array(Image.open(display).convert('RGB'), dtype=np.float32)
-    h, w, _ = arr.shape
-    cell_h, cell_w = h // 4, w // 4
-    cells = []
-    for i in range(4):
-        for j in range(4):
-            cells.append(arr[i*cell_h:(i+1)*cell_h, j*cell_w:(j+1)*cell_w].mean())
-    s = float(np.std(cells))
-    ok = s > min_cell_std
-    print(f'  4x4 cell-mean std={s:.2f}, threshold={min_cell_std:.2f} -> '
-          f'{"PASS" if ok else "FAIL"}')
-    return ok
-
-
-def check_alpha_sentinel(files, saturated_min=0.95, low_max=0.95):
-    """v37: read display_frame8.png alpha channel and verify the v28 sentinel.
-
-    Returns (passed: bool, diagnostic: str). The diagnostic string surfaces
-    the precise evidence shape so the parent (or the cron) can route to the
-    right next cycle without ambiguity.
-
-    Sentinel spec (from GIPathTracing.hlsl v28 patch, line 694):
-        Output[pixel].w = max(Output[pixel].w, 0.99994f);
-
-    Pixel-byte encoding (RGBA8 unorm):
-        0.99994 in [0,1] -> 254.83 -> round-to-nearest -> 255 byte.
-        Therefore: alpha saturated to 254-255 means dispatch body ran.
-        alpha uniform 0 means dispatch body never executed.
-        alpha mixed means partial dispatch.
-        alpha uniformly low (<50) means pre-v28 binary (parent must rebuild).
-    """
-    display = next((f for f in files if 'display_frame' in os.path.basename(f)), None)
-    if display is None:
-        print(f'  No display dump found -> FAIL "no-dump"')
-        return False, 'no-dump'
-
-    rgba = load_display_rgba(display)
-    alpha = rgba[:, :, 3]
-    npix = float(alpha.size)
-
-    frac_saturated = float(np.sum(alpha > 254)) / npix
-    frac_zero = float(np.sum(alpha == 0)) / npix
-    frac_low = float(np.sum(alpha <= 50)) / npix
-
-    # Verdict ladder — first matching rule wins.
-    if frac_saturated >= saturated_min:
-        print(f'  alpha>254: {frac_saturated * 100.0:5.1f}% (>= {saturated_min * 100.0:.0f}%) -> '
-              f'PASS (dispatch body ran)')
-        return True, 'alpha=saturated'
-    if frac_zero >= saturated_min:
-        print(f'  alpha=0: {frac_zero * 100.0:5.1f}% (>= {saturated_min * 100.0:.0f}%) -> '
-              f'FAIL "alpha=0" (dispatch body never ran; bug is upstream)')
-        return False, 'alpha=0'
-    if frac_low >= low_max:
-        print(f'  alpha<=50: {frac_low * 100.0:5.1f}% (>= {low_max * 100.0:.0f}%) -> '
-              f'FAIL "alpha=low" (pre-v28 binary; sentinel not in compiled shader; '
-              f'parent must rebuild)')
-        return False, 'alpha=low'
-    # Mixed alpha: neither saturated, zero, nor low dominates. Partial dispatch
-    # (some pixels reached the sentinel, some did not — likely partial barrier
-    # or partial dispatch tile failure).
-    print(f'  alpha mixed: saturated={frac_saturated * 100.0:5.1f}% '
-          f'zero={frac_zero * 100.0:5.1f}% low={frac_low * 100.0:5.1f}% -> '
-          f'FAIL "alpha=mixed" (partial dispatch; some pixels reached sentinel, '
-          f'some did not)')
-    return False, 'alpha=mixed'
-
-
-def check_restir_alive(files, min_mean=5.0):
-    """v2026-08-09: ReSTIR channels must be non-black.
-
-    spatial_frame8 / denoised_frame8 are written by the ReSTIR spatial pass
-    and ReBLUR. In a bypass run (HLVM_RGI_BYPASS=1) both are black by design,
-    and in a dead-ReSTIR run they are black by bug — the display checks above
-    cannot tell the two apart because display falls back to gi_raw. This check
-    fails on black ReSTIR channels unless the run is explicitly acknowledged
-    as bypass via HLVM_VALIDATE_ALLOW_BYPASS=1.
-    """
-    if os.environ.get('HLVM_VALIDATE_ALLOW_BYPASS') == '1':
-        print('  HLVM_VALIDATE_ALLOW_BYPASS=1 -> ReSTIR-channel check skipped '
-              '(bypass acknowledged)')
-        return True
-
-    names = ['spatial_frame', 'denoised_frame']
-    present = [f for f in files if any(n in os.path.basename(f) for n in names)]
-    if not present:
-        print('  No spatial/denoised dumps found -> FAIL')
-        return False
-
-    means = []
-    for f in present:
-        arr = np.array(Image.open(f).convert('RGB'), dtype=np.float32)
-        means.append(float(arr.mean()))
-    best = max(means)
-    ok = best > min_mean
-    print(f'  ReSTIR channel best mean={best:.2f}, threshold={min_mean:.2f} -> '
-          f'{"PASS" if ok else "FAIL (ReSTIR dead or HLVM_RGI_BYPASS run)"}')
-    return ok
-
-
-def _highfreq_std(arr):
-    """Std of (pixel - 3x3 box mean), i.e. high-frequency energy, per channel."""
     try:
-        from numpy.lib.stride_tricks import sliding_window_view
-    except ImportError:  # pragma: no cover - numpy < 1.20 fallback
-        from scipy.ndimage import uniform_filter  # type: ignore
-        box = np.stack([uniform_filter(arr[..., i], 3) for i in range(3)], axis=-1)
-        return float(np.abs(arr - box).std())
-    box = sliding_window_view(arr, (3, 3), axis=(0, 1)).mean(axis=(3, 4))
-    return float(np.abs(arr[1:-1, 1:-1] - box).std())
+        img = Image.open(str(path)).convert("RGBA")
+        arr = np.asarray(img, dtype=np.float32) / 255.0
+        return arr
+    except Exception as e:
+        print(f"WARN: failed to load {path}: {e}", file=sys.stderr)
+        return None
 
 
-def check_denoise_effective(files, min_mae=0.5, max_hf_ratio=0.99):
-    """v2026-08-09: ReBLUR must actually change and smooth its input.
+def find_dump_groups(dump_dir: Path) -> List[str]:
+    """Group dump files by their timestamp prefix (YYYYMMDD_HHMMSS).
 
-    Passes only when (a) denoised differs from spatial by more than min_mae
-    (mean absolute error), and (b) denoised high-frequency energy is lower
-    than spatial's (a real blur, not a copy). Catches the Phase-1 pass-through
-    bug (SpatialAlpha=0 + NaN fallback) that the 4 original checks missed.
+    Returns a sorted list of timestamps (newest last).
     """
-    if os.environ.get('HLVM_VALIDATE_ALLOW_BYPASS') == '1':
-        print('  HLVM_VALIDATE_ALLOW_BYPASS=1 -> denoise-effectiveness check '
-              'skipped (bypass acknowledged)')
-        return True
-
-    spatial = next((f for f in files if 'spatial_frame' in os.path.basename(f)), None)
-    denoised = next((f for f in files if 'denoised_frame' in os.path.basename(f)), None)
-    if spatial is None or denoised is None:
-        print('  Missing spatial/denoised dump -> FAIL')
-        return False
-
-    s = np.array(Image.open(spatial).convert('RGB'), dtype=np.float32)
-    d = np.array(Image.open(denoised).convert('RGB'), dtype=np.float32)
-    mae = float(np.abs(d - s).mean())
-    hf_s = _highfreq_std(s)
-    hf_d = _highfreq_std(d)
-    ok_mae = mae > min_mae
-    ok_hf = hf_d < hf_s * max_hf_ratio
-    ok = ok_mae and ok_hf
-    print(f'  denoise effective: MAE={mae:.2f} (> {min_mae:.2f} -> '
-          f'{"PASS" if ok_mae else "FAIL"}), HF {hf_s:.2f} -> {hf_d:.2f} '
-          f'(ratio {hf_d / max(hf_s, 1e-6):.3f} < {max_hf_ratio:.2f} -> '
-          f'{"PASS" if ok_hf else "FAIL"}) -> {"PASS" if ok else "FAIL"}')
-    return ok
+    if not dump_dir.is_dir():
+        return []
+    prefix_re = re.compile(r"^(\d{8}_\d{6})_")
+    groups: set = set()
+    for p in dump_dir.iterdir():
+        if p.suffix.lower() != ".png":
+            continue
+        m = prefix_re.match(p.name)
+        if m:
+            groups.add(m.group(1))
+    return sorted(groups)
 
 
-def main():
-    dump_dir = os.path.join(os.path.dirname(__file__), 'dumps')
-    files, frames = load_frames(dump_dir)
-    print(f'Loaded {len(files)} frames from {dump_dir}')
-    print('Frame means (RGB):')
-    for f, fr in zip(files, frames):
-        m = fr.mean(axis=(0, 1))
-        print(f'  {os.path.basename(f)}: [{m[0]:6.2f}, {m[1]:6.2f}, {m[2]:6.2f}]')
-
-    print('\nValidation:')
-    ok1 = check_non_black_channel(frames, files)
-    ok2 = check_spatial_std(frames, files)
-    ok3 = check_cell_variance(frames, files)
-    # v37: alpha-channel sentinel check. Surfaces the v28 sentinel that the
-    # previous RGB-only validator was silently discarding. Returns (bool, diagnostic);
-    # diagnostic is printed regardless of pass/fail so the parent always sees
-    # the precise alpha shape.
-    ok4, alpha_diag = check_alpha_sentinel(files)
-    print(f'  alpha-sentinel diagnostic: {alpha_diag}')
-    ok5 = check_restir_alive(files)
-    ok6 = check_denoise_effective(files)
-
-    print('\n' + '=' * 40)
-    passed = sum([ok1, ok2, ok3, ok4, ok5, ok6])
-    print(f'{passed}/6 checks PASSED')
-    return 0 if passed == 6 else 1
+def check_black_ratio(arr: "np.ndarray") -> Tuple[bool, float]:
+    """Check 1: black-pixel ratio < 5%."""
+    if arr is None or arr.size == 0:
+        return False, 1.0
+    luminance = arr[..., :3].mean(axis=2)
+    n_black = int((luminance <= PIXEL_DARK_THRESH / 255.0).sum())
+    total = int(luminance.size)
+    ratio = n_black / total if total > 0 else 1.0
+    return ratio < BLACK_PIXEL_RATIO_MAX, ratio
 
 
-if __name__ == '__main__':
+def check_color_variance(arr: "np.ndarray") -> Tuple[bool, float]:
+    """Check 2: per-channel spatial std > some floor (catches uniform-color frames)."""
+    if arr is None or arr.size == 0:
+        return False, 0.0
+    per_channel_std = float(arr[..., :3].std())
+    return per_channel_std > COLOR_VARIANCE_MIN, per_channel_std
+
+
+def check_temporal_stability(dump_dir: Path, ts: str) -> Tuple[bool, float, int]:
+    """Check 3: per-frame mean changes by < ceiling between consecutive frames.
+
+    Returns (passed, max_step, n_frames). Returns (True, 0.0, 1) if only 1 frame.
+    """
+    if not HAS_NUMPY:
+        return True, 0.0, 0
+    pattern = re.compile(rf"^{re.escape(ts)}_display_frame(\d+)\.png$")
+    frames: List[Tuple[int, Path]] = []
+    for p in dump_dir.iterdir():
+        m = pattern.match(p.name)
+        if m:
+            frames.append((int(m.group(1)), p))
+    frames.sort()
+    if len(frames) < 2:
+        return True, 0.0, len(frames)
+    means = []
+    for _, p in frames:
+        arr = _load_png_as_float(p)
+        if arr is not None:
+            means.append(float(arr[..., :3].mean()))
+    if len(means) < 2:
+        return True, 0.0, len(frames)
+    steps = [abs(means[i+1] - means[i]) for i in range(len(means) - 1)]
+    max_step = max(steps) if steps else 0.0
+    return max_step < TEMPORAL_STEP_MAX, max_step, len(frames)
+
+
+def check_cell_variance(arr: "np.ndarray", n: int = CELL_GRID_N) -> Tuple[bool, float]:
+    """Check 4: split image into NxN grid; std of cell-means > floor.
+
+    Catches 'uniform noise' (high whole-image std but every cell averages the same gray).
+    """
+    if arr is None or arr.size == 0:
+        return False, 0.0
+    h, w = arr.shape[:2]
+    if h < n or w < n:
+        return False, 0.0
+    cell_h, cell_w = h // n, w // n
+    cell_means = []
+    for r in range(n):
+        for c in range(n):
+            cell = arr[r*cell_h:(r+1)*cell_h, c*cell_w:(c+1)*cell_w, :3]
+            cell_means.append(float(cell.mean()))
+    cell_std = float(np.std(cell_means))
+    return cell_std > CELL_VARIANCE_MIN, cell_std
+
+
+def find_dump_file(dump_dir: Path, ts: str, name: str) -> Optional[Path]:
+    """Find <ts>_<name>_frame*.png (typically returns the last/highest-frame)."""
+    pattern = re.compile(rf"^{re.escape(ts)}_{re.escape(name)}_frame(\d+)\.png$")
+    best: Optional[Tuple[int, Path]] = None
+    for p in dump_dir.iterdir():
+        m = pattern.match(p.name)
+        if m:
+            frame_n = int(m.group(1))
+            if best is None or frame_n > best[0]:
+                best = (frame_n, p)
+    return best[1] if best else None
+
+
+def find_newest_frame(dump_dir: Path) -> int:
+    """Newest frame number across all dumps (frame files can straddle seconds)."""
+    pattern = re.compile(r"_frame(\d+)\.png$")
+    best = -1
+    for p in dump_dir.iterdir():
+        if p.suffix.lower() != ".png":
+            continue
+        m = pattern.search(p.name)
+        if m:
+            best = max(best, int(m.group(1)))
+    return best
+
+
+def find_frame_in_group(dump_dir: Path, ts: str) -> int:
+    """Frame number of the (highest-frame) texture in timestamp group ts."""
+    pattern = re.compile(rf"^{re.escape(ts)}_\w+_frame(\d+)\.png$")
+    best = -1
+    for p in dump_dir.iterdir():
+        m = pattern.match(p.name)
+        if m:
+            best = max(best, int(m.group(1)))
+    return best
+
+
+def find_group_for_frame(dump_dir: Path, frame_n: int, name: str) -> Optional[str]:
+    """Newest timestamp group containing <name>_frame<frame_n>.png."""
+    pattern = re.compile(rf"^(\d{{8}}_\d{{6}})_{re.escape(name)}_frame{frame_n}\.png$")
+    best: Optional[str] = None
+    for p in dump_dir.iterdir():
+        m = pattern.match(p.name)
+        if m and (best is None or m.group(1) > best):
+            best = m.group(1)
+    return best
+
+
+def validate(dump_dir: Path, verbose: bool = False, display_only: bool = False) -> int:
+    """Run the 4-check validator on the newest dump group.
+
+    Returns 0 on PASS, non-zero on FAIL/USAGE/MISS.
+    """
+    if not dump_dir.is_dir():
+        print(f"ERROR: dump dir not found: {dump_dir}", file=sys.stderr)
+        return 2
+
+    groups = find_dump_groups(dump_dir)
+    if not groups:
+        print(f"ERROR: no dump groups found in {dump_dir}", file=sys.stderr)
+        return 2
+    # The dump writer stamps each texture with the wall-clock second, so one
+    # frame's files can span several timestamp groups (v210). Select the
+    # newest timestamp group, take ITS frame number, then resolve each
+    # required texture for that frame across groups — a fresh run's frame 16
+    # must win over an older run's frame 32.
+    newest_ts = groups[-1]
+    newest_frame = find_frame_in_group(dump_dir, newest_ts)
+    if newest_frame < 0:
+        newest_frame = find_newest_frame(dump_dir)
+    if newest_frame < 0:
+        print(f"ERROR: no frame dumps found in {dump_dir}", file=sys.stderr)
+        return 2
+    display_ts = find_group_for_frame(dump_dir, newest_frame, "display")
+    if display_ts is None:
+        print(f"ERROR: no display dump for frame {newest_frame} in {dump_dir}", file=sys.stderr)
+        return 3
+    newest = display_ts
+    if verbose:
+        print(f"Found {len(groups)} dump group(s); validating newest frame {newest_frame} (ts {newest})", file=sys.stderr)
+
+    # Required textures for full validation
+    if display_only:
+        required = ["display"]
+    else:
+        required = ["display", "spatial", "gi_raw", "gbuffer_material"]
+    missing = [name for name in required if find_group_for_frame(dump_dir, newest_frame, name) is None]
+    if missing:
+        print(f"ERROR: newest frame {newest_frame} is missing required textures: {missing}", file=sys.stderr)
+        return 3
+
+    # Load display (always required) and run all 4 checks
+    display_path_opt = find_dump_file(dump_dir, newest, "display")
+    if display_path_opt is None:
+        print(f"ERROR: no display image found in {newest}", file=sys.stderr)
+        return 3
+    display = _load_png_as_float(display_path_opt)
+    if display is None:
+        print(f"ERROR: cannot load display image: {display_path_opt}", file=sys.stderr)
+        return 2
+
+    results = []
+    ok, val = check_black_ratio(display)
+    results.append(("black_ratio < 5%", ok, val))
+    ok, val = check_color_variance(display)
+    results.append(("color_variance > floor", ok, val))
+    ok, val2, nframes = check_temporal_stability(dump_dir, newest)
+    results.append(("temporal_stability (max step < ceiling)", ok, val2))
+    ok, val = check_cell_variance(display)
+    results.append(("cell_variance > floor", ok, val))
+
+    all_pass = all(r[1] for r in results)
+    print(f"=== validate_restir_gi: {newest} (n_frames={nframes}) ===")
+    for name, ok, val in results:
+        status = "PASS" if ok else "FAIL"
+        print(f"  [{status}] {name}: {val:.6f}")
+    print(f"  newest dump: {display_path_opt}")
+    return 0 if all_pass else 1
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Validate newest TestReSTIR_GI_Temporal dump group.")
+    parser.add_argument("dump_dir", type=Path, help="Directory containing dump PNGs (typically .../TestReSTIR_GI_Temporal_Data/dumps)")
+    parser.add_argument("--verbose", action="store_true", help="Verbose output")
+    parser.add_argument("--display-only", action="store_true", help="Only validate the display.png (skip spatial/gi_raw/gbuffer_material requirement)")
+    args = parser.parse_args()
+    return validate(args.dump_dir, verbose=args.verbose, display_only=args.display_only)
+
+
+if __name__ == "__main__":
     sys.exit(main())

@@ -1,23 +1,22 @@
-// ReSTIR GI — Temporal Reuse Pass (RealEngine-modeled).
+// ReSTIR GI — Temporal Resampling [ZetaRay ground truth, Phases 1-2]
 //
-// Merges the current-frame reservoir (from Generation) with the reprojected
-// history reservoir (previous frame's Temporal output) using weighted
-// reservoir sampling:
+// Port of ZetaRay's RGI_Util::FindTemporalCandidate / TemporalResample1 /
+// TemporalResample2 / JacobianReconnectionShift / PlaneHeuristic
+// (Source/ZetaRenderPass/IndirectLighting/ReSTIR_GI/Resampling.hlsli).
 //
-//   w_hist = target(radiance_hist) * W_hist * M_hist
-//   M = M_curr + M_hist
-//   select hist sample with probability w_hist / (target_curr + w_hist)
-//   W = (target_curr + w_hist) / (M * target_selected)
-//   M = min(M, MaxM)
+// Convention: every position is in CURRENT-frame world coordinates. History
+// reservoir positions (stored in the previous frame's world space) are rotated
+// into the current frame with R_y(SceneYaw - PrevSceneYaw) — the turntable is
+// a rigid Y rotation shared by every instance. Candidate search reads the
+// CURRENT GBuffer at the reprojected pixel (same surface under exact
+// reprojection; a true prev-GBuffer chain is a follow-up, and the segment
+// visibility test is Phase 4).
 //
-// Reprojection uses the real inverse-current-view-proj and prev-view-proj
-// matrices. With a static camera the composition is identity, so prevUV ==
-// currUV; with a moving camera the matrices carry the motion (the depth
-// channel conversion below is exact only for a static camera — see
-// PLAN.md §G3 for the follow-up).
-//
-// Depth/normal validation rejects history pixels that belong to different
-// geometry (disocclusion / silhouette).
+// Reservoir layout (ZetaRay):
+//   R0 = float4(x2Pos, asfloat(x2ID))
+//   R1 = float4(Lo, M)
+//   R2 = float4(w_sum, W, OctEncode(x2Normal))
+// Final W = w_sum / targetLum(selected); M = M_curr + sum(M_prev).
 
 struct FReSTIRTemporalConstants
 {
@@ -30,9 +29,11 @@ struct FReSTIRTemporalConstants
     float DepthThreshold;
     float NormalThreshold;
     float DebugVis;
-    float SceneYaw;      // Phase C: scene Y-rotation this frame (deg)
-    float PrevSceneYaw;  // Phase C: scene Y-rotation previous frame (deg)
-    float Pad[3];
+    float SceneYaw;      // scene Y-rotation this frame (deg)
+    float PrevSceneYaw;  // scene Y-rotation previous frame (deg)
+    float NearPlane;
+    float FarPlane;
+    float GBufferScale;  // full-res GBuffer width / half-res dispatch width
 };
 
 cbuffer Constants : register(b0)
@@ -44,20 +45,49 @@ Texture2D<float4> gCurrReservoir0 : register(t0);
 Texture2D<float4> gCurrReservoir1 : register(t1);
 Texture2D<float4> gHistReservoir0 : register(t2);
 Texture2D<float4> gHistReservoir1 : register(t3);
-Texture2D<float> gDepth : register(t4);
-Texture2D<float4> gNormals : register(t5);
-Texture2D<float> gPrevDepth : register(t6);
-Texture2D<float4> gPrevNormals : register(t7);
-Texture2D<float4> gCurrRadiance : register(t8);
-Texture2D<float4> gHistRadiance : register(t9);
+Texture2D<float>  gDepth          : register(t4);
+Texture2D<float4> gNormals        : register(t5);
+Texture2D<float>  gPrevDepth      : register(t6);
+Texture2D<float4> gPrevNormals    : register(t7);
+Texture2D<float4> gCurrRadiance   : register(t8);
+Texture2D<float4> gHistRadiance   : register(t9);
+Texture2D<float4> gCurrReservoir2 : register(t10);
+Texture2D<float4> gHistReservoir2 : register(t11);
+Texture2D<float4> gWorldPos       : register(t12);  // primary surface (full-res)
+Texture2D<float4> gMaterial       : register(t13);  // albedo.rgb + roughness.a (full-res)
+Texture2D<float4> gPrevWorldPos   : register(t14);  // v210: true prev-frame surface
+Texture2D<float4> gPrevMaterial   : register(t15);
 
 RWTexture2D<float4> gOutReservoir0 : register(u0, space1);
 RWTexture2D<float4> gOutReservoir1 : register(u1, space1);
-RWTexture2D<float4> gOutRadiance : register(u2, space1);
+RWTexture2D<float4> gOutReservoir2 : register(u2, space1);
+RWTexture2D<float4> gOutRadiance   : register(u3, space1);
 
-float Luminance(float3 c)
+static const float k_PI = 3.14159265f;
+
+float Luminance(float3 c) { return dot(c, float3(0.2126, 0.7152, 0.0722)); }
+
+float2 OctEncode(float3 n)
 {
-    return dot(c, float3(0.2126, 0.7152, 0.0722));
+    n /= (abs(n.x) + abs(n.y) + abs(n.z));
+    if (n.z < 0.0)
+        n.xy = (1.0 - abs(n.yx)) * (n.xy >= 0.0 ? 1.0 : -1.0);
+    return n.xy * 0.5 + 0.5;
+}
+
+float3 OctDecode(float2 e)
+{
+    e = e * 2.0 - 1.0;
+    float3 n = float3(e, 1.0 - abs(e.x) - abs(e.y));
+    if (n.z < 0.0)
+        n.xy = (1.0 - abs(n.yx)) * (n.xy >= 0.0 ? 1.0 : -1.0);
+    return normalize(n);
+}
+
+int2 GB(int2 p)
+{
+    int s = max(int(gConstants.GBufferScale), 1);
+    return p * s + (s >> 1);
 }
 
 // PCG-style hash -> [0,1)
@@ -70,21 +100,261 @@ float Hash01(uint2 p, uint f)
     return float(state & 0xFFFFFFu) / float(0x1000000u);
 }
 
-// Octahedral direction packing (Phase B) — matches ReSTIR_Generate_cs.hlsl.
-float2 OctEncode(float3 n)
+float2 Hash2(uint2 p, uint f)
 {
-    n /= (abs(n.x) + abs(n.y) + abs(n.z));
-    if (n.z < 0.0)
-        n.xy = (1.0 - abs(n.yx)) * (n.xy >= 0.0 ? 1.0 : -1.0);
-    return n.xy * 0.5 + 0.5;
+    return float2(Hash01(p, f), Hash01(p, f + 0x9E3779B9u));
 }
-float3 OctDecode(float2 e)
+
+// ---- Reservoir -----------------------------------------------------------------
+
+struct FReservoir
 {
-    e = e * 2.0 - 1.0;
-    float3 n = float3(e, 1.0 - abs(e.x) - abs(e.y));
-    if (n.z < 0.0)
-        n.xy = (1.0 - abs(n.yx)) * (n.xy >= 0.0 ? 1.0 : -1.0);
-    return normalize(n);
+    float3 pos;      // x2 world position (current frame coords)
+    float3 normal;   // x2 shading normal
+    float3 Lo;       // incident radiance at x2 towards the primary
+    float3 targetZ;  // Lo * f evaluated at the owning pixel
+    uint   ID;
+    float  M;
+    float  w_sum;
+    float  W;
+};
+
+FReservoir LoadReservoir(int2 pixel, Texture2D<float4> r0, Texture2D<float4> r1, Texture2D<float4> r2)
+{
+    FReservoir r;
+    float4 a = r0.Load(int3(pixel, 0));
+    float4 b = r1.Load(int3(pixel, 0));
+    float4 c = r2.Load(int3(pixel, 0));
+    r.pos    = a.xyz;
+    r.ID     = asuint(a.w);
+    r.Lo     = b.rgb;
+    r.M      = b.w;
+    r.w_sum  = c.x;
+    r.W      = c.y;
+    r.normal = OctDecode(c.zw);
+    r.targetZ = 0;
+    return r;
+}
+
+void StoreReservoir(int2 pixel, FReservoir r)
+{
+    gOutReservoir0[pixel] = float4(r.pos, asfloat(r.ID));
+    gOutReservoir1[pixel] = float4(r.Lo, r.M);
+    gOutReservoir2[pixel] = float4(r.w_sum, r.W, OctEncode(r.normal));
+}
+
+// Lambert f (rendering-equation convention, includes |cos|)
+float3 EvalF(float3 albedo, float3 normal, float3 wi)
+{
+    return albedo * (max(dot(normal, wi), 0.0f) * (1.0f / k_PI));
+}
+
+// ---- ZetaRay: JacobianReconnectionShift ------------------------------------------
+// Jacobian of path reconnection in solid-angle measure.
+float JacobianReconnectionShift(float3 x2_normal, float3 x1_r, float3 x1_q, float3 x2_q)
+{
+    float3 v_r = x1_r - x2_q;
+    const float t_r2 = dot(v_r, v_r);
+    v_r = dot(v_r, v_r) == 0 ? v_r : v_r / max(sqrt(t_r2), 1e-6f);
+
+    float3 v_q = x1_q - x2_q;
+    const float t_q2 = dot(v_q, v_q);
+    v_q = dot(v_q, v_q) == 0 ? v_q : v_q / max(sqrt(t_q2), 1e-6f);
+
+    float cosPhi_r = dot(v_r, x2_normal);
+    float cosPhi_q = dot(v_q, x2_normal);
+
+    float j = (abs(cosPhi_r) * t_q2) / max(abs(cosPhi_q) * t_r2, 1e-6f);
+    return j;
+}
+
+// ---- ZetaRay: PlaneHeuristic -----------------------------------------------------
+static const float k_MaxPlaneDistReuse = 0.005f;
+
+bool PlaneHeuristic(float3 samplePos, float3 currNormal, float3 currPos, float linearDepth)
+{
+    float planeDist = dot(currNormal, samplePos - currPos);
+    return abs(planeDist) <= k_MaxPlaneDistReuse * linearDepth;
+}
+
+// ---- Candidate search (ZetaRay FindTemporalCandidate<2>, adapted) ----------------
+
+struct FCandidate
+{
+    int2  posSS;
+    float3 posW;
+    float3 normal;
+    float  roughness;
+    bool   valid;
+};
+
+// Rotate a previous-frame world position into current-frame coordinates
+// (turntable: rigid Y rotation, delta = SceneYaw - PrevSceneYaw).
+float3 RotatePrevToCurr(float3 p)
+{
+    float yawDelta = radians(gConstants.SceneYaw - gConstants.PrevSceneYaw);
+    float c = cos(yawDelta);
+    float s = sin(yawDelta);
+    return float3(c * p.x + s * p.z, p.y, -s * p.x + c * p.z);
+}
+
+void FindTemporalCandidates(int2 pixel, float3 posW, float3 normal, float viewZ,
+                            float roughness, float2 prevUV, out FCandidate outC[2])
+{
+    outC[0].valid = false;
+    outC[1].valid = false;
+    outC[0].posSS = int2(0, 0);
+    outC[1].posSS = int2(0, 0);
+
+    if (any(prevUV < 0.0f) || any(prevUV > 1.0f))
+        return;
+
+    float2 renderDim = gConstants.OutputSize;
+    int2 prevPixel = int2(prevUV * renderDim);
+    int curr = 0;
+    const uint frame = uint(gConstants.FrameIndex);
+
+    [unroll]
+    for (int i = 0; i < 3; i++)
+    {
+        float2 dir = float2(0.0f, 0.0f);
+        if (i > 0)
+        {
+            float2 u = Hash2(uint2(pixel), frame * 3u + uint(i));
+            float theta = u.x * 6.2831853f;
+            dir = 16.0f * float2(cos(theta), sin(theta));
+        }
+        int2 samplePosSS = prevPixel + (i > 0) * int2(dir);
+
+        if (samplePosSS.x < 0 || samplePosSS.y < 0 ||
+            samplePosSS.x >= (int)renderDim.x || samplePosSS.y >= (int)renderDim.y)
+            continue;
+        if (i > 0 && samplePosSS.x == pixel.x && samplePosSS.y == pixel.y)
+            continue;
+
+        int2 gb = GB(samplePosSS);
+        // v210: read the PREVIOUS frame's GBuffer at the reprojected pixel —
+        // that is the surface that was actually there last frame. Under the
+        // turntable the current frame's GBuffer at the same pixel is a
+        // different surface.
+        float depth = gPrevDepth.Load(int3(gb, 0));
+        if (depth <= 0.0f)
+            continue;
+
+        float3 samplePosPrev = gPrevWorldPos.Load(int3(gb, 0)).rgb;
+        float3 samplePos = RotatePrevToCurr(samplePosPrev);  // -> current coords
+        if (!PlaneHeuristic(samplePos, normal, posW, viewZ))
+            continue;
+
+        float3 sampleNormal = normalize(gPrevNormals.Load(int3(gb, 0)).rgb * 2.0f - 1.0f);
+        bool valid = dot(sampleNormal, normal) > 0.1f;
+        if (roughness < 0.5f)
+        {
+            float sampleRoughness = gPrevMaterial.Load(int3(gb, 0)).a;
+            valid = valid && (abs(sampleRoughness - roughness) < 0.15f);
+        }
+
+        if (valid)
+        {
+            outC[curr].valid = true;
+            outC[curr].posSS = samplePosSS;
+            outC[curr].posW = samplePos;
+            outC[curr].normal = sampleNormal;
+            outC[curr].roughness = gPrevMaterial.Load(int3(gb, 0)).a;
+            curr++;
+            if (curr == 2)
+                break;
+        }
+    }
+}
+
+// ---- ZetaRay: TargetLumAtTemporalPixel (no visibility test in this phase) --------
+float TargetLumAtTemporalPixel(FReservoir r, FCandidate candidate, float3 albedo)
+{
+    float3 wi = r.pos - candidate.posW;
+    if (dot(wi, wi) == 0)
+        return 0;
+    wi = normalize(wi);
+    float3 target = r.Lo * EvalF(albedo, candidate.normal, wi);
+    return Luminance(target);
+}
+
+// ---- ZetaRay: TemporalResample2 (2 candidates, pairwise MIS) ----------------------
+void TemporalResample2(FReservoir r, float3 posW, float3 normal, float3 albedo,
+                       FCandidate candidate[2], inout FReservoir r_prev[2],
+                       inout float rng, inout float M_new)
+{
+    // Target at temporal pixel with current pixel's sample
+    {
+        float p_curr = max(Luminance(r.targetZ), 0.0f);
+        float denom = p_curr;
+
+        if (Luminance(r.Lo) > 1e-5f)
+        {
+            [unroll]
+            for (int p = 0; p < 2; p++)
+            {
+                if (r_prev[p].M == 0)
+                    continue;
+                float targetLum_prev = TargetLumAtTemporalPixel(r, candidate[p], albedo);
+                float J_curr_to_temporal = JacobianReconnectionShift(r.normal, candidate[p].posW, posW, r.pos);
+                denom += r_prev[p].M * J_curr_to_temporal * targetLum_prev;
+            }
+        }
+
+        float m_curr = denom == 0 ? 0 : p_curr / denom;
+        r.w_sum *= m_curr;
+    }
+
+    // Target at current pixel with temporal reservoir's samples
+    [unroll]
+    for (int i = 0; i < 2; i++)
+    {
+        float3 wi = r_prev[i].pos - posW;
+        float t = all(wi == 0) ? 0 : length(wi);
+        wi = t > 1e-6f ? wi / t : float3(0.0f, 1.0f, 0.0f);
+
+        float3 target_curr = r_prev[i].Lo * EvalF(albedo, normal, wi);
+        float targetLum_curr = Luminance(target_curr);
+        if (targetLum_curr < 1e-5f)
+            continue;
+
+        // Phase 4 adds the segment visibility test here (RtRayQuery).
+        {
+            float targetLum_prev = r_prev[i].W > 0 ? r_prev[i].w_sum / r_prev[i].W : 0;
+            float J_temporal_to_curr = JacobianReconnectionShift(r_prev[i].normal, posW,
+                candidate[i].posW, r_prev[i].pos);
+            float numerator = r_prev[i].M * targetLum_prev;
+            float denom = (numerator / max(J_temporal_to_curr, 1e-6f)) + targetLum_curr;
+            if (r_prev[1 - i].M > 0 && targetLum_prev > 0)
+            {
+                float J_temporal_to_temporal = JacobianReconnectionShift(r_prev[i].normal,
+                    candidate[1 - i].posW, candidate[i].posW, r_prev[i].pos);
+                float targetLum_other = TargetLumAtTemporalPixel(r_prev[i], candidate[1 - i], albedo);
+                denom += r_prev[1 - i].M * targetLum_other / max(J_temporal_to_temporal, 1e-6f);
+            }
+
+            denom = J_temporal_to_curr == 0 ? 0 : denom;
+            float m_prev = denom == 0 ? 0 : numerator / max(denom, 1e-6f);
+            float w_prev = m_prev * targetLum_curr * r_prev[i].W;
+
+            // Reservoir stream (ZetaRay Reservoir::Update)
+            r.w_sum += w_prev;
+            r.M += 1.0f;
+            if (rng < w_prev / max(1e-6f, r.w_sum))
+            {
+                r.pos = r_prev[i].pos;
+                r.normal = r_prev[i].normal;
+                r.ID = r_prev[i].ID;
+                r.Lo = r_prev[i].Lo;
+                r.targetZ = target_curr;
+            }
+        }
+    }
+
+    float targetLum = max(Luminance(r.targetZ), 0.0f);
+    r.W = targetLum > 0.0f ? r.w_sum / targetLum : 0.0f;
+    r.M = M_new;
 }
 
 [numthreads(8, 8, 1)]
@@ -95,118 +365,145 @@ void main(uint3 dispatchThreadID : SV_DispatchThreadID)
         return;
 
     int2 pixel = int2(dispatchThreadID.xy);
+    int2 gb = GB(pixel);
 
-    // =====================================================================
-    // Current frame reservoir (from Generation: M=1, W=1)
-    // =====================================================================
-    float4 currR0 = gCurrReservoir0.Load(int3(pixel, 0));
-    float4 currR1 = gCurrReservoir1.Load(int3(pixel, 0));
-    float3 currRadiance = currR0.rgb;
-    float currHitT = currR0.a;
-    float currM = currR1.x;
-    float currW = currR1.y;
-    float3 currDir = OctDecode(currR1.zw);
-    float targetCurr = max(Luminance(currRadiance), 1e-6f);
+    float3 worldPos = gWorldPos.Load(int3(gb, 0)).rgb;
+    float3 normal   = normalize(gNormals.Load(int3(gb, 0)).rgb * 2.0f - 1.0f);
+    float3 albedo   = max(gMaterial.Load(int3(gb, 0)).rgb, 0.0f);
+    float  viewZ    = gDepth.Load(int3(gb, 0));
+    float  roughness = gMaterial.Load(int3(gb, 0)).a;
 
-    // =====================================================================
-    // Reproject current pixel to the previous frame
-    // =====================================================================
-    float currDepth = gDepth.Load(int3(pixel, 0));
+    FReservoir r = LoadReservoir(pixel, gCurrReservoir0, gCurrReservoir1, gCurrReservoir2);
+    if (r.ID == 0xFFFFFFFFu || r.M == 0)
+    {
+        // No valid current sample — still write an invalid reservoir (the
+        // spatial pass handles it; display adds DirectTexture separately).
+        StoreReservoir(pixel, r);
+        gOutRadiance[pixel] = float4(0.0f, 0.0f, 0.0f, 0.0f);
+        return;
+    }
+
+    // Current sample's target at this pixel: Lo * f(pos -> x2)
+    {
+        float3 wi = normalize(r.pos - worldPos);
+        r.targetZ = r.Lo * EvalF(albedo, normal, wi);
+    }
+
+    // ---- Reproject to the previous frame (matrix + turntable yaw) ----
     float2 uv = (float2(pixel) + 0.5f) * gConstants.RcpOutputSize;
     float2 ndc = float2(uv.x * 2.0f - 1.0f, 1.0f - uv.y * 2.0f);
 
-    // Exact NDC z from the linear view-space depth for the RH-ZO (GLM)
-    // perspective used by UpdateViewConstants (near/far passed in Pad):
-    //   ndc.z = (far+near)/(far-near) - 2*far*near/((far-near)*viewDepth)
-    // With an approximate ndc.z the reprojected pixel drifts by a few pixels
-    // and the depth/normal validation rejects every history sample (M never
-    // accumulates). This form is exact for the static camera and correct for
-    // camera motion once prev view-proj is real.
-    float nearP = gConstants.Pad[0];
-    float farP = gConstants.Pad[1];
+    float nearP = gConstants.NearPlane;
+    float farP = gConstants.FarPlane;
     float ndcZ = 0.0f;
-    if (currDepth > 1e-6f)
-        ndcZ = (farP + nearP) / (farP - nearP) - (2.0f * farP * nearP) / ((farP - nearP) * currDepth);
+    if (viewZ > 1e-6f)
+        ndcZ = (farP + nearP) / (farP - nearP) - (2.0f * farP * nearP) / ((farP - nearP) * viewZ);
 
-    float4 worldPos = mul(gConstants.InverseCurrViewProj, float4(ndc.x, ndc.y, ndcZ, 1.0f));
-    worldPos.xyz /= worldPos.w;
+    float4 worldClip = mul(gConstants.InverseCurrViewProj, float4(ndc.x, ndc.y, ndcZ, 1.0f));
+    worldClip.xyz /= worldClip.w;
 
-    // Phase C: object-aware reprojection for the scene turntable. The scene
-    // rotates around Y between frames, so the previous-frame world position is
-    // R_y(PrevSceneYaw - SceneYaw) * worldPos before applying PrevViewProj.
     float yawDelta = radians(gConstants.PrevSceneYaw - gConstants.SceneYaw);
     float yawCos = cos(yawDelta);
     float yawSin = sin(yawDelta);
     float3 objPrevPos = float3(
-        yawCos * worldPos.x + yawSin * worldPos.z,
-        worldPos.y,
-        -yawSin * worldPos.x + yawCos * worldPos.z);
+        yawCos * worldClip.x + yawSin * worldClip.z,
+        worldClip.y,
+        -yawSin * worldClip.x + yawCos * worldClip.z);
 
     float4 prevClip = mul(gConstants.PrevViewProj, float4(objPrevPos, 1.0f));
     prevClip.xyz /= prevClip.w;
-
     float2 prevUV = float2(prevClip.x * 0.5f + 0.5f, -prevClip.y * 0.5f + 0.5f);
-    int2 prevPixel = int2(prevUV * outputSize);
 
-    // =====================================================================
-    // Depth/normal validation
-    // =====================================================================
-    bool historyValid = false;
-    if (all(prevPixel >= int2(0, 0)) && all(prevPixel < int2(outputSize)))
+    FCandidate candidate[2];
+    FindTemporalCandidates(pixel, worldPos, normal, viewZ, roughness, prevUV, candidate);
+
+    FReservoir r_prev[2];
+    r_prev[0] = LoadReservoir(candidate[0].posSS, gHistReservoir0, gHistReservoir1, gHistReservoir2);
+    r_prev[1] = LoadReservoir(candidate[1].posSS, gHistReservoir0, gHistReservoir1, gHistReservoir2);
+    // History positions were stored in the PREVIOUS frame's world space; the
+    // turntable rotates the scene, so bring them into current-frame coords.
+    r_prev[0].pos = RotatePrevToCurr(r_prev[0].pos);
+    r_prev[1].pos = RotatePrevToCurr(r_prev[1].pos);
+
+    float M_new = r.M;
+    [unroll]
+    for (int k = 0; k < 2; k++)
     {
-        float prevDepth = gPrevDepth.Load(int3(prevPixel, 0));
-        float3 prevNormal = gPrevNormals.Load(int3(prevPixel, 0)).rgb * 2.0f - 1.0f;
-        float3 currNormal = gNormals.Load(int3(pixel, 0)).rgb * 2.0f - 1.0f;
-
-        float depthDiff = abs(prevDepth - currDepth);
-        float normalDot = dot(normalize(currNormal), normalize(prevNormal));
-
-        historyValid = (depthDiff < gConstants.DepthThreshold && normalDot > gConstants.NormalThreshold);
+        if (candidate[k].valid)
+            M_new += r_prev[k].M;
     }
 
-    // =====================================================================
-    // Weighted reservoir merge (RealEngine reservoir.hlsli semantics)
-    // =====================================================================
-    float M = currM;
-    float W = currW;
-    float3 selectedRadiance = currRadiance;
-    float3 selectedDirection = currDir;
-    float selectedTarget = targetCurr;
-    float selectedHitT = currHitT;
-    float sumWeight = targetCurr * currW * currM;
+    float rng = Hash01(uint2(pixel), uint(gConstants.FrameIndex));
 
-    if (historyValid)
+    if (candidate[1].valid && roughness > 0.05f)
     {
-        float4 hR0 = gHistReservoir0.Load(int3(prevPixel, 0));
-        float4 hR1 = gHistReservoir1.Load(int3(prevPixel, 0));
-        float3 histRadiance = hR0.rgb;
-        float histHitT = hR0.a;
-        float histM = hR1.x;
-        float histW = hR1.y;
-        float3 histDir = OctDecode(hR1.zw);
-
-        float targetHist = max(Luminance(histRadiance), 1e-6f);
-        float wHist = targetHist * histW * histM;
-
-        sumWeight += wHist;
-        M = currM + histM;
-
-        float rng = Hash01(uint2(pixel), uint(gConstants.FrameIndex));
-        if (rng < wHist / max(sumWeight, 1e-6f))
+        TemporalResample2(r, worldPos, normal, albedo, candidate, r_prev, rng, M_new);
+    }
+    else if (candidate[0].valid)
+    {
+        // TemporalResample1 path: single candidate. Port of ZetaRay's
+        // TemporalResample1 (m_curr scaling + one m_prev stream).
+        float p_curr = max(Luminance(r.targetZ), 0.0f);
+        if (r.w_sum != 0)
         {
-            selectedRadiance = histRadiance;
-            selectedDirection = histDir;
-            selectedTarget = targetHist;
-            selectedHitT = histHitT;
+            float targetLum_prev = 0.0f;
+            if (r_prev[0].M > 0 && Luminance(r.Lo) > 1e-6f)
+                targetLum_prev = TargetLumAtTemporalPixel(r, candidate[0], albedo);
+
+            float J_curr_to_temporal = JacobianReconnectionShift(r.normal, candidate[0].posW, worldPos, r.pos);
+            float m_curr = p_curr / max(p_curr + r_prev[0].M * targetLum_prev * J_curr_to_temporal, 1e-6f);
+            r.w_sum *= m_curr;
         }
 
-        W = sumWeight / max(M * selectedTarget, 1e-6f);
-        M = min(M, gConstants.MaxM);
+        if (r_prev[0].ID == 0xFFFFFFFFu || dot(r_prev[0].Lo, 1.0f) == 0)
+        {
+            float targetLum = max(Luminance(r.targetZ), 0.0f);
+            r.W = targetLum > 0.0f ? r.w_sum / targetLum : 0.0f;
+            r.M = M_new;
+        }
+        else
+        {
+            float3 wi = r_prev[0].pos - worldPos;
+            float t = length(wi);
+            wi = t > 1e-6f ? wi / t : float3(0.0f, 1.0f, 0.0f);
+            float3 target_curr = r_prev[0].Lo * EvalF(albedo, normal, wi);
+            float targetLum_curr = Luminance(target_curr);
+            if (targetLum_curr > 1e-6f)
+            {
+                float targetLum_prev = r_prev[0].W > 0 ? r_prev[0].w_sum / r_prev[0].W : 0;
+                float J_temporal_to_curr = JacobianReconnectionShift(r_prev[0].normal, worldPos,
+                    candidate[0].posW, r_prev[0].pos);
+                float numerator = r_prev[0].M * targetLum_prev;
+                float denom = numerator / max(J_temporal_to_curr, 1e-6f) + targetLum_curr;
+                float m_prev = numerator / max(denom, 1e-6f);
+                float w_prev = m_prev * targetLum_curr * r_prev[0].W;
+
+                r.w_sum += w_prev;
+                r.M += 1.0f;
+                if (rng < w_prev / max(1e-6f, r.w_sum))
+                {
+                    r.pos = r_prev[0].pos;
+                    r.normal = r_prev[0].normal;
+                    r.ID = r_prev[0].ID;
+                    r.Lo = r_prev[0].Lo;
+                    r.targetZ = target_curr;
+                }
+            }
+            float targetLum = max(Luminance(r.targetZ), 0.0f);
+            r.W = targetLum > 0.0f ? r.w_sum / targetLum : 0.0f;
+            r.M = M_new;
+        }
+    }
+    else
+    {
+        // No temporal candidate: keep the current sample, W = w_sum / targetLum.
+        float targetLum = max(Luminance(r.targetZ), 0.0f);
+        r.W = targetLum > 0.0f ? r.w_sum / targetLum : 0.0f;
+        r.M = M_new;
     }
 
-    gOutReservoir0[pixel] = float4(selectedRadiance, selectedHitT);
-    gOutReservoir1[pixel] = float4(M, W, OctEncode(selectedDirection));
-    // Resolve: radiance * W estimates the integrated radiance (unbiased
-    // under the luminance target — same weight applies to all channels).
-    gOutRadiance[pixel] = float4(selectedRadiance * W, 1.0f);
+    r.M = min(r.M, gConstants.MaxM);
+    StoreReservoir(pixel, r);
+    // Final indirect estimate at this pixel: target_z * W.
+    gOutRadiance[pixel] = float4(r.targetZ * r.W, 1.0f);
 }

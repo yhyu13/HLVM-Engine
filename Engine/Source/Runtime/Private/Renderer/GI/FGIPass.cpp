@@ -170,6 +170,32 @@ namespace GI
             return false;
         if (!UploadLights())
             return false;
+        // v214: MaterialPlaceholderTexture (Phase 3b per-texel bounce albedo
+        // array, t9..t40, filled with white pixels so out-of-range or empty
+        // slots return 1,1,1 instead of sampling garbage). Was previously
+        // created+uploaded lazily on first DispatchRays, which forced a
+        // per-frame `Device->waitForIdle()` at line 671 and an open/close
+        // command list inside the dispatch hot path. The `if (!Material*)`
+        // guard made it one-shot per process, so the lifecycle move is
+        // steady-state byte-identical.
+        {
+            nvrhi::TextureDesc PlaceholderDesc;
+            PlaceholderDesc.dimension  = nvrhi::TextureDimension::Texture2D;
+            PlaceholderDesc.width       = 1;
+            PlaceholderDesc.height      = 1;
+            PlaceholderDesc.format      = nvrhi::Format::RGBA8_UNORM;
+            PlaceholderDesc.initialState = nvrhi::ResourceStates::ShaderResource;
+            PlaceholderDesc.keepInitialState = true;
+            PlaceholderDesc.debugName   = "FGIPass.MaterialPlaceholder";
+            MaterialPlaceholderTexture = Device->createTexture(PlaceholderDesc);
+            nvrhi::CommandListHandle WriteCmd = Device->createCommandList();
+            WriteCmd->open();
+            const uint32_t WhitePixel = 0xFFFFFFFFu;
+            WriteCmd->writeTexture(MaterialPlaceholderTexture, 0, 0, &WhitePixel, 4);
+            WriteCmd->close();
+            Device->executeCommandList(WriteCmd);
+            Device->waitForIdle();
+        }
 
         bIsInitialized = true;
         HLVM_LOG(LogGI, info, TXT("FGIPass initialized (shader dir: {})"), *InShaderDataDir);
@@ -183,13 +209,14 @@ namespace GI
         ShaderLibrary          = nullptr;
         RTPipeline.Shutdown();
         BindingLayout          = nullptr;
-        UAVBindingLayout       = nullptr; // v22 split: clear separate UAV layout
+        // 2026-08-16 (six-role-pipeline v2): UAVBindingLayout removed.
         ConstantBuffer         = nullptr;
         LightsBuffer           = nullptr;
         LightsCount            = 0;
         OutputTexture          = nullptr;
         DummyDebugStatsTexture = nullptr;
-        DummyDirectionTexture = nullptr;
+        DummySampleInfoTexture = nullptr;
+        DummyDirectTexture     = nullptr;
         MaterialPlaceholderTexture = nullptr;
         Device                 = nullptr;
         Scene                  = nullptr;
@@ -238,10 +265,13 @@ namespace GI
             return false;
         }
 
-        // MaxPayloadSize = 64 (GIPayload is a compact fully-used 64-byte struct in
-        // GIPathTracing.hlsl - see its comment about slangc per-entry dead-stripping)
+        // MaxPayloadSize = 80 (v210, 2026-08-21): the ReSTIR GI candidate
+        // sample now carries the second-path-vertex state back from ClosestHit
+        // (x2 normal + packed x2 ID), growing GIPayload from 64 to 80 bytes.
+        // TestPathTraceGI's 64-byte payload is still compatible (maxPayloadSize
+        // only needs to be >= the shaders' actual payload).
         // MaxAttributeSize = 8 (barycentric float2 attributes - standard)
-        if (!RTPipeline.FinalizePipeline(/*MaxPayloadSize*/ 64, /*MaxAttributeSize*/ 8))
+        if (!RTPipeline.FinalizePipeline(/*MaxPayloadSize*/ 80, /*MaxAttributeSize*/ 8))
         {
             HLVM_LOG(LogGI, err, TXT("FRayTracingPipeline finalize failed"));
             return false;
@@ -265,12 +295,19 @@ namespace GI
 
     bool FGIPass::CreateBindingLayout()
     {
-        // v22 split (six-role-pipeline): separate SRV-only + UAV-only binding layouts to
-        // avoid the nvrhi-deferred-barrier-ordering pattern documented in
-        // gpu-rendering-bisect-debug/references/nvrhi-deferred-barrier-ordering.md.
-        // The single-binding-set approach (v1-v21) caused nvrhi to bind descriptor sets
-        // before the implicit UAV->GENERAL barrier landed, triggering the
-        // "A command list should be executed before it is reopened" pattern 7x/run.
+        // 2026-08-16 (six-role-pipeline v2): REVERT the v22 split. The
+        // separate SRV-only + UAV-only binding layouts caused GBuffer SRV
+        // reads to return zero (mode 20/21/22 dumped solid black despite
+        // valid per-frame texture handles). The proven-control
+        // TestCornellBoxGI uses a single binding set containing both SRV
+        // and UAV resources, and its GI dispatch works correctly.
+        //
+        // The v22 split's justification (silence a Vulkan validation
+        // warning) was weaker than the data-corruption it caused. With the
+        // validation layer STUBBED at DeviceManagerVk4_LifeCycle.cpp
+        // anyway, the warning is invisible; reverting gains correctness
+        // at zero cost.
+        //
         // Resource layout matches GIPathTracing.hlsl register declarations:
         //   b0 = GIConstants (own constant buffer)
         //   b1 = ViewConstants (test-provided)
@@ -282,14 +319,17 @@ namespace GI
         //   t6 = RTIndices   (StructuredBuffer<uint>)
         //   t7 = Lights      (StructuredBuffer<FLight>)
         //   t8 = RTInstanceInfo (StructuredBuffer<FInstanceInfo>)
+        //   t9 = MaterialTextures[] (Texture2D<float4> array, MaxMaterialTextures slots)
         //   s2 = LinearSampler
-        //   u0 = OutputTexture (RWTexture2D<float4>)  -- moved to UAVBindingLayout
-        //   u1 = DebugStatsTexture (RWTexture2D<float4>, bound always; dummy when unused)  -- moved to UAVBindingLayout
+        //   u0 = OutputTexture (RWTexture2D<float4>)  -- merged back into primary layout
+        //   u1 = DebugStatsTexture (RWTexture2D<float4>, bound always; dummy when unused)
+        //   u2 = OutputDirection (RWTexture2D<float4>)  -- ReSTIR primary ray direction
+        //   u3 = SampleInfo (RWTexture2D<float4>)  -- ReSTIR x2 normal + sample pdf (v210)
+        //   u4 = DirectTexture (RWTexture2D<float4>)  -- primary direct+ambient+sky (v210)
         auto& Builder = RTPipeline.CreateBindingLayout();
-        // FBindingLayoutBuilder stores already-shifted SPIR-V slots (t=0,
-        // s=128, b=256, u=384). NVRHI's default VulkanBindingOffsets would
-        // add the shifts a second time when constructing the Vulkan layout.
-        // Keep all offsets at zero, matching the separately-created UAV layout.
+        // All offsets zero — the builder's AddXxx methods already apply
+        // the SPIR-V register shifts (TRegShift=0, SRegShift=128, BRegShift=256,
+        // URegShift=384) and we want nvrhi to NOT add a second shift on top.
         Builder.SetBindingOffsets(0, 0, 0, 0)
                .SetVisibility(nvrhi::ShaderType::All)
                .AddConstantBuffer(0)             // b0 - GIConstants
@@ -302,7 +342,12 @@ namespace GI
                .AddStructuredBufferSRV(6)        // t6 - RTIndices
                .AddStructuredBufferSRV(7)        // t7 - Lights
                .AddStructuredBufferSRV(8)        // t8 - RTInstanceInfo
-               .AddSampler(2);                   // s2 - LinearSampler
+               .AddSampler(2)                    // s2 - LinearSampler
+               .AddTextureUAV(0)                 // u0 - OutputTexture (radiance)
+               .AddTextureUAV(1)                 // u1 - DebugStatsTexture (bound always; dummy when unused)
+               .AddTextureUAV(2)                 // u2 - OutputDirection (primary ray dir for ReSTIR)
+               .AddTextureUAV(3)                 // u3 - SampleInfo (x2 normal + pdf, v210)
+               .AddTextureUAV(4);                // u4 - DirectTexture (primary direct+ambient, v210)
         // t9 - per-texel bounce albedo texture ARRAY (Phase 3b). One binding
         // with descriptorCount = MaxMaterialTextures; the shader indexes it by
         // RTInstanceInfo.AlbedoTextureIndex. Slots without a caller texture are
@@ -312,53 +357,10 @@ namespace GI
             MatTexArray.size = MaxMaterialTextures;
             Builder.AddItem(MatTexArray);
         }
-        // (u0/u1 moved to UAVBindingLayout below)
 
-        // v22: build the UAV-only binding layout separately. This keeps the SRV-only
-        // layout's requireTextureState calls unambiguous (no SHADER_READ_ONLY_OPTIMAL
-        // vs GENERAL conflict) and lets nvrhi commit each barrier cleanly.
-        nvrhi::BindingLayoutDesc UAVLayoutDesc;
-        // v137 (six-role-pipeline, tick 247, 2026-07-31): explicit zero binding offsets.
-        // The default VulkanBindingOffsets has unorderedAccess=384; combined with
-        // item.slot = URegShift + N = 384 + N, nvrhi's BindingLayout ctor computes
-        // bindingLocation = registerOffset + binding.slot = 384 + 384 = 768 for
-        // item 0 and 384 + 385 = 769 for item 1. The shader's register(u0, space1)
-        // and register(u1, space1) compile to SPIR-V Binding=384/385 (default
-        // --uRegShift=384). Without this zero, descriptor writes go to slots
-        // 768/769 (out of the descriptor set's allocated range) and are silently
-        // dropped. Matches the FReSTIRPass precedent at FReSTIRPass.cpp:161-163,
-        // 186-188, 207-208 which already calls setBindingOffsets(0,0,0,0) on all
-        // three of its layouts.
-        nvrhi::VulkanBindingOffsets UAVOffsets;
-        UAVOffsets.setConstantBufferOffset(0)
-                  .setShaderResourceOffset(0)
-                  .setSamplerOffset(0)
-                  .setUnorderedAccessViewOffset(0);
-        UAVLayoutDesc.setBindingOffsets(UAVOffsets);
-        UAVLayoutDesc.visibility = nvrhi::ShaderType::All;
-        nvrhi::BindingLayoutItem UAVItems[3];
-        UAVItems[0].slot = FBindingLayoutBuilder::URegShift + 0;
-        UAVItems[0].type = nvrhi::ResourceType::Texture_UAV;
-        UAVItems[0].size = 1;
-        UAVItems[1].slot = FBindingLayoutBuilder::URegShift + 1;
-        UAVItems[1].type = nvrhi::ResourceType::Texture_UAV;
-        UAVItems[1].size = 1;
-        // u2 — primary sample ray direction (ReSTIR GI). Bound always with a
-        // dummy when the caller does not request it, mirroring u1's pattern.
-        UAVItems[2].slot = FBindingLayoutBuilder::URegShift + 2;
-        UAVItems[2].type = nvrhi::ResourceType::Texture_UAV;
-        UAVItems[2].size = 1;
-        UAVLayoutDesc.bindings.assign(UAVItems, UAVItems + 3);
-        UAVBindingLayout = Device->createBindingLayout(UAVLayoutDesc);
-        if (!UAVBindingLayout)
-        {
-            HLVM_LOG(LogGI, err, TXT("FGIPass: failed to create UAV binding layout (v22 split)"));
-            return false;
-        }
-        RTPipeline.AddBindingLayout(UAVBindingLayout);
-
-        // The actual SRV binding layout handle is created inside FRayTracingPipeline::FinalizePipeline();
-        // we only need to make sure the builder was populated here.
+        // The actual binding layout handle is created inside
+        // FRayTracingPipeline::FinalizePipeline(); we only need to make sure
+        // the builder was populated here.
         return true;
     }
 
@@ -596,13 +598,18 @@ namespace GI
             CmdList->setTextureState(Desc.GBufferMaterial, nvrhi::AllSubresources,
                                      nvrhi::ResourceStates::ShaderResource);
 
-        // v135 (six-role-pipeline, tick 213, 2026-07-30): commit barriers BEFORE
-        // createBindingSet. The descriptor's vkUpdateDescriptorSets call captures
-        // the image's CURRENT physical layout; if the image is still in
-        // COLOR_ATTACHMENT_OPTIMAL (from the GBuffer raster pass), the GPU reads
-        // garbage at dispatch time even if the line-668 commitBarriers fires later.
-        CmdList->commitBarriers();
-
+        // v22 split (six-role-pipeline): separate SRV-only + UAV-only binding layouts to
+        // avoid the nvrhi-deferred-barrier-ordering pattern documented in
+        // gpu-rendering-bisect-debug/references/nvrhi-deferred-barrier-ordering.md.
+        // The single-binding-set approach (v1-v21) caused nvrhi to bind descriptor sets
+        // before the implicit UAV->GENERAL barrier landed, triggering the
+        // "A command list should be executed before it is reopened" pattern 7x/run.
+        //
+        // 2026-08-16 (six-role-pipeline v2): v22 split reverted. SRV + UAV go
+        // into the SAME binding set, matching the proven-control
+        // TestCornellBoxGI pattern. The single-set validation warning is
+        // acceptable (validation is stubbed at DeviceManagerVk4_LifeCycle.cpp
+        // anyway).
         FBindingSetBuilder SRVBuilder;
         SRVBuilder.SetConstantBuffer(0, ConstantBuffer)
                   .SetConstantBuffer(1, Desc.ViewConstants)
@@ -626,29 +633,108 @@ namespace GI
         if (Desc.LinearSampler)
             SRVBuilder.SetSampler(2, Desc.LinearSampler);
 
-        // Phase 3b: per-texel bounce albedo textures (t9..t40). Slots without a
-        // caller-provided texture get a white placeholder so the closest-hit's
-        // dynamic index always lands on a valid descriptor.
-        if (!MaterialPlaceholderTexture)
+        // u0 — primary output radiance. Bound unconditionally.
+        SRVBuilder.SetTextureUAV(0, Desc.OutputTexture);
+
+        // u1 — debug bounce stats (optional, bound always; dummy when unused).
+        nvrhi::TextureHandle DebugStatsUAV = Desc.DebugStatsTexture;
+        if (DebugStatsUAV && Desc.DebugBounceStats)
         {
-            nvrhi::TextureDesc PlaceholderDesc;
-            PlaceholderDesc.dimension = nvrhi::TextureDimension::Texture2D;
-            PlaceholderDesc.width = 1;
-            PlaceholderDesc.height = 1;
-            PlaceholderDesc.format = nvrhi::Format::RGBA8_UNORM;
-            PlaceholderDesc.initialState = nvrhi::ResourceStates::ShaderResource;
-            PlaceholderDesc.keepInitialState = true;
-            PlaceholderDesc.debugName = "FGIPass.MaterialPlaceholder";
-            MaterialPlaceholderTexture = Device->createTexture(PlaceholderDesc);
-            nvrhi::CommandListHandle WriteCmd = Device->createCommandList();
-            WriteCmd->open();
-            const uint32_t WhitePixel = 0xFFFFFFFFu;
-            WriteCmd->writeTexture(MaterialPlaceholderTexture, 0, 0, &WhitePixel, 4);
-            WriteCmd->close();
-            Device->executeCommandList(WriteCmd);
-            Device->waitForIdle();
+            CmdList->setTextureState(DebugStatsUAV, nvrhi::AllSubresources,
+                                     nvrhi::ResourceStates::UnorderedAccess);
         }
-        // v22 split: build SRV binding set first (clean SHADER_READ_ONLY_OPTIMAL barrier).
+        else
+        {
+            if (!DummyDebugStatsTexture)
+            {
+                nvrhi::TextureDesc DummyDesc;
+                DummyDesc.dimension = nvrhi::TextureDimension::Texture2D;
+                DummyDesc.width = 1;
+                DummyDesc.height = 1;
+                DummyDesc.format = nvrhi::Format::RGBA32_FLOAT;
+                DummyDesc.isUAV = true;
+                DummyDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
+                DummyDesc.keepInitialState = true;
+                DummyDesc.debugName = "FGIPass.DummyDebugStats";
+                DummyDebugStatsTexture = Device->createTexture(DummyDesc);
+            }
+            DebugStatsUAV = DummyDebugStatsTexture;
+            CmdList->setTextureState(DebugStatsUAV, nvrhi::AllSubresources,
+                                     nvrhi::ResourceStates::UnorderedAccess);
+        }
+        SRVBuilder.SetTextureUAV(1, DebugStatsUAV);
+
+        // u2 — primary sample ray direction (ReSTIR GI). The shader writes this
+        // UNCONDITIONALLY at the raw dispatch coord (GIPathTracing.hlsl, the
+        // `OutputDirection[pixel]` store), so the bound resource MUST be at
+        // least the dispatch extent. A 1x1 dummy was used here previously,
+        // which made every thread but one an out-of-bounds UAV store on any
+        // consumer that does not supply the texture. Fall back to the mandatory
+        // output UAV instead: it is the one resource guaranteed present, both
+        // consumers size it to their own dispatch extent, and the shader
+        // overwrites it later in the same invocation, so the stray write cannot
+        // affect the result. Same idiom as FReSTIRPass::DispatchGeneration's
+        // optional-t4 ternary. Contrast u1 above, which is guarded by
+        // Params3.z instead and therefore may safely keep its dummy.
+        nvrhi::TextureHandle DirectionUAV = Desc.OutputDirection
+            ? Desc.OutputDirection
+            : Desc.OutputTexture;
+        CmdList->setTextureState(DirectionUAV, nvrhi::AllSubresources,
+                                 nvrhi::ResourceStates::UnorderedAccess);
+        SRVBuilder.SetTextureUAV(2, DirectionUAV);
+
+        // v210 (2026-08-21, ZetaRay ground-truth port, Phase 1): u3 SampleInfo
+        // (x2 normal + primary-sample pdf) and u4 DirectTexture (primary
+        // direct + ambient + sky-on-primary-miss). Unlike u2, these are ONLY
+        // written by the ReSTIR GI consumer's shader (which declares them and
+        // always supplies real dispatch-sized textures), so absent callers
+        // (TestPathTraceGI / TestCornellBoxGI, whose shaders do not declare
+        // u3/u4) get 1x1 dummies purely as descriptor-set placeholders.
+        nvrhi::TextureHandle SampleInfoUAV = Desc.SampleInfoTexture;
+        if (!SampleInfoUAV)
+        {
+            if (!DummySampleInfoTexture)
+            {
+                nvrhi::TextureDesc DummyDesc;
+                DummyDesc.dimension = nvrhi::TextureDimension::Texture2D;
+                DummyDesc.width = 1;
+                DummyDesc.height = 1;
+                DummyDesc.format = nvrhi::Format::RGBA32_FLOAT;
+                DummyDesc.isUAV = true;
+                DummyDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
+                DummyDesc.keepInitialState = true;
+                DummyDesc.debugName = "FGIPass.DummySampleInfo";
+                DummySampleInfoTexture = Device->createTexture(DummyDesc);
+            }
+            SampleInfoUAV = DummySampleInfoTexture;
+        }
+        CmdList->setTextureState(SampleInfoUAV, nvrhi::AllSubresources,
+                                 nvrhi::ResourceStates::UnorderedAccess);
+        SRVBuilder.SetTextureUAV(3, SampleInfoUAV);
+
+        nvrhi::TextureHandle DirectUAV = Desc.DirectTexture;
+        if (!DirectUAV)
+        {
+            if (!DummyDirectTexture)
+            {
+                nvrhi::TextureDesc DummyDesc;
+                DummyDesc.dimension = nvrhi::TextureDimension::Texture2D;
+                DummyDesc.width = 1;
+                DummyDesc.height = 1;
+                DummyDesc.format = nvrhi::Format::RGBA32_FLOAT;
+                DummyDesc.isUAV = true;
+                DummyDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
+                DummyDesc.keepInitialState = true;
+                DummyDesc.debugName = "FGIPass.DummyDirect";
+                DummyDirectTexture = Device->createTexture(DummyDesc);
+            }
+            DirectUAV = DummyDirectTexture;
+        }
+        CmdList->setTextureState(DirectUAV, nvrhi::AllSubresources,
+                                 nvrhi::ResourceStates::UnorderedAccess);
+        SRVBuilder.SetTextureUAV(4, DirectUAV);
+
+        // Build SRV+UAV binding set as one (v22 split reverted).
         nvrhi::BindingSetDesc SRVSetDesc = SRVBuilder.Build();
         // Phase 3b: fill the t9 descriptor array (arrayElement 0..31); the
         // shader's dynamic AlbedoTextureIndex must always hit a valid slot.
@@ -691,107 +777,20 @@ namespace GI
             SRVSetDesc, BindingLayout);
         if (!SRVBindingSet)
         {
-            HLVM_LOG(LogGI, err, TXT("FGIPass: failed to create per-frame SRV binding set (v22)"));
+            HLVM_LOG(LogGI, err, TXT("FGIPass: failed to create per-frame binding set (v22-revert)"));
             return;
         }
         if (std::getenv("HLVM_RGI_DIAG"))
         {
-            HLVM_LOG(LogGI, info, TXT("FGIPass: per-frame SRV binding set created OK (handle=0x{:x})"),
+            HLVM_LOG(LogGI, info, TXT("FGIPass: per-frame binding set created OK (handle=0x{:x})"),
                 reinterpret_cast<uintptr_t>(SRVBindingSet.Get()));
         }
 
-        // v22 split: build UAV binding set second (clean GENERAL barrier).
-        FBindingSetBuilder UAVBuilder;
-        UAVBuilder.SetTextureUAV(0, Desc.OutputTexture);
-
-        nvrhi::TextureHandle DebugStatsUAV = Desc.DebugStatsTexture;
-        if (DebugStatsUAV && Desc.DebugBounceStats)
-        {
-            CmdList->setTextureState(DebugStatsUAV, nvrhi::AllSubresources,
-                                     nvrhi::ResourceStates::UnorderedAccess);
-        }
-        else
-        {
-            if (!DummyDebugStatsTexture)
-            {
-                nvrhi::TextureDesc DummyDesc;
-                DummyDesc.dimension = nvrhi::TextureDimension::Texture2D;
-                DummyDesc.width = 1;
-                DummyDesc.height = 1;
-                DummyDesc.format = nvrhi::Format::RGBA32_FLOAT;
-                DummyDesc.isUAV = true;
-                DummyDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
-                DummyDesc.keepInitialState = true;
-                DummyDesc.debugName = "FGIPass.DummyDebugStats";
-                DummyDebugStatsTexture = Device->createTexture(DummyDesc);
-            }
-            DebugStatsUAV = DummyDebugStatsTexture;
-            CmdList->setTextureState(DebugStatsUAV, nvrhi::AllSubresources,
-                                     nvrhi::ResourceStates::UnorderedAccess);
-        }
-        UAVBuilder.SetTextureUAV(1, DebugStatsUAV);
-
-        // u2 — primary sample ray direction (ReSTIR GI). Fall back to a dummy
-        // UAV when the caller doesn't supply it, so the descriptor is always
-        // bound (the shader writes it unconditionally).
-        nvrhi::TextureHandle DirectionUAV = Desc.OutputDirection;
-        if (DirectionUAV)
-        {
-            CmdList->setTextureState(DirectionUAV, nvrhi::AllSubresources,
-                                     nvrhi::ResourceStates::UnorderedAccess);
-        }
-        else
-        {
-            if (!DummyDirectionTexture)
-            {
-                nvrhi::TextureDesc DummyDesc;
-                DummyDesc.dimension = nvrhi::TextureDimension::Texture2D;
-                DummyDesc.width = 1;
-                DummyDesc.height = 1;
-                DummyDesc.format = nvrhi::Format::RGBA32_FLOAT;
-                DummyDesc.isUAV = true;
-                DummyDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
-                DummyDesc.keepInitialState = true;
-                DummyDesc.debugName = "FGIPass.DummyDirection";
-                DummyDirectionTexture = Device->createTexture(DummyDesc);
-            }
-            DirectionUAV = DummyDirectionTexture;
-            CmdList->setTextureState(DirectionUAV, nvrhi::AllSubresources,
-                                     nvrhi::ResourceStates::UnorderedAccess);
-        }
-        UAVBuilder.SetTextureUAV(2, DirectionUAV);
-
-        nvrhi::BindingSetHandle UAVBindingSet = Device->createBindingSet(
-            UAVBuilder.Build(), UAVBindingLayout);
-        if (!UAVBindingSet)
-        {
-            HLVM_LOG(LogGI, err, TXT("FGIPass: failed to create per-frame UAV binding set (v22)"));
-            return;
-        }
-        if (std::getenv("HLVM_RGI_DIAG"))
-        {
-            HLVM_LOG(LogGI, info, TXT("FGIPass: per-frame UAV binding set created OK (handle=0x{:x})"),
-                reinterpret_cast<uintptr_t>(UAVBindingSet.Get()));
-        }
-
-        // v22 split: dispatch with TWO binding sets (SRV + UAV). This routes through
-        // the new FRayTracingPipeline::DispatchRays overload that adds both binding
-        // sets in sequence, eliminating the nvrhi-deferred-barrier-ordering issue
-        // that mixed SRV+UAV in a single binding set caused.
-        // v131 (six-role-pipeline, tick 151, 2026-07-30): commit barriers before
-        // dispatch. Per references/nvrhi-deferred-barrier-ordering.md, nvrhi's
-        // setComputeState binds descriptor sets BEFORE commitBarriers, so the
-        // Vulkan validation layer sees the descriptors with the WRONG image
-        // layout (SHADER_READ_ONLY_OPTIMAL not yet applied because the barrier
-        // is still pending). Without this explicit commitBarriers() call, the
-        // GPU may dispatch with stale layouts and return zero for SRV reads.
-        // The fix is to flush pending barriers here, so the dispatch sees the
-        // correct SHADER_READ_ONLY_OPTIMAL layout for GBufferWorldPos/Normal/
-        // Material. This addresses Candidate B (image layout transition) from
-        // the v131 plan.
-        CmdList->commitBarriers();
-
-        RTPipeline.DispatchRays(CmdList, Desc.OutputWidth, Desc.OutputHeight, 1, SRVBindingSet, UAVBindingSet);
+        // v22 split reverted: dispatch with ONE binding set containing SRV + UAV.
+        // The deferred-barrier-ordering warning may re-emerge (validation layer
+        // stubbed in this build, so we won't see it). If GBuffer SRV reads now
+        // return non-zero (mode 20/21/22 dump non-black), the revert succeeded.
+        RTPipeline.DispatchRays(CmdList, Desc.OutputWidth, Desc.OutputHeight, 1, SRVBindingSet);
 
         // DIAGNOSTIC (v3): log dispatch return. If this line doesn't appear,
         // the dispatch call hangs/fails fatally; if it does appear, the

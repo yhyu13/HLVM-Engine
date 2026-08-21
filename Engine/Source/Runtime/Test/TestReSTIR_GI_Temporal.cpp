@@ -53,6 +53,7 @@
 #include "Renderer/PostProcess/FReBLURPass.h"
 #include "Renderer/PostProcess/FReSTIRPass.h"
 #include "Renderer/RayTracing/BLASBuilder.h"
+#include "Renderer/GI/GICVars.h"   // v176: r_ReSTIR_MaxM CVar (default 30.0f, see GICVars.h:38)
 #include "Renderer/RayTracing/TLASBuilder.h"
 #include "Renderer/Scene3D/Scene3DLoader.h"
 #include "Renderer/Scene3D/FCornellBoxScene.h"
@@ -621,6 +622,21 @@ public:
         else
             HLVM_LOG(LogTest, info, TXT("ReSTIR pipeline enabled (default)"));
 
+        // v176: HLVM_RGI_MAXM env-var hook — override r_ReSTIR_MaxM at startup
+        // (no rebuild needed). Inline shape (no new class member).
+        if (const char* E = std::getenv("HLVM_RGI_MAXM"))
+        {
+            try
+            {
+                float v = std::stof(E);
+                if (v > 0.0f)
+                {
+                    CVar_r_ReSTIR_MaxM.SetValue(v);
+                    HLVM_LOG(LogTest, info, TXT("HLVM_RGI_MAXM override: r_ReSTIR_MaxM = {:.2f}"), v);
+                }
+            } catch (...) {}
+        }
+
         // (HLVM-bypass: non-immediate pattern, like TestRTShadowsGBuffer.
         // The validation-layer's immediate-CL state machine silently
         // dropped setGraphicsState/drawIndexed GPU commands across frames.
@@ -652,6 +668,10 @@ public:
         GBufferNormal           = nullptr;
         GBufferMaterial         = nullptr;
         GBufferDepth            = nullptr;
+        PrevGBufferWorldPos     = nullptr;
+        PrevGBufferNormal       = nullptr;
+        PrevGBufferMaterial     = nullptr;
+        PrevLinearDepth         = nullptr;
         SunLightBuffer          = nullptr;
         PlaceholderTexture      = nullptr;
         AllInstanceInfos.clear();
@@ -665,12 +685,17 @@ public:
 
         OutputTexture           = nullptr;
         DirectionTexture        = nullptr;
+        SampleInfoTexture       = nullptr;
+        DirectTexture           = nullptr;
         DenoisedTexture         = nullptr;        ReservoirTex0           = nullptr;
         ReservoirTex1           = nullptr;
+        ReservoirTex2           = nullptr;
         TemporalReservoir0      = nullptr;
         TemporalReservoir1      = nullptr;
         TemporalReservoir2      = nullptr;
         TemporalReservoir3      = nullptr;
+        TemporalReservoir4      = nullptr;
+        TemporalReservoir5      = nullptr;
         SpatialRadiance         = nullptr;
         AccumTexture            = nullptr;
         DisplayTexture          = nullptr;
@@ -745,7 +770,27 @@ public:
         // UpdateViewConstants needs the command list open, so open CommandList first.
         CommandList->open();
 
-        UpdateViewConstants(FB.width, FB.height);
+        // v195: WIDTH/HEIGHT, NOT FB.width/FB.height. These two arguments reach
+        // THREE consumers, only one of which is the camera aspect ratio:
+        //   (a) aspect  — glm::perspective(fov, float(W)/float(H), ...)
+        //   (b) VC.Size — marshalled into ViewConstantsBuffer, read by the RT
+        //                 shader as g_View.RenderTargetSize
+        //   (c) the raster viewport, via LastWidth/LastHeight
+        // (b) is load-bearing. GIPathTracing.hlsl forms the Phase-D scale as
+        // RenderTargetSize / DispatchRaysDimensions(); the denominator is
+        // HalfResWidth, assigned W/2 in CreateGBufferTextures where W == WIDTH,
+        // so it is FIXED at 400 regardless of window size. A swapchain-derived
+        // numerator therefore corrupts gbScale for every ray: widening drives
+        // gbPixel past the fixed GBuffer, every Load returns 0, and those pixels
+        // fall into the no-geometry early-out and are shaded as SKY — silently,
+        // and plausibly enough to survive a glance. Narrowing samples only the
+        // left/top sub-rect. The GBuffer MRTs are never recreated on resize
+        // (BackBufferResizing only clears the binding cache), so WIDTH/HEIGHT is
+        // the true extent. On (a): the blit presents with an unconditional
+        // stretch — BlitVS emits a fixed fullscreen NDC quad, BlitPS samples it
+        // with no letterbox term — so the correct upstream aspect is the render
+        // target's; taking it from the window would apply that aspect twice.
+        UpdateViewConstants(WIDTH, HEIGHT);
 
         // (0) GBuffer raster pass — renders Sponza into GBufferWorldPos /
         //     GBufferNormal / GBufferMaterial MRTs. Must run BEFORE FGIPass
@@ -754,7 +799,9 @@ public:
         // the v1-introduced HLVM-bypass close+execute+waitForIdle+open
         // block was the regression — see NOTE comment near line 1531).
         // The whole frame submits at end of Render via line 691.
-        RenderGBuffer(FB.width, FB.height);
+        // v197: no arguments — the raster extent is a property of the target,
+        // not of the caller. See the note on RenderGBuffer's definition.
+        RenderGBuffer();
 
         // Turntable: rebuild the TLAS with the current scene Y-rotation so the
         // ray tracer and the raster pass always agree (2026-08-10).
@@ -771,6 +818,9 @@ public:
             Desc.SceneTLAS         = SceneTLAS;
             Desc.OutputTexture     = OutputTexture;
             Desc.OutputDirection   = DirectionTexture;
+            // v210 (ZetaRay ground-truth port): candidate sample state.
+            Desc.SampleInfoTexture = SampleInfoTexture;
+            Desc.DirectTexture     = DirectTexture;
             Desc.RTVertices        = VertexBuffer;
             Desc.RTIndices         = IndexBuffer;
             Desc.RTInstanceInfo    = InstanceInfoBuffer;
@@ -818,14 +868,25 @@ public:
                 AccumFrameCount);
         }
 
-        // (2) Bilateral denoise — kept as a barrier-flushing dispatch between
-        // GIPass and the ReSTIR stages: its execution forces nvrhi to emit
-        // the pending layout transitions (GENERAL -> SHADER_READ_ONLY) for
-        // the GBuffer + reservoir textures BEFORE the ReSTIR binding sets are
-        // created, which the validation layer otherwise reports as
-        // VUID-VkDescriptorImageInfo-imageLayout-00344 at the temporal
-        // dispatch. Its output (DenoisedTexture) is not consumed by ReSTIR
-        // (ReBLUR, step 5.5, is the denoiser).
+        // (2) Bilateral denoise — VESTIGIAL. Output dead; retained on a false
+        // premise. The old comment claimed this dispatch is what forces nvrhi
+        // to flush pending layout transitions before the ReSTIR binding sets
+        // are created (VUID-VkDescriptorImageInfo-imageLayout-00344). Wrong:
+        // in vulkan-compute.cpp, CommandList::setComputeState ends by calling
+        // commitBarriers(), while CommandList::dispatch only does
+        // updateComputeVolatileBuffers() + cmdBuf.dispatch(). The flush is
+        // setComputeState's, and every consuming pass issues its own —
+        // FReSTIRPass::DispatchGeneration flushes before DispatchTemporal
+        // builds its sets. Nothing here is load-bearing for that ordering.
+        // (The explicit commitBarriers() before ReBLURPass::Dispatch guards a
+        // different hazard — descriptors bound before barriers land *within*
+        // one setComputeState — and is not a precedent for this block.)
+        // Kept only because deleting it is gated on absence-evidence (no VUID
+        // in a real run), which source cannot supply. See PENDING_PLAN_v190.
+        // Also incoherent: half-res input, full-res guides and OutputTexture,
+        // so it filters one quadrant. Harmless solely because ReBLUR overwrites
+        // DenoisedTexture in 5.5 and no gate reads the "denoised" dump.
+        // Do not cite this pass as correct.
         if (!bBypass)
         {
             FBilateralDenoisePass::FDesc Bd{};
@@ -833,8 +894,15 @@ public:
             Bd.DepthTexture    = LinearDepthTexture;
             Bd.NormalTexture   = GBufferNormal;
             Bd.OutputTexture   = DenoisedTexture;
-            Bd.OutputWidth     = FB.width;
-            Bd.OutputHeight    = FB.height;
+            // v189: match the HALF-res InputTexture above. This was FB.width/
+            // height, but FBilateralDenoisePass derives BOTH its dispatch grid
+            // and TexelSize from these, and the shader recovers its bounds by
+            // inverting TexelSize — so ~3/4 of threads cleared the early-out
+            // and then Loaded the half-res input out of bounds (returning 0).
+            // Grid-independence of the barrier flush: see the block comment
+            // above. Scope limits of this fix: likewise above.
+            Bd.OutputWidth     = HalfResWidth;
+            Bd.OutputHeight    = HalfResHeight;
             Bd.DepthSigma      = 0.05f;
             Bd.NormalSigma     = 0.5f;
             Bd.SpatialSigma    = 4.0f;
@@ -847,19 +915,29 @@ public:
             ReSTIR::FReSTIRPass::FGenerationDesc Gd{};
             Gd.RadianceTexture  = OutputTexture;      // gi_raw (radiance.rgb + hitT.a)
             Gd.DirectionTexture = DirectionTexture;   // Phase B: primary ray direction
+            Gd.SampleInfoTexture = SampleInfoTexture; // v210: x2 normal + pdf
+            Gd.MaterialTexture  = GBufferMaterial;    // v210: albedo for f
             Gd.WorldPosTexture  = GBufferWorldPos;
             Gd.NormalTexture   = GBufferNormal;
             Gd.DepthTexture    = LinearDepthTexture;
             Gd.OutReservoir0   = ReservoirTex0;
             Gd.OutReservoir1   = ReservoirTex1;
+            Gd.OutReservoir2   = ReservoirTex2;
             Gd.OutputWidth     = HalfResWidth;    // Phase D
             Gd.OutputHeight    = HalfResHeight;
 
             ReSTIR::FReSTIRConstants C{};
-            C.OutputSize[0]      = float(FB.width);
-            C.OutputSize[1]      = float(FB.height);
-            C.RcpOutputSize[0]   = 1.0f / float(FB.width);
-            C.RcpOutputSize[1]   = 1.0f / float(FB.height);
+            // v185: this pass dispatches at HALF res (Gd.OutputWidth above, and
+            // FReSTIRPass.cpp:393 derives the grid from it), so OutputSize must
+            // describe the half-res grid the shader is actually running on.
+            // Matches the spatial block below. Inert today (the generation
+            // shader only uses OutputSize for its early-out, which no half-res
+            // thread can trip against a full-res bound) but a live trap for the
+            // next field added — same latent shape v184 was bitten by.
+            C.OutputSize[0]      = float(HalfResWidth);
+            C.OutputSize[1]      = float(HalfResHeight);
+            C.RcpOutputSize[0]   = 1.0f / float(HalfResWidth);
+            C.RcpOutputSize[1]   = 1.0f / float(HalfResHeight);
             C.FrameIndex         = float(AccumFrameCount);
             C.NumCandidates      = 8.0f;
             C.DepthThreshold     = 0.05f;
@@ -890,6 +968,8 @@ public:
                 ReservoirTex0, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
             CommandList->setTextureState(
                 ReservoirTex1, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+            CommandList->setTextureState(
+                ReservoirTex2, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
             // On frame > 0 the prev-frame Temporal pass wrote the previous
             // output pair in UnorderedAccess. The temporal pass reads one
             // PAIR as SRV history and writes the OTHER PAIR as UAV output.
@@ -903,6 +983,19 @@ public:
                 TemporalReservoir2, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
             CommandList->setTextureState(
                 TemporalReservoir3, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+            CommandList->setTextureState(
+                TemporalReservoir4, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+            CommandList->setTextureState(
+                TemporalReservoir5, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+            // v210: true prev-frame GBuffer (written by CopyGBufferToPrev).
+            CommandList->setTextureState(
+                PrevGBufferWorldPos, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+            CommandList->setTextureState(
+                PrevGBufferNormal, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+            CommandList->setTextureState(
+                PrevGBufferMaterial, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+            CommandList->setTextureState(
+                PrevLinearDepth, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
             // Also keep depth SRV in SHADER_READ_ONLY (they remain untouched
             // until temporal writes them).
             CommandList->setTextureState(
@@ -911,6 +1004,7 @@ public:
             ReSTIR::FReSTIRPass::FTemporalDesc Td{};
             Td.CurrentReservoir0 = ReservoirTex0;
             Td.CurrentReservoir1 = ReservoirTex1;
+            Td.CurrentReservoir2 = ReservoirTex2;
             // Ping-pong History and Output across TWO texture PAIRS
             // (0/1 <-> 2/3). The old two-texture ping-pong aliased a history
             // SRV with an output UAV on the same texture every frame — a
@@ -923,14 +1017,22 @@ public:
             const bool bPing = (AccumFrameCount % 2) == 0;
             Td.HistoryReservoir0 = (AccumFrameCount == 0) ? ReservoirTex0 : (bPing ? TemporalReservoir0 : TemporalReservoir2);
             Td.HistoryReservoir1 = (AccumFrameCount == 0) ? ReservoirTex1 : (bPing ? TemporalReservoir1 : TemporalReservoir3);
+            Td.HistoryReservoir2 = (AccumFrameCount == 0) ? ReservoirTex2 : (bPing ? TemporalReservoir4 : TemporalReservoir5);
             Td.OutReservoir0     =                                            (bPing ? TemporalReservoir2 : TemporalReservoir0);
             Td.OutReservoir1     =                                            (bPing ? TemporalReservoir3 : TemporalReservoir1);
+            Td.OutReservoir2     =                                            (bPing ? TemporalReservoir5 : TemporalReservoir4);
             Td.CurrentRadiance   = OutputTexture;       // gi_raw (radiance source)
             Td.HistoryRadiance   = OutputTexture;       // no separate history radiance texture
             Td.DepthTexture      = LinearDepthTexture;
             Td.NormalTexture     = GBufferNormal;
-            Td.PrevDepthTexture  = LinearDepthTexture;
-            Td.PrevNormalTexture = GBufferNormal;
+            // v210: true previous-frame GBuffer (was same-frame aliases).
+            Td.PrevDepthTexture  = PrevLinearDepth;
+            Td.PrevNormalTexture = PrevGBufferNormal;
+            Td.PrevWorldPosTexture = PrevGBufferWorldPos;
+            Td.PrevMaterialTexture = PrevGBufferMaterial;
+            // v210: full-res primary surface for target/BSDF evaluation.
+            Td.WorldPosTexture   = GBufferWorldPos;
+            Td.MaterialTexture   = GBufferMaterial;
             Td.OutRadiance       = SpatialRadiance;       // output radiance directly
             Td.OutputWidth       = HalfResWidth;    // Phase D
             Td.OutputHeight      = HalfResHeight;
@@ -942,12 +1044,27 @@ public:
             glm::mat4 InvCurr = glm::inverse(CurrViewProj);
             memcpy(TC.InverseCurrViewProj, glm::value_ptr(InvCurr), sizeof(TC.InverseCurrViewProj));
             memcpy(TC.PrevViewProj, glm::value_ptr(PrevViewProj), sizeof(TC.PrevViewProj));
-            TC.OutputSize[0]    = float(FB.width);
-            TC.OutputSize[1]    = float(FB.height);
-            TC.RcpOutputSize[0] = 1.0f / float(FB.width);
-            TC.RcpOutputSize[1] = 1.0f / float(FB.height);
+            // v185: this pass dispatches at HALF res (Td.OutputWidth above),
+            // but these were still filled from the FULL-res framebuffer. The
+            // shader uses them for ALL its screen-space arithmetic, so at
+            // 800x600/400x300 every derived quantity was off by 2x:
+            //   :136 uv = (pixel + 0.5) * RcpOutputSize -> spans only [0,0.5],
+            //        so reprojection was computed in the top-left quadrant of
+            //        NDC instead of the full frame;
+            //   :170 prevPixel = prevUV * OutputSize -> up to 800, while the
+            //        history reservoirs are 400x300, and the :176 bounds test
+            //        validates against this SAME wrong constant so it does not
+            //        catch it. Out-of-range Loads return 0 -> prevDepth/normal
+            //        zero -> history rejected. The likeliest cause of the
+            //        long-standing `M mean=2.93` against MaxM=30.
+            // The spatial block below was already correct; these two call sites
+            // were simply missed when Phase D landed.
+            TC.OutputSize[0]    = float(HalfResWidth);
+            TC.OutputSize[1]    = float(HalfResHeight);
+            TC.RcpOutputSize[0] = 1.0f / float(HalfResWidth);
+            TC.RcpOutputSize[1] = 1.0f / float(HalfResHeight);
             TC.FrameIndex       = float(AccumFrameCount);
-            TC.MaxM             = 30.0f;
+            TC.MaxM             = CVar_r_ReSTIR_MaxM.GetValue();   // v176: wire CVar (default 30.0f; tune via HLVM_RGI_MAXM)
             TC.DepthThreshold   = 0.05f;
             TC.NormalThreshold  = 0.5f;
             TC.DebugVis         = 0.0f;
@@ -957,8 +1074,30 @@ public:
             // Near/far planes (must match UpdateViewConstants perspective).
             // The temporal shader reconstructs the exact NDC z from the
             // linear view-space depth using these.
-            TC.Pad[0]           = 0.001f;
-            TC.Pad[1]           = 50.0f;
+            TC.NearPlane        = 0.001f;
+            TC.FarPlane         = 50.0f;
+            // v183: this pass dispatches at half res but DepthTexture /
+            // NormalTexture / PrevDepthTexture / PrevNormalTexture are full-res
+            // GBuffer MRTs. The shader scales the dispatch pixel by this ratio
+            // before sampling them; without it the depth/normal validation
+            // compares the top-left quadrant and rejects nearly all history.
+            //
+            // v191: the numerator is WIDTH, NOT FB.width. INVARIANT: the GBuffer
+            // MRTs are fixed-size and independent of the swapchain — they are
+            // created once inside CreateGBufferTextures from `const uint32_t W =
+            // WIDTH` and are never recreated on resize (BackBufferResizing clears
+            // only the binding cache). HalfResWidth is W/2 off that same constant.
+            // Both operands of this ratio are therefore fixed, and FB.width was a
+            // variable third quantity that merely coincides with the numerator at
+            // startup. On a resize the uint division truncates silently: a 600-wide
+            // swapchain yields 1, which `max(int(s),1)` in the shader's GB() helper
+            // turns into the identity map — undoing v183 exactly the way v184's
+            // GBufferScale==0 did — and a 1200-wide one yields 3, indexing the
+            // 800-wide GBuffer out of bounds so every Load returns 0 and history is
+            // rejected. Both are silent: no VUID, no error, just a collapsed M.
+            // If the GBuffer is ever made to follow the swapchain, this must change
+            // with it.
+            TC.GBufferScale     = static_cast<float>(WIDTH / std::max(HalfResWidth, 1u));
 
             ReSTIRPass.DispatchTemporal(CommandList, Td, TC);
         }
@@ -978,6 +1117,10 @@ public:
             CommandList->setTextureState(
                 TemporalReservoir3, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
             CommandList->setTextureState(
+                TemporalReservoir4, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+            CommandList->setTextureState(
+                TemporalReservoir5, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+            CommandList->setTextureState(
                 DenoisedTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
 
             ReSTIR::FReSTIRPass::FSpatialDesc Sd{};
@@ -989,6 +1132,10 @@ public:
             const bool bSpatialPing = (AccumFrameCount % 2) == 0;
             Sd.Reservoir0       = bSpatialPing ? TemporalReservoir2 : TemporalReservoir0;
             Sd.Reservoir1       = bSpatialPing ? TemporalReservoir3 : TemporalReservoir1;
+            Sd.Reservoir2       = bSpatialPing ? TemporalReservoir5 : TemporalReservoir4;
+            // v210: full-res primary surface for target/BSDF evaluation.
+            Sd.WorldPosTexture  = GBufferWorldPos;
+            Sd.MaterialTexture  = GBufferMaterial;
             Sd.NormalTexture    = GBufferNormal;
             Sd.DepthTexture     = LinearDepthTexture;
             Sd.OutRadiance      = SpatialRadiance;
@@ -1002,7 +1149,12 @@ public:
             SC.RcpOutputSize[1] = 1.0f / float(HalfResHeight);
             SC.NormalThreshold  = 0.9f;
             SC.DepthThreshold   = 0.05f;
-            SC.MaxM             = 30.0f;
+            // v183: same half-res dispatch / full-res GBuffer ratio as the
+            // temporal pass (NormalTexture and DepthTexture are full-res MRTs).
+            // v191: WIDTH, not FB.width — same invariant and same silent-failure
+            // analysis as the temporal site above (search: "v191: the numerator").
+            SC.GBufferScale     = static_cast<float>(WIDTH / std::max(HalfResWidth, 1u));
+            SC.MaxM             = CVar_r_ReSTIR_MaxM.GetValue();   // v176: wire CVar (default 30.0f; tune via HLVM_RGI_MAXM)
             SC.SpatialRadius    = 3.0f;
             SC.DebugVis         = 0.0f;
 
@@ -1023,8 +1175,25 @@ public:
             RC.HalfH = static_cast<float>(HalfResHeight);
             RC.RcpHalfW = 1.0f / static_cast<float>(HalfResWidth);
             RC.RcpHalfH = 1.0f / static_cast<float>(HalfResHeight);
-            RC.RcpFullW = 1.0f / static_cast<float>(FB.width);
-            RC.RcpFullH = 1.0f / static_cast<float>(FB.height);
+            // v192: the resolve pass is FIXED-EXTENT end to end. Its outputs
+            // (FullResGIRaw / FullResSpatial), its guides (LinearDepthTexture /
+            // GBufferNormal) and its input (OutputTexture) are all created inside
+            // CreateGBufferTextures from WIDTH/HEIGHT and are never recreated on
+            // resize. These were FB.width/FB.height — the one swapchain-derived
+            // quantity in a pass where nothing else is swapchain-derived. Widening
+            // the window launched threads past the end of an 800x600 output, and
+            // the kernel has NO bounds test on tid.xy (its only early-out is the
+            // depth check), so that was an out-of-bounds UAV store — undefined
+            // behaviour, not the harmless zero an out-of-range Load returns.
+            // Narrowing smeared the input's last column across the overhang (the
+            // shader's own clamp) and left the remaining columns unwritten.
+            // NOTE: Resolve_cs.hlsl's `int2 fp = hp * 2 + 1` is deliberately NOT
+            // parameterised. It encodes the fixed half-res-to-full-res footprint
+            // relationship between OutputTexture and the GBuffer MRTs, which have
+            // a common origin in WIDTH/HEIGHT — it is not a swapchain ratio, and a
+            // constant for it could only ever hold 2.
+            RC.RcpFullW = 1.0f / static_cast<float>(WIDTH);
+            RC.RcpFullH = 1.0f / static_cast<float>(HEIGHT);
             RC.DepthSigma = 8.0f;
             RC.NormalSigma = 32.0f;
             CommandList->writeBuffer(ResolveConstantsBuffer, &RC, sizeof(RC));
@@ -1052,11 +1221,15 @@ public:
                 CS.setPipeline(ResolvePipeline);
                 CS.addBindingSet(BS);
                 CommandList->setComputeState(CS);
-                CommandList->dispatch((FB.width + 7) / 8, (FB.height + 7) / 8, 1);
+                // v192: fixed extent, matching OutTex. See the note above.
+                CommandList->dispatch((WIDTH + 7) / 8, (HEIGHT + 7) / 8, 1);
             };
 
             DispatchResolve(OutputTexture, FullResGIRaw);       // gi_raw dump
             DispatchResolve(SpatialRadiance, FullResSpatial);   // ReBLUR input
+            // v210: upscale the primary direct+ambient so the display pass can
+            // recombine it with the ReSTIR indirect estimate.
+            DispatchResolve(DirectTexture, FullResDirect);
         }
 
         // (5.5) ReBLUR denoise on the ReSTIR resolve output (RESTIR mode only)
@@ -1078,10 +1251,26 @@ public:
                 glm::mat4 InvCurr = glm::inverse(CurrViewProj);
                 memcpy(ReBLURConstants.InverseCurrViewProj, glm::value_ptr(InvCurr), 64);
                 memcpy(ReBLURConstants.PrevViewProj, glm::value_ptr(PrevViewProj), 64);
-                ReBLURConstants.OutputSize[0] = static_cast<float>(FB.width);
-                ReBLURConstants.OutputSize[1] = static_cast<float>(FB.height);
-                ReBLURConstants.RcpOutputSize[0] = 1.0f / static_cast<float>(FB.width);
-                ReBLURConstants.RcpOutputSize[1] = 1.0f / static_cast<float>(FB.height);
+                // v194: WIDTH/HEIGHT, not FB.width/FB.height. Every resource
+                // this pass touches is fixed-size — output, input, history and
+                // both GBuffer guides — and BackBufferResizing recreates none
+                // of them, so the swapchain extent merely coincided at startup.
+                //
+                // These feed three consumers that must agree: the dispatch grid,
+                // the blur-tap clamp, and pixelUv for IsHistoryValid. Widening
+                // stores out of bounds (the kernel has no extent guard);
+                // narrowing leaves the tail unwritten and rejects history across
+                // the rounding pad, silently passing those texels through
+                // undenoised. Neither raises a VUID.
+                //
+                // Set the extent explicitly rather than leaving OutputWidth zero
+                // for the getDesc() fallback in FReBLURPass::Dispatch: that
+                // fallback fixes only the dispatch grid and never touches these
+                // constants, which are the ones the shader reads.
+                ReBLURConstants.OutputSize[0] = static_cast<float>(WIDTH);
+                ReBLURConstants.OutputSize[1] = static_cast<float>(HEIGHT);
+                ReBLURConstants.RcpOutputSize[0] = 1.0f / static_cast<float>(WIDTH);
+                ReBLURConstants.RcpOutputSize[1] = 1.0f / static_cast<float>(HEIGHT);
                 ReBLURConstants.HitDistParams[0] = 3.0f;
                 ReBLURConstants.HitDistParams[1] = 0.1f;
                 ReBLURConstants.HitDistParams[2] = 20.0f;
@@ -1099,8 +1288,8 @@ public:
                 ReBLURDesc.DepthTexture = LinearDepthTexture;
                 ReBLURDesc.NormalRoughnessTexture = GBufferNormal;
                 ReBLURDesc.OutputTexture = DenoisedTexture;
-                ReBLURDesc.OutputWidth = FB.width;
-                ReBLURDesc.OutputHeight = FB.height;
+                ReBLURDesc.OutputWidth = WIDTH;    // v194: see the note above
+                ReBLURDesc.OutputHeight = HEIGHT;  // v194: see the note above
                 // nvrhi binds descriptor sets BEFORE pending barriers land, so
                 // the descriptors capture the stale image layout and reads
                 // return garbage (VUID-VkDescriptorImageInfo-imageLayout-00344,
@@ -1129,19 +1318,41 @@ public:
             if (bBypass)
                 CommandList->setTextureState(
                     AccumInput, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+            // v210: full-res direct lighting for the display combine.
+            CommandList->setTextureState(
+                FullResDirect, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
 
             ++AccumFrameCount;
             struct FAccumC { uint32_t FrameCount; uint32_t Width; uint32_t Height; float Exposure; };
             FAccumC AccC{};
             AccC.FrameCount = AccumFrameCount;
-            AccC.Width      = FB.width;
-            AccC.Height     = FB.height;
+            // v193: WIDTH/HEIGHT, NOT FB.width/FB.height. Every resource this
+            // pass touches is fixed-size: the UAVs AccumTexture and
+            // DisplayTexture are created in CreateGBufferTextures from the
+            // file-scope WIDTH/HEIGHT, and the SRV input (FullResGIRaw /
+            // FullResSpatial / DenoisedTexture) is created there from the same
+            // constants. The swapchain was the only swapchain-derived quantity
+            // in the pass, and BackBufferResizing clears the binding cache
+            // without recreating any texture.
+            //
+            // These two fields also parameterise the kernel's own bounds guard
+            // (the early-out in GIAccumulate_cs.hlsl main, which compares
+            // SV_DispatchThreadID against Width/Height). Sourced from the
+            // swapchain, that guard clipped the dispatch against the dispatch —
+            // a tautology, not a bound. Widening the window therefore stored out
+            // of bounds through both UAVs; narrowing left part of DisplayTexture
+            // unwritten, and since the dump sizes its readback from the texture
+            // descriptor rather than the dispatch, that unwritten region reaches
+            // validate_restir_gi.py's black-ratio check. Neither raises a VUID.
+            AccC.Width      = WIDTH;
+            AccC.Height     = HEIGHT;
             AccC.Exposure   = Exposure;
             CommandList->writeBuffer(AccumulateConstants, &AccC, sizeof(AccC));
 
             FBindingSetBuilder SetBuilder;
             SetBuilder.SetConstantBuffer(0, AccumulateConstants)
                       .SetTextureSRV(0, AccumInput)
+                      .SetTextureSRV(1, FullResDirect)
                       .SetTextureUAV(0, AccumTexture)
                       .SetTextureUAV(1, DisplayTexture);
             nvrhi::BindingSetHandle AccumBS = NvrhiDevice->createBindingSet(
@@ -1151,7 +1362,8 @@ public:
             CS.setPipeline(AccumulatePipeline);
             CS.addBindingSet(AccumBS);
             CommandList->setComputeState(CS);
-            CommandList->dispatch((FB.width + 7) / 8, (FB.height + 7) / 8, 1);
+            // v193: grid covers the fixed UAV extent, matching the constants above.
+            CommandList->dispatch((WIDTH + 7) / 8, (HEIGHT + 7) / 8, 1);
         }
 
         // (7) Blit the accumulated display to the swapchain
@@ -1167,6 +1379,13 @@ public:
                 CommandList, Framebuffer, DisplayTexture,
                 &BindingCache, FB.width, FB.height, BlitParams);
         }
+
+        // v210 (ZetaRay ground truth): snapshot THIS frame's rasterized GBuffer
+        // into the true previous-frame chain at the END of the frame — the
+        // temporal pass of the NEXT frame must read the surfaces that existed
+        // LAST frame at the reprojected pixels. Under the turntable the current
+        // frame's GBuffer at those pixels holds different geometry.
+        CopyGBufferToPrev();
 
         // The blit above recorded into the same open CommandList that
         // RenderGBuffer + FGIPass + denoise + ReSTIR + accumulate all wrote
@@ -1475,6 +1694,27 @@ private:
         MtDesc.debugName = "GBufferMaterial";
         GBufferMaterial = NvrhiDevice->createTexture(MtDesc);
 
+        // v210 (ZetaRay ground-truth port): true PREVIOUS-frame GBuffer chain.
+        // Under the turntable the surface at a reprojected pixel in the
+        // CURRENT frame is a different surface than the one that was there
+        // last frame, so temporal reuse must read last frame's GBuffer (the
+        // old same-frame aliases made every candidate fail validation and M
+        // never accumulated). Copied from the current GBuffer after every
+        // raster pass.
+        nvrhi::TextureDesc PrevWpDesc = WpDesc;
+        PrevWpDesc.debugName = "PrevGBufferWorldPos";
+        PrevWpDesc.initialState = nvrhi::ResourceStates::CopyDest;
+        PrevWpDesc.keepInitialState = true;
+        PrevGBufferWorldPos = NvrhiDevice->createTexture(PrevWpDesc);
+
+        nvrhi::TextureDesc PrevNmDesc = PrevWpDesc;
+        PrevNmDesc.debugName = "PrevGBufferNormal";
+        PrevGBufferNormal = NvrhiDevice->createTexture(PrevNmDesc);
+
+        nvrhi::TextureDesc PrevMtDesc = PrevWpDesc;
+        PrevMtDesc.debugName = "PrevGBufferMaterial";
+        PrevGBufferMaterial = NvrhiDevice->createTexture(PrevMtDesc);
+
         // Depth attachment (D32) — was created but NEVER attached to the
         // framebuffer, and depth test/write were disabled (fixed 2026-08-10).
         // Without occlusion every overlapping Sponza mesh fragment wrote the
@@ -1505,6 +1745,11 @@ private:
             LtDesc.debugName = "LinearDepth";
             LinearDepthTexture = NvrhiDevice->createTexture(LtDesc);
         }
+        nvrhi::TextureDesc PrevLtDesc = LinearDepthTexture->getDesc();
+        PrevLtDesc.debugName = "PrevLinearDepth";
+        PrevLtDesc.initialState = nvrhi::ResourceStates::CopyDest;
+        PrevLtDesc.keepInitialState = true;
+        PrevLinearDepth = NvrhiDevice->createTexture(PrevLtDesc);
 
         // Pipeline color/depth outputs for the GBuffer pass
         // Phase D (PLAN_REALTIME_RESTIR_GAP): ReSTIR GI traces and reuses at
@@ -1520,6 +1765,13 @@ private:
         DirectionTexture = CreateTexture2D(
             NvrhiDevice, HalfW, HalfH, nvrhi::Format::RGBA32_FLOAT,
             nvrhi::ResourceStates::UnorderedAccess, "GIPrimaryDirection");
+        // v210 (ZetaRay ground-truth port): candidate sample state UAVs.
+        SampleInfoTexture = CreateTexture2D(
+            NvrhiDevice, HalfW, HalfH, nvrhi::Format::RGBA32_FLOAT,
+            nvrhi::ResourceStates::UnorderedAccess, "GISampleInfo");
+        DirectTexture = CreateTexture2D(
+            NvrhiDevice, HalfW, HalfH, nvrhi::Format::RGBA32_FLOAT,
+            nvrhi::ResourceStates::UnorderedAccess, "GIDirect");
         DenoisedTexture = CreateTexture2D(
             NvrhiDevice, W, H, nvrhi::Format::RGBA32_FLOAT,
             nvrhi::ResourceStates::UnorderedAccess, "DenoisedHDR");
@@ -1529,6 +1781,8 @@ private:
             nvrhi::ResourceStates::UnorderedAccess, "Reservoir0");
         ReservoirTex1 = CreateTexture2D(NvrhiDevice, HalfW, HalfH, nvrhi::Format::RGBA32_FLOAT,
             nvrhi::ResourceStates::UnorderedAccess, "Reservoir1");
+        ReservoirTex2 = CreateTexture2D(NvrhiDevice, HalfW, HalfH, nvrhi::Format::RGBA32_FLOAT,
+            nvrhi::ResourceStates::UnorderedAccess, "Reservoir2");
         TemporalReservoir0 = CreateTexture2D(NvrhiDevice, HalfW, HalfH, nvrhi::Format::RGBA32_FLOAT,
             nvrhi::ResourceStates::UnorderedAccess, "TemporalReservoir0");
         TemporalReservoir1 = CreateTexture2D(NvrhiDevice, HalfW, HalfH, nvrhi::Format::RGBA32_FLOAT,
@@ -1543,6 +1797,10 @@ private:
             nvrhi::ResourceStates::UnorderedAccess, "TemporalReservoir2");
         TemporalReservoir3 = CreateTexture2D(NvrhiDevice, HalfW, HalfH, nvrhi::Format::RGBA32_FLOAT,
             nvrhi::ResourceStates::UnorderedAccess, "TemporalReservoir3");
+        TemporalReservoir4 = CreateTexture2D(NvrhiDevice, HalfW, HalfH, nvrhi::Format::RGBA32_FLOAT,
+            nvrhi::ResourceStates::UnorderedAccess, "TemporalReservoir4");
+        TemporalReservoir5 = CreateTexture2D(NvrhiDevice, HalfW, HalfH, nvrhi::Format::RGBA32_FLOAT,
+            nvrhi::ResourceStates::UnorderedAccess, "TemporalReservoir5");
         SpatialRadiance = CreateTexture2D(NvrhiDevice, HalfW, HalfH, nvrhi::Format::RGBA32_FLOAT,
             nvrhi::ResourceStates::UnorderedAccess, "SpatialRadiance");
 
@@ -1553,6 +1811,9 @@ private:
         FullResSpatial = CreateTexture2D(
             NvrhiDevice, W, H, nvrhi::Format::RGBA32_FLOAT,
             nvrhi::ResourceStates::UnorderedAccess, "FullResSpatial");
+        FullResDirect = CreateTexture2D(
+            NvrhiDevice, W, H, nvrhi::Format::RGBA32_FLOAT,
+            nvrhi::ResourceStates::UnorderedAccess, "FullResDirect");
 
         AccumTexture  = CreateTexture2D(NvrhiDevice, W, H, nvrhi::Format::RGBA32_FLOAT,
             nvrhi::ResourceStates::UnorderedAccess, "Accum");
@@ -2003,7 +2264,16 @@ private:
     //
     // After the loop, transitions the 3 GBuffer MRTs to ShaderResource so
     // FGIPass's Texture2D<float4> SRV reads find the correct layout.
-    void RenderGBuffer(uint32_t /*W*/, uint32_t /*H*/)
+    // v197 (card K): takes NO extent parameters. It rasterises into
+    // GBufferFrameBuffer, whose MRTs come from `const uint32_t W = WIDTH` and
+    // are never recreated on resize — so the extent belongs to the target, not
+    // the caller. v195 pinned the viewport below to WIDTH/HEIGHT but left the
+    // parameters in place as `/*W*/`, `/*H*/`; the call site then still read as
+    // though the raster extent followed the swapchain, and un-commenting either
+    // one would have silently restored the v195 defect in the pass v195 fixed.
+    // No query shape flags that: a FB.width sweep sees a plausible hit, a
+    // signature sweep sees inert parameters. Dropping them makes it structural.
+    void RenderGBuffer()
     {
         if (!GBufferPipeline || !GBufferFrameBuffer) return;
         if (!Scene) return;
@@ -2180,7 +2450,21 @@ private:
             IBB.setFormat(nvrhi::Format::R32_UINT);
             State.setIndexBuffer(IBB);
 
-            nvrhi::Viewport Vp(0.f, float(LastWidth), 0.f, float(LastHeight), 0.f, 1.f);
+            // v195: WIDTH/HEIGHT, NOT LastWidth/LastHeight. This viewport
+            // rasterises into GBufferFrameBuffer, whose MRTs are fixed-size
+            // (created from `const uint32_t W = WIDTH` and never recreated on
+            // resize). LastWidth/LastHeight are assigned from the swapchain, so
+            // a resize pointed a wrong-sized viewport at a fixed-size target:
+            // widening clips geometry away at the MRT edge, narrowing leaves
+            // the outer region unrasterised and holding its cleared value —
+            // which the GI pass then reads as "no geometry" and shades as sky.
+            // NOTE: LastWidth/LastHeight themselves are deliberately left
+            // swapchain-derived. Their other role is resize DETECTION at the
+            // top of Render(), where `FB.width != LastWidth` gates
+            // BindingCache.Clear(). Substituting the variable rather than this
+            // use of it would make that comparison `WIDTH != WIDTH`, never
+            // fire, and leave the binding cache stale across a resize.
+            nvrhi::Viewport Vp(0.f, float(WIDTH), 0.f, float(HEIGHT), 0.f, 1.f);
             State.viewport.addViewportAndScissorRect(Vp);
 
             CommandList->setGraphicsState(State);
@@ -2245,9 +2529,39 @@ private:
         }
         else if (FrameCount < 4 || FrameCount % 120 == 0)
         {
+            // v197: WIDTH/HEIGHT, not LastWidth/LastHeight — this reports the
+            // viewport set above, which v195 pinned to the fixed extent while
+            // leaving this log on the swapchain one. Equal at 800x600, so the
+            // line was accidentally truthful; on resize it would have lied
+            // exactly when consulted.
             HLVM_LOG(LogTest, info, TXT("RenderGBuffer frame {}: drew {} meshes, viewport {}x{}"),
-                FrameCount, MeshCount, LastWidth, LastHeight);
+                FrameCount, MeshCount, WIDTH, HEIGHT);
         }
+    }
+
+    // ---- Previous-frame GBuffer snapshot (v210) ---------------------------
+    // Copies the freshly rasterized GBuffer into the PREV textures so the
+    // temporal pass can validate/reuse LAST frame's surfaces at the
+    // reprojected pixels. The old aliases (PrevDepth = LinearDepth etc.) were
+    // same-frame reads, which under the turntable always rejected candidates.
+    void CopyGBufferToPrev()
+    {
+        if (!CommandList) return;
+        if (!GBufferWorldPos || !PrevGBufferWorldPos) return;
+
+        auto CopyOne = [&](nvrhi::TextureHandle Src, nvrhi::TextureHandle Dst)
+        {
+            CommandList->setTextureState(Src, nvrhi::AllSubresources,
+                nvrhi::ResourceStates::CopySource);
+            CommandList->setTextureState(Dst, nvrhi::AllSubresources,
+                nvrhi::ResourceStates::CopyDest);
+            CommandList->copyTexture(Dst, nvrhi::TextureSlice(), Src, nvrhi::TextureSlice());
+        };
+
+        CopyOne(GBufferWorldPos, PrevGBufferWorldPos);
+        CopyOne(GBufferNormal, PrevGBufferNormal);
+        CopyOne(GBufferMaterial, PrevGBufferMaterial);
+        CopyOne(LinearDepthTexture, PrevLinearDepth);
     }
 
     // ---- View constants ----------------------------------------------------
@@ -2309,6 +2623,7 @@ private:
         BLB.SetVisibility(nvrhi::ShaderType::Compute)
            .AddConstantBuffer(0)
            .AddTextureSRV(0)
+           .AddTextureSRV(1)   // v210: DirectTexture combine
            .AddTextureUAV(0)
            .AddTextureUAV(1);
 
@@ -2603,10 +2918,14 @@ private:
             { "spatial",          FullResSpatial },
             { "denoised",         DenoisedTexture },
             { "gi_raw",           FullResGIRaw },
-            { "reservoir_radA",   TemporalReservoir0 },
-            { "reservoir_MW_A",   TemporalReservoir1 },
-            { "reservoir_radB",   TemporalReservoir2 },
-            { "reservoir_MW_B",   TemporalReservoir3 },
+            // v210: 3-texture reservoir (ZetaRay layout).
+            //   R0 = pos + asfloat(ID); R1 = Lo + M; R2 = w_sum + W + normal.
+            { "reservoir_posA",   TemporalReservoir0 },
+            { "reservoir_LoM_A",  TemporalReservoir1 },
+            { "reservoir_C_A",    TemporalReservoir4 },
+            { "reservoir_posB",   TemporalReservoir2 },
+            { "reservoir_LoM_B",  TemporalReservoir3 },
+            { "reservoir_C_B",    TemporalReservoir5 },
         };
         for (const auto& It : Items)
         {
@@ -2637,24 +2956,29 @@ private:
             }
         }
 
-        // Derived: reservoir M/W — the active pair is the one with the larger
-        // M sum; M mean/max are reported across both pairs.
+        // Derived: reservoir M/W (v210 layout) — M lives in the LoM texture's
+        // alpha (R1.w), W in the C texture's green (R2.y). The active pair is
+        // the one with the larger M sum; mean/max across both pairs.
         float MMax = 0.0f, MSum = 0.0f, WMean = 0.0f;
-        const nvrhi::TextureHandle MWTexs[2] = { TemporalReservoir1, TemporalReservoir3 };
+        const nvrhi::TextureHandle LoMTexs[2] = { TemporalReservoir1, TemporalReservoir3 };
+        const nvrhi::TextureHandle CTexs[2]   = { TemporalReservoir4, TemporalReservoir5 };
         {
             float BestPairMSum = -1.0f;
             size_t NPixPerTex = 0;
             for (int p = 0; p < 2; ++p)
             {
-                if (!MWTexs[p] || !ReadbackTextureFloats(MWTexs[p], Px))
+                if (!LoMTexs[p] || !ReadbackTextureFloats(LoMTexs[p], Px))
                     continue;
                 NPixPerTex = Px.size() / 4;
                 float PairMSum = 0.0f, PairWSum = 0.0f;
+                std::vector<float> CPx;
+                const bool HaveC = CTexs[p] && ReadbackTextureFloats(CTexs[p], CPx);
                 for (size_t i = 0; i < NPixPerTex; ++i)
                 {
-                    const float M = Px[i*4 + 0];
+                    const float M = Px[i*4 + 3];   // R1.w
                     PairMSum += M;
-                    PairWSum += Px[i*4 + 1];
+                    if (HaveC)
+                        PairWSum += CPx[i*4 + 1];  // R2.y
                     if (M > MMax) MMax = M;
                 }
                 MSum += PairMSum;
@@ -2753,6 +3077,10 @@ private:
     nvrhi::TextureHandle          GBufferNormal;
     nvrhi::TextureHandle          GBufferMaterial;
     nvrhi::TextureHandle          GBufferDepth;
+    nvrhi::TextureHandle          PrevGBufferWorldPos;   // v210: true prev-frame chain
+    nvrhi::TextureHandle          PrevGBufferNormal;
+    nvrhi::TextureHandle          PrevGBufferMaterial;
+    nvrhi::TextureHandle          PrevLinearDepth;
     nvrhi::BufferHandle           SunLightBuffer;
     nvrhi::TextureHandle          PlaceholderTexture;
     std::vector<FInstanceInfo>    AllInstanceInfos;   // Phase 3: patched averages
@@ -2762,6 +3090,7 @@ private:
     uint32_t                      HalfResHeight = 0;
     nvrhi::TextureHandle          FullResGIRaw;        // Phase D: upscaled gi_raw dump
     nvrhi::TextureHandle          FullResSpatial;      // Phase D: upscaled spatial -> ReBLUR
+    nvrhi::TextureHandle          FullResDirect;       // v210: upscaled DirectTexture -> display combine
     nvrhi::ComputePipelineHandle  ResolvePipeline;
     nvrhi::BindingLayoutHandle    ResolveBindingLayout;
     nvrhi::BufferHandle           ResolveConstantsBuffer;
@@ -2784,13 +3113,18 @@ private:
     // Per-frame intermediate textures
     nvrhi::TextureHandle          OutputTexture;
     nvrhi::TextureHandle          DirectionTexture;
+    nvrhi::TextureHandle          SampleInfoTexture;   // v210: x2 normal + pdf (FGIPass u3)
+    nvrhi::TextureHandle          DirectTexture;       // v210: primary direct+ambient (FGIPass u4)
     nvrhi::TextureHandle          DenoisedTexture;
     nvrhi::TextureHandle          ReservoirTex0;
     nvrhi::TextureHandle          ReservoirTex1;
+    nvrhi::TextureHandle          ReservoirTex2;       // v210: w_sum/W/OctEncode(normal)
     nvrhi::TextureHandle          TemporalReservoir0;
     nvrhi::TextureHandle          TemporalReservoir1;
     nvrhi::TextureHandle          TemporalReservoir2;
     nvrhi::TextureHandle          TemporalReservoir3;
+    nvrhi::TextureHandle          TemporalReservoir4;  // v210: reservoir C ping-pong pair A
+    nvrhi::TextureHandle          TemporalReservoir5;  // v210: reservoir C ping-pong pair B
     nvrhi::TextureHandle          SpatialRadiance;
     nvrhi::TextureHandle          AccumTexture;
     nvrhi::TextureHandle          DisplayTexture;

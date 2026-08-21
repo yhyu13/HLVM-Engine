@@ -46,6 +46,12 @@ struct GIPayload {
     uint   bounceCount;
     uint   flags;            // bit 0 = continue path, bit 1 = terminated by RR
     uint   seed;
+    // v210 (2026-08-21, ZetaRay ground-truth port, Phase 1): the ReSTIR GI
+    // candidate's second path vertex (x2). ClosestHit fills them at every
+    // bounce; RayGen captures them right after the PRIMARY trace. 80-byte
+    // payload (FGIPass::CreatePipeline maxPayloadSize = 80).
+    float3 sampleNormal;      // x2 shading normal
+    uint   sampleID;          // packed (instanceIdx << 24) | (primitiveIdx & 0xFFFFFF); 0xFFFFFFFF = invalid
 };
 
 struct ShadowPayload {
@@ -85,15 +91,33 @@ ConstantBuffer<ViewConstants> g_View : register(b1);
 // Resources
 // =============================================================================
 
-RWTexture2D<float4> Output : register(u0, space1);
+// Output (RWTexture2D<float4>) and OutputDirection (u2) live in the DEFAULT
+// register space (= descriptor set 0 in nvrhi's legacy mode). Earlier
+// versions put them in space1 with a separate UAV-only binding layout (the
+// "v22 split"), but that path returned zero for GBuffer SRV reads — the
+// split's image-layout-transition ordering interacted badly with nvrhi's
+// auto-barrier tracking. Reverting to the proven TestCornellBoxGI single-
+// binding-set pattern. See docs/PENDING_PLAN_v2.md and
+// docs/DIAGNOSTIC_2026-07-30.md for the bisect history.
+RWTexture2D<float4> Output : register(u0);
 
 // Primary sample ray direction (ReSTIR GI reservoirs). Written per-pixel as
 // float4(direction, 1.0). The direction is the ray used for the pixel's
 // primary GI sample so the reservoir can reproject/merge a real sample.
-RWTexture2D<float4> OutputDirection : register(u2, space1);
+RWTexture2D<float4> OutputDirection : register(u2);
+
+// v210 (2026-08-21, ZetaRay ground-truth port, Phase 1):
+// u3 SampleInfo — float4(x2Normal.xyz, samplePdf): the second path vertex's
+// shading normal and the primary sample's BSDF pdf. The reservoir stores the
+// normal; the pdf seeds the RIS weight (w_sum = targetLum/pdf, W = 1/pdf).
+// u4 DirectTexture — float4(primaryDirect + primaryAmbient [+ sky on primary
+// miss], 0): everything the ReSTIR reservoir must NOT carry. The display pass
+// recombines it with the ReSTIR indirect estimate.
+RWTexture2D<float4> SampleInfo : register(u3);
+RWTexture2D<float4> DirectTexture : register(u4);
 
 #if GI_DEBUG_STATS
-RWTexture2D<float4> DebugStatsTexture : register(u1, space1);
+RWTexture2D<float4> DebugStatsTexture : register(u1);
 #endif
 
 RaytracingAccelerationStructure SceneBVH : register(t0);
@@ -511,8 +535,10 @@ void RayGen() {
         // Background sky for pixels with no rasterized geometry (fixed
         // 2026-08-09): was pure black, making 56% of the display black.
         // Unproject the primary ray through this pixel (GLM RH-ZO) and
-        // evaluate the same SampleSky used by the miss shader, so the
-        // background is consistent with the GI sky.
+        // evaluate the same SampleSky used by the miss shader. v210: the sky
+        // now lands in DirectTexture (the ReSTIR reservoir is INVALID here —
+        // there is no x2 vertex to reuse); the display pass adds
+        // DirectTexture + ReSTIR indirect.
         float2 px = float2(gbPixel) + 0.5f;
         float2 ndc = float2(px.x / g_View.RenderTargetSize.x * 2.0f - 1.0f,
                             1.0f - px.y / g_View.RenderTargetSize.y * 2.0f);
@@ -526,7 +552,11 @@ void RayGen() {
         // maps the view-space direction back to world space (translation is
         // killed by the w=0 component).
         float3 worldDir = normalize(mul(float4(viewDir, 0.0f), g_View.ViewMatrix).xyz);
-        Output[pixel] = float4(SampleSky(worldDir), 1.0f);
+        float3 sky = SampleSky(worldDir);
+        Output[pixel] = float4(0.0f, 0.0f, 0.0f, 0.0f);
+        OutputDirection[pixel] = float4(0.0f, 0.0f, 0.0f, asfloat(0xFFFFFFFFu));
+        SampleInfo[pixel] = float4(0.0f, 0.0f, 0.0f, 0.0f);
+        DirectTexture[pixel] = float4(sky, 0.0f);
         return;
     }
 
@@ -551,9 +581,17 @@ void RayGen() {
     // Multi-sample indirect GI
     float3 indirect = float3(0.0f, 0.0f, 0.0f);
     float avgFirstHitDist = 0.0f;
-    // Direction of the first sample's primary ray — used by ReSTIR GI to
-    // build a reservoir that holds a real (radiance, direction, hitT) sample.
+    // v210 (ZetaRay ground truth, Phase 1): the ReSTIR GI candidate sample.
+    // The reservoir stores the SECOND path vertex x2 (position, normal, ID),
+    // the incident radiance Lo at x2 towards the primary surface, and the
+    // primary sample's PDF. Direct lighting stays OUT of the reservoir — it is
+    // written to DirectTexture and recombined at display time.
     float3 firstSampleDir = float3(0.0f, 1.0f, 0.0f);
+    float firstSamplePdf = 0.0f;
+    float3 firstSampleLo = float3(0.0f, 0.0f, 0.0f);
+    float3 firstSampleX2Normal = float3(0.0f, 1.0f, 0.0f);
+    uint firstSampleX2ID = 0xFFFFFFFFu;
+    float firstSampleHitT = 0.0f;
 
 #if GI_DEBUG_STATS
     float debugTotalBounces = 0.0f;
@@ -571,12 +609,22 @@ void RayGen() {
         payload.flags = 0u;
         payload.hitDistance = 0.0f;
         payload.seed = pixelSeed + s * 7919u;
+        payload.sampleNormal = float3(0.0f, 1.0f, 0.0f);
+        payload.sampleID = 0xFFFFFFFFu;
 
         uint sampleSeed = pixelSeed + s * 7919u;
         float roughness = GBufferMaterial[gbPixel].a;  // Phase 2 (GBuffer MRT2 alpha)
-        float3 rayDir = sampleRoughnessLobe(normal, roughness, random_float2(sampleSeed));
-        if (s == 0)
+        // v210: cosine-weighted hemisphere sampling with the EXACT PDF
+        // (cos/pi). The old sampleRoughnessLobe lerped toward the normal
+        // without any PDF correction, which biased the tracer (throughput *=
+        // albedo is only exact when f/pdf == albedo, i.e. cosine sampling of
+        // a Lambert surface — Sponza's gltf roughness is ~0.9).
+        float3 rayDir = sampleHemisphereCosine(normal, random_float2(sampleSeed));
+        float samplePdf = max(dot(normal, rayDir), 0.0f) * k_INV_PI;
+        if (s == 0) {
             firstSampleDir = rayDir;
+            firstSamplePdf = samplePdf;
+        }
         float3 rayOrigin = OffsetRayOrigin(worldPos, normal, rayDir);
 
         // Fully initialize every payload field: slangc compiles entry points
@@ -600,8 +648,13 @@ void RayGen() {
                 ray,
                 payload);
 
-            if (bounce == 0)
+            if (bounce == 0) {
                 firstHitDist = payload.hitDistance;
+                // Capture x2 (second path vertex) right after the PRIMARY
+                // trace — later bounces overwrite these payload fields.
+                firstSampleX2Normal = payload.sampleNormal;
+                firstSampleX2ID = payload.sampleID;
+            }
 
             if ((payload.flags & 0x01) == 0)
                 break;
@@ -617,6 +670,10 @@ void RayGen() {
 
         indirect += payload.radiance;
         avgFirstHitDist += firstHitDist;
+        if (s == 0) {
+            firstSampleLo = payload.radiance;
+            firstSampleHitT = firstHitDist;
+        }
 
 #if GI_DEBUG_STATS
         debugTotalBounces += float(payload.bounceCount);
@@ -632,9 +689,31 @@ void RayGen() {
     result += indirect / max(float(spp), 1.0f);
     avgFirstHitDist /= max(float(spp), 1.0f);
 
-    // Emit the primary sample ray direction for ReSTIR GI reservoir building.
-    // Done unconditionally so downstream reservoirs always have a valid sample.
-    OutputDirection[pixel] = float4(firstSampleDir, 1.0);
+    // =========================================================================
+    // v210 (ZetaRay ground truth, Phase 1) — ReSTIR GI candidate sample out.
+    //   Output         u0 = float4(Lo, hitT)         Lo = incident radiance at
+    //                                                 x2 towards x1 (indirect
+    //                                                 only; primary direct and
+    //                                                 ambient live in u4).
+    //   OutputDirection u2 = float4(x2Pos, asfloat(ID))  second path vertex.
+    //   SampleInfo     u3 = float4(x2Normal, pdf)     primary BSDF sample pdf.
+    //   DirectTexture  u4 = float4(direct + ambient [+ sky on primary miss]).
+    // When the primary ray misses there IS no x2: the reservoir is invalid
+    // (ID = 0xFFFFFFFF, Lo = 0) and the visible sky is added to u4.
+    // =========================================================================
+    float3 sampleLo = firstSampleLo;
+    float3 x2Pos = worldPos + firstSampleDir * firstSampleHitT;
+    bool primaryMiss = (firstSampleHitT <= 0.0f);
+    float3 directAndAmbient = primaryDirect + primaryAmbient;
+    if (primaryMiss)
+        directAndAmbient += firstSampleLo;   // miss-shader sky is visible radiance
+
+    Output[pixel] = float4(primaryMiss ? float3(0.0f, 0.0f, 0.0f) : sampleLo, firstSampleHitT);
+    OutputDirection[pixel] = float4(primaryMiss ? float3(0.0f, 0.0f, 0.0f) : x2Pos,
+                                    asfloat(primaryMiss ? 0xFFFFFFFFu : firstSampleX2ID));
+    SampleInfo[pixel] = float4(primaryMiss ? float3(0.0f, 0.0f, 0.0f) : firstSampleX2Normal,
+                               firstSamplePdf);
+    DirectTexture[pixel] = float4(directAndAmbient, 0.0f);
 
     // Safety clamp: mark NaN/inf pixels red for debugging.
     if (any(isnan(result)) || any(isinf(result)))
@@ -744,9 +823,18 @@ void RayGen() {
             case 12u: debugColor = g_GI.AmbientColor.rgb; break;
             case 13u: debugColor = RTInstanceInfo[0].AlbedoColor; break;         // SRV sanity read
             case 14u: debugColor = RTVertices[0].Position * 0.25f + 0.5f; break; // SRV sanity read
-            case 20u: debugColor = GBufferMaterial.Load(int3(pixel, 0)).rgb; break; // SRV read of GBufferMaterial
-            case 21u: debugColor = GBufferNormal.Load(int3(pixel, 0)).rgb * 0.5f + 0.5f; break; // SRV read of GBufferNormal (sanity compare to case 2)
-            case 22u: debugColor = GBufferWorldPos.Load(int3(pixel, 0)).rgb * 0.25f + 0.5f; break; // SRV read of GBufferWorldPos (sanity compare)
+// v182 (six-role-pipeline, 2026-08-30): modes 20/21/22/31 previously indexed
+// the GBuffer with `pixel` (DISPATCH space) while the production reads at
+// :501-503 index with `gbPixel` (FULL-RES GBuffer space, = pixel * gbScale
+// after the Phase-D half-res dispatch change at :496-499). At the current
+// 400x300 dispatch / 800x600 GBuffer the probes therefore sampled only the
+// top-left quadrant — a DIFFERENT address than the code they are meant to
+// bisect. Any "mode 20 returns zero => t3 SRV is unbound" conclusion drawn
+// from the old probes measured the wrong texel and is not evidence about the
+// production read. Aligned to gbPixel so the probes are faithful.
+            case 20u: debugColor = GBufferMaterial.Load(int3(gbPixel, 0)).rgb; break; // SRV read of GBufferMaterial
+            case 21u: debugColor = GBufferNormal.Load(int3(gbPixel, 0)).rgb * 0.5f + 0.5f; break; // SRV read of GBufferNormal (sanity compare to case 2)
+            case 22u: debugColor = GBufferWorldPos.Load(int3(gbPixel, 0)).rgb * 0.25f + 0.5f; break; // SRV read of GBufferWorldPos (sanity compare)
 // v128 (six-role-pipeline, tick 113, 2026-07-30): single-pixel sentinel
 // at (0,0,0). If mode 30 shows albedo at (0,0,0) but mode 20 shows zero
 // everywhere, the binding works at (0,0,0) but is masked elsewhere (e.g.,
@@ -773,7 +861,7 @@ void RayGen() {
 // layout or pipeline state, not dead-strip).
             case 31u:
             {
-                float3 aliveSentinel = GBufferMaterial.Load(int3(pixel, 0)).rgb * 0.5f + 0.1f;
+                float3 aliveSentinel = GBufferMaterial.Load(int3(gbPixel, 0)).rgb * 0.5f + 0.1f;
                 if (any(aliveSentinel > float3(0.1, 0.1, 0.1))) {
                     debugColor = aliveSentinel; // binding works, slangc keeps the read
                 } else {
@@ -855,6 +943,14 @@ void ClosestHit(inout GIPayload payload : SV_RayPayload, in Attributes attr : SV
     float3 vertexNormal = v0.Normal * bary.x + v1.Normal * bary.y + v2.Normal * bary.z;
     float3 hitNormal = normalize(vertexNormal);
 
+    // v210 (ZetaRay ground truth, Phase 1): carry the second path vertex (x2)
+    // state back to RayGen for the ReSTIR GI reservoir. RayGen captures it
+    // right after the PRIMARY trace; later bounces may overwrite it, which is
+    // harmless. ID packs (instance << 24) | (primitive & 0xFFFFFF) — enough for
+    // Sponza and gives the future segment-visibility test a triangle to skip.
+    payload.sampleNormal = hitNormal;
+    payload.sampleID = (instanceIdx << 24) | (primitiveIdx & 0xFFFFFFu);
+
     // Fallback to the geometric normal if the interpolated normal is invalid.
     if (any(isnan(hitNormal)) || any(isinf(hitNormal))) {
         float3 p0w = mul(ObjectToWorld3x4(), float4(v0.Position, 1.0)).xyz;
@@ -909,7 +1005,10 @@ void ClosestHit(inout GIPayload payload : SV_RayPayload, in Attributes attr : SV
     }
 
     payload.seed = payload.seed + payload.bounceCount * 13u + 17u;
-    payload.direction = sampleRoughnessLobe(hitNormal, info.Roughness, random_float2(payload.seed));
+    // v210: cosine-weighted bounce sampling (pdf = cos/pi). With the Lambert
+    // BRDF, f/pdf == albedo, so the `throughput *= albedo` above is exact.
+    // The old roughness-lerp lobe had no PDF and biased the Lo estimate.
+    payload.direction = sampleHemisphereCosine(hitNormal, random_float2(payload.seed));
     payload.origin = OffsetRayOrigin(hitPosition, hitNormal, payload.direction);
 
     payload.flags |= 0x01;
