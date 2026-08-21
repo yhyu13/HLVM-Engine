@@ -333,6 +333,12 @@ void FDeviceManagerVk::CreateSyncObjects()
 	{
 		m_AcquireSemaphores.push_back(device->createSemaphore(vk::SemaphoreCreateInfo()));
 	}
+	// v213: per-acquire-slot event queries (null until first use — the first
+	// acquire of a slot never waits).
+	m_AcquireSlotQueries.clear();
+	m_AcquireSlotQueries.resize(numAcquireSemaphores);
+	for (uint32_t i = 0; i < numAcquireSemaphores; i++)
+		m_AcquireSlotQueries[i] = nullptr;
 
 	m_AcquireSemaphoreIndex = 0;
 }

@@ -170,7 +170,15 @@ private:
 	bool								bCanPresent = false;
 	TVector<vk::Semaphore>				m_PresentSemaphores;
 	TVector<vk::Semaphore>				m_AcquireSemaphores;
+	// v213 (real-time pass): one event query per acquire slot. The query is
+	// recorded at the END of the frame that used the slot (Present), so
+	// waiting on it before REUSING the semaphore in BeginFrame guarantees the
+	// render submission that waited on the semaphore has executed — this is
+	// what makes frame overlap legal
+	// (VUID-vkAcquireNextImageKHR-semaphore-01779).
+	TVector<nvrhi::EventQueryHandle>	m_AcquireSlotQueries;
 	uint32_t							m_AcquireSemaphoreIndex = 0;
+	uint32_t							m_CurrentAcquireSlot = 0;
 	std::deque<nvrhi::EventQueryHandle> m_FramesInFlight;
 	TVector<nvrhi::EventQueryHandle>	m_QueryPool;
 	// Framebuffers (one per swapchain image)

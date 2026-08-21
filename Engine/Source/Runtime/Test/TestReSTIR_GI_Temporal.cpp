@@ -771,6 +771,38 @@ public:
         // real-time pass.
         const bool bProfile = (std::getenv("HLVM_RGI_LOG_FRAMETIME") != nullptr);
         auto T0 = std::chrono::steady_clock::now();
+        // v213 (Phase 5b): poll LAST frame's GPU timers (results land after the
+        // previous submission executes).
+        if (bGpuTimers && bTimersPending)
+        {
+            bool AllReady = true;
+            double Times[6] = {0, 0, 0, 0, 0, 0};
+            for (int i = 0; i < 6; ++i)
+            {
+                if (!GpuTimers[i]) { AllReady = false; break; }
+                if (NvrhiDevice->pollTimerQuery(GpuTimers[i]))
+                    Times[i] = static_cast<double>(NvrhiDevice->getTimerQueryTime(GpuTimers[i])) * 1000.0;
+                else
+                    AllReady = false;
+            }
+            if (AllReady)
+            {
+                bTimersPending = false;
+                for (int i = 0; i < 6; ++i)
+                    GpuTimerSums[i].push_back(Times[i]);
+                const size_t N = GpuTimerSums[0].size();
+                if (N % 8 == 0)
+                {
+                    auto Avg8 = [](const std::vector<double>& V) {
+                        return std::accumulate(V.end() - 8, V.end(), 0.0) / 8.0;
+                    };
+                    HLVM_LOG(LogTest, info,
+                        TXT("gpu ms (avg 8): GBuffer={:.2f} RayTrace={:.2f} ReSTIR={:.2f} Resolve={:.2f} BlitAccum={:.2f} total={:.2f}"),
+                        Avg8(GpuTimerSums[0]), Avg8(GpuTimerSums[1]), Avg8(GpuTimerSums[2]),
+                        Avg8(GpuTimerSums[3]), Avg8(GpuTimerSums[4]), Avg8(GpuTimerSums[5]));
+                }
+            }
+        }
         const auto& FB = Framebuffer->getFramebufferInfo();
         // Remember the swapchain back-buffer for the readback diagnostic.
         CurrentBackBufferTexture = (Framebuffer->getDesc().colorAttachments.size() > 0)
@@ -785,6 +817,7 @@ public:
 
         // UpdateViewConstants needs the command list open, so open CommandList first.
         CommandList->open();
+        if (bGpuTimers && GpuTimers[5]) CommandList->beginTimerQuery(GpuTimers[5]);
 
         // v195: WIDTH/HEIGHT, NOT FB.width/FB.height. These two arguments reach
         // THREE consumers, only one of which is the camera aspect ratio:
@@ -817,11 +850,14 @@ public:
         // The whole frame submits at end of Render via line 691.
         // v197: no arguments — the raster extent is a property of the target,
         // not of the caller. See the note on RenderGBuffer's definition.
+        if (bGpuTimers && GpuTimers[0]) CommandList->beginTimerQuery(GpuTimers[0]);
         RenderGBuffer();
+        if (bGpuTimers && GpuTimers[0]) CommandList->endTimerQuery(GpuTimers[0]);
         auto T1 = std::chrono::steady_clock::now();
 
         // Turntable: rebuild the TLAS with the current scene Y-rotation so the
         // ray tracer and the raster pass always agree (2026-08-10).
+        if (bGpuTimers && GpuTimers[1]) CommandList->beginTimerQuery(GpuTimers[1]);
         BuildTLAS(CommandList);
 
         // (1) GI ray trace — produces OutputTexture (HDR rgb + hitDist alpha)
@@ -888,6 +924,7 @@ public:
             HLVM_LOG(LogTest, info, TXT("Post-GIPass: returned Frame={}"),
                 AccumFrameCount);
         }
+        if (bGpuTimers && GpuTimers[1]) CommandList->endTimerQuery(GpuTimers[1]);
         auto T2 = std::chrono::steady_clock::now();
 
         // (2) Bilateral denoise — VESTIGIAL. Output dead; retained on a false
@@ -933,6 +970,7 @@ public:
 
         // (3) ReSTIR Generate — skipped in HLVM_RGI_BYPASS mode
         auto T3 = T2, T4 = T2, T5 = T2;
+        if (bGpuTimers && GpuTimers[2]) CommandList->beginTimerQuery(GpuTimers[2]);
         if (!bBypass)
         {
             ReSTIR::FReSTIRPass::FGenerationDesc Gd{};
@@ -1189,8 +1227,10 @@ public:
             ReSTIRPass.DispatchSpatial(CommandList, Sd, SC);
             T5 = std::chrono::steady_clock::now();
         }
+        if (bGpuTimers && GpuTimers[2]) CommandList->endTimerQuery(GpuTimers[2]);
 
         // (5.4) Phase D: depth/normal-weighted half-res → full-res resolve.
+        if (bGpuTimers && GpuTimers[3]) CommandList->beginTimerQuery(GpuTimers[3]);
         {
             struct FResolveC
             {
@@ -1260,9 +1300,11 @@ public:
             // recombine it with the ReSTIR indirect estimate.
             DispatchResolve(DirectTexture, FullResDirect);
         }
+        if (bGpuTimers && GpuTimers[3]) CommandList->endTimerQuery(GpuTimers[3]);
         auto T6 = std::chrono::steady_clock::now();
 
         // (5.5) ReBLUR denoise on the ReSTIR resolve output (RESTIR mode only)
+        if (bGpuTimers && GpuTimers[4]) CommandList->beginTimerQuery(GpuTimers[4]);
         {
             nvrhi::TextureHandle AccumInput = bBypass ? FullResGIRaw : FullResSpatial;
             if (bReBLURInitialized && !bBypass)
@@ -1395,6 +1437,7 @@ public:
             // v193: grid covers the fixed UAV extent, matching the constants above.
             CommandList->dispatch((WIDTH + 7) / 8, (HEIGHT + 7) / 8, 1);
         }
+        if (bGpuTimers && GpuTimers[4]) CommandList->endTimerQuery(GpuTimers[4]);
         auto T7 = std::chrono::steady_clock::now();
 
         // (7) Blit the accumulated display to the swapchain
@@ -1468,8 +1511,11 @@ public:
         const bool bLastFrame = (AccumFrameCount >= AccumTargetFrames);
         if (CommandList)
         {
+            if (bGpuTimers && GpuTimers[5]) CommandList->endTimerQuery(GpuTimers[5]);
             CommandList->close();
             NvrhiDevice->executeCommandList(CommandList);
+            if (bGpuTimers)
+                bTimersPending = true;
         }
 
         // Dump AFTER the per-frame CL executes. DumpCurrentFrame creates its
@@ -1726,6 +1772,14 @@ private:
     bool CreateGBufferTextures()
     {
         const uint32_t W = WIDTH, H = HEIGHT;
+
+        // v213 (Phase 5b): per-phase GPU timers (HLVM_RGI_GPU_TIMERS=1).
+        bGpuTimers = (std::getenv("HLVM_RGI_GPU_TIMERS") != nullptr);
+        if (bGpuTimers)
+        {
+            for (int i = 0; i < 6; ++i)
+                GpuTimers[i] = NvrhiDevice->createTimerQuery();
+        }
 
         nvrhi::TextureDesc WpDesc;
         WpDesc.dimension  = nvrhi::TextureDimension::Texture2D;
@@ -3191,6 +3245,11 @@ private:
     nvrhi::TextureHandle          SpatialRadiance;
     nvrhi::TextureHandle          AccumTexture;
     nvrhi::TextureHandle          DisplayTexture;
+    // v213 (Phase 5b): GPU timer queries for per-phase GPU time.
+    nvrhi::TimerQueryHandle       GpuTimers[6];   // 0=GBuffer 1=RayTrace 2=ReSTIR 3=Resolve 4=BlitAccum 5=Total
+    bool                          bGpuTimers = false;
+    bool                          bTimersPending = false;
+    std::vector<double>           GpuTimerSums[6];
 
     // GIAccumulate pipeline
     nvrhi::ComputePipelineHandle  AccumulatePipeline;

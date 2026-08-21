@@ -191,6 +191,7 @@ void FDeviceManagerVk::DestroyDeviceAndSwapChain()
 		}
 	}
 	m_AcquireSemaphores.clear();
+	m_AcquireSlotQueries.clear();
 
 	DestroySwapChain();
 
@@ -226,7 +227,18 @@ bool FDeviceManagerVk::BeginFrame()
 		return false;
 	}
 
-	const auto& semaphore = m_AcquireSemaphores[m_AcquireSemaphoreIndex];
+	const uint32_t AcquireSlot = m_AcquireSemaphoreIndex;
+	m_CurrentAcquireSlot = AcquireSlot;
+	// v213 (real-time pass): before REUSING this acquire semaphore, wait for
+	// the event query recorded at the end of the frame that LAST used the slot
+	// (Present). Its completion means the render submission that waited on the
+	// semaphore has executed, so the semaphore has no pending operations —
+	// frame overlap without VUID-vkAcquireNextImageKHR-semaphore-01779.
+	if (m_AcquireSlotQueries.size() > AcquireSlot && m_AcquireSlotQueries[AcquireSlot])
+	{
+		m_NvrhiDevice->waitEventQuery(m_AcquireSlotQueries[AcquireSlot]);
+	}
+	const auto& semaphore = m_AcquireSemaphores[AcquireSlot];
 	vk::Result	result = vk::Result::eErrorUnknown;
 	int			maxAttempts = 3;
 
@@ -395,6 +407,10 @@ bool FDeviceManagerVk::Present()
 	m_NvrhiDevice->resetEventQuery(query);
 	m_NvrhiDevice->setEventQuery(query, nvrhi::CommandQueue::Graphics);
 	m_FramesInFlight.push_back(query);
+	// v213: associate this frame's completion with the acquire slot it used,
+	// so BeginFrame can wait on it before reusing the semaphore.
+	if (m_AcquireSlotQueries.size() > m_CurrentAcquireSlot)
+		m_AcquireSlotQueries[m_CurrentAcquireSlot] = query;
 
 	FrameIndex++;
 	return true;
