@@ -141,6 +141,8 @@ namespace ReSTIR
             // candidate validation under the scene turntable.
             nvrhi::TextureHandle PrevWorldPosTexture;
             nvrhi::TextureHandle PrevMaterialTexture;
+            // v211 (Phase 4): TLAS for segment-visibility tests in reuse.
+            nvrhi::rt::AccelStructHandle SceneTLAS;
             nvrhi::TextureHandle OutReservoir0;
             nvrhi::TextureHandle OutReservoir1;
             nvrhi::TextureHandle OutReservoir2;
@@ -158,6 +160,8 @@ namespace ReSTIR
             // v210: t6/t7 — full-res primary surface (world pos + albedo).
             nvrhi::TextureHandle WorldPosTexture;
             nvrhi::TextureHandle MaterialTexture;
+            // v211 (Phase 4): TLAS for segment-visibility tests in reuse.
+            nvrhi::rt::AccelStructHandle SceneTLAS;
             // Same contract as FTemporalDesc above — the caller supplies the
             // guide/dispatch ratio as FReSTIRSpatialConstants::GBufferScale.
             nvrhi::TextureHandle NormalTexture;
@@ -211,6 +215,14 @@ namespace ReSTIR
         nvrhi::ComputePipelineHandle TemporalPipeline;
         nvrhi::ComputePipelineHandle SpatialPipeline;
         nvrhi::BufferHandle ConstantBuffer;
+        // v211 (Phase 4): 1x1 fallbacks so TestCornellBoxGI / TestPathTraceGI
+        // keep populating the shared v210/v211 layout slots without owning the
+        // new textures. Their shaders do not declare/read the extra slots, so
+        // the descriptors are inert. The TLAS slot is the exception: it must
+        // be a REAL acceleration structure (checked_cast), so callers wire
+        // their TLAS explicitly.
+        nvrhi::TextureHandle DummyReservoir;   // 1x1 RGBA32F
+        nvrhi::TextureHandle DummyGuide;       // 1x1 normal/pos/material stand-in
         FString ShaderDataDir;
         bool bIsInitialized = false;
     };

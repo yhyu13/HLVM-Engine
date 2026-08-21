@@ -39,6 +39,7 @@ Texture2D<float>  gDepth     : register(t4);
 Texture2D<float4> gReservoir2 : register(t5);
 Texture2D<float4> gWorldPos  : register(t6);
 Texture2D<float4> gMaterial  : register(t7);
+RaytracingAccelerationStructure g_bvh : register(t8);  // v211: segment visibility
 
 RWTexture2D<float4> gOutput : register(u0);
 
@@ -128,6 +129,44 @@ float JacobianReconnectionShift(float3 x2_normal, float3 x1_r, float3 x1_q, floa
     return (abs(cosPhi_r) * t_q2) / max(abs(cosPhi_q) * t_r2, 1e-6f);
 }
 
+// ---- v211 (Phase 4): ZetaRay Visibility_Segment port ----------------------
+bool VisibilitySegment(float3 origin, float3 wi, float rayT, float3 normal, uint triID,
+                       RaytracingAccelerationStructure bvh)
+{
+    if (triID == 0xFFFFFFFFu || rayT < 1e-6f)
+        return false;
+    float ndotwi = dot(normal, wi);
+    if (ndotwi == 0.0f)
+        return false;
+    if (ndotwi < 0.0f)
+        return false;
+
+    float3 adjustedOrigin = origin + normal * 1e-4f;
+
+    RayQuery<RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH |
+             RAY_FLAG_SKIP_CLOSEST_HIT_SHADER |
+             RAY_FLAG_FORCE_OPAQUE> rayQuery;
+
+    RayDesc ray;
+    ray.Origin = adjustedOrigin;
+    ray.TMin = 3e-6;
+    ray.TMax = max(rayT * 0.999f, 1e-5f);
+    ray.Direction = wi;
+
+    rayQuery.TraceRayInline(bvh, RAY_FLAG_NONE, 0xFF, ray);
+    rayQuery.Proceed();
+
+    if (rayQuery.CommittedStatus() == COMMITTED_TRIANGLE_HIT)
+    {
+        uint hitInst = rayQuery.CommittedInstanceID();
+        uint hitPrim = rayQuery.CommittedPrimitiveIndex();
+        uint sampleInst = (triID >> 24) & 0xFFu;
+        uint samplePrim = triID & 0xFFFFFFu;
+        return (hitInst == sampleInst && hitPrim == samplePrim);
+    }
+    return true;
+}
+
 static const float k_MaxPlaneDistReuse = 0.005f;
 
 bool PlaneHeuristic(float3 samplePos, float3 currNormal, float3 currPos, float linearDepth)
@@ -205,7 +244,10 @@ void Stream(inout FPairwiseMIS p, FReservoir r_c, float3 posW_c, float3 normal_c
 
         float3 brdfCosTheta_c = EvalF(albedo_c, normal_c, wi);
         target_curr = r_i.Lo * brdfCosTheta_c;
-        // Phase 4: target_curr *= Visibility_Segment(...)
+        // v211: segment visibility between the current pixel and the
+        // neighbor's sample vertex.
+        if (Luminance(target_curr) > 1e-5f)
+            target_curr *= VisibilitySegment(posW_c, wi, t, normal_c, r_i.ID, g_bvh) ? 1.0f : 0.0f;
 
         const float targetLum = max(Luminance(target_curr), 0.0f);
         const float J_temporal_to_curr = JacobianReconnectionShift(r_i.normal, posW_c, posW_i, r_i.pos);
@@ -220,7 +262,8 @@ void Stream(inout FPairwiseMIS p, FReservoir r_c, float3 posW_c, float3 normal_c
         wi = t > 1e-6f ? wi / t : float3(0.0f, 1.0f, 0.0f);
 
         brdfCosTheta_i = EvalF(albedo_i, normal_i, wi);
-        // Phase 4: *= Visibility_Segment(...)
+        if (Luminance(r_c.Lo * brdfCosTheta_i) > 1e-5f)
+            brdfCosTheta_i *= VisibilitySegment(posW_i, wi, t, normal_i, r_c.ID, g_bvh) ? 1.0f : 0.0f;
 
         float J_curr_to_temporal = JacobianReconnectionShift(r_c.normal, posW_i, posW_c, r_c.pos);
         Update_m_c(p, r_c, r_i, brdfCosTheta_i, J_curr_to_temporal);

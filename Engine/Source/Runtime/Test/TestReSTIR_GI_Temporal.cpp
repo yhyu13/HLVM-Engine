@@ -747,6 +747,12 @@ public:
                 TXT("ReSTIR GI Temporal - {:.1f} FPS | Accum {}/{}"),
                 fps, AccumFrameCount, AccumTargetFrames);
             if (auto* DM = GetDeviceManager()) DM->SetWindowTitle(WindowTitle);
+            // v211: frame-time gate (HLVM_RGI_LOG_FRAMETIME=1).
+            if (std::getenv("HLVM_RGI_LOG_FRAMETIME"))
+            {
+                HLVM_LOG(LogTest, info, TXT("frame time: {:.2f} ms/frame ({:.1f} fps)"),
+                    fps > 0.0f ? 1000.0f / fps : 0.0f, fps);
+            }
             FPSUpdateTimer = 0.0f;
             FrameCount = 0;
         }
@@ -1030,6 +1036,8 @@ public:
             Td.PrevNormalTexture = PrevGBufferNormal;
             Td.PrevWorldPosTexture = PrevGBufferWorldPos;
             Td.PrevMaterialTexture = PrevGBufferMaterial;
+            // v211 (Phase 4): segment-visibility TLAS in reuse.
+            Td.SceneTLAS = SceneTLAS;
             // v210: full-res primary surface for target/BSDF evaluation.
             Td.WorldPosTexture   = GBufferWorldPos;
             Td.MaterialTexture   = GBufferMaterial;
@@ -1136,6 +1144,7 @@ public:
             // v210: full-res primary surface for target/BSDF evaluation.
             Sd.WorldPosTexture  = GBufferWorldPos;
             Sd.MaterialTexture  = GBufferMaterial;
+            Sd.SceneTLAS        = SceneTLAS;
             Sd.NormalTexture    = GBufferNormal;
             Sd.DepthTexture     = LinearDepthTexture;
             Sd.OutRadiance      = SpatialRadiance;

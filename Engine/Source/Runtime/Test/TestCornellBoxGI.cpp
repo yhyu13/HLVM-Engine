@@ -1510,7 +1510,7 @@ public:
             CmdList->setTextureState(Reservoir0Texture, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
             CmdList->setTextureState(Reservoir1Texture, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
 
-            ReSTIR::FReSTIRConstants GenConstants;
+            ReSTIR::FReSTIRConstants GenConstants{};
             GenConstants.OutputSize[0] = static_cast<float>(CurrentFBInfo.width);
             GenConstants.OutputSize[1] = static_cast<float>(CurrentFBInfo.height);
             GenConstants.RcpOutputSize[0] = 1.0f / static_cast<float>(CurrentFBInfo.width);
@@ -1548,7 +1548,12 @@ public:
             CmdList->setTextureState(ReSTIROutputTexture, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
 
             // Temporal constants
-            ReSTIR::FReSTIRTemporalConstants TempConstants;
+            // v187: value-initialize. These structs are marshalled FIELD-BY-FIELD
+            // in FReSTIRPass.cpp, and that marshaller reads fields this test does
+            // not assign (NearPlane/FarPlane/GBufferScale at :454-456, added for
+            // the TestReSTIR_GI_Temporal path by v183/v184). Without `{}` those
+            // reads are indeterminate and the values reach a GPU-visible buffer.
+            ReSTIR::FReSTIRTemporalConstants TempConstants{};
             glm::mat4 currViewProj = proj * view;
             glm::mat4 invCurrViewProj = glm::inverse(currViewProj);
             memcpy(TempConstants.InverseCurrViewProj, glm::value_ptr(invCurrViewProj), 64);
@@ -1562,6 +1567,29 @@ public:
             TempConstants.DepthThreshold = CVar_r_ReSTIR_DepthThreshold.GetValue();
             TempConstants.NormalThreshold = CVar_r_ReSTIR_NormalThreshold.GetValue();
             TempConstants.DebugVis = 0.0f;
+            // v188: the marshaller (FReSTIRPass.cpp:441-456) writes five more
+            // scalars past DebugVis for EVERY caller. v187 value-initialized
+            // this struct so those reads are defined rather than indeterminate,
+            // but leaving them at zero is not good enough now that the Cornell
+            // shader names them: GBufferScale == 0 is the exact value v184
+            // proved dangerous (a GB()-style helper's max(int(s),1) would
+            // launder it into a plausible wrong answer), and NearPlane ==
+            // FarPlane == 0 would make any ndcZ reconstruction divide by
+            // (farP - nearP) == 0. Assign all five from this call site.
+            TempConstants.SceneYaw = 0.0f;      // Cornell scene never rotates
+            TempConstants.PrevSceneYaw = 0.0f;
+            // Mirrors this test's own projection at :1276
+            // glm::perspectiveLH_ZO(radians(90), aspect, 0.01f, 10.0f).
+            // Deliberately NOT the sibling test's 0.001/50.0 — these are
+            // per-scene, and copying them would be a guess.
+            TempConstants.NearPlane = 0.01f;
+            TempConstants.FarPlane = 10.0f;
+            // This pass dispatches at CurrentFBInfo (see OutputWidth/Height
+            // below) and binds the full-res GBuffer depth/normal MRTs, so the
+            // full-res -> dispatch-res ratio is exactly 1. If Cornell is ever
+            // moved to a half-res ReSTIR dispatch this must be recomputed the
+            // way TestReSTIR_GI_Temporal.cpp does it.
+            TempConstants.GBufferScale = 1.0f;
 
             ReSTIR::FReSTIRPass::FTemporalDesc TempDesc;
             TempDesc.CurrentReservoir0 = Reservoir0Texture;
@@ -1577,6 +1605,8 @@ public:
             TempDesc.OutReservoir0 = Reservoir0MergedTexture;
             TempDesc.OutReservoir1 = Reservoir1MergedTexture;
             TempDesc.OutRadiance = TemporalRadianceTexture;
+            // v211 (Phase 4): segment-visibility TLAS (shared FReSTIRPass layout).
+            TempDesc.SceneTLAS = TopLevelAS;
             TempDesc.OutputWidth = CurrentFBInfo.width;
             TempDesc.OutputHeight = CurrentFBInfo.height;
             if (CVar_r_ReSTIR_EnableTemporal.GetValue())
@@ -1599,7 +1629,7 @@ public:
 
             if (CVar_r_ReSTIR_EnableSpatial.GetValue())
             {
-                ReSTIR::FReSTIRSpatialConstants SpatConstants;
+                ReSTIR::FReSTIRSpatialConstants SpatConstants{};
                 SpatConstants.OutputSize[0] = static_cast<float>(CurrentFBInfo.width);
                 SpatConstants.OutputSize[1] = static_cast<float>(CurrentFBInfo.height);
                 SpatConstants.RcpOutputSize[0] = 1.0f / static_cast<float>(CurrentFBInfo.width);
@@ -1609,6 +1639,12 @@ public:
                 SpatConstants.MaxM = CVar_r_ReSTIR_MaxM.GetValue();
                 SpatConstants.SpatialRadius = CVar_r_ReSTIR_SpatialRadius.GetValue();
                 SpatConstants.DebugVis = 0.0f;
+                // v187: this pass dispatches at FULL res (see OutputWidth/Height
+                // below, which take CurrentFBInfo — the same resolution as the
+                // GBuffer MRTs sampled by gNormals/gDepth), so the full-res-to-
+                // dispatch ratio is exactly 1. Assigned explicitly because
+                // DispatchSpatial marshals this field unconditionally.
+                SpatConstants.GBufferScale = 1.0f;
 
                 ReSTIR::FReSTIRPass::FSpatialDesc SpatDesc;
                 SpatDesc.RadianceTexture = DenoisedHDRTexture;
@@ -1617,6 +1653,7 @@ public:
                 SpatDesc.NormalTexture = GBufferNormalsTexture;
                 SpatDesc.DepthTexture = GBufferDepthTexture;
                 SpatDesc.OutRadiance = ReSTIROutputTexture;
+                SpatDesc.SceneTLAS = TopLevelAS;
                 SpatDesc.OutputWidth = CurrentFBInfo.width;
                 SpatDesc.OutputHeight = CurrentFBInfo.height;
                 ReSTIRPass.DispatchSpatial(CmdList, SpatDesc, SpatConstants);

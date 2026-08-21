@@ -57,6 +57,7 @@ Texture2D<float4> gWorldPos       : register(t12);  // primary surface (full-res
 Texture2D<float4> gMaterial       : register(t13);  // albedo.rgb + roughness.a (full-res)
 Texture2D<float4> gPrevWorldPos   : register(t14);  // v210: true prev-frame surface
 Texture2D<float4> gPrevMaterial   : register(t15);
+RaytracingAccelerationStructure g_bvh : register(t16);  // v211: segment visibility
 
 RWTexture2D<float4> gOutReservoir0 : register(u0, space1);
 RWTexture2D<float4> gOutReservoir1 : register(u1, space1);
@@ -168,6 +169,47 @@ float JacobianReconnectionShift(float3 x2_normal, float3 x1_r, float3 x1_q, floa
     return j;
 }
 
+// ---- v211 (Phase 4): ZetaRay Visibility_Segment port ----------------------
+// Returns true when the segment (origin, origin + wi*rayT) is unoccluded.
+// A hit on the sample's OWN triangle (packed ID) is not an occluder. Opaque
+// surfaces only (Sponza has no transmission in the GI path).
+bool VisibilitySegment(float3 origin, float3 wi, float rayT, float3 normal, uint triID,
+                       RaytracingAccelerationStructure bvh)
+{
+    if (triID == 0xFFFFFFFFu || rayT < 1e-6f)
+        return false;
+    float ndotwi = dot(normal, wi);
+    if (ndotwi == 0.0f)
+        return false;
+    if (ndotwi < 0.0f)
+        return false;
+
+    float3 adjustedOrigin = origin + normal * 1e-4f;
+
+    RayQuery<RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH |
+             RAY_FLAG_SKIP_CLOSEST_HIT_SHADER |
+             RAY_FLAG_FORCE_OPAQUE> rayQuery;
+
+    RayDesc ray;
+    ray.Origin = adjustedOrigin;
+    ray.TMin = 3e-6;
+    ray.TMax = max(rayT * 0.999f, 1e-5f);
+    ray.Direction = wi;
+
+    rayQuery.TraceRayInline(bvh, RAY_FLAG_NONE, 0xFF, ray);
+    rayQuery.Proceed();
+
+    if (rayQuery.CommittedStatus() == COMMITTED_TRIANGLE_HIT)
+    {
+        uint hitInst = rayQuery.CommittedInstanceID();
+        uint hitPrim = rayQuery.CommittedPrimitiveIndex();
+        uint sampleInst = (triID >> 24) & 0xFFu;
+        uint samplePrim = triID & 0xFFFFFFu;
+        return (hitInst == sampleInst && hitPrim == samplePrim);
+    }
+    return true;
+}
+
 // ---- ZetaRay: PlaneHeuristic -----------------------------------------------------
 static const float k_MaxPlaneDistReuse = 0.005f;
 
@@ -268,15 +310,23 @@ void FindTemporalCandidates(int2 pixel, float3 posW, float3 normal, float viewZ,
     }
 }
 
-// ---- ZetaRay: TargetLumAtTemporalPixel (no visibility test in this phase) --------
-float TargetLumAtTemporalPixel(FReservoir r, FCandidate candidate, float3 albedo)
+// ---- ZetaRay: TargetLumAtTemporalPixel --------------------------------------
+float TargetLumAtTemporalPixel(FReservoir r, FCandidate candidate, float3 albedo, bool testVisibility)
 {
     float3 wi = r.pos - candidate.posW;
     if (dot(wi, wi) == 0)
         return 0;
     wi = normalize(wi);
     float3 target = r.Lo * EvalF(albedo, candidate.normal, wi);
-    return Luminance(target);
+    float targetLum = Luminance(target);
+    // v211: test whether the sample vertex is visible from the temporal pixel.
+    if (testVisibility && targetLum > 1e-5f)
+    {
+        float t = length(r.pos - candidate.posW);
+        if (!VisibilitySegment(candidate.posW, wi, t, candidate.normal, r.ID, g_bvh))
+            return 0;
+    }
+    return targetLum;
 }
 
 // ---- ZetaRay: TemporalResample2 (2 candidates, pairwise MIS) ----------------------
@@ -296,7 +346,7 @@ void TemporalResample2(FReservoir r, float3 posW, float3 normal, float3 albedo,
             {
                 if (r_prev[p].M == 0)
                     continue;
-                float targetLum_prev = TargetLumAtTemporalPixel(r, candidate[p], albedo);
+                float targetLum_prev = TargetLumAtTemporalPixel(r, candidate[p], albedo, p != 0);
                 float J_curr_to_temporal = JacobianReconnectionShift(r.normal, candidate[p].posW, posW, r.pos);
                 denom += r_prev[p].M * J_curr_to_temporal * targetLum_prev;
             }
@@ -319,7 +369,7 @@ void TemporalResample2(FReservoir r, float3 posW, float3 normal, float3 albedo,
         if (targetLum_curr < 1e-5f)
             continue;
 
-        // Phase 4 adds the segment visibility test here (RtRayQuery).
+        if (VisibilitySegment(posW, wi, t, normal, r_prev[i].ID, g_bvh))
         {
             float targetLum_prev = r_prev[i].W > 0 ? r_prev[i].w_sum / r_prev[i].W : 0;
             float J_temporal_to_curr = JacobianReconnectionShift(r_prev[i].normal, posW,
@@ -330,7 +380,7 @@ void TemporalResample2(FReservoir r, float3 posW, float3 normal, float3 albedo,
             {
                 float J_temporal_to_temporal = JacobianReconnectionShift(r_prev[i].normal,
                     candidate[1 - i].posW, candidate[i].posW, r_prev[i].pos);
-                float targetLum_other = TargetLumAtTemporalPixel(r_prev[i], candidate[1 - i], albedo);
+                float targetLum_other = TargetLumAtTemporalPixel(r_prev[i], candidate[1 - i], albedo, true);
                 denom += r_prev[1 - i].M * targetLum_other / max(J_temporal_to_temporal, 1e-6f);
             }
 
@@ -448,7 +498,7 @@ void main(uint3 dispatchThreadID : SV_DispatchThreadID)
         {
             float targetLum_prev = 0.0f;
             if (r_prev[0].M > 0 && Luminance(r.Lo) > 1e-6f)
-                targetLum_prev = TargetLumAtTemporalPixel(r, candidate[0], albedo);
+                targetLum_prev = TargetLumAtTemporalPixel(r, candidate[0], albedo, true);
 
             float J_curr_to_temporal = JacobianReconnectionShift(r.normal, candidate[0].posW, worldPos, r.pos);
             float m_curr = p_curr / max(p_curr + r_prev[0].M * targetLum_prev * J_curr_to_temporal, 1e-6f);
@@ -468,7 +518,7 @@ void main(uint3 dispatchThreadID : SV_DispatchThreadID)
             wi = t > 1e-6f ? wi / t : float3(0.0f, 1.0f, 0.0f);
             float3 target_curr = r_prev[0].Lo * EvalF(albedo, normal, wi);
             float targetLum_curr = Luminance(target_curr);
-            if (targetLum_curr > 1e-6f)
+            if (targetLum_curr > 1e-6f && VisibilitySegment(worldPos, wi, t, normal, r_prev[0].ID, g_bvh))
             {
                 float targetLum_prev = r_prev[0].W > 0 ? r_prev[0].w_sum / r_prev[0].W : 0;
                 float J_temporal_to_curr = JacobianReconnectionShift(r_prev[0].normal, worldPos,
@@ -503,6 +553,14 @@ void main(uint3 dispatchThreadID : SV_DispatchThreadID)
     }
 
     r.M = min(r.M, gConstants.MaxM);
+    // v211 (Phase 4): ZetaRay SuppressOutlierReservoirs — a reservoir whose
+    // w_sum dwarfs its wave's average is likely a firefly; cap its M.
+    {
+        float waveSum = WaveActiveSum(r.w_sum);
+        float waveAvg = (waveSum - r.w_sum) / max(float(WaveGetLaneCount()) - 1.0f, 1e-6f);
+        if (r.w_sum > 25.0f * waveAvg)
+            r.M = 1.0f;
+    }
     StoreReservoir(pixel, r);
     // Final indirect estimate at this pixel: target_z * W.
     gOutRadiance[pixel] = float4(r.targetZ * r.W, 1.0f);

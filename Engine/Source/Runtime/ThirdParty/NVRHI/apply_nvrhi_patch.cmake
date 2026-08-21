@@ -26,15 +26,45 @@ execute_process(
 )
 
 if(_hlvm_already_applied EQUAL 0)
-    message(STATUS "nvrhi patch already applied, skipping: ${_hlvm_patch}")
+    message(STATUS "nvrhi patch already applied (exact), skipping: ${_hlvm_patch}")
 else()
     execute_process(
         COMMAND git apply "${_hlvm_patch}"
         RESULT_VARIABLE _hlvm_apply_result
     )
     if(NOT _hlvm_apply_result EQUAL 0)
-        message(FATAL_ERROR
-            "apply_nvrhi_patch.cmake: git apply failed (${_hlvm_apply_result}): ${_hlvm_patch}")
+        # The working tree may already carry FUNCTIONALLY equivalent edits
+        # with different comment text (e.g. the v169 variant of the 08608
+        # fix in the Release checkout). Verify each hunk's functional marker
+        # before failing; if all are present, treat the patch as applied.
+        execute_process(
+            COMMAND grep -q "add_library(nvrhi STATIC" CMakeLists.txt
+            RESULT_VARIABLE _hlvm_h1
+            ERROR_QUIET
+        )
+        execute_process(
+            COMMAND sh -c "grep -q 'include_validation' CMakeLists.txt || grep -q '\\${src_validation}' CMakeLists.txt"
+            RESULT_VARIABLE _hlvm_h2
+            ERROR_QUIET
+        )
+        execute_process(
+            COMMAND grep -q "HLVM bypass: continuing" src/validation/validation-commandlist.cpp
+            RESULT_VARIABLE _hlvm_h3
+            ERROR_QUIET
+        )
+        execute_process(
+            COMMAND sh -c "grep -q 'bindPipeline(vk::PipelineBindPoint::eGraphics, GfxPso->pipeline)' src/vulkan/vulkan-raytracing.cpp || grep -q 'm_CurrentCmdBuf->cmdBuf.bindPipeline(vk::PipelineBindPoint::eGraphics, GfxPso->pipeline)' src/vulkan/vulkan-raytracing.cpp"
+            RESULT_VARIABLE _hlvm_h4
+            ERROR_QUIET
+        )
+        if(_hlvm_h1 EQUAL 0 AND _hlvm_h2 EQUAL 0 AND _hlvm_h3 EQUAL 0 AND _hlvm_h4 EQUAL 0)
+            message(STATUS "nvrhi patch functionally already applied (markers present), skipping: ${_hlvm_patch}")
+        else()
+            message(FATAL_ERROR
+                "apply_nvrhi_patch.cmake: git apply failed (${_hlvm_apply_result}) and functional markers are incomplete: "
+                "CMakeLists=${_hlvm_h1}/${_hlvm_h2} validationCL=${_hlvm_h3} raytracing=${_hlvm_h4} — ${_hlvm_patch}")
+        endif()
+    else()
+        message(STATUS "nvrhi patch applied: ${_hlvm_patch}")
     endif()
-    message(STATUS "nvrhi patch applied: ${_hlvm_patch}")
 endif()

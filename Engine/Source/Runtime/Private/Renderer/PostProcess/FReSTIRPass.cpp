@@ -257,7 +257,8 @@ namespace ReSTIR
                 nvrhi::BindingLayoutItem::Texture_SRV(12),
                 nvrhi::BindingLayoutItem::Texture_SRV(13),
                 nvrhi::BindingLayoutItem::Texture_SRV(14),
-                nvrhi::BindingLayoutItem::Texture_SRV(15)
+                nvrhi::BindingLayoutItem::Texture_SRV(15),
+                nvrhi::BindingLayoutItem::RayTracingAccelStruct(16)   // v211: g_bvh
             };
 
             TemporalLayoutSRV = Device->createBindingLayout(LayoutDesc);
@@ -348,6 +349,7 @@ namespace ReSTIR
                 nvrhi::BindingLayoutItem::Texture_SRV(5),   // Reservoir2 (v210)
                 nvrhi::BindingLayoutItem::Texture_SRV(6),   // WorldPos (v210)
                 nvrhi::BindingLayoutItem::Texture_SRV(7),   // Material (v210)
+                nvrhi::BindingLayoutItem::RayTracingAccelStruct(8),  // v211: g_bvh
                 nvrhi::BindingLayoutItem::Texture_UAV(384)  // Output radiance
             };
 
@@ -420,6 +422,25 @@ namespace ReSTIR
             ConstantBuffer = Device->createBuffer(BufferDesc);
         }
 
+        // =====================================================================
+        // Create 1x1 fallback textures (v211) — populate shared layout slots
+        // for consumers that do not own the v210/v211 resources.
+        // =====================================================================
+        {
+            nvrhi::TextureDesc DummyDesc;
+            DummyDesc.dimension = nvrhi::TextureDimension::Texture2D;
+            DummyDesc.width = 1;
+            DummyDesc.height = 1;
+            DummyDesc.format = nvrhi::Format::RGBA32_FLOAT;
+            DummyDesc.initialState = nvrhi::ResourceStates::ShaderResource;
+            DummyDesc.keepInitialState = true;
+
+            DummyDesc.debugName = "FReSTIRPass.DummyReservoir";
+            DummyReservoir = Device->createTexture(DummyDesc);
+            DummyDesc.debugName = "FReSTIRPass.DummyGuide";
+            DummyGuide = Device->createTexture(DummyDesc);
+        }
+
         bIsInitialized = true;
         HLVM_LOG(LogPostProcess, info, TXT("FReSTIRPass initialized successfully"));
         return true;
@@ -478,8 +499,8 @@ namespace ReSTIR
             nvrhi::BindingSetItem::Texture_SRV(2, Desc.NormalTexture),
             nvrhi::BindingSetItem::Texture_SRV(3, Desc.DepthTexture),
             nvrhi::BindingSetItem::Texture_SRV(4, Desc.DirectionTexture ? Desc.DirectionTexture : Desc.RadianceTexture),
-            nvrhi::BindingSetItem::Texture_SRV(5, Desc.SampleInfoTexture ? Desc.SampleInfoTexture : Desc.RadianceTexture),
-            nvrhi::BindingSetItem::Texture_SRV(6, Desc.MaterialTexture ? Desc.MaterialTexture : Desc.RadianceTexture)
+            nvrhi::BindingSetItem::Texture_SRV(5, Desc.SampleInfoTexture ? Desc.SampleInfoTexture : DummyGuide),
+            nvrhi::BindingSetItem::Texture_SRV(6, Desc.MaterialTexture ? Desc.MaterialTexture : DummyGuide)
         };
         // v202: the ternary is load-bearing for TestCornellBoxGI, which never
         // sets DirectionTexture — it keeps t4's descriptor populated so the
@@ -499,7 +520,7 @@ namespace ReSTIR
         UAVSetDesc.bindings = {
             nvrhi::BindingSetItem::Texture_UAV(384, Desc.OutReservoir0),
             nvrhi::BindingSetItem::Texture_UAV(385, Desc.OutReservoir1),
-            nvrhi::BindingSetItem::Texture_UAV(386, Desc.OutReservoir2)
+            nvrhi::BindingSetItem::Texture_UAV(386, Desc.OutReservoir2 ? Desc.OutReservoir2 : DummyReservoir)
         };
         nvrhi::BindingSetHandle UAVBindingSet = Device->createBindingSet(UAVSetDesc, GenerationLayoutUAV);
 
@@ -582,20 +603,21 @@ namespace ReSTIR
             nvrhi::BindingSetItem::ConstantBuffer(256, ConstantBuffer),
             nvrhi::BindingSetItem::Texture_SRV(0, Desc.CurrentReservoir0),
             nvrhi::BindingSetItem::Texture_SRV(1, Desc.CurrentReservoir1),
-            nvrhi::BindingSetItem::Texture_SRV(10, Desc.CurrentReservoir2),
+            nvrhi::BindingSetItem::Texture_SRV(10, Desc.CurrentReservoir2 ? Desc.CurrentReservoir2 : DummyReservoir),
             nvrhi::BindingSetItem::Texture_SRV(2, Desc.HistoryReservoir0),
             nvrhi::BindingSetItem::Texture_SRV(3, Desc.HistoryReservoir1),
-            nvrhi::BindingSetItem::Texture_SRV(11, Desc.HistoryReservoir2),
+            nvrhi::BindingSetItem::Texture_SRV(11, Desc.HistoryReservoir2 ? Desc.HistoryReservoir2 : DummyReservoir),
             nvrhi::BindingSetItem::Texture_SRV(4, Desc.DepthTexture),
             nvrhi::BindingSetItem::Texture_SRV(5, Desc.NormalTexture),
             nvrhi::BindingSetItem::Texture_SRV(6, Desc.PrevDepthTexture),
             nvrhi::BindingSetItem::Texture_SRV(7, Desc.PrevNormalTexture),
             nvrhi::BindingSetItem::Texture_SRV(8, Desc.CurrentRadiance),
             nvrhi::BindingSetItem::Texture_SRV(9, Desc.HistoryRadiance),
-            nvrhi::BindingSetItem::Texture_SRV(12, Desc.WorldPosTexture ? Desc.WorldPosTexture : Desc.NormalTexture),
-            nvrhi::BindingSetItem::Texture_SRV(13, Desc.MaterialTexture ? Desc.MaterialTexture : Desc.NormalTexture),
-            nvrhi::BindingSetItem::Texture_SRV(14, Desc.PrevWorldPosTexture ? Desc.PrevWorldPosTexture : Desc.PrevNormalTexture),
-            nvrhi::BindingSetItem::Texture_SRV(15, Desc.PrevMaterialTexture ? Desc.PrevMaterialTexture : Desc.PrevNormalTexture)
+            nvrhi::BindingSetItem::Texture_SRV(12, Desc.WorldPosTexture ? Desc.WorldPosTexture : DummyGuide),
+            nvrhi::BindingSetItem::Texture_SRV(13, Desc.MaterialTexture ? Desc.MaterialTexture : DummyGuide),
+            nvrhi::BindingSetItem::Texture_SRV(14, Desc.PrevWorldPosTexture ? Desc.PrevWorldPosTexture : DummyGuide),
+            nvrhi::BindingSetItem::Texture_SRV(15, Desc.PrevMaterialTexture ? Desc.PrevMaterialTexture : DummyGuide),
+            nvrhi::BindingSetItem::RayTracingAccelStruct(16, Desc.SceneTLAS ? Desc.SceneTLAS.Get() : nullptr)
         };
         nvrhi::BindingSetHandle SRVBindingSet = Device->createBindingSet(SRVSetDesc, TemporalLayoutSRV);
 
@@ -603,7 +625,7 @@ namespace ReSTIR
         UAVSetDesc.bindings = {
             nvrhi::BindingSetItem::Texture_UAV(384, Desc.OutReservoir0),
             nvrhi::BindingSetItem::Texture_UAV(385, Desc.OutReservoir1),
-            nvrhi::BindingSetItem::Texture_UAV(386, Desc.OutReservoir2),
+            nvrhi::BindingSetItem::Texture_UAV(386, Desc.OutReservoir2 ? Desc.OutReservoir2 : DummyReservoir),
             nvrhi::BindingSetItem::Texture_UAV(387, Desc.OutRadiance)
         };
         nvrhi::BindingSetHandle UAVBindingSet = Device->createBindingSet(UAVSetDesc, TemporalLayoutUAV);
@@ -674,11 +696,12 @@ namespace ReSTIR
             nvrhi::BindingSetItem::Texture_SRV(0, Desc.RadianceTexture),
             nvrhi::BindingSetItem::Texture_SRV(1, Desc.Reservoir0),
             nvrhi::BindingSetItem::Texture_SRV(2, Desc.Reservoir1),
-            nvrhi::BindingSetItem::Texture_SRV(5, Desc.Reservoir2),
+            nvrhi::BindingSetItem::Texture_SRV(5, Desc.Reservoir2 ? Desc.Reservoir2 : DummyReservoir),
             nvrhi::BindingSetItem::Texture_SRV(3, Desc.NormalTexture),
             nvrhi::BindingSetItem::Texture_SRV(4, Desc.DepthTexture),
-            nvrhi::BindingSetItem::Texture_SRV(6, Desc.WorldPosTexture ? Desc.WorldPosTexture : Desc.NormalTexture),
-            nvrhi::BindingSetItem::Texture_SRV(7, Desc.MaterialTexture ? Desc.MaterialTexture : Desc.NormalTexture),
+            nvrhi::BindingSetItem::Texture_SRV(6, Desc.WorldPosTexture ? Desc.WorldPosTexture : DummyGuide),
+            nvrhi::BindingSetItem::Texture_SRV(7, Desc.MaterialTexture ? Desc.MaterialTexture : DummyGuide),
+            nvrhi::BindingSetItem::RayTracingAccelStruct(8, Desc.SceneTLAS ? Desc.SceneTLAS.Get() : nullptr),
             nvrhi::BindingSetItem::Texture_UAV(384, Desc.OutRadiance)
         };
         nvrhi::BindingSetHandle BindingSet = Device->createBindingSet(BindingSetDesc, SpatialLayout);
@@ -709,6 +732,8 @@ namespace ReSTIR
         TemporalShader = nullptr;
         GenerationShader = nullptr;
         ConstantBuffer = nullptr;
+        DummyReservoir = nullptr;
+        DummyGuide = nullptr;
         Device = nullptr;
         bIsInitialized = false;
     }
