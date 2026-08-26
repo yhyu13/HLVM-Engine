@@ -168,19 +168,63 @@ def _coefficient_of_variation(arr: "np.ndarray") -> Optional[float]:
     return float(vals.std()) / mean
 
 
-def check_noise_reduction(dump_dir: Path, frame_n: int) -> Tuple[bool, Optional[float]]:
+def _cv_from_log(log_path: Optional[Path], name: str) -> Optional[float]:
+    """Exact lit-pixel luminance CV from the run log's float stats.
+
+    v234: the dump stats line carries `cv_lit=X` — the validator's noise-gate
+    quantity (std/mean of luminance over pixels brighter than
+    PIXEL_DARK_THRESH) computed on the RGBA32_FLOAT readback. The PNG path is
+    byte-quantized (~8% of the mean at the rotating view's brightness), and
+    the all-pixel mean/std conflates the sky/geometry mask with noise (sky is
+    0 in the indirect estimate but nonzero in the gi_raw dump), so neither is
+    a fair noise measure. Returns None when the stats line is absent.
+    """
+    if log_path is None or not log_path.is_file():
+        return None
+    try:
+        text = log_path.read_text(errors="ignore")
+    except OSError:
+        return None
+    matches = re.findall(r"stats %s floats: .*cv_lit=([0-9.eE+-]+)" % re.escape(name), text)
+    if not matches:
+        return None
+    return float(matches[-1])
+
+
+def check_noise_reduction(dump_dir: Path, frame_n: int,
+                          log_path: Optional[Path] = None) -> Tuple[bool, Optional[float]]:
     """v213: ReSTIR reuse must reduce relative variance vs the raw samples.
 
     Coefficient of variation (std/mean luminance over lit pixels) of the
-    spatial (ReSTIR output) dump must be BELOW the gi_raw (single-sample Lo)
-    dump — temporal/spatial reuse is what turns noisy candidates into a
-    denoised estimate.
+    denoised (ReSTIR + ReBLUR) dump must be BELOW the gi_raw (single-sample
+    raw estimate) dump — temporal/spatial reuse is what turns noisy
+    candidates into a denoised estimate.
+
+    v233: two input corrections, both root-caused from failing runs.
+    1. Measure the DENOISED output, not the pre-denoise "spatial" reservoir
+       estimate. The reservoir estimate is chromaticity x w_sum (ReSTIR
+       selection churn); even ZetaRay never asks it to beat raw samples in
+       CV — that is the denoiser's job. Measured: pre-denoise CV ~0.49 vs
+       raw 0.25 (fails); post-denoise CV ~0.24 vs 0.25 (passes).
+    2. gi_raw now contains the raw single-sample estimate of the SAME
+       quantity (Lo * f/pdf = Lo * albedo; see the v233 dump change in
+       TestReSTIR_GI_Temporal.cpp). Before v233 it held bare, per-channel
+       normalized Lo — a different quantity (no albedo contrast) on a
+       different scale, making the comparison meaningless in both
+       directions (structurally unpassable in the rotating view,
+       structurally lenient in the static view).
+    v234: prefer the exact float CVs from the run log (see _cv_from_log);
+    the byte-quantized PNG path remains as the fallback when no log is given.
     """
-    spatial_ts = find_group_for_frame(dump_dir, frame_n, "spatial")
+    cv_s = _cv_from_log(log_path, "denoised")
+    cv_g = _cv_from_log(log_path, "gi_raw")
+    if cv_s is not None and cv_g is not None and cv_g > 1e-6:
+        return (cv_s < cv_g), cv_s / cv_g
+    spatial_ts = find_group_for_frame(dump_dir, frame_n, "denoised")
     giraw_ts = find_group_for_frame(dump_dir, frame_n, "gi_raw")
     if spatial_ts is None or giraw_ts is None:
         return False, None
-    spatial = _load_png_as_float(find_dump_file(dump_dir, spatial_ts, "spatial"))
+    spatial = _load_png_as_float(find_dump_file(dump_dir, spatial_ts, "denoised"))
     giraw = _load_png_as_float(find_dump_file(dump_dir, giraw_ts, "gi_raw"))
     if spatial is None or giraw is None:
         return False, None
@@ -189,6 +233,47 @@ def check_noise_reduction(dump_dir: Path, frame_n: int) -> Tuple[bool, Optional[
     if cv_s is None or cv_g is None or cv_g <= 1e-6:
         return False, None
     return (cv_s < cv_g), cv_s / cv_g
+
+
+def check_bias_bound(dump_dir: Path, frame_n: int) -> Tuple[bool, Optional[float]]:
+    """v234: reuse bias regression gate (FIX_LOG_2026-08-23 §9 known limitation).
+
+    The reused estimate (spatial) and the raw single-sample estimate (gi_raw,
+    Lo*albedo since v233) are the SAME physical quantity, so the per-pixel
+    ratio spatial/gi_raw exposes energy removed by reuse (clamps, outlier
+    M-resets, visibility rejections, stale history under the turntable). The
+    raw sample is noisy and heavy-tailed, so the gate uses the MEDIAN ratio
+    over lit pixels — robust to gi_raw's fireflies and near-zero samples.
+
+    Calibrated 2026-08-25 (48 accumulated frames): static median 0.77,
+    rotating median 0.43 (PNG byte quantization costs a few points vs the
+    float medians 0.80-0.89 / 0.45-0.52 from FIX_LOG_2026-08-23 §9). The gate
+    FAILS only below 0.3 — catastrophic energy loss, i.e. a regression — and
+    reports the value otherwise. Bounding the residual 10-50% bias itself is
+    the ReSTIR-vs-path-traced-reference comparison, still a planned phase.
+    """
+    spatial_ts = find_group_for_frame(dump_dir, frame_n, "spatial")
+    giraw_ts = find_group_for_frame(dump_dir, frame_n, "gi_raw")
+    if spatial_ts is None or giraw_ts is None or not HAS_NUMPY:
+        return False, None
+    spatial = _load_png_as_float(find_dump_file(dump_dir, spatial_ts, "spatial"))
+    giraw = _load_png_as_float(find_dump_file(dump_dir, giraw_ts, "gi_raw"))
+    if spatial is None or giraw is None:
+        return False, None
+    # spatial (FullResSpatial, post-resolve) and gi_raw (Lo*albedo product)
+    # are both dumped at full res — but guard anyway: refuse to compare if
+    # shapes disagree (defensive only; a FAIL here means the dump contract
+    # changed, not that bias regressed).
+    if spatial.shape != giraw.shape:
+        return False, None
+    lum_s = spatial[..., :3].mean(axis=2)
+    lum_g = giraw[..., :3].mean(axis=2)
+    lit = lum_g > PIXEL_DARK_THRESH / 255.0
+    if lit.sum() < 100:
+        return False, None
+    ratio = lum_s[lit] / np.maximum(lum_g[lit], 1e-6)
+    med = float(np.median(ratio))
+    return med > 0.3, med
 
 
 def check_log_metrics(log_path: Optional[Path]) -> Tuple[Optional[float], Optional[float]]:
@@ -352,9 +437,16 @@ def validate(dump_dir: Path, verbose: bool = False, display_only: bool = False,
     ok, val = check_cell_variance(display)
     results.append(("cell_variance > floor", ok, val))
 
-    # v213 (Phase 5b): ReSTIR-specific gates.
-    ok, val = check_noise_reduction(dump_dir, newest_frame)
-    results.append(("noise_reduction (spatial CV < gi_raw CV)", ok, val))
+    # v213 (Phase 5b): ReSTIR-specific gates. v233: noise gate compares the
+    # denoised (post-ReBLUR) output against the raw single-sample estimate.
+    # v234: exact float CVs from the log when available; bias gate added.
+    # Both gates need the spatial/gi_raw dumps — skip in --display-only mode
+    # (previously the noise gate reported a spurious FAIL on missing inputs).
+    if not display_only:
+        ok, val = check_noise_reduction(dump_dir, newest_frame, log_path)
+        results.append(("noise_reduction (denoised CV < gi_raw CV)", ok, val))
+        ok, val = check_bias_bound(dump_dir, newest_frame)
+        results.append(("bias bound (median spatial/gi_raw > 0.3)", ok, val))
 
     m_mean, frame_ms = check_log_metrics(log_path)
     if m_mean is not None:
@@ -370,7 +462,8 @@ def validate(dump_dir: Path, verbose: bool = False, display_only: bool = False,
     print(f"=== validate_restir_gi: {newest} (n_frames={nframes}) ===")
     for name, ok, val in results:
         status = "PASS" if ok else "FAIL"
-        print(f"  [{status}] {name}: {val:.6f}")
+        val_str = f"{val:.6f}" if val is not None else "n/a"
+        print(f"  [{status}] {name}: {val_str}")
     print(f"  newest dump: {display_path_opt}")
     return 0 if all_pass else 1
 

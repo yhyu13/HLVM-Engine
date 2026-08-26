@@ -17,6 +17,14 @@
 //   R1 = float4(Lo, M)
 //   R2 = float4(w_sum, W, OctEncode(x2Normal))
 // Final W = w_sum / targetLum(selected); M = M_curr + sum(M_prev).
+//
+// v232 (card P): clamp r.W to k_MaxW after every compute site, and clamp
+// r.w_sum to k_MaxWSum at the store site. The unclamped W feeds the next
+// frame's accumulator through `w_prev = m_prev * targetLum_curr * r_prev.W`
+// (line 528/389), creating an unbounded feedback loop across accum cycles
+// (HLVM_RGI_ACCUM=8) — observed peak W ≈ 59044. M is already capped by
+// gConstants.MaxM (line 555); W is symmetric. ZetaRay reference cap is
+// MAX_W = 256 and MAX_W_SUM = 4096 (see RGI_Util in ZetaRenderPass).
 
 struct FReSTIRTemporalConstants
 {
@@ -35,6 +43,12 @@ struct FReSTIRTemporalConstants
     float FarPlane;
     float GBufferScale;  // full-res GBuffer width / half-res dispatch width
 };
+
+// v232 (card P): per-pixel reservoir weight clamps. Both fields can run
+// away across accum cycles; M is already clamped at :555, W and w_sum are
+// not. See file header for the feedback-loop pathology.
+static const float k_MaxW = 256.0f;       // ZetaRay RGI_Util::MAX_W
+static const float k_MaxWSum = 4096.0f;    // ZetaRay RGI_Util::MAX_W_SUM
 
 cbuffer Constants : register(b0)
 {
@@ -166,6 +180,11 @@ float JacobianReconnectionShift(float3 x2_normal, float3 x1_r, float3 x1_q, floa
     float cosPhi_q = dot(v_q, x2_normal);
 
     float j = (abs(cosPhi_r) * t_q2) / max(abs(cosPhi_q) * t_r2, 1e-6f);
+    // v233: enable ZetaRay's (commented-out) Jacobian clamp. An unclamped J
+    // >> 1 (sample vertex much closer to the donor pixel than to the
+    // receiver) inflates w_sum through the m_curr/m_prev terms and is the
+    // feed mechanism behind >50x firefly outliers in the final estimate.
+    j = clamp(j, 1e-4f, 1e2f);
     return j;
 }
 
@@ -288,7 +307,10 @@ void FindTemporalCandidates(int2 pixel, float3 posW, float3 normal, float viewZ,
         if (!PlaneHeuristic(samplePos, normal, posW, viewZ))
             continue;
 
-        float3 sampleNormal = normalize(gPrevNormals.Load(int3(gb, 0)).rgb * 2.0f - 1.0f);
+        // v233: rotate the previous frame's world-space normal into current
+        // coordinates (same rigid turntable rotation as the position above).
+        float3 sampleNormal = normalize(RotatePrevToCurr(
+            normalize(gPrevNormals.Load(int3(gb, 0)).rgb * 2.0f - 1.0f)));
         bool valid = dot(sampleNormal, normal) > 0.1f;
         if (roughness < 0.5f)
         {
@@ -330,7 +352,13 @@ float TargetLumAtTemporalPixel(FReservoir r, FCandidate candidate, float3 albedo
 }
 
 // ---- ZetaRay: TemporalResample2 (2 candidates, pairwise MIS) ----------------------
-void TemporalResample2(FReservoir r, float3 posW, float3 normal, float3 albedo,
+// v215 BUGFIX: `r` must be `inout` — ZetaRay's signature is `inout Reservoir r`.
+// It was by value, so the stream selection and `r.M = M_new` were discarded and
+// the 2-candidate path silently did nothing (Cornell's flat walls make
+// candidate[1] valid ~95%, so the broken path dominated there; Sponza's
+// candidate[1] is valid only ~22%, hiding the bug behind the working inline
+// TemporalResample1 path).
+void TemporalResample2(inout FReservoir r, float3 posW, float3 normal, float3 albedo,
                        FCandidate candidate[2], inout FReservoir r_prev[2],
                        uint2 pixel, uint frame, inout float M_new)
 {
@@ -407,6 +435,9 @@ void TemporalResample2(FReservoir r, float3 posW, float3 normal, float3 albedo,
 
     float targetLum = max(Luminance(r.targetZ), 0.0f);
     r.W = targetLum > 0.0f ? r.w_sum / targetLum : 0.0f;
+    // v232: clamp W and w_sum to break the cross-frame feedback loop
+    r.W = min(r.W, k_MaxW);
+    r.w_sum = min(r.w_sum, k_MaxWSum);
     r.M = M_new;
 }
 
@@ -471,8 +502,14 @@ void main(uint3 dispatchThreadID : SV_DispatchThreadID)
     r_prev[1] = LoadReservoir(candidate[1].posSS, gHistReservoir0, gHistReservoir1, gHistReservoir2);
     // History positions were stored in the PREVIOUS frame's world space; the
     // turntable rotates the scene, so bring them into current-frame coords.
+    // v233: the x2 NORMAL must rotate with the position — it is stored in
+    // world space (OctEncode) and feeds JacobianReconnectionShift; leaving it
+    // in the previous frame's orientation accumulates a yaw error of
+    // (reservoir age) x (deg/frame) — up to ~8 degrees at the M=30 cap.
     r_prev[0].pos = RotatePrevToCurr(r_prev[0].pos);
     r_prev[1].pos = RotatePrevToCurr(r_prev[1].pos);
+    r_prev[0].normal = normalize(RotatePrevToCurr(r_prev[0].normal));
+    r_prev[1].normal = normalize(RotatePrevToCurr(r_prev[1].normal));
 
     float M_new = r.M;
     [unroll]
@@ -508,6 +545,9 @@ void main(uint3 dispatchThreadID : SV_DispatchThreadID)
         {
             float targetLum = max(Luminance(r.targetZ), 0.0f);
             r.W = targetLum > 0.0f ? r.w_sum / targetLum : 0.0f;
+            // v232: clamp W and w_sum to break the cross-frame feedback loop
+            r.W = min(r.W, k_MaxW);
+            r.w_sum = min(r.w_sum, k_MaxWSum);
             r.M = M_new;
         }
         else
@@ -541,6 +581,9 @@ void main(uint3 dispatchThreadID : SV_DispatchThreadID)
             }
             float targetLum = max(Luminance(r.targetZ), 0.0f);
             r.W = targetLum > 0.0f ? r.w_sum / targetLum : 0.0f;
+            // v232: clamp W and w_sum to break the cross-frame feedback loop
+            r.W = min(r.W, k_MaxW);
+            r.w_sum = min(r.w_sum, k_MaxWSum);
             r.M = M_new;
         }
     }
@@ -549,6 +592,9 @@ void main(uint3 dispatchThreadID : SV_DispatchThreadID)
         // No temporal candidate: keep the current sample, W = w_sum / targetLum.
         float targetLum = max(Luminance(r.targetZ), 0.0f);
         r.W = targetLum > 0.0f ? r.w_sum / targetLum : 0.0f;
+        // v232: clamp W and w_sum to break the cross-frame feedback loop
+        r.W = min(r.W, k_MaxW);
+        r.w_sum = min(r.w_sum, k_MaxWSum);
         r.M = M_new;
     }
 

@@ -177,12 +177,17 @@ static glm::vec3 EnvVec3(const char* Name, const glm::vec3& Fallback)
     }
     return Fallback;
 }
+// v215 (Cornell alignment): scene selection (HLVM_RGI_SCENE=cornell).
+static bool g_bCornellScene = false;
+
 // Horizon framing: eye height ~2.5 m, perfectly level (target y == eye y).
-// Override with HLVM_RGI_CAM_POS / HLVM_RGI_CAM_TARGET (world coords).
-static glm::vec3 GetCameraPos()   { return EnvVec3("HLVM_RGI_CAM_POS",    glm::vec3( 0.0f, 2.5f, 18.0f)); }
-static glm::vec3 GetCameraTarget(){ return EnvVec3("HLVM_RGI_CAM_TARGET", glm::vec3( 0.0f, 2.5f, -10.0f)); }
+// Cornell Box: camera inside the closed unit box looking along -Z at the back
+// wall (matches TestCornellBoxGI's framing). Override with HLVM_RGI_CAM_POS /
+// HLVM_RGI_CAM_TARGET (world coords).
+static glm::vec3 GetCameraPos()   { return EnvVec3("HLVM_RGI_CAM_POS",    g_bCornellScene ? glm::vec3( 0.0f,  0.0f,  0.8f) : glm::vec3( 0.0f, 2.5f, 18.0f)); }
+static glm::vec3 GetCameraTarget(){ return EnvVec3("HLVM_RGI_CAM_TARGET", g_bCornellScene ? glm::vec3( 0.0f, -0.2f, -0.8f) : glm::vec3( 0.0f, 2.5f, -10.0f)); }
 static glm::vec3 GetCameraUp()    { return glm::vec3( 0.0f, 1.0f,  0.0f); }
-static float     GetCameraFovDeg(){ return 65.0f; }
+static float     GetCameraFovDeg(){ return g_bCornellScene ? 90.0f : 65.0f; }
 
 // Per-mesh albedo for the multimodal structural judge. Sponza's real colors
 // live in textures which this test does not load (flat white base color), so
@@ -273,9 +278,21 @@ public:
         //   HLVM_RGI_SCENE_YAW="deg"      -> fixed angle, no animation
         //   HLVM_RGI_SCENE_RPS="r/s"      -> rotation speed (default 0.03)
         //   HLVM_RGI_SUN_DIR="x y z"      -> world-space sun direction
+        // v215: HLVM_RGI_SCENE=cornell runs the aligned pipeline on the
+        // procedural Cornell Box (static by default).
+        g_bCornellScene = (std::getenv("HLVM_RGI_SCENE") != nullptr
+            && std::string(std::getenv("HLVM_RGI_SCENE")) == "cornell");
+        SceneScale = g_bCornellScene ? 1.0f : 0.01f;
         if (const char* Yaw = std::getenv("HLVM_RGI_SCENE_YAW"))
         {
             SceneRotationDeg = static_cast<float>(std::atof(Yaw));
+            SceneRotationDegSpeed = 0.0f;
+        }
+        else if (g_bCornellScene)
+        {
+            // Cornell: static by default (classic view; temporal reuse is the
+            // interesting test, not the turntable). Override with the env vars.
+            SceneRotationDeg = 0.0f;
             SceneRotationDegSpeed = 0.0f;
         }
         else
@@ -324,8 +341,17 @@ public:
             NvrhiDevice->executeCommandList(TexCmdList);
         }
 
-        // Sponza GLTF scene (Samples/Assets/sponza/Sponza01.gltf)
-        if (!LoadSponza())
+        // Scene: Sponza GLTF (default) or the procedural Cornell Box (v215).
+        // Both feed the SAME aligned GBuffer + FGIPass + ReSTIR pipeline.
+        if (g_bCornellScene)
+        {
+            if (!LoadCornellBox())
+            {
+                HLVM_LOG(LogTest, err, TXT("Failed to load Cornell Box scene"));
+                return false;
+            }
+        }
+        else if (!LoadSponza())
         {
             HLVM_LOG(LogTest, err, TXT("Failed to load Sponza scene"));
             return false;
@@ -676,6 +702,8 @@ public:
         PrevGBufferMaterial     = nullptr;
         PrevLinearDepth         = nullptr;
         SunLightBuffer          = nullptr;
+        CornellLightsBuffer     = nullptr;
+        CornellLightCount       = 0;
         PlaceholderTexture      = nullptr;
         AllInstanceInfos.clear();
         MaterialTextures.clear();
@@ -906,10 +934,13 @@ public:
             // visible shadows while sky GI (path-traced miss) fills the dark
             // interior. The earlier v142 setup used AmbientScale=1.5 + interior
             // point lights, which washed out the scene.
-            Desc.LightsBuffer      = SunLightBuffer;
-            Desc.LightCount        = 1;
+            // v215: Cornell uses the scene's area light (ceiling panel); Sponza
+            // uses the sun-only buffer. The flat ambient hack is disabled for
+            // Cornell so the indirect estimate is pure path-traced light.
+            Desc.LightsBuffer      = g_bCornellScene ? CornellLightsBuffer : SunLightBuffer;
+            Desc.LightCount        = g_bCornellScene ? CornellLightCount : 1;
             Desc.MaterialTextures  = MaterialTextures;   // Phase 3b per-texel bounce albedo
-            Desc.AmbientScale      = 0.35f;
+            Desc.AmbientScale      = g_bCornellScene ? 0.0f : 0.35f;
             Desc.AmbientColor[0]   = 0.75f;
             Desc.AmbientColor[1]   = 0.8f;
             Desc.AmbientColor[2]   = 1.0f;
@@ -1227,7 +1258,14 @@ public:
             SC.SpatialRadius    = 3.0f;
             SC.DebugVis         = 0.0f;
 
-            ReSTIRPass.DispatchSpatial(CommandList, Sd, SC);
+            // v215: HLVM_RGI_SPATIAL=0 skips the spatial resample (the
+            // temporal output's target_z*W then feeds the display directly) —
+            // isolates the spatial pass's contribution to any bias.
+            if (std::getenv("HLVM_RGI_SPATIAL") == nullptr
+                || std::string(std::getenv("HLVM_RGI_SPATIAL")) != "0")
+            {
+                ReSTIRPass.DispatchSpatial(CommandList, Sd, SC);
+            }
             T5 = std::chrono::steady_clock::now();
         }
         if (bGpuTimers && GpuTimers[2]) CommandList->endTimerQuery(GpuTimers[2]);
@@ -1396,9 +1434,12 @@ public:
             // v210: full-res direct lighting for the display combine.
             CommandList->setTextureState(
                 FullResDirect, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
+            // v215: GBuffer albedo for the bypass (Lo*albedo) reflection.
+            CommandList->setTextureState(
+                GBufferMaterial, nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource);
 
             ++AccumFrameCount;
-            struct FAccumC { uint32_t FrameCount; uint32_t Width; uint32_t Height; float Exposure; };
+            struct FAccumC { uint32_t FrameCount; uint32_t Width; uint32_t Height; float Exposure; uint32_t BypassIndirect; };
             FAccumC AccC{};
             AccC.FrameCount = AccumFrameCount;
             // v193: WIDTH/HEIGHT, NOT FB.width/FB.height. Every resource this
@@ -1422,12 +1463,16 @@ public:
             AccC.Width      = WIDTH;
             AccC.Height     = HEIGHT;
             AccC.Exposure   = Exposure;
+            // v215: bypass applies the Lambert albedo to Lo so "ReSTIR off"
+            // shows the same reflected estimate as the reservoir path.
+            AccC.BypassIndirect = bBypass ? 1u : 0u;
             CommandList->writeBuffer(AccumulateConstants, &AccC, sizeof(AccC));
 
             FBindingSetBuilder SetBuilder;
             SetBuilder.SetConstantBuffer(0, AccumulateConstants)
                       .SetTextureSRV(0, AccumInput)
                       .SetTextureSRV(1, FullResDirect)
+                      .SetTextureSRV(2, GBufferMaterial)
                       .SetTextureUAV(0, AccumTexture)
                       .SetTextureUAV(1, DisplayTexture);
             nvrhi::BindingSetHandle AccumBS = NvrhiDevice->createBindingSet(
@@ -1580,8 +1625,15 @@ private:
             HLVM_LOG(LogTest, err, TXT("FScene3DLoader returned empty scene"));
             return false;
         }
-        HLVM_LOG(LogTest, info, TXT("Sponza loaded ({} mesh groups)"), static_cast<uint32_t>(Scene->MeshTree.size()));
+        HLVM_LOG(LogTest, info, TXT("Scene loaded ({} mesh groups)"),
+            static_cast<uint32_t>(Scene->MeshTree.size()));
+        return BuildSceneGPUResources();
+    }
 
+    // Build the unified vertex/index/instance buffers + BLAS/TLAS for
+    // whatever FScene is loaded (Sponza or Cornell Box). Scene must be set.
+    bool BuildSceneGPUResources()
+    {
         // Build a unified vertex/index buffer + per-instance info for the RT shaders.
         std::vector<FRTVertex> AllVertices;
         std::vector<uint32_t> AllIndices;
@@ -1729,7 +1781,8 @@ private:
             SceneBLASes.push_back(BLAS);
         }
 
-        // TLAS — Sponza is large; scale by 0.01 (same as TestRTDispatch) and
+        // TLAS — Sponza is large (scale 0.01); Cornell Box is unit-sized
+        // (scale 1.0). Rotate around Y by the turntable angle.
         // rotate around Y by the turntable angle. The rotation must match the
         // raster ModelMatrix in UpdateViewConstants exactly: v' = S * Ry * v
         // (row-major 3x4, translation in the 4th column). Rebuilt per frame
@@ -1751,6 +1804,25 @@ private:
         return true;
     }
 
+    // v215 (Cornell alignment): procedural unit Cornell box (closed room, red
+    // left / green right walls, white floor/ceiling/front/back) with the area
+    // light from TestPathTraceGI_Data/CornellBox_Lights.json. The same aligned
+    // GBuffer + FGIPass + ReSTIR pipeline runs on it as on Sponza.
+    bool LoadCornellBox()
+    {
+        const FPath LightsJson = FPath(FString::Format(
+            TXT("{}/Engine/Source/Runtime/Test/TestPathTraceGI_Data/CornellBox_Lights.json"), *GProjectRoot));
+        auto Cornell = FCornellBoxScene::Build(LightsJson);
+        if (!Cornell || !Cornell->SceneNode || Cornell->SceneNode->MeshTree.empty())
+        {
+            HLVM_LOG(LogTest, err, TXT("FCornellBoxScene returned empty scene"));
+            return false;
+        }
+        Scene = Cornell->SceneNode;
+        CornellSceneLights = Cornell->Lights;
+        return BuildSceneGPUResources();
+    }
+
     // Rebuild the TLAS with the current SceneRotationDeg (turntable). All
     // instances share the same scale(0.01)*Ry(angle) transform. Called at init
     // and once per frame so the ray tracer follows the rotating scene.
@@ -1762,9 +1834,9 @@ private:
         const float RotCos = glm::cos(glm::radians(SceneRotationDeg));
         const float RotSin = glm::sin(glm::radians(SceneRotationDeg));
         float Transform[12] = {
-            0.01f * RotCos,  0.0f,          0.01f * RotSin, 0.0f,
-            0.0f,            0.01f,         0.0f,           0.0f,
-           -0.01f * RotSin,  0.0f,          0.01f * RotCos, 0.0f
+            SceneScale * RotCos,  0.0f,          SceneScale * RotSin, 0.0f,
+            0.0f,                 SceneScale,    0.0f,                0.0f,
+           -SceneScale * RotSin,  0.0f,          SceneScale * RotCos, 0.0f
         };
 
         std::vector<nvrhi::rt::InstanceDesc> InstanceDescs;
@@ -2365,6 +2437,23 @@ private:
             InitCmd->writeBuffer(SunLightBuffer, &SunLight, sizeof(SunLight));
         }
 
+        // v215: Cornell Box area light (loaded into Scene->Lights by
+        // FCornellBoxScene::Build from CornellBox_Lights.json).
+        if (g_bCornellScene && !CornellSceneLights.empty())
+        {
+            nvrhi::BufferDesc LDesc;
+            LDesc.byteSize = static_cast<uint32_t>(CornellSceneLights.size() * sizeof(Renderer::FLight));
+            LDesc.structStride = sizeof(Renderer::FLight);
+            LDesc.initialState = nvrhi::ResourceStates::ShaderResource;
+            LDesc.keepInitialState = true;
+            LDesc.debugName = "CornellLightsBuffer";
+            CornellLightsBuffer = NvrhiDevice->createBuffer(LDesc);
+            InitCmd->writeBuffer(CornellLightsBuffer, CornellSceneLights.data(), LDesc.byteSize);
+            CornellLightCount = static_cast<uint32_t>(CornellSceneLights.size());
+            HLVM_LOG(LogTest, info, TXT("Cornell: uploaded {} area light(s)"),
+                CornellLightCount);
+        }
+
         InitCmd->close();
         NvrhiDevice->executeCommandList(InitCmd);
         NvrhiDevice->waitForIdle();
@@ -2710,7 +2799,9 @@ private:
         // Same Y-rotation as the per-frame TLAS rebuild (turntable).
         const glm::mat4 SceneRot = glm::rotate(
             glm::mat4(1.0f), glm::radians(SceneRotationDeg), glm::vec3(0.0f, 1.0f, 0.0f));
-        glm::mat4 Model = SceneRot * glm::scale(glm::mat4(1.0f), glm::vec3(0.01f));
+        // v215: scene-dependent scale (0.01 Sponza / 1.0 Cornell Box) — must
+        // match BuildTLAS exactly.
+        glm::mat4 Model = SceneRot * glm::scale(glm::mat4(1.0f), glm::vec3(SceneScale));
         glm::mat4 View  = glm::lookAt(CamPos, CamTarget, CamUp);
         // Use RH-ZO perspective WITHOUT Z flip. glm::perspective already
         // produces [-1, 1] Z (OpenGL convention). Don't flip — flipping moves
@@ -2754,6 +2845,7 @@ private:
            .AddConstantBuffer(0)
            .AddTextureSRV(0)
            .AddTextureSRV(1)   // v210: DirectTexture combine
+           .AddTextureSRV(2)   // v215: GBuffer albedo for bypass reflection
            .AddTextureUAV(0)
            .AddTextureUAV(1);
 
@@ -2775,7 +2867,7 @@ private:
         if (!AccumulatePipeline) return false;
 
         nvrhi::BufferDesc CD;
-        CD.byteSize = 16;   // 4 constants (uint, uint, uint, float)
+        CD.byteSize = 32;   // 5 constants (4x uint + float) — 20 bytes padded
         CD.isConstantBuffer = true;
         CD.initialState = nvrhi::ResourceStates::ConstantBuffer;
         CD.keepInitialState = true;
@@ -2915,11 +3007,47 @@ private:
         DumpRGBA32FTexture(DisplayTexture, TXT("display"), dir);
         DumpRGBA32FTexture(FullResSpatial, TXT("spatial"), dir);
         DumpRGBA32FTexture(DenoisedTexture, TXT("denoised"), dir);
-        // bug-075 followup: gi_raw is HDR (radiance * exposure); per-channel
+        // v233 (noise-gate fix): the validator's noise_reduction gate compares
+        // CV(spatial) < CV(gi_raw) as "reuse must beat the raw samples". But
+        // gi_raw held BARE Lo (incident radiance at x2) while the ReSTIR
+        // estimate is Lo * f / pdf = Lo * albedo — a different quantity that
+        // includes the albedo texture's spatial contrast (measured in the
+        // rotating view: albedo CV 0.47 > Lo CV 0.41, so the gate was
+        // structurally unpassable no matter how good the reuse is). Dump the
+        // raw single-sample estimate of the SAME quantity the reservoir
+        // estimates: Lo * albedo (cosine-weighted sampling => f/pdf == albedo
+        // exactly). Raw-clamped (not normalized) so the CV scale matches the
+        // spatial dump; the old normalized Lo visualization moves to gi_lo.
+        {
+            std::vector<float> LoPx, MatPx;
+            if (ReadbackTextureFloats(FullResGIRaw, LoPx) &&
+                ReadbackTextureFloats(GBufferMaterial, MatPx) &&
+                LoPx.size() == MatPx.size())
+            {
+                for (size_t i = 0; i + 3 < LoPx.size(); i += 4)
+                {
+                    LoPx[i + 0] *= MatPx[i + 0];
+                    LoPx[i + 1] *= MatPx[i + 1];
+                    LoPx[i + 2] *= MatPx[i + 2];
+                    LoPx[i + 3] = 1.0f;
+                }
+                // v234: log the float stats (incl. cv_lit) for the SAME
+                // Lo*albedo quantity the PNG holds — the "gi_raw" tag in
+                // LogFinalFrameStats refers to bare Lo (renamed "gi_lo"
+                // there), which made any log-derived gi_raw metric silently
+                // measure the wrong quantity.
+                LogFloatStats(TXT("gi_raw"), LoPx);
+                const std::string Filename = dir + "/" + MakeTimestampPrefix() +
+                    "_gi_raw_frame" + std::to_string(AccumFrameCount) + ".png";
+                if (FImageDump::DumpToPNG(FString(Filename.c_str()), WIDTH, HEIGHT, LoPx.data()))
+                    HLVM_LOG(LogTest, info, TXT("Dumped gi_raw (Lo*albedo raw estimate) ({})"), *FString(Filename));
+            }
+        }
+        // bug-075 followup: Lo is HDR (radiance * exposure); per-channel
         // normalization surfaces the real distribution even when values are
         // small (e.g. (0.9, 0.9, 0.97)) which would otherwise dump as nearly
         // uniform (0.9*255=229, almost the same color).
-        DumpRGBA32FTexture(FullResGIRaw, TXT("gi_raw"), dir, /*bNormalizePerChannel=*/true);
+        DumpRGBA32FTexture(FullResGIRaw, TXT("gi_lo"), dir, /*bNormalizePerChannel=*/true);
         // GBuffer channel dumps (per-frame sentinel + post-pass values).
         // Same HLVM_DUMP_RGI gate; same dir; same naming convention
         // (timestamp_channel_frameN.png) so the validator can consume them
@@ -3011,6 +3139,14 @@ private:
         float MinC[3] = {1e30f, 1e30f, 1e30f}, MaxC[3] = {-1e30f, -1e30f, -1e30f};
         double SumC[3] = {0.0, 0.0, 0.0}, SumSq[3] = {0.0, 0.0, 0.0};
         const size_t NPix = Pixels.size() / 4;
+        // v234: exact lit-pixel luminance CV (the validator's noise-gate
+        // quantity) computed on the float readback — the PNG-based gate is
+        // byte-quantized (~8% of the mean at the rotating view's
+        // brightness), and the all-pixel mean/std below conflates the
+        // sky/geometry mask with noise (sky pixels are 0 in the indirect
+        // estimate but nonzero in the gi_raw dump, which made an all-pixel
+        // CV comparison structurally unfair).
+        double SumL = 0.0, SumL2 = 0.0; size_t LitN = 0;
         for (size_t i = 0; i < NPix; ++i)
         {
             for (size_t c = 0; c < 3; ++c)
@@ -3021,13 +3157,22 @@ private:
                 SumC[c] += static_cast<double>(v);
                 SumSq[c] += static_cast<double>(v) * static_cast<double>(v);
             }
+            const double L = (static_cast<double>(Pixels[i*4+0]) + static_cast<double>(Pixels[i*4+1]) + static_cast<double>(Pixels[i*4+2])) / 3.0;
+            if (L > 8.0 / 255.0)  // PIXEL_DARK_THRESH, mirrors validate_restir_gi.py
+            {
+                SumL += L; SumL2 += L * L; ++LitN;
+            }
         }
-        HLVM_LOG(LogTest, info, TXT("stats {} floats: R[{:.4f},{:.4f}] G[{:.4f},{:.4f}] B[{:.4f},{:.4f}] mean=[{:.4f},{:.4f},{:.4f}] std=[{:.4f},{:.4f},{:.4f}]"),
+        const double LitMean = LitN > 0 ? SumL / static_cast<double>(LitN) : 0.0;
+        const double LitVar  = LitN > 0 ? std::max(0.0, SumL2 / static_cast<double>(LitN) - LitMean * LitMean) : 0.0;
+        const double CvLit   = LitMean > 1e-6 ? std::sqrt(LitVar) / LitMean : 0.0;
+        HLVM_LOG(LogTest, info, TXT("stats {} floats: R[{:.4f},{:.4f}] G[{:.4f},{:.4f}] B[{:.4f},{:.4f}] mean=[{:.4f},{:.4f},{:.4f}] std=[{:.4f},{:.4f},{:.4f}] cv_lit={:.4f}"),
             *Name, MinC[0], MaxC[0], MinC[1], MaxC[1], MinC[2], MaxC[2],
             SumC[0]/static_cast<double>(NPix), SumC[1]/static_cast<double>(NPix), SumC[2]/static_cast<double>(NPix),
             std::sqrt(std::max(0.0, SumSq[0]/static_cast<double>(NPix) - (SumC[0]/static_cast<double>(NPix))*(SumC[0]/static_cast<double>(NPix)))),
             std::sqrt(std::max(0.0, SumSq[1]/static_cast<double>(NPix) - (SumC[1]/static_cast<double>(NPix))*(SumC[1]/static_cast<double>(NPix)))),
-            std::sqrt(std::max(0.0, SumSq[2]/static_cast<double>(NPix) - (SumC[2]/static_cast<double>(NPix))*(SumC[2]/static_cast<double>(NPix)))));
+            std::sqrt(std::max(0.0, SumSq[2]/static_cast<double>(NPix) - (SumC[2]/static_cast<double>(NPix))*(SumC[2]/static_cast<double>(NPix)))),
+            CvLit);
     }
 
     // End-of-run numerical summary, always logged (no env gate): readback of
@@ -3047,7 +3192,7 @@ private:
             { "display",          DisplayTexture },
             { "spatial",          FullResSpatial },
             { "denoised",         DenoisedTexture },
-            { "gi_raw",           FullResGIRaw },
+            { "gi_lo",            FullResGIRaw },  // bare Lo (v234: renamed; "gi_raw" = Lo*albedo, logged in the dump block)
             // v210: 3-texture reservoir (ZetaRay layout).
             //   R0 = pos + asfloat(ID); R1 = Lo + M; R2 = w_sum + W + normal.
             { "reservoir_posA",   TemporalReservoir0 },
@@ -3085,7 +3230,6 @@ private:
                     GrayErr = ErrSum / static_cast<float>(ErrCount);
             }
         }
-
         // Derived: reservoir M/W (v210 layout) — M lives in the LoM texture's
         // alpha (R1.w), W in the C texture's green (R2.y). The active pair is
         // the one with the larger M sum; mean/max across both pairs.
@@ -3120,6 +3264,27 @@ private:
             }
             const float TotalPix = static_cast<float>(NPixPerTex * 2);
             const float MMean = TotalPix > 0.0f ? static_cast<float>(MSum) / TotalPix : 0.0f;
+            // v215: reservoir M distribution across the temporal pairs —
+            // fraction of valid reservoirs (M>0) vs merged history (M>1).
+        {
+            int Valid = 0, Merged = 0, Total = 0;
+                for (int p = 0; p < 2; ++p)
+                {
+                    if (!LoMTexs[p] || !ReadbackTextureFloats(LoMTexs[p], Px))
+                        continue;
+                    const size_t N = Px.size() / 4;
+                    for (size_t i = 0; i < N; ++i)
+                    {
+                        const float M = Px[i*4 + 3];
+                        ++Total;
+                        if (M > 0.0f) ++Valid;
+                        if (M > 1.0f) ++Merged;
+                    }
+                }
+                HLVM_LOG(LogTest, info, TXT("reservoir M dist: valid={:.1f}% merged(M>1)={:.1f}% (n={})"),
+                    100.0 * static_cast<double>(Valid) / std::max(Total, 1),
+                    100.0 * static_cast<double>(Merged) / std::max(Total, 1), Total);
+            }
             HLVM_LOG(LogTest, info, TXT("ReSTIR summary: reservoir M mean={:.2f} max={:.1f} (MaxM=30) | W mean={:.3f} | spatial grayscale err={:.4f}"),
                 MMean, MMax, WMean, GrayErr);
         }
@@ -3213,6 +3378,10 @@ private:
     nvrhi::TextureHandle          PrevLinearDepth;
     nvrhi::BufferHandle           SunLightBuffer;
     nvrhi::TextureHandle          PlaceholderTexture;
+    float                         SceneScale = 0.01f;    // v215: 0.01 Sponza / 1.0 Cornell
+    nvrhi::BufferHandle           CornellLightsBuffer;   // v215: Cornell area light
+    uint32_t                      CornellLightCount = 0;
+    std::vector<Renderer::FLight> CornellSceneLights;    // v215: loaded from JSON
     std::vector<FInstanceInfo>    AllInstanceInfos;   // Phase 3: patched averages
     TVector<nvrhi::TextureHandle> MaterialTextures;   // Phase 3b: per-texel bounce albedo
     nvrhi::ITexture*              CurrentBackBufferTexture = nullptr; // swapchain diag

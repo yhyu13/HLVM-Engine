@@ -18,6 +18,10 @@ cbuffer AccumConstants : register(b0)
     uint  Width;
     uint  Height;
     float Exposure;     // pre-tonemap exposure multiplier
+    uint  BypassIndirect;  // v215: 1 = multiply the indirect input by the
+                           // GBuffer albedo (bypass shows the same reflected
+                           // estimate as ReSTIR; the reservoir normally applies
+                           // f = albedo*cos/pi with pdf = cos/pi -> Lo*albedo)
 };
 
 // =============================================================================
@@ -26,6 +30,7 @@ cbuffer AccumConstants : register(b0)
 
 Texture2D<float4>   InputTexture  : register(t0);
 Texture2D<float4>   DirectTexture : register(t1);
+Texture2D<float4>   MaterialTexture : register(t2);
 RWTexture2D<float4> AccumTexture  : register(u0);
 RWTexture2D<float4> DisplayTexture : register(u1);
 
@@ -65,7 +70,13 @@ void main(uint2 dispatchThreadId : SV_DispatchThreadID)
         return;
 
     // ReSTIR indirect estimate + primary direct/ambient (v210 split).
-    float3 sample = InputTexture[pixel].rgb + DirectTexture[pixel].rgb;
+    // v215: in bypass mode the indirect input is the raw Lo; apply the
+    // Lambert albedo so "ReSTIR off" estimates the same reflected quantity
+    // the reservoir produces (Lo * f with cosine sampling == Lo * albedo).
+    float3 indirect = InputTexture[pixel].rgb;
+    if (BypassIndirect != 0u)
+        indirect *= max(MaterialTexture[pixel].rgb, 0.0f);
+    float3 sample = indirect + DirectTexture[pixel].rgb;
 
     // FrameCount is 1-based. On the first frame there is no previous accumulation.
     float3 accum = (FrameCount <= 1u) ? sample : (AccumTexture[pixel].rgb + sample);

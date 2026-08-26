@@ -35,7 +35,7 @@ AUTO_CVAR_INT  (r_GI_DebugMode,        0,     "Debug visualization: 0=final,1=al
 // =============================================================================
 
 AUTO_CVAR_INT(r_ReSTIR_NumCandidates, 8, "ReSTIR generation: number of candidate samples per pixel", EConsoleVariableFlag::Saved)
-AUTO_CVAR_FLOAT(r_ReSTIR_MaxM, 30.0f, "ReSTIR temporal: maximum reservoir M value", EConsoleVariableFlag::Saved)
+AUTO_CVAR_FLOAT(r_ReSTIR_MaxM, 10.0f, "ReSTIR temporal: maximum reservoir M value (ZetaRay M_MAX=10; larger caps bias the pairwise-MIS estimate brighter)", EConsoleVariableFlag::Saved)
 AUTO_CVAR_FLOAT(r_ReSTIR_DepthThreshold, 0.05f, "ReSTIR temporal/spatial: depth rejection threshold", EConsoleVariableFlag::Saved)
 AUTO_CVAR_FLOAT(r_ReSTIR_NormalThreshold, 0.5f, "ReSTIR temporal/spatial: normal dot rejection threshold", EConsoleVariableFlag::Saved)
 AUTO_CVAR_FLOAT(r_ReSTIR_SpatialRadius, 1.0f, "ReSTIR spatial: neighbor sampling radius in pixels", EConsoleVariableFlag::Saved)
