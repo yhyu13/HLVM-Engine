@@ -107,8 +107,14 @@ void main(uint3 dispatchThreadID : SV_DispatchThreadID)
         float3 target = lo * f;
         float targetLum = max(Luminance(target), 0.0f);
 
-        float w = targetLum / max(pdf, 1e-6f);
-        float W = targetLum > 0.0f ? 1.0f / max(pdf, 1e-6f) : 0.0f;
+        // v233: clamp W to ZetaRay's MAX_W at the source too — at grazing
+        // angles pdf = cos/pi -> 0, so 1/pdf exceeds the 256 cap used by
+        // every downstream pass (temporal history W arrives clamped; the
+        // first frame's generate output must obey the same bound). Derive
+        // w_sum FROM the clamped W so the pair stays consistent
+        // (w_sum == targetLum * W is the unclamped identity here).
+        float W = targetLum > 0.0f ? min(1.0f / max(pdf, 1e-6f), 256.0f) : 0.0f;
+        float w = targetLum * W;
 
         out0 = float4(x2Pos, asfloat(x2ID));
         out1 = float4(lo, 1.0f);

@@ -12,7 +12,32 @@ struct FReSTIRTemporalConstants
     float DepthThreshold;
     float NormalThreshold;
     float DebugVis;
-    float Pad[3];
+    // v188: this copy previously declared `float Pad[3]` here and stopped.
+    // FReSTIRPass::DispatchTemporal marshals field-by-field into a flat
+    // float[64] and writes FIVE more scalars past DebugVis, unconditionally,
+    // for every caller including this test (FReSTIRPass.cpp:441-456). The
+    // shared C++ header (FReSTIRPass.h:40-60) and the TestReSTIR_GI_Temporal
+    // copy both declare all five; this one did not.
+    //
+    // The array form was not merely short, it was displaced: HLSL puts each
+    // constant-buffer ARRAY element on its own 16-byte register (the v184
+    // rule), so with DebugVis at float 40 (register 10, slot .x), Pad[0] could
+    // not sit at 41 — it landed at 44, Pad[1] at 48, Pad[2] at 52, against C++
+    // writes at 41..45. Plain scalars pack tightly and none of these five
+    // straddles a 16-byte boundary (41,42,43 = register 10 .y/.z/.w;
+    // 44,45 = register 11 .x/.y), so C++ write order == HLSL read order.
+    //
+    // If a VECTOR is ever appended to this tail, the straddle rule bites
+    // before the array rule does — a float2 starting at 43 would be bumped to
+    // 44. Keep this tail scalar, in this order, matching the header.
+    //
+    // None of these five is read by this shader today; they are declared so
+    // the layout agrees, not so the values are consumed.
+    float SceneYaw;
+    float PrevSceneYaw;
+    float NearPlane;
+    float FarPlane;
+    float GBufferScale;
 };
 
 cbuffer Constants : register(b0)
@@ -28,9 +53,37 @@ Texture2D<float> gDepth : register(t4);
 Texture2D<float4> gNormals : register(t5);
 Texture2D<float> gPrevDepth : register(t6);
 Texture2D<float4> gPrevNormals : register(t7);
+// v230 (card N): sync SRV count to FReSTIRPass::TemporalLayoutSRV (16 SRVs +
+// RT AS). The shared layout advertises t8..t16; the previous version of this
+// file declared only t0..t7, so its pipeline was built against a layout the
+// SPIR-V did not contain. t8..t9 are the current/history radiance inputs,
+// t10..t11 are Reservoir2 (Phase-2 octahedral-direction reservoir), t12..t13
+// are the full-res primary surface (worldpos + material), t14..t15 are the
+// true prev-frame counterparts, t16 is the segment-visibility TLAS.
+Texture2D<float4> gCurrRadiance   : register(t8);
+Texture2D<float4> gHistRadiance   : register(t9);
+Texture2D<float4> gCurrReservoir2 : register(t10);
+Texture2D<float4> gHistReservoir2 : register(t11);
+Texture2D<float4> gWorldPos       : register(t12);
+Texture2D<float4> gMaterial       : register(t13);
+Texture2D<float4> gPrevWorldPos   : register(t14);
+Texture2D<float4> gPrevMaterial   : register(t15);
+RaytracingAccelerationStructure g_bvh : register(t16);
 
-RWTexture2D<float4> gOutReservoir0 : register(u0);
-RWTexture2D<float4> gOutReservoir1 : register(u1);
+// v230 (card N): sync UAV count + space to FReSTIRPass::TemporalLayoutUAV.
+// The shared layout declares 4 UAVs at registers u384..u387 (SPIR-V set 1,
+// i.e. `register(uN, space1)`); the previous version of this file declared
+// only 2 UAVs at `register(u0)`/`register(u1)` in the DEFAULT space (set 0).
+// Without the explicit `space1`, Vulkan would put them in the wrong set and
+// the descriptor-set binding would fail at dispatch. The control's
+// TempDesc currently leaves u2/u3 at null → fall back to the dummy textures
+// FReSTIRPass wires in, so the binding set is still populated and Vulkan
+// validation stays green; the temporal pass is data-starved on these slots
+// which is acceptable for this known-good control.
+RWTexture2D<float4> gOutReservoir0 : register(u0, space1);
+RWTexture2D<float4> gOutReservoir1 : register(u1, space1);
+RWTexture2D<float4> gOutReservoir2 : register(u2, space1);
+RWTexture2D<float4> gOutRadiance   : register(u3, space1);
 
 [numthreads(8, 8, 1)]
 void main(uint3 dispatchThreadID : SV_DispatchThreadID)

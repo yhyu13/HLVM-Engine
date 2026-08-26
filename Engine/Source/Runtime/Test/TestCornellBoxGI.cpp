@@ -74,6 +74,107 @@ static std::vector<char> ReadBinaryFile(const std::string& Filename)
     return buffer;
 }
 
+// v229: extract the 14 ReSTIR/denoise textures + the 3 history-clear cmdlist
+// writes into a single helper. Called once from FCornellBoxGIPass::Initialize
+// (replacing the inline block that lived at :955-1021 pre-v229) and again from
+// the resize branch in Render so a window-resize event recreates the textures
+// at the new extent. Without the resize path, a widened window launches
+// swapchain-sized dispatches over startup-sized UAVs (an unguarded OOB UAV
+// store). See card L in docs/PENDING_PICK.md and docs/PENDING_COMMIT_v229.md
+// for the full defect analysis and the test invariants.
+//
+// nvrhi::TextureHandle is ref-counted internally; reassigning the caller's
+// handle drops the old texture. The existing resize branch at :1169-1199
+// reassigns GBufferDiffuseTexture etc. without explicit release — same
+// pattern here.
+static void CreateReSTIRTextures(
+    nvrhi::IDevice* Device,
+    uint32_t Width,
+    uint32_t Height,
+    nvrhi::TextureHandle& Reservoir0,
+    nvrhi::TextureHandle& Reservoir1,
+    nvrhi::TextureHandle& Reservoir0History,
+    nvrhi::TextureHandle& Reservoir1History,
+    nvrhi::TextureHandle& Reservoir0Merged,
+    nvrhi::TextureHandle& Reservoir1Merged,
+    nvrhi::TextureHandle& ReSTIROutput,
+    nvrhi::TextureHandle& TemporalRadiance,
+    nvrhi::TextureHandle& RadianceHistory,
+    nvrhi::TextureHandle& PrevDepth,
+    nvrhi::TextureHandle& PrevNormal)
+{
+    // Reservoir pair (ping-pong) + history + merged (all RGBA16F UAVs)
+    {
+        nvrhi::TextureDesc Desc;
+        Desc.dimension = nvrhi::TextureDimension::Texture2D;
+        Desc.width = Width;
+        Desc.height = Height;
+        Desc.format = nvrhi::Format::RGBA16_FLOAT;
+        Desc.isRenderTarget = false;
+        Desc.isUAV = true;
+        Desc.isTypeless = false;
+        Desc.initialState = nvrhi::ResourceStates::UnorderedAccess;
+        Desc.keepInitialState = true;
+
+        Desc.debugName = "Reservoir0";
+        Reservoir0 = Device->createTexture(Desc);
+        Desc.debugName = "Reservoir1";
+        Reservoir1 = Device->createTexture(Desc);
+        Desc.debugName = "Reservoir0History";
+        Reservoir0History = Device->createTexture(Desc);
+        Desc.debugName = "Reservoir1History";
+        Reservoir1History = Device->createTexture(Desc);
+        Desc.debugName = "Reservoir0Merged";
+        Reservoir0Merged = Device->createTexture(Desc);
+        Desc.debugName = "Reservoir1Merged";
+        Reservoir1Merged = Device->createTexture(Desc);
+
+        Desc.format = nvrhi::Format::RGBA32_FLOAT;
+        Desc.isShaderResource = true;  // sampled by Blit + ReSTIR temporal history
+        Desc.debugName = "ReSTIROutput";
+        ReSTIROutput = Device->createTexture(Desc);
+        Desc.debugName = "TemporalRadiance";
+        TemporalRadiance = Device->createTexture(Desc);
+        Desc.debugName = "RadianceHistory";
+        RadianceHistory = Device->createTexture(Desc);
+    }
+
+    // Previous frame depth and normal for temporal validation
+    {
+        nvrhi::TextureDesc Desc;
+        Desc.dimension = nvrhi::TextureDimension::Texture2D;
+        Desc.width = Width;
+        Desc.height = Height;
+        // Use same depth format as GBufferDepthTexture so copyTexture is valid
+        Desc.format = nvrhi::Format::D32;
+        Desc.isRenderTarget = false;
+        Desc.isUAV = false;
+        Desc.isTypeless = true;
+        Desc.initialState = nvrhi::ResourceStates::ShaderResource;
+        Desc.keepInitialState = true;
+        Desc.debugName = "PrevDepth";
+        PrevDepth = Device->createTexture(Desc);
+
+        Desc.format = nvrhi::Format::RGBA16_FLOAT;
+        Desc.debugName = "PrevNormal";
+        PrevNormal = Device->createTexture(Desc);
+    }
+
+    // Clear history textures so the first frame after a resize does not
+    // sample stale reservoir state from the previous (different-sized) layout.
+    // Mirrors the pre-v229 behavior at :1011-1021.
+    {
+        nvrhi::CommandListHandle ClearCmd = Device->createCommandList();
+        ClearCmd->open();
+        nvrhi::Color ClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+        ClearCmd->clearTextureFloat(Reservoir0History, nvrhi::AllSubresources, ClearColor);
+        ClearCmd->clearTextureFloat(Reservoir1History, nvrhi::AllSubresources, ClearColor);
+        ClearCmd->clearTextureFloat(RadianceHistory, nvrhi::AllSubresources, ClearColor);
+        ClearCmd->close();
+        Device->executeCommandList(ClearCmd);
+    }
+}
+
 // =============================================================================
 // FCornellBoxGIPass
 // =============================================================================
@@ -951,74 +1052,25 @@ public:
         // =====================================================================
         // Create ReSTIR textures and initialize ReSTIR pass
         // =====================================================================
+        // v229: extract the 14-texture creation block into a file-local helper
+        // (CreateReSTIRTextures, defined just below). The helper is also called
+        // from the resize branch at :1238 so a window-resize event recreates the
+        // ReSTIR textures at the new extent, matching the existing pattern for
+        // the GBuffer MRTs at :1169-1199. Without the resize path, a widened
+        // window launches swapchain-sized dispatches over startup-sized UAVs —
+        // an unguarded out-of-bounds UAV store. The helper takes the texture
+        // handles by reference because they are private members of this test
+        // class; a free static function is used (no header change) and the
+        // nvrhi::TextureHandle ref-counted handles are simply overwritten on
+        // reassignment (verified by reading the existing resize branch which
+        // reassigns GBufferDiffuseTexture etc. without explicit release).
         HLVM_LOG(LogTest, info, TXT("Creating ReSTIR textures..."));
-        {
-            nvrhi::TextureDesc Desc;
-            Desc.dimension = nvrhi::TextureDimension::Texture2D;
-            Desc.width = GBufferWidth;
-            Desc.height = GBufferHeight;
-            Desc.format = nvrhi::Format::RGBA16_FLOAT;
-            Desc.isRenderTarget = false;
-            Desc.isUAV = true;
-            Desc.isTypeless = false;
-            Desc.initialState = nvrhi::ResourceStates::UnorderedAccess;
-            Desc.keepInitialState = true;
-
-            Desc.debugName = "Reservoir0";
-            Reservoir0Texture = NvrhiDevice->createTexture(Desc);
-            Desc.debugName = "Reservoir1";
-            Reservoir1Texture = NvrhiDevice->createTexture(Desc);
-            Desc.debugName = "Reservoir0History";
-            Reservoir0HistoryTexture = NvrhiDevice->createTexture(Desc);
-            Desc.debugName = "Reservoir1History";
-            Reservoir1HistoryTexture = NvrhiDevice->createTexture(Desc);
-            Desc.debugName = "Reservoir0Merged";
-            Reservoir0MergedTexture = NvrhiDevice->createTexture(Desc);
-            Desc.debugName = "Reservoir1Merged";
-            Reservoir1MergedTexture = NvrhiDevice->createTexture(Desc);
-
-            Desc.format = nvrhi::Format::RGBA32_FLOAT;
-            Desc.isShaderResource = true;  // sampled by Blit + ReSTIR temporal history
-            Desc.debugName = "ReSTIROutput";
-            ReSTIROutputTexture = NvrhiDevice->createTexture(Desc);
-            Desc.debugName = "TemporalRadiance";
-            TemporalRadianceTexture = NvrhiDevice->createTexture(Desc);
-            Desc.debugName = "RadianceHistory";
-            RadianceHistoryTexture = NvrhiDevice->createTexture(Desc);
-        }
-
-        // Previous frame depth and normal for temporal validation
-        {
-            nvrhi::TextureDesc Desc;
-            Desc.dimension = nvrhi::TextureDimension::Texture2D;
-            Desc.width = GBufferWidth;
-            Desc.height = GBufferHeight;
-            // Use same depth format as GBufferDepthTexture so copyTexture is valid
-            Desc.format = nvrhi::Format::D32;
-            Desc.isRenderTarget = false;
-            Desc.isUAV = false;
-            Desc.isTypeless = true;
-            Desc.initialState = nvrhi::ResourceStates::ShaderResource;
-            Desc.keepInitialState = true;
-            Desc.debugName = "PrevDepth";
-            PrevDepthTexture = NvrhiDevice->createTexture(Desc);
-
-            Desc.format = nvrhi::Format::RGBA16_FLOAT;
-            Desc.debugName = "PrevNormal";
-            PrevNormalTexture = NvrhiDevice->createTexture(Desc);
-        }
-
-        // Clear history textures
-        {
-            nvrhi::CommandListHandle ClearCmd = NvrhiDevice->createCommandList();
-            ClearCmd->open();
-            nvrhi::Color ClearColor(0.0f, 0.0f, 0.0f, 0.0f);
-            ClearCmd->clearTextureFloat(Reservoir0HistoryTexture, nvrhi::AllSubresources, ClearColor);
-            ClearCmd->clearTextureFloat(Reservoir1HistoryTexture, nvrhi::AllSubresources, ClearColor);
-            ClearCmd->clearTextureFloat(RadianceHistoryTexture, nvrhi::AllSubresources, ClearColor);
-            ClearCmd->close();
-            NvrhiDevice->executeCommandList(ClearCmd);
-        }
+        CreateReSTIRTextures(NvrhiDevice, GBufferWidth, GBufferHeight,
+            Reservoir0Texture, Reservoir1Texture,
+            Reservoir0HistoryTexture, Reservoir1HistoryTexture,
+            Reservoir0MergedTexture, Reservoir1MergedTexture,
+            ReSTIROutputTexture, TemporalRadianceTexture, RadianceHistoryTexture,
+            PrevDepthTexture, PrevNormalTexture);
 
         if (!ReSTIRPass.Initialize(NvrhiDevice, DataDir))
         {
@@ -1251,6 +1303,20 @@ public:
                 StagingDesc.debugName = "StagingTexture";
                 StagingTexture = NvrhiDevice->createStagingTexture(StagingDesc, nvrhi::CpuAccessMode::Read);
             }
+
+            // v229: also recreate the ReSTIR textures at the new extent. The
+            // GBuffer MRTs above were just recreated; the ReSTIR pair, history,
+            // merged, output, temporal radiance, radiance history, and prev
+            // depth/normal are sized at init and never recreated — without this
+            // call, a widened window launches swapchain-sized dispatches over
+            // startup-sized UAVs (unguarded OOB UAV store). See card L in
+            // docs/PENDING_PICK.md and PENDING_COMMIT_v229.md.
+            CreateReSTIRTextures(NvrhiDevice, GBufferWidth, GBufferHeight,
+                Reservoir0Texture, Reservoir1Texture,
+                Reservoir0HistoryTexture, Reservoir1HistoryTexture,
+                Reservoir0MergedTexture, Reservoir1MergedTexture,
+                ReSTIROutputTexture, TemporalRadianceTexture, RadianceHistoryTexture,
+                PrevDepthTexture, PrevNormalTexture);
 
             BindingCache.Clear();
         }
@@ -1526,6 +1592,19 @@ public:
             GenDesc.WorldPosTexture = GBufferWorldPosTexture;
             GenDesc.NormalTexture = GBufferNormalsTexture;
             GenDesc.DepthTexture = GBufferDepthTexture;
+            // v231 (card M): FReSTIRPass::GenerationLayoutSRV advertises t4..t6,
+            // and FReSTIRPass::DispatchGeneration's ternaries
+            // (FReSTIRPass.cpp:501-503) fall back to Desc.RadianceTexture (t4)
+            // and DummyGuide (t5/t6) when a slot is null. Cornell does not own
+            // the Phase-B octahedral-direction texture (DirectionTexture), the
+            // sample-info SRV (SampleInfoTexture), or the full-res material SRV
+            // (MaterialTexture), so we leave them at null here. The binding
+            // set is populated via the ternaries; the generation pass is
+            // data-starved on those slots, which is acceptable for this known-
+            // good control.
+            GenDesc.DirectionTexture = nullptr;
+            GenDesc.SampleInfoTexture = nullptr;
+            GenDesc.MaterialTexture = nullptr;
             GenDesc.OutReservoir0 = Reservoir0Texture;
             GenDesc.OutReservoir1 = Reservoir1Texture;
             GenDesc.OutputWidth = CurrentFBInfo.width;
@@ -1596,6 +1675,21 @@ public:
             TempDesc.CurrentReservoir1 = Reservoir1Texture;
             TempDesc.HistoryReservoir0 = Reservoir0HistoryTexture;
             TempDesc.HistoryReservoir1 = Reservoir1HistoryTexture;
+            // v230 (card N): FReSTIRPass::TemporalLayoutSRV advertises t8..t15
+            // + t16, and FReSTIRPass::DispatchTemporal's ternaries
+            // (FReSTIRPass.cpp:606/609/616-619) fall back to DummyReservoir /
+            // DummyGuide when a slot is null. Cornell does not own the Phase-2
+            // (Reservoir2), Phase-3 (full-res surface) or Phase-4 (true
+            // prev-frame surface) textures, so we leave them at null here. The
+            // binding set is populated via the dummies; the temporal pass is
+            // data-starved on those slots, which is acceptable for this known-
+            // good control.
+            TempDesc.CurrentReservoir2 = nullptr;
+            TempDesc.HistoryReservoir2 = nullptr;
+            TempDesc.WorldPosTexture = nullptr;
+            TempDesc.MaterialTexture = nullptr;
+            TempDesc.PrevWorldPosTexture = nullptr;
+            TempDesc.PrevMaterialTexture = nullptr;
             TempDesc.CurrentRadiance = DenoisedHDRTexture;
             TempDesc.HistoryRadiance = ReSTIROutputTexture;
             TempDesc.DepthTexture = GBufferDepthTexture;

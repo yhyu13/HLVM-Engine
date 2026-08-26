@@ -7,11 +7,13 @@ Implements the validator cited in:
   - DIAGNOSTIC_2026-08-01-v25.md (v25 finding: scalar mean-luma gate lets garbage pass)
   - software-development-practices §"4-check structural validator > scalar mean-luma gate"
 
-Acceptance criteria (the 4 structural checks):
+Acceptance criteria (the 5 structural checks):
   1. Black-pixel ratio < 5%       — shadows allowed, full-black is not
   2. Color variance > some floor  — per-channel spatial std over the whole frame
   3. Temporal stability < ceiling — max step between consecutive frame means (skipped if only 1 frame)
   4. Cell variance > some floor   — split image into NxN grid; std of cell-means
+  5. Scene content (v235)         — >=1% pixels with HSV saturation > 0.15; the
+                                    anti-'white wall' gate (FAIL_LOG_2026-08-26)
 
 Usage:
   python3 validate_restir_gi.py <dump_dir>
@@ -53,6 +55,17 @@ TEMPORAL_STEP_MAX     = 0.15       # max per-frame-mean step between consecutive
 CELL_VARIANCE_MIN     = 0.003      # NxN cell-mean std floor
 CELL_GRID_N           = 8          # NxN grid for cell-variance check
 PIXEL_DARK_THRESH     = 8          # pixel value <= 8/255 considered "black"
+# --- v235: scene-content gate (FAIL_LOG_2026-08-26.md) ---
+# From 2026-08-10 to 2026-08-26 the Sponza camera was pointed at a featureless
+# exterior wall / open sky, and EVERY gate above passed: a smooth gray gradient
+# satisfies black-ratio, variance, temporal-stability and cell-variance floors.
+# The one thing such a framing cannot fake is the scene's characteristic albedo
+# colors — both verification scenes are built around saturated surfaces
+# (Sponza: red carpet / banners / plants; Cornell: red and green walls).
+# Measured on display dumps: broken framings 0.0000 saturated pixels, healthy
+# Sponza 0.096-0.105, Cornell 0.58. The 0.01 floor has >=9x margin both ways.
+CONTENT_SAT_THRESHOLD = 0.15       # HSV saturation above which a pixel counts
+CONTENT_SAT_FRAC_MIN  = 0.01       # >= 1% of pixels must be saturated
 
 
 def _load_png_as_float(path: Path) -> Optional["np.ndarray"]:
@@ -151,6 +164,26 @@ def check_cell_variance(arr: "np.ndarray", n: int = CELL_GRID_N) -> Tuple[bool, 
             cell_means.append(float(cell.mean()))
     cell_std = float(np.std(cell_means))
     return cell_std > CELL_VARIANCE_MIN, cell_std
+
+
+def check_scene_content(arr: "np.ndarray") -> Tuple[bool, float]:
+    """Check 5 (v235): fraction of saturated pixels > floor — the 'white wall' gate.
+
+    A camera pointing at a featureless wall / open sky produces a smooth,
+    unsaturated gradient that passes every statistical variance gate while
+    showing none of the scene. Both verification scenes contain strongly
+    saturated albedo (Sponza's red carpet and plants, Cornell's red/green
+    walls), so a healthy frame has a measurable saturated-pixel fraction.
+    Empirical: broken framings 0.0000, healthy Sponza >= 0.096, Cornell 0.58.
+    """
+    if arr is None or arr.size == 0 or not HAS_NUMPY:
+        return False, 0.0
+    rgb = arr[..., :3]
+    mx = rgb.max(axis=2)
+    mn = rgb.min(axis=2)
+    sat = np.where(mx > 1e-5, (mx - mn) / np.maximum(mx, 1e-5), 0.0)
+    frac = float((sat > CONTENT_SAT_THRESHOLD).mean())
+    return frac > CONTENT_SAT_FRAC_MIN, frac
 
 
 def _coefficient_of_variation(arr: "np.ndarray") -> Optional[float]:
@@ -436,6 +469,10 @@ def validate(dump_dir: Path, verbose: bool = False, display_only: bool = False,
     results.append(("temporal_stability (max step < ceiling)", ok, val2))
     ok, val = check_cell_variance(display)
     results.append(("cell_variance > floor", ok, val))
+    # v235: the anti-'white wall' gate — a featureless framing passes every
+    # variance floor above; require the scene's saturated albedo colors.
+    ok, val = check_scene_content(display)
+    results.append(("scene_content (saturated-pixel frac > 1%)", ok, val))
 
     # v213 (Phase 5b): ReSTIR-specific gates. v233: noise gate compares the
     # denoised (post-ReBLUR) output against the raw single-sample estimate.

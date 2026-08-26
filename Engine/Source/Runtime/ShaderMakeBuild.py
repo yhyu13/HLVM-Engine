@@ -643,5 +643,12 @@ def create_restir_gi_temporal_shadermake(test_target_name: str) -> ShaderMakeMod
         output_dir_cmake=test_data_dir,
         include_dirs_cmake=include_dirs,
         project_name="HLVM_ReSTIR_GI_Temporal",
-        slang_options="-DGI_DEBUG_STATS=1"
+        # 2026-08-16 (six-role-pipeline v1): add HLVM_RGI_DEBUG_VIS so the
+        # debug-mode cases (20/21/22 reading GBufferMaterial/Normal/WorldPos
+        # SRVs; 30/31 single-pixel + alive sentinels) are compiled into the
+        # GIPathTracing.sblob used by TestReSTIR_GI_Temporal. Without this,
+        # the cases fall through to `default` (gray 0.5,0.5,0.5) and the
+        # SRV-binding probes return misleading values. See
+        # docs/DIAGNOSTIC_2026-07-30.md and docs/PENDING_PLAN_v1.md.
+        slang_options="-DGI_DEBUG_STATS=1 -DHLVM_RGI_DEBUG_VIS=1"
     )

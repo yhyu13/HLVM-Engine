@@ -9,7 +9,12 @@ struct FReSTIRConstants
     float DepthThreshold;
     float NormalThreshold;
     float DebugVis;
-    float2 Pad;
+    // v186: kept field-for-field and kind-for-kind identical to
+    // FReSTIRPass.h and to the TestReSTIR_GI_Temporal_Data copy. Both tests
+    // share the same C++ FReSTIRConstants, so fixing only one shader copy
+    // would have moved the C++/HLSL kind mismatch here instead of removing it.
+    float Pad0;
+    float Pad1;
 };
 
 cbuffer Constants : register(b0)
@@ -21,6 +26,19 @@ Texture2D<float4> gRadiance : register(t0);
 Texture2D<float4> gWorldPos : register(t1);
 Texture2D<float4> gNormals : register(t2);
 Texture2D<float> gDepth : register(t3);
+// v231 (card M): sync SRV count to FReSTIRPass::GenerationLayoutSRV (7 SRVs).
+// The shared layout advertises t4..t6; the previous version of this file
+// declared only t0..t3, so its pipeline was built from a layout advertising
+// 3 SRVs its SPIR-V did not contain. t4 is the Phase-B octahedral direction
+// payload (also named `gSample` in the primary), t5 is the sample-info SRV
+// (x2Normal + samplePdf), t6 is the full-res material SRV (albedo+roughness).
+// The control's `main()` does not read these symbols, so the SPIR-V will
+// declare-but-not-reference them; the binding layer is still populated via
+// the ternaries in FReSTIRPass::DispatchGeneration (lines 501-503), and the
+// data-starved slots are inert at runtime.
+Texture2D<float4> gSample     : register(t4);
+Texture2D<float4> gSampleInfo : register(t5);
+Texture2D<float4> gMaterial   : register(t6);
 
 // v151 (six-role-pipeline): match the temporal shader's set-1 placement
 // for the UAVs (register(u0, space1) etc). The C++ side now composes two

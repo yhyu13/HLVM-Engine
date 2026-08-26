@@ -62,7 +62,7 @@
 #include "Renderer/PostProcess/FReBLURPass.h"
 #include "Renderer/PostProcess/FReSTIRPass.h"
 #include "Renderer/RayTracing/BLASBuilder.h"
-#include "Renderer/GI/GICVars.h"   // v176: r_ReSTIR_MaxM CVar (default 30.0f, see GICVars.h:38)
+#include "Renderer/GI/GICVars.h"   // v176: r_ReSTIR_MaxM CVar (default 10.0f since v215, see GICVars.h)
 #include "Renderer/RayTracing/TLASBuilder.h"
 #include "Renderer/Scene3D/Scene3DLoader.h"
 #include "Renderer/Scene3D/FCornellBoxScene.h"
@@ -1177,7 +1177,7 @@ public:
             TC.RcpOutputSize[0] = 1.0f / float(HalfResWidth);
             TC.RcpOutputSize[1] = 1.0f / float(HalfResHeight);
             TC.FrameIndex       = float(AccumFrameCount);
-            TC.MaxM             = CVar_r_ReSTIR_MaxM.GetValue();   // v176: wire CVar (default 30.0f; tune via HLVM_RGI_MAXM)
+            TC.MaxM             = CVar_r_ReSTIR_MaxM.GetValue();   // v176: wire CVar (default 10.0f since v215; tune via HLVM_RGI_MAXM)
             TC.DepthThreshold   = 0.05f;
             TC.NormalThreshold  = 0.5f;
             TC.DebugVis         = 0.0f;
@@ -1269,7 +1269,7 @@ public:
             // v191: WIDTH, not FB.width — same invariant and same silent-failure
             // analysis as the temporal site above (search: "v191: the numerator").
             SC.GBufferScale     = static_cast<float>(WIDTH / std::max(HalfResWidth, 1u));
-            SC.MaxM             = CVar_r_ReSTIR_MaxM.GetValue();   // v176: wire CVar (default 30.0f; tune via HLVM_RGI_MAXM)
+            SC.MaxM             = CVar_r_ReSTIR_MaxM.GetValue();   // v176: wire CVar (default 10.0f since v215; tune via HLVM_RGI_MAXM)
             SC.SpatialRadius    = 3.0f;
             SC.DebugVis         = 0.0f;
 
@@ -3300,8 +3300,10 @@ private:
                     100.0 * static_cast<double>(Valid) / std::max(Total, 1),
                     100.0 * static_cast<double>(Merged) / std::max(Total, 1), Total);
             }
-            HLVM_LOG(LogTest, info, TXT("ReSTIR summary: reservoir M mean={:.2f} max={:.1f} (MaxM=30) | W mean={:.3f} | spatial grayscale err={:.4f}"),
-                MMean, MMax, WMean, GrayErr);
+            // v235: print the live cap — the hardcoded "(MaxM=30)" label kept
+            // claiming 30 after r_ReSTIR_MaxM's default became 10 (v215).
+            HLVM_LOG(LogTest, info, TXT("ReSTIR summary: reservoir M mean={:.2f} max={:.1f} (MaxM={:.1f}) | W mean={:.3f} | spatial grayscale err={:.4f}"),
+                MMean, MMax, CVar_r_ReSTIR_MaxM.GetValue(), WMean, GrayErr);
         }
     }
 

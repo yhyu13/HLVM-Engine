@@ -87,14 +87,14 @@ bool FBilateralDenoisePass::Initialize(nvrhi::IDevice* InDevice, const FString& 
         // b0 -> 256 (Constants)
         // t0 -> 0 (Input texture - RGB)
         // t1 -> 1 (Depth guide)
-        // t2 -> 2 (Normal guide - optional)
+        // t2 -> 2 (Normal guide - REQUIRED, see FDesc)
         // s0 -> 128 (Point sampler)
         // u0 -> 384 (Output texture - RGB)
         LayoutDesc.bindings = {
             nvrhi::BindingLayoutItem::ConstantBuffer(256),
             nvrhi::BindingLayoutItem::Texture_SRV(0),   // Input RGB
             nvrhi::BindingLayoutItem::Texture_SRV(1),   // Depth
-            nvrhi::BindingLayoutItem::Texture_SRV(2),   // Normal
+            nvrhi::BindingLayoutItem::Texture_SRV(2),   // Normal (REQUIRED - see FDesc)
             nvrhi::BindingLayoutItem::Sampler(128),
             nvrhi::BindingLayoutItem::Texture_UAV(384) // Output RGB
         };
@@ -152,6 +152,28 @@ void FBilateralDenoisePass::Dispatch(nvrhi::ICommandList* CmdList, const FDesc& 
         return;
     }
 
+    // NormalTexture is REQUIRED, not optional. The binding layout declares t2
+    // unconditionally (see Initialize) and all three shader copies Load
+    // t_Normal twice with no gate, so there is no code path in this class that
+    // tolerates a null handle.
+    //
+    // This check is deliberately LOUD and deliberately does NOT try to make the
+    // pass survive. A silent early-out here would be worse than the failure it
+    // replaces: this pass writes DenoisedTexture, which feeds AccumInput, which
+    // the accumulate pass turns into DisplayTexture -- the "display" dump that
+    // validate_restir_gi.py checks. Returning before dispatch leaves that
+    // texture STALE, not blank, so the downstream pass would consume the
+    // previous frame's contents and the validator would see a plausible image.
+    // Without this check the null reaches createBindingSet against a layout
+    // that requires t2, which fails loudly at binding-set creation; the point
+    // of the check is to keep that attributable and name the field, not to
+    // convert a loud failure into a quiet wrong one.
+    if (!Desc.NormalTexture)
+    {
+        HLVM_LOG(LogPostProcess, err, TXT("FBilateralDenoisePass::Dispatch: NormalTexture is required (t2 is declared unconditionally in the binding layout and the shader Loads it ungated); output left UNWRITTEN"));
+        return;
+    }
+
     // Upload constants
     float ConstantsData[64]; // 256 bytes
     memset(ConstantsData, 0, sizeof(ConstantsData));
@@ -160,7 +182,38 @@ void FBilateralDenoisePass::Dispatch(nvrhi::ICommandList* CmdList, const FDesc& 
     ConstantsData[2] = Desc.DepthSigma;
     ConstantsData[3] = Desc.NormalSigma;
     ConstantsData[4] = Desc.SpatialSigma;
-    // Pad[5], Pad[6], Pad[7] remain zero
+
+    // GuideScale: the depth/normal guides are NOT required to share the
+    // dispatch extent. Under Phase D the primary consumer dispatches at half
+    // res over a half-res input while the guides remain the full-res GBuffer
+    // MRTs; indexing them with the raw dispatch coord samples the top-left
+    // quadrant, so every bilateral weight is computed against an unrelated
+    // surface. Derive the ratio from the guide's own desc rather than adding a
+    // caller-supplied field: a consumer whose guides already match the
+    // dispatch (the Cornell control) yields exactly 1 and is byte-unaffected,
+    // and a future consumer cannot forget to set it. Shader-side max(...,1)
+    // keeps a missing/narrower guide on the identity map.
+    // Derived from DepthTexture, NOT NormalTexture. Both guides are indexed
+    // with the SAME scale (see the FDesc invariant), so the scale must be
+    // sourced from a guide that cannot be absent. v205 moved it here off
+    // NormalTexture, whose header then claimed to be optional; v213 established
+    // that the claim was false at every level (unconditional t2 in the layout,
+    // ungated t_Normal Loads in all three shader copies, unconditional bind
+    // below) and Dispatch now rejects a null NormalTexture outright. The
+    // derivation stays on DepthTexture regardless: it is the guide with no
+    // branch of any kind in this class, so the scale cannot end up behind a
+    // condition a future caller can skip -- which is the failure v205 found,
+    // where the identity map was restored by the very branch that looked like
+    // it was handling the absent case.
+    float GuideScale = 1.0f;
+    if (Desc.DepthTexture)
+    {
+        const uint32_t GuideW = Desc.DepthTexture->getDesc().width;
+        if (GuideW && outputW)
+            GuideScale = static_cast<float>(GuideW / outputW);
+    }
+    ConstantsData[5] = GuideScale;
+    // Pad[6], Pad[7] remain zero
     CmdList->writeBuffer(ConstantBuffer, ConstantsData, sizeof(ConstantsData));
 
     // Create binding set

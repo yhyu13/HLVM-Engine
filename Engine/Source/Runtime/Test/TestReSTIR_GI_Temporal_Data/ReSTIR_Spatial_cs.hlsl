@@ -126,7 +126,9 @@ float JacobianReconnectionShift(float3 x2_normal, float3 x1_r, float3 x1_q, floa
     float cosPhi_r = dot(v_r, x2_normal);
     float cosPhi_q = dot(v_q, x2_normal);
 
-    return (abs(cosPhi_r) * t_q2) / max(abs(cosPhi_q) * t_r2, 1e-6f);
+    // v233: enable ZetaRay's (commented-out) Jacobian clamp — unclamped J
+    // inflates w_sum and feeds >50x firefly outliers in the final estimate.
+    return clamp((abs(cosPhi_r) * t_q2) / max(abs(cosPhi_q) * t_r2, 1e-6f), 1e-4f, 1e2f);
 }
 
 // ---- v211 (Phase 4): ZetaRay Visibility_Segment port ----------------------
@@ -309,6 +311,9 @@ void End(inout FPairwiseMIS p, FReservoir r_c, float3 posW_c, inout float rng)
     p.r_s.M = p.M_s;
     const float targetLum = max(Luminance(p.r_s.targetZ), 0.0f);
     p.r_s.W = targetLum > 0 ? p.r_s.w_sum / (targetLum * (1.0f + p.k)) : 0;
+    // v232: clamp W to break the spatial→temporal feedback into next frame
+    p.r_s.W = min(p.r_s.W, 256.0f); // k_MaxW — mirror ZetaRay's RGI_Util::MAX_W
+    p.r_s.w_sum = min(p.r_s.w_sum, 4096.0f); // k_MaxWSum
     p.r_s.W = isnan(p.r_s.W) ? 0 : p.r_s.W;
 }
 
@@ -424,5 +429,31 @@ void main(uint3 dispatchThreadID : SV_DispatchThreadID)
     r = pairwiseMIS.r_s;
     r.M = min(r.M, gConstants.MaxM);
 
-    gOutput[pixel] = float4(r.targetZ * r.W, 1.0f);
+    // v233: anti-firefly clamp on the FINAL estimate (ZetaRay only suppresses
+    // outlier reservoirs after the temporal merge; the spatial merge can
+    // still produce estimate = targetZ * W spikes when the selected sample's
+    // targetLum at this pixel is much smaller than the accumulated w_sum).
+    // Same 25x-local-average threshold as SuppressOutlierReservoirs, with an
+    // absolute floor so legitimately bright pixels in dark neighborhoods
+    // (e.g. a sun patch ringed by sky) are not killed. Rescaling W (not the
+    // color) preserves chromaticity.
+    float3 estimate = r.targetZ * r.W;
+    float lum = Luminance(estimate);
+    if (lum > 1e-6f)
+    {
+        float waveSum = WaveActiveSum(lum);
+        float waveAvg = (waveSum - lum) / max(float(WaveGetLaneCount()) - 1.0f, 1e-6f);
+        float cap = max(25.0f * waveAvg, 1.0f);
+        if (lum > cap)
+            estimate *= cap / lum;
+    }
+
+    // v234 (next-session-backlog #4): the ReBLUR input contract is
+    // (radiance, hitDist) — alpha must be the hit distance of the indirect
+    // bounce, |x2 - x1|, for the SELECTED sample (ZetaRay feeds ReBLUR the
+    // same quantity). The old constant 1.0 made GetNormHitDist a constant
+    // and history validation (hitDist > 0) vacuous. Invalid reservoirs
+    // above write alpha=0, which correctly invalidates their history.
+    float hitDist = length(r.pos - worldPos);
+    gOutput[pixel] = float4(estimate, hitDist);
 }

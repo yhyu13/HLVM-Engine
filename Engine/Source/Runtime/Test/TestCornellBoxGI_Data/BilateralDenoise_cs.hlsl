@@ -18,7 +18,12 @@ cbuffer Constants : register(b0)
     float  DepthSigma;   // Depth tolerance (smaller = sharper edges)
     float  NormalSigma;  // Normal tolerance in radians (smaller = sharper edges)
     float  SpatialSigma; // Spatial falloff (larger = more blur)
-    float  Pad0;
+    // Slot 5 is written by the shared FBilateralDenoisePass::Dispatch as
+    // GuideScale (full-res guide extent / dispatch extent). This target
+    // dispatches at the same resolution as its guides, so the value is always
+    // 1 here and the shader does not need to apply it. Named, not consumed,
+    // so the layout stays legible against the primary target's copy.
+    float  GuideScale_Unused;
     float  Pad1;
     float  Pad2;
 };

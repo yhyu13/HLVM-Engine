@@ -39,3 +39,20 @@ Engine/Source/Plugin/mcp-framework/dist/
 Engine/Source/Plugin/hlvm-engine-mcp/node_modules/
 Engine/Source/Plugin/hlvm-engine-mcp/dist/
 Engine/Source/Plugin/hlvm-engine-mcp/logs/
+
+# Third-party agent / IDE state directories (2026-08-25, next-session-backlog #3)
+.memory/
+.git-historian/
+.kilo/
+.lingma/
+.opencode/
+.sisyphus/
+.claude/
+.env
+.env.example
+.overseer.lock
+.pipeline.lock
+
+# Runtime dump artifacts (validator input; evidence is copied to Vibe_Coding/*/evidence/)
+Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal_Data/dumps/
+Engine/Source/Runtime/Test/TestCornellBoxGI_Data/dumps/

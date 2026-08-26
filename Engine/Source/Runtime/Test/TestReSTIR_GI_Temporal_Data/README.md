@@ -117,3 +117,13 @@ bash Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal_Data/fresh-evidence-scan.
 # One-shot multi-mode diagnostic run
 bash Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal_Data/run_rgi_diagnostic.sh
 ```
+
+## References
+
+- [Vibe_Coding/51_PathTraceGI_Debug/session-PathTraceGI_payload_debug.md](../../../../../Vibe_Coding/51_PathTraceGI_Debug/session-PathTraceGI_payload_debug.md) —
+  the path-trace payload debugging session that preceded this test's ReSTIR
+  rework. TL;DR: slangc compiles each RT entry point independently and can
+  dead-strip payload fields an entry never uses, desyncing the raygen /
+  closest-hit payload layout; the fix is to fully initialize every payload
+  field on both sides of TraceRay. That session is why GIPathTracing.hlsl
+  keeps its payload compact and symmetric.

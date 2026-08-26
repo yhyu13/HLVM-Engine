@@ -69,12 +69,29 @@ namespace ReBLUR
     class FReBLURPass
     {
     public:
+        // INVARIANT: all five textures must match OutputWidth/OutputHeight.
+        // ReBLUR_cs.hlsl indexes every texture, GUIDES INCLUDED, with the raw
+        // dispatch coord (gDepth/gNormalRoughness at dispatchThreadID.xy; taps
+        // clamp to OutputSize), so a guide at any other extent is sampled with
+        // this pass's coordinates and silently yields the wrong region.
+        //
+        // THE OPPOSITE OF FBilateralDenoisePass, whose guides need NOT match:
+        // its GuideScale exists to map half-res dispatch onto full-res guides.
+        // Do not carry that rule across — here that ratio is a defect, not a
+        // supported case. Same directory, same-looking FDesc, inverse contracts.
+        // FReSTIRPass holds a THIRD contract (guides free, but the CALLER
+        // supplies the ratio); all three are tabulated at FReSTIRPass.h's
+        // FTemporalDesc. Keep that table authoritative — do not restate the
+        // set here, or the two copies will drift.
+        //
+        // Nor is it merely current-caller accident: a scale would need a new
+        // cbuffer field, and FReBLURConstants is size-pinned above.
         struct FDesc
         {
             nvrhi::TextureHandle CurrentRadianceTexture;   // Noisy GI radiance (RGB) + hit distance (A)
             nvrhi::TextureHandle HistoryTexture;           // Ping-pong history buffer (RGBA16F)
-            nvrhi::TextureHandle DepthTexture;             // Linear depth
-            nvrhi::TextureHandle NormalRoughnessTexture;  // Normal (RGB) + roughness (A)
+            nvrhi::TextureHandle DepthTexture;             // Linear depth — MUST be OutputWidth x OutputHeight
+            nvrhi::TextureHandle NormalRoughnessTexture;  // Normal (RGB) + roughness (A) — MUST likewise
             nvrhi::TextureHandle OutputTexture;            // Denoised output
             uint32_t OutputWidth = 0;
             uint32_t OutputHeight = 0;

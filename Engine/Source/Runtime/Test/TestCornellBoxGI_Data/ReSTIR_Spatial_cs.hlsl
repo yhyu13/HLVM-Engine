@@ -16,7 +16,22 @@ struct FReSTIRSpatialConstants
     float MaxM;
     float SpatialRadius;
     float DebugVis;
-    float2 Pad;
+    // v187: FReSTIRPass::DispatchSpatial marshals field-by-field into a flat
+    // float[64] and writes GBufferScale at float 9 UNCONDITIONALLY, for every
+    // caller including this test. This copy previously stopped at DebugVis and
+    // declared `float2 Pad`, so that constant landed in Pad.x and was silently
+    // swallowed. Byte-for-byte the wire is unchanged by this edit — float 9 is
+    // written either way — but the field now has the name and the kind the
+    // shared C++ header gives it (FReSTIRPass.h:70-72), matching the
+    // TestReSTIR_GI_Temporal_Data copy verbatim.
+    //
+    // NOTE: this pass dispatches at FULL res here (TestCornellBoxGI.cpp
+    // sets SpatDesc.OutputWidth/OutputHeight from CurrentFBInfo, the same
+    // resolution as the GBuffer MRTs it samples), so the scale is 1 and no
+    // GB() conversion is needed. Do NOT add one without also making the
+    // dispatch half-res.
+    float GBufferScale;
+    float Pad;
 };
 
 cbuffer Constants : register(b0)

@@ -18,10 +18,41 @@ cbuffer Constants : register(b0)
     float  DepthSigma;   // Depth tolerance (smaller = sharper edges)
     float  NormalSigma;  // Normal tolerance in radians (smaller = sharper edges)
     float  SpatialSigma; // Spatial falloff (larger = more blur)
-    float  Pad0;
+    float  GuideScale;   // full-res guide extent / dispatch extent (see GB() below)
     float  Pad1;
     float  Pad2;
 };
+
+// This is the SHARED/default copy of this shader, compiled by the
+// Common_ShaderMake target from Engine/Source/Runtime/Shader/ShaderMake.cfg.
+// Selection between this copy and the two further copies under Test/*_Data/
+// is driven by each consumer's FBilateralDenoisePass::Initialize(...,
+// InShaderDataDir) argument: the DataDir the consumer passes composes the
+// .sblob path the pass loads (FBilateralDenoisePass.cpp constructs the path
+// from InShaderDataDir, not from any global override). The override
+// FCommonRenderPasses::SetShaderDataDir() governs BLIT resources only (its
+// sole consumer is InitBlitResources(), which loads BlitVS/BlitPS); it does
+// not select this shader. A consumer that does NOT pass its own DataDir lands
+// on this file by default, and its extents are unknowable from here. Keep the
+// guide handling here in agreement with the primary copy because two further
+// copies exist under Test/*_Data/; whichever copy a consumer compiles, the
+// invariant "GB() maps a dispatch texel to its guide footprint's centre"
+// (declared below) must hold.
+//
+// A pass may dispatch at a LOWER resolution than its depth/normal GUIDES
+// (the input radiance matches the dispatch; the guides may be full-res
+// GBuffer MRTs). Indexing the guides with the raw dispatch coord then samples
+// a corner of the guide at short stride -- geometrically unrelated texels, so
+// every depth and normal weight in the kernel is computed against the wrong
+// surface. There is no VUID and no error; the output is merely wrong.
+// GB() maps a dispatch texel to the CENTRE of its footprint in the guide.
+// GuideScale == 0 (an unfilled constant) must degrade to the identity map,
+// never to a divide-by-zero or a collapsed index.
+int2 GB(int2 p)
+{
+    int s = max(int(GuideScale), 1);
+    return p * s + (s / 2);
+}
 
 Texture2D<float4> t_Input   : register(t0);  // Noisy HDR RGBA input (RGB + hitDist in alpha)
 Texture2D<float>  t_Depth  : register(t1);   // Depth guide
@@ -62,10 +93,11 @@ void main(uint2 dispatchThreadId : SV_DispatchThreadID)
     if (pixelCoord.x >= outputSize.x || pixelCoord.y >= outputSize.y)
         return;
 
-    // Center pixel data
-    float centerDepth = t_Depth[pixelCoord];
-    float3 centerNormal = normalize(t_Normal[pixelCoord].rgb * 2.0 - 1.0);
-    float4 centerValue = t_Input[pixelCoord];
+    // Center pixel data. t_Input matches the dispatch resolution so it uses
+    // the raw coord; the two GUIDES may be larger and must go through GB().
+    float centerDepth = t_Depth.Load(int3(GB(int2(pixelCoord)), 0));
+    float3 centerNormal = normalize(t_Normal.Load(int3(GB(int2(pixelCoord)), 0)).rgb * 2.0 - 1.0);
+    float4 centerValue = t_Input.Load(int3(pixelCoord, 0));
 
     float4 sum = centerValue;
     float weightSum = 1.0;
@@ -93,20 +125,20 @@ void main(uint2 dispatchThreadId : SV_DispatchThreadID)
             // Spatial weight
             float wSpatial = spatialWeight(distSq, SpatialSigma);
 
-            // Depth weight
-            float neighborDepth = t_Depth[uint2(neighborPixel)];
+            // Depth weight (guide may be larger -> GB())
+            float neighborDepth = t_Depth.Load(int3(GB(neighborPixel), 0));
             float depthDiff = abs(neighborDepth - centerDepth);
             float wDepth = depthWeight(depthDiff, DepthSigma);
 
-            // Normal weight
-            float3 neighborNormal = normalize(t_Normal[uint2(neighborPixel)].rgb * 2.0 - 1.0);
+            // Normal weight (guide may be larger -> GB())
+            float3 neighborNormal = normalize(t_Normal.Load(int3(GB(neighborPixel), 0)).rgb * 2.0 - 1.0);
             float wNormal = normalWeight(centerNormal, neighborNormal, NormalSigma);
 
             // Combined weight
             float weight = wSpatial * wDepth * wNormal;
 
             // Accumulate
-            float4 neighborValue = t_Input[uint2(neighborPixel)];
+            float4 neighborValue = t_Input.Load(int3(neighborPixel, 0));
             sum += neighborValue * weight;
             weightSum += weight;
         }

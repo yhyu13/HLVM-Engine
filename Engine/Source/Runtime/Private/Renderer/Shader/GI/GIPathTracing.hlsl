@@ -85,15 +85,23 @@ ConstantBuffer<ViewConstants> g_View : register(b1);
 // Resources
 // =============================================================================
 
-RWTexture2D<float4> Output : register(u0, space1);
+// Output (RWTexture2D<float4>) and OutputDirection (u2) live in the DEFAULT
+// register space (= descriptor set 0 in nvrhi's legacy mode). Earlier
+// versions put them in space1 with a separate UAV-only binding layout (the
+// "v22 split"), but that path returned zero for GBuffer SRV reads — the
+// split's image-layout-transition ordering interacted badly with nvrhi's
+// auto-barrier tracking. Reverting to the proven TestCornellBoxGI single-
+// binding-set pattern. See docs/PENDING_PLAN_v2.md and
+// docs/DIAGNOSTIC_2026-07-30.md for the bisect history.
+RWTexture2D<float4> Output : register(u0);
 
 // Primary sample ray direction (ReSTIR GI reservoirs). Written per-pixel as
 // float4(direction, 1.0). The direction is the ray used for the pixel's
 // primary GI sample so the reservoir can reproject/merge a real sample.
-RWTexture2D<float4> OutputDirection : register(u2, space1);
+RWTexture2D<float4> OutputDirection : register(u2);
 
 #if GI_DEBUG_STATS
-RWTexture2D<float4> DebugStatsTexture : register(u1, space1);
+RWTexture2D<float4> DebugStatsTexture : register(u1);
 #endif
 
 RaytracingAccelerationStructure SceneBVH : register(t0);
@@ -744,9 +752,18 @@ void RayGen() {
             case 12u: debugColor = g_GI.AmbientColor.rgb; break;
             case 13u: debugColor = RTInstanceInfo[0].AlbedoColor; break;         // SRV sanity read
             case 14u: debugColor = RTVertices[0].Position * 0.25f + 0.5f; break; // SRV sanity read
-            case 20u: debugColor = GBufferMaterial.Load(int3(pixel, 0)).rgb; break; // SRV read of GBufferMaterial
-            case 21u: debugColor = GBufferNormal.Load(int3(pixel, 0)).rgb * 0.5f + 0.5f; break; // SRV read of GBufferNormal (sanity compare to case 2)
-            case 22u: debugColor = GBufferWorldPos.Load(int3(pixel, 0)).rgb * 0.25f + 0.5f; break; // SRV read of GBufferWorldPos (sanity compare)
+// v182 (six-role-pipeline, 2026-08-30): modes 20/21/22/31 previously indexed
+// the GBuffer with `pixel` (DISPATCH space) while the production reads at
+// :501-503 index with `gbPixel` (FULL-RES GBuffer space, = pixel * gbScale
+// after the Phase-D half-res dispatch change at :496-499). At the current
+// 400x300 dispatch / 800x600 GBuffer the probes therefore sampled only the
+// top-left quadrant — a DIFFERENT address than the code they are meant to
+// bisect. Any "mode 20 returns zero => t3 SRV is unbound" conclusion drawn
+// from the old probes measured the wrong texel and is not evidence about the
+// production read. Aligned to gbPixel so the probes are faithful.
+            case 20u: debugColor = GBufferMaterial.Load(int3(gbPixel, 0)).rgb; break; // SRV read of GBufferMaterial
+            case 21u: debugColor = GBufferNormal.Load(int3(gbPixel, 0)).rgb * 0.5f + 0.5f; break; // SRV read of GBufferNormal (sanity compare to case 2)
+            case 22u: debugColor = GBufferWorldPos.Load(int3(gbPixel, 0)).rgb * 0.25f + 0.5f; break; // SRV read of GBufferWorldPos (sanity compare)
 // v128 (six-role-pipeline, tick 113, 2026-07-30): single-pixel sentinel
 // at (0,0,0). If mode 30 shows albedo at (0,0,0) but mode 20 shows zero
 // everywhere, the binding works at (0,0,0) but is masked elsewhere (e.g.,
@@ -773,7 +790,7 @@ void RayGen() {
 // layout or pipeline state, not dead-strip).
             case 31u:
             {
-                float3 aliveSentinel = GBufferMaterial.Load(int3(pixel, 0)).rgb * 0.5f + 0.1f;
+                float3 aliveSentinel = GBufferMaterial.Load(int3(gbPixel, 0)).rgb * 0.5f + 0.1f;
                 if (any(aliveSentinel > float3(0.1, 0.1, 0.1))) {
                     debugColor = aliveSentinel; // binding works, slangc keeps the read
                 } else {

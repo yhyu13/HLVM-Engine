@@ -41,6 +41,7 @@ void main(uint3 tid : SV_DispatchThreadID)
     float2 fracPart = frac(halfUV);
 
     float3 sum = float3(0.0);
+    float sumA = 0.0;
     float weightSum = 0.0;
     for (int dy = 0; dy <= 1; ++dy)
     {
@@ -48,11 +49,11 @@ void main(uint3 tid : SV_DispatchThreadID)
         {
             int2 hp = clamp(base + int2(dx, dy), int2(0, 0), int2(HalfSize) - 1);
             float4 s = HalfResRadiance.Load(int3(hp, 0));
-            // Every half-res texel is written by the raygen. Do NOT skip on
-            // alpha: alpha is the primary-ray first-hit distance, which is
-            // legitimately 0 for rays that escape to the sky (the old
-            // alpha alive-sentinel used to mask this by forcing alpha >= 1).
-            // Skip only non-finite radiance.
+            // Every half-res texel is written by its producer. Do NOT skip on
+            // alpha: alpha is a hit distance (primary-ray hitT for the raw
+            // trace, |x2 - x1| for the ReSTIR spatial estimate — v234), which
+            // is legitimately 0 for rays that escape to the sky and for
+            // invalid reservoirs. Skip only non-finite radiance.
             if (!all(isfinite(s.rgb)))
                 continue;
 
@@ -67,8 +68,10 @@ void main(uint3 tid : SV_DispatchThreadID)
             float normalW = pow(max(dot(centerNormal, sNormal), 0.0), NormalSigma);
             float w = bilinear * depthW * normalW;
             sum += s.rgb * w;
+            sumA += s.a * w;   // v234: propagate hit distance to ReBLUR
             weightSum += w;
         }
     }
-    FullResOutput[tid.xy] = float4(weightSum > 1e-3 ? sum / weightSum : sum, 1.0);
+    FullResOutput[tid.xy] = float4(weightSum > 1e-3 ? sum / weightSum : sum,
+                                   weightSum > 1e-3 ? sumA / weightSum : sumA);
 }

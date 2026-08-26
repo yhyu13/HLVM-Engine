@@ -18,10 +18,25 @@ cbuffer Constants : register(b0)
     float  DepthSigma;   // Depth tolerance (smaller = sharper edges)
     float  NormalSigma;  // Normal tolerance in radians (smaller = sharper edges)
     float  SpatialSigma; // Spatial falloff (larger = more blur)
-    float  Pad0;
+    float  GuideScale;   // full-res guide extent / dispatch extent (see GB() below)
     float  Pad1;
     float  Pad2;
 };
+
+// Phase D dispatches this pass at HALF resolution (the input radiance is
+// half-res) while the depth/normal GUIDES remain the full-res GBuffer MRTs.
+// Indexing those guides with the raw dispatch coord samples the top-left
+// quadrant at half stride -- geometrically unrelated texels, so every depth
+// and normal weight in the kernel is computed against the wrong surface.
+// GB() maps a dispatch texel to the CENTRE of its footprint in the guide,
+// matching the form Resolve_cs.hlsl uses for the same two textures.
+// GuideScale == 0 (an unfilled constant) must degrade to the identity map,
+// never to a divide-by-zero or a collapsed index.
+int2 GB(int2 p)
+{
+    int s = max(int(GuideScale), 1);
+    return p * s + (s / 2);
+}
 
 Texture2D<float4> t_Input   : register(t0);  // Noisy HDR RGBA input (RGB + hitDist in alpha)
 Texture2D<float>  t_Depth  : register(t1);   // Depth guide
@@ -62,9 +77,10 @@ void main(uint2 dispatchThreadId : SV_DispatchThreadID)
     if (pixelCoord.x >= outputSize.x || pixelCoord.y >= outputSize.y)
         return;
 
-    // Center pixel data
-    float centerDepth = t_Depth.Load(int3(pixelCoord, 0));
-    float3 centerNormal = normalize(t_Normal.Load(int3(pixelCoord, 0)).rgb * 2.0 - 1.0);
+    // Center pixel data. t_Input is half-res like the dispatch, so it uses the
+    // raw coord; the two GUIDES are full-res and must go through GB().
+    float centerDepth = t_Depth.Load(int3(GB(int2(pixelCoord)), 0));
+    float3 centerNormal = normalize(t_Normal.Load(int3(GB(int2(pixelCoord)), 0)).rgb * 2.0 - 1.0);
     float4 centerValue = t_Input.Load(int3(pixelCoord, 0));
 
     float4 sum = centerValue;
@@ -93,13 +109,13 @@ void main(uint2 dispatchThreadId : SV_DispatchThreadID)
             // Spatial weight
             float wSpatial = spatialWeight(distSq, SpatialSigma);
 
-            // Depth weight
-            float neighborDepth = t_Depth.Load(int3(neighborPixel, 0));
+            // Depth weight (guide is full-res -> GB())
+            float neighborDepth = t_Depth.Load(int3(GB(neighborPixel), 0));
             float depthDiff = abs(neighborDepth - centerDepth);
             float wDepth = depthWeight(depthDiff, DepthSigma);
 
-            // Normal weight
-            float3 neighborNormal = normalize(t_Normal.Load(int3(neighborPixel, 0)).rgb * 2.0 - 1.0);
+            // Normal weight (guide is full-res -> GB())
+            float3 neighborNormal = normalize(t_Normal.Load(int3(GB(neighborPixel), 0)).rgb * 2.0 - 1.0);
             float wNormal = normalWeight(centerNormal, neighborNormal, NormalSigma);
 
             // Combined weight
