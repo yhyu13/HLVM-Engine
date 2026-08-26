@@ -30,6 +30,15 @@
  *   - HLVM_RGI_ACCUM=N       target frames for accumulation (default 8)
  *   - HLVM_RGI_EXPOSURE=F    pre-tonemap exposure (default 1.0)
  *   - HLVM_PT_DEBUG_MODE=N   shader-side debug mode (passed to GIPathTracing.hlsl)
+ * v215 (ZetaRay alignment):
+ *   - HLVM_RGI_SCENE=cornell run the procedural Cornell Box (area-light NEE,
+ *     camera inside the box, static by default) instead of Sponza
+ *   - HLVM_RGI_BYPASS=1       "ReSTIR off" — raw path-traced display; the
+ *     indirect input is now multiplied by the GBuffer albedo (t2) so bypass
+ *     shows the SAME reflected quantity the reservoir estimates (Lo*f)
+ *   - HLVM_RGI_SPATIAL=0      skip only the spatial resample (temporal-only)
+ *   - HLVM_RGI_MAXM=N         reservoir M cap (default 10 = ZetaRay M_MAX)
+ *   - HLVM_RGI_SCENE_RPS      turntable speed (default 0.03 r/s; 0 for static)
  *
  * Why this test exists: the previous TestFewBounceGI was renamed to
  * TestCornellBoxGI (commit 2216e71) and the ReSTIR/ReBLUR compute pipelines
@@ -140,26 +149,29 @@ static_assert(sizeof(FInstanceInfo) == 48, "FInstanceInfo must be 48 bytes");
 // ============================================================================
 // Camera rig
 // ============================================================================
-// Sponza's coordinate origin is at floor center, with the structure extending
-// roughly ±6m after the 0.01 scale we apply when building the TLAS. Place the
-// camera outside the structure, looking inward and downward, with a wide FOV.
+// Sponza's coordinate origin is at floor center. After the 0.01 scale applied
+// to both the TLAS instances and the raster ModelMatrix, the measured world
+// AABB (decoded from Sponza01.gltf accessors + node rotations, 2026-08-26) is:
+//   x [-19.2, 18.0]  (long atrium axis)
+//   y [ -1.3, 14.3]  (height; floor at y~0, roof slab at y~13-14)
+//   z [-11.8, 11.1]  (short axis)
+// The atrium CENTER CORRIDOR is blocked by the `Material__298` (background.ktx)
+// divider wall spanning the full length at z in [-1.6, 0.9], y in [0.4, 7.6] —
+// any camera near z=0 looking down -X gets half its frame filled by it.
 //
 // Lesson inherited from Vibe_Coding/51_PathTraceGI_Debug:
 //   - camera must be IN FRONT OF the visible scene, not at its center
 //   - FOV must be wide enough (90°) to see the colored side walls
 //   - view direction must be -Z, not +Z (left-handed, RH-conventions glitch)
-// Sponza vertices live in the GLTF coord space (hundreds of units), but the
-// TLAS scales them by 0.01 — so the path tracer sees Sponza at ±0.06.
-// Apply the same scale to the raster ModelMatrix and place the camera at the
-// matching scaled coordinates. Original-scale camera with the un-scaled
-// model matrix produced no rasterized fragments (all verts clipped by far).
 //
-// v-framing (2026-08-01): measured gi_raw/worldpos ranges show the rasterized
-// structure actually spans x[-15,15] y[-12,8] z[-14,0] (Sponza's original units
-// are ~1500, scaled by the 0.01 model matrix). The old camera at (0,0.03,0.08)
-// sat on the floor at the near edge and framed only ~6% of the frame (a thin
-// floor band). Move the camera back (+z, outside z>0), up to mid-height, and
-// look at the scene center so the full structure is framed. FOV 75°.
+// FAILURE LESSON (2026-08-26, FAIL_LOG_2026-08-26.md): the 2026-08-10 default
+// (0, 2.5, 18) -> (0, 2.5, -10) sat 7.6 m OUTSIDE the outer `bricks` shell
+// (z max 10.4) staring at a featureless exterior wall; with the turntable's
+// old default yaw=90 the building's long axis rotates into Z and the same
+// camera ends up INSIDE the end wall. Both framings render a flat
+// white-on-white gradient ("blurry white image") — and the 9-gate validator
+// PASSED it for months because every gate is a statistical property that a
+// featureless image satisfies. The camera must be INSIDE the atrium.
 //
 // 2026-08-10: horizon camera + rotating scene. The scene spins around Y
 // (TLAS instances AND the raster ModelMatrix use the same per-frame angle
@@ -180,12 +192,15 @@ static glm::vec3 EnvVec3(const char* Name, const glm::vec3& Fallback)
 // v215 (Cornell alignment): scene selection (HLVM_RGI_SCENE=cornell).
 static bool g_bCornellScene = false;
 
-// Horizon framing: eye height ~2.5 m, perfectly level (target y == eye y).
-// Cornell Box: camera inside the closed unit box looking along -Z at the back
-// wall (matches TestCornellBoxGI's framing). Override with HLVM_RGI_CAM_POS /
-// HLVM_RGI_CAM_TARGET (world coords).
-static glm::vec3 GetCameraPos()   { return EnvVec3("HLVM_RGI_CAM_POS",    g_bCornellScene ? glm::vec3( 0.0f,  0.0f,  0.8f) : glm::vec3( 0.0f, 2.5f, 18.0f)); }
-static glm::vec3 GetCameraTarget(){ return EnvVec3("HLVM_RGI_CAM_TARGET", g_bCornellScene ? glm::vec3( 0.0f, -0.2f, -0.8f) : glm::vec3( 0.0f, 2.5f, -10.0f)); }
+// Sponza default (2026-08-26): the SOUTH AISLE — inside the atrium between the
+// southern column row and the outer wall (z=-4 clears both the column row at
+// z~+-2.8 and the `Material__298` divider wall at z in [-1.6, 0.9]), eye level,
+// looking down the long axis (-X). Probe-verified to frame textured stone
+// walls, the marble floor and receding vaults. Cornell Box: camera inside the
+// closed unit box looking along -Z at the back wall (matches TestCornellBoxGI's
+// framing). Override with HLVM_RGI_CAM_POS / HLVM_RGI_CAM_TARGET (world coords).
+static glm::vec3 GetCameraPos()   { return EnvVec3("HLVM_RGI_CAM_POS",    g_bCornellScene ? glm::vec3( 0.0f,  0.0f,  0.8f) : glm::vec3(  8.0f, 2.5f, -4.0f)); }
+static glm::vec3 GetCameraTarget(){ return EnvVec3("HLVM_RGI_CAM_TARGET", g_bCornellScene ? glm::vec3( 0.0f, -0.2f, -0.8f) : glm::vec3(-13.0f, 2.2f, -4.0f)); }
 static glm::vec3 GetCameraUp()    { return glm::vec3( 0.0f, 1.0f,  0.0f); }
 static float     GetCameraFovDeg(){ return g_bCornellScene ? 90.0f : 65.0f; }
 
@@ -3467,8 +3482,12 @@ private:
     float     FPSUpdateTimer = 0.0f;
     double    TotalFrameTimeSec = 0.0;    // v214: run-average frame time
     double    TotalFramesAnimated = 0.0;
-    float     SceneRotationDeg = 90.0f;        // scene Y-rotation (turntable)
-    float     PrevSceneRotationDeg = 90.0f;    // previous frame (Phase C reprojection)
+    // 2026-08-26: start at yaw=0. The old 90° default rotated the building's
+    // long axis into Z, embedding the (then z=18) camera inside the end wall —
+    // the "blurry white image" failure. yaw=0 keeps the atrium's long axis on
+    // X, matching the in-atrium default camera above.
+    float     SceneRotationDeg = 0.0f;         // scene Y-rotation (turntable)
+    float     PrevSceneRotationDeg = 0.0f;     // previous frame (Phase C reprojection)
     float     SceneRotationDegSpeed = 0.0f;    // degrees/second (0 = still)
     bool      bShowWindow = false;             // HLVM_SHOW_WINDOW=1
     // View-proj history for the ReSTIR temporal pass (real reprojection).
