@@ -1,0 +1,13 @@
+# Pending Commit v93
+- plan: docs/PENDING_PLAN_v93.md
+- files: docs/PENDING_PLAN_v93.md, docs/PENDING_PLAN_REVIEW_v93.md, docs/PENDING_COMMIT_v93.md, docs/PENDING_IMPL_REVIEW_v93.md, docs/PENDING_TESTS_v93.md, docs/PENDING_TEST_AUDIT_v93.md, docs/PIPELINE_HEALTH_2026-07-28.md (append), docs/PENDING_PICK.md (update)
+- source: no bundle
+- target: N/A (no source code committed; markers only)
+- task: restir-gi-fix — v93 file-only root-cause probe results
+- verify: cat docs/PENDING_PICK.md | head -5; echo "---"; ls docs/PENDING_*_v93.md
+- skip_impl_review: yes (file-only diagnostic tick; 0 source-code lines)
+- produces_test_files: no
+- notes: 0 source-code lines modified. NEW file-only Part A probes (3/3 PASS, all confirmed on disk): P1 PASS — GIPathTracing.hlsl:88 (Private copy) and GIPathTracing.hlsl:88 (Data copy at TestReSTIR_GI_Temporal_Data/) both show `RWTexture2D<float4> Output : register(u0);` — no space1 qualifier. P2 PASS — FRayTracingPipeline.cpp:149-153 shows `PipelineDesc.globalBindingLayouts = { BindingLayout };` plus optional BindlessLayout push. UAVBindingLayout never referenced outside FGIPass.cpp. P3 PASS — FReSTIRPass.cpp:246-247 registers both `TemporalLayoutSRV` AND `TemporalLayoutUAV` on the compute pipeline. ReSTIR_Temporal_cs.hlsl:32-33 declares `RWTexture2D<float4> gOutReservoir0 : register(u0, space1);` and `gOutReservoir1 : register(u1, space1);` confirming the correct sibling shape. The diagnosis is structural: FGIPass's v22 split is half-applied — split-binding-sets-bound is implemented, but pipeline-registers-both-layouts is NOT and shader-declares-space1 is NOT. Result: shader's `Output` UAV at descriptor set 0 binding 0 maps to nothing-or-mismatch → gi_raw=(0,0,0). The parent now has a precise, hunk-level fix recipe: (a) edit GIPathTracing.hlsl BOTH copies to add `, space1` to `Output : register(u0)` AND `DebugStatsTexture : register(u1)`; (b) edit FRayTracingPipeline.cpp to expose UAVBindingLayout registration (e.g., add `FRayTracingPipeline::AddBindingLayout(handle)` method and call from FGIPass::Initialize after UAVBindingLayout creation); OR collapse back to single binding-set (u0/u1 back into SRV layout, drop UAVBindingLayout + the second addBindingSet). The 10-second terminal probe per PIPELINE_BLOCKER_2026-07-28.md remains required to confirm the Vulkan VUID warning shape matches the diagnosis (VUID-VkDescriptorImageInfo-imageLayout + VkPhysicalDeviceRayTracingPipelineProperties + descriptor set/binding mismatch).
+
+## Plan Deviations (impler fills this in if it deviated)
+None. Impler followed plan exactly: 6 marker files produced, 0 source-code lines, 3 file-only probes confirmed.

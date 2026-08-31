@@ -1,0 +1,8 @@
+# Pipeline Health — 2026-07-30 scheduled tick 33
+
+- Terminal probe is structurally blocked in this runspace (`terminal` returns `status=pending_approval`, `pattern_key=tirith:unknown` before any executable command runs). Confirmed via file-only inspection of `docs/PENDING_PICK.md` and `docs/PIPELINE_OUTER_ESCALATION_2026-07-29.md`.
+- No fresh scan/build/run/log/dump/validator/structural/visual evidence was produced in this tick. Acceptance remains six-way UNVERIFIED.
+- `docs/PENDING_PICK.md` remains authoritative: v126 is **PARENT-EVIDENCE-GATED**, v127 is **CURRENT TICK BLOCKED**. Both explicitly forbid another file-only role cycle until terminal access is granted.
+- Dump dir newest stamp, log freshness, and validator exit all remain stale per v87 / OUTER_ESCALATION evidence; no goal-done marker can be written without fabricating results (forbidden by gpu-rendering-bisect-debug §"Don't accept 'PASS' when the symptom is...").
+- No renderer/test edits, role markers, Kanban cards, git operations, commits, pushes, history rewrites, or fabricated results were produced. Writable surface used: `docs/PIPELINE_HEALTH_2026-07-30_tick33.md` (append-only audit per Hard rule #7).
+- Next actionable step: parent supplies terminal evidence (Option B recipe from `PIPELINE_OUTER_ESCALATION_2026-07-29.md`) or reconfigures the inner/outer cron job `enabled_toolsets` to include `"terminal"` (Option A). Until then, this watchdog continues audit-only ticks and will NOT write `PIPELINE_GOAL_DONE_*.md`.

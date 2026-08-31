@@ -1,0 +1,17 @@
+# Pending Commit v152
+- plan: docs/PENDING_PLAN_v150.md
+- files: (none — no source change)
+- source: no bundle — verification cycle, not impl cycle
+- target: working tree
+- task: Acknowledge the v151 reviewer's FIX-on-verification verdict. The reviewer explicitly stated "no source-side fix is owed; halt at the reviewer stage; the operator runspace must perform the 6 acceptance checks." Per the `six-role-pipeline` skill's cycle-stop precedent (already honored at v151 by skipping the structurally-blocked tester + testing-verifier), this v152 commit is a non-impl marker that:
+  1. Confirms the v151 source change remains on disk in the four files (FReSTIRPass.cpp, FReSTIRPass.h, both ReSTIR_Generate_cs.hlsl copies).
+  2. Confirms the case 20/21/22/30/31 GIPathTracing debug modes from the 2026-07-30 diagnostic remain on disk in both the master shader and the test data dir copy.
+  3. Documents the structural blocker: this cron runspace is file-only; `terminal` is denied by tirith on every probe (cumulative ≥1104 denials, EC-039). The build, non-bypass run, validator, and vision steps required for the 6 acceptance checks are not exercisable from here.
+  4. Re-issues the exact 6 operator-runspace commands from the v151 reviewer's feedback so the operator can close the cycle without reading PENDING_IMPL_REVIEW_v151.
+- verify: (operator) `./Build.sh --Config=Debug --Target=TestReSTIR_GI_Temporal --Test` then `HLVM_DUMP_RGI=1 HLVM_RGI_ACCUM=8 ./Engine/Source/Runtime/Binary/Debug/TestReSTIR_GI_Temporal` then `python Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal_Data/validate_restir_gi.py` on the newest dump group and vision-check the display PNG.
+- skip_impl_review: yes — this is a non-impl commit (no source change; just a halt acknowledgment). The reviewer that already produced `PENDING_IMPL_REVIEW_v151.md` is the human-readable audit trail; an additional impl-review would be cosmetic.
+- produces_test_files: no
+- notes: This commit does NOT advance the cycle to the tester role. The skill's anti-pattern #3 forbids skipping the reviewer on test-producing commits, but this commit produces no test files AND the reviewer has already produced its verdict. The next role per the state machine would be tester (Rule 7) — but tester cannot run `validate_restir_gi.py` from this file-only runspace, so spawning it would produce a phantom verdict (skill anti-pattern #6: "the 6-role pipeline is wrong for this work when the diagnosis is a single suspicious dump that needs a 5-min bisect"). The state machine is halted at this v152 marker awaiting operator runspace; the next cron tick (whether it is the same pipeline, the OVerseer cron t_7b79c010, or a new human-driven session) must perform the 6 acceptance checks before any new cycle can be planned.
+
+## Plan Deviations
+The v150 plan's premise (that the 2026-08-05 15:42 log showed "all-zero reservoir stats from a real non-bypass run") was already falsified in v151's Plan Deviations section: that log was `HLVM_RGI_BYPASS=1` (line 68), so the zero stats are bypass-mode-expected, not ReSTIR-defect evidence. v152 does not add any new deviation; it documents that the v151 deviation already covers the verification gap. The v151 binding-layout split remains a candidate fix by analogy with the bug-075 temporal split; the actual non-bypass ReSTIR runtime path has not been exercised in any saved log on disk, and v152 does not pretend otherwise.

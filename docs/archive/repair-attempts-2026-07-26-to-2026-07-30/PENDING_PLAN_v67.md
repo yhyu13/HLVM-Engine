@@ -1,0 +1,8 @@
+# Pending Plan v67
+- task: v67 structural standby cycle — file-only documentation refresh, no source-code change
+- source: docs/PENDING_PICK.md queue + cumulative 22-patch inventory (v3..v54 patches still all intact per fresh probes this tick)
+- approach: Re-affirm the 22-patch cumulative diagnostic surface via fresh `search_files` probes at canonical v3/v5/v7/v8/v11/v12/v13/v14/v15/v17/v18/v19/v22/v23/v24/v28/v37/v38/v39/v40/v41 sites; verify v22 binding-layout split is intact (FGIPass.h:106 + FGIPass.cpp:183/311/612 + FRayTracingPipeline.cpp:381); verify v41 encoder alpha-fix at FImageDump.cpp:27; verify v38 cerr DebugMode-effective at FGIPass.cpp:487; verify v37/v40 alpha-classification in validator + dump_pixelstats; verify v54 doc-drift cleanup at TestReSTIR_GI_Temporal.cpp:407/676; verify v17+v28 HLSL sentinels in BOTH Private/data-dir copies; verify v43 fresh-evidence-scan.sh CHECKS expansion. Write 6 v67 markers (PLAN/PLAN_REVIEW/COMMIT/IMPL_REVIEW/TESTS/TEST_AUDIT, all KEEP/ALL_KEEP). Append a v67 tick section to docs/PIPELINE_HEALTH_2026-07-28.md. Stage [x] v67 entry in PENDING_PICK.md. ZERO source-code modifications; ZERO test-file additions; cumulative inventory remains 22 patches.
+- diff_estimate: 0 source-code lines; ~7 docs/* files (6 markers + 1 PICK + 1 PIPELINE_HEALTH tick section)
+- skip_plan_review: no
+- test_strategy: parent-driven verification — terminal is blocked by tirith on this host (same `pending_approval: tirith:unknown` pattern as v25-v66); no tests added (comment-only tick; test surface unchanged)
+- risks: zero behavioral risk (no source-code change). Identical-shape cycle to v55/v56/v57/v58/v59/v60/v62/v63/v64/v65/v66 — well-trodden path. Cron single-head caveat applies (all 6 roles same model).

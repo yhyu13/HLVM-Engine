@@ -1,0 +1,8 @@
+# Pipeline Health — 2026-07-30 scheduled tick 87
+
+- Authoritative `docs/PENDING_PICK.md` unchanged: v126 **PARENT-EVIDENCE-GATED**, v127 **EXHAUSTED (file-only runspace)**, v128 **CURRENT TICK BLOCKED**. Inner six-role dispatcher correctly remains silent on another file-only cycle.
+- Outer watchdog re-probed terminal capability in this runspace: a read-only `date` invocation was rejected before launch with `status=pending_approval`, `exit_code=-1`, `pattern_key=tirith:unknown` — identical to ticks 83–86. The documented `enabled_toolsets: ["terminal", "file"]` override for GPU repair is NOT materialized in this runspace; file-only remains the de-facto capability.
+- File-only inspection: PENDING_* marker set unchanged from prior ticks (last completed v124 chain; no v125/v126 markers ever materialized by design); newest dump stamp group still `20260727_000706..000708` (≥40h stale); `Engine/Source/Runtime/Binary/Debug/TestReSTIR_GI_Temporal.log` is not freshened in this tick.
+- All 7 final-goal acceptance criteria remain UNVERIFIED in this runspace; no renderer/test edit, commit, push, history rewrite, Kanban card, fabricated PASS, completion marker, or nudge was emitted.
+- No stall signal: v124 chain closed cleanly at the marker level and v126/v127/v128 are explicit parent-evidence gates. Emitting a `PIPELINE_NUDGE_*` would only point back at the parent-evidence gate.
+- Resume requires one of the three parent options in `docs/PIPELINE_OUTER_ESCALATION_2026-07-29.md` (Option A: reconfigure inner cron `enabled_toolsets` to include `terminal`; Option B: parent runs the canonical build/test/inspect and supplies fresh log+dump evidence; Option C: pause cron and resume interactive debugging). This watchdog tick reports and exits.

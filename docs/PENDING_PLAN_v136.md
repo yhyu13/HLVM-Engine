@@ -1,0 +1,16 @@
+# Pending Plan v136
+- task: Revert v132 createValidationLayer hookup to unblock the build link failure
+- source: docs/archive/repair-attempts-2026-07-26-to-2026-07-30/PENDING_COMMIT_v132.md (historical); current source `Engine/Source/Runtime/Private/Renderer/DeviceManagerVk4_LifeCycle.cpp:88`
+- approach: Replace `m_ValidationLayer = nvrhi::validation::createValidationLayer(m_NvrhiDevice);` with `m_ValidationLayer = nullptr;` at line 88. This restores the pre-v132 stub state. The validation TUs remain in `add_library(nvrhi ...)` (v134 patch) and `NVRHI_WITH_VALIDATION=ON` (v133 patch) for future use, but the runtime hookup is removed. This unblocks `cmake --build --clean-first` which currently fails at the executable link step with `undefined reference to nvrhi::validation::createValidationLayer(nvrhi::IDevice*)`. v131+v135 commitBarriers patches (FGIPass.cpp:557-562, 675; GIPathTracing.hlsl:685-687, 712-714) remain in place — they are the actual fix attempts and need a successful rebuild to test.
+- diff_estimate: -1 / +1 lines (single line replaced)
+- skip_plan_review: no (planning the file change is small but the implications are non-trivial: removing instrumentation that was the diagnostic for SRV-zero. Plan-criticer should verify this is the right trade-off)
+- test_strategy: role #5 verifies file-only state (patches v131+v135+v132-revert intact, v133+v134 cmake flags intact, no other references to m_ValidationLayer or createValidationLayer)
+- risks:
+  1. Reverting v132 loses the validation layer hookup. If the nvrhi validation layer was needed by some other runtime path (not in source file scope), the runtime may segfault. Mitigation: `search_files` shows no other reference to `m_ValidationLayer` outside DeviceManagerVk4_LifeCycle.cpp (lines 88, 163). Line 163 is the destructor (sets to nullptr) which is unaffected.
+  2. The validation TUs in `add_library(nvrhi ...)` and `NVRHI_WITH_VALIDATION=ON` cmake flag still cause the .a to be built with validation symbols. This is dead code but not harmful.
+  3. **The actual SRV-zero bug is NOT fixed by v136.** v136 is a build-unblocker; v131+v135 are the (still-untested) actual fix attempts. After v136 lands, parent must rebuild + run + check mode 20. If mode 20 returns non-zero per-pixel, v131+v135 was the fix. If mode 20 still returns zero, v137 will need to address slangc dead-strip / pipeline cache / Output UAV mis-bind / VK_LAYER_KHRONOS_validation=1 explicitly.
+  4. **The link failure may NOT be solely caused by v132's call.** The 23:57 binary exists and contains v131+v135 but not v132. The rebuild_Debug.log shows the FAILED link attempt was AFTER the 23:57 test run. So the link failure started after v132 was added. Reverting v132 should fix the link. But the underlying issue (ninja dep-graph staleness) means v132 + v133 + v134 might also need to be reverted for the link to actually succeed cleanly. **Mitigation**: do v136 (revert v132) first as the minimum change; if link still fails, v137 will revert v133+v134 too.
+
+---
+
+**Per `software-development-practices §Plan Mode`, this plan is delivered as a markdown file. No file edits performed by this role.**

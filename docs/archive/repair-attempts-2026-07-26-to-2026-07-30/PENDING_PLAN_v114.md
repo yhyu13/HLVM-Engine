@@ -1,0 +1,16 @@
+# Pending Plan v114
+- task: restir-gi-fix — complete the split SRV/UAV ray-tracing binding contract and correct the newly found UAV-slot mismatch before GPU verification
+- source: direct edit of current source using `docs/restir-gi-fix-v101.patch` as a partial reference; do not apply that patch unchanged
+- approach: Finish the existing v22 split by adding the UAV layout to `FRayTracingPipeline`'s global layouts and moving both GI shader UAV declarations to `space1`, as v101 proposed. Also correct the omission found by this planner: `FGIPass.cpp` currently creates the UAV layout at raw slots 0/1 while `FBindingSetBuilder::SetTextureUAV(0/1)` emits shifted slots 384/385, so the second layout must use `FBindingLayoutBuilder::URegShift + 0/1`; clear additional layouts in `Shutdown()` so reinitialization cannot retain stale handles. Touch only `FRayTracingPipeline.h/.cpp`, `FGIPass.cpp`, and the private/test-data copies of `GIPathTracing.hlsl`.
+- diff_estimate: approximately +31 / -6 source lines across 5 files; marker files excluded
+- skip_plan_review: no
+- test_strategy: Role #5 must first statically prove (1) both UAV layout slots equal 384/385, (2) both UAV binding-set items also equal 384/385 through `FBindingSetBuilder`, (3) the second global layout is appended before `FinalizePipeline`, (4) both shader copies use `register(u0/u1, space1)`, and (5) shutdown clears the added-layout vector. If terminal is available, rebuild `TestReSTIR_GI_Temporal`, run a fresh `HLVM_DUMP_RGI=1 HLVM_RGI_ACCUM=8` capture, scan the fresh log for command-list/Vulkan errors, validate only the newest dump group, and inspect the fresh display image for recognizable, sanely exposed Sponza geometry.
+- risks: The v101 patch was reviewed repeatedly but omitted the layout-vs-set slot contract; applying it unchanged can leave `createBindingSet` incompatible even if the pipeline accepts a second descriptor set. Shader register-space mapping is runtime/compiler-sensitive, so static checks cannot establish acceptance. Terminal is currently denied by tirith despite this job's terminal-enabled configuration; all build/GPU claims must remain UNVERIFIED until real execution succeeds. Preserve unrelated working-tree changes and do not commit, push, or use Kanban.
+
+## Root-cause evidence available to the plan-criticer
+- `FBindingLayoutBuilder::URegShift` is 384 (`FBindingLayoutBuilder.h:37`).
+- `FBindingSetBuilder::SetTextureUAV` adds `URegShift + RegisterIndex` (`FBindingLayoutBuilder.cpp:178-187`), therefore the per-frame set uses slots 384 and 385.
+- The current standalone UAV layout assigns raw slots 0 and 1 (`FGIPass.cpp:301-310`). Layout and set therefore disagree before dispatch.
+- The current v22 split already dispatches both `SRVBindingSet` and `UAVBindingSet` (`FGIPass.cpp:621-625`), but `FRayTracingPipeline::FinalizePipeline()` only registers the main binding layout (`FRayTracingPipeline.cpp:148-154`).
+- `docs/restir-gi-fix-v101.patch` repairs the missing second-global-layout registration and shader descriptor set, but does not repair the 0/1 versus 384/385 slot mismatch and does not clear the added-layout handles on shutdown.
+- Fresh terminal execution of the preflight was attempted this tick and denied as `pending_approval: tirith:unknown`; this plan advances only the mechanically verifiable source contract.

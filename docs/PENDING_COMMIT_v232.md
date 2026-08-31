@@ -1,0 +1,17 @@
+# Pending Commit v232
+- plan: docs/PENDING_PLAN_v232.md
+- files: Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal_Data/ReSTIR_Temporal_cs.hlsl, Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal_Data/ReSTIR_Spatial_cs.hlsl
+- source: no bundle — direct edit (defect identified by tick-726 + re-verified first-hand by planner this turn)
+- target: working tree (no branch — cron runspace is file-only, no git access per agent_3_impler.md step 6)
+- task: Clamp unbounded ReSTIR W reservoir (card P) — break cross-frame feedback loop where `w_prev = m_prev * targetLum_curr * r_prev.W` amplifies W across accum cycles
+- verify: cd /home/hangyu5/Documents/Gitrepo-My/HLVM-Engine && ./Build.sh --Config=Debug --Target=TestReSTIR_GI_Temporal --Rebuild && HLVM_DUMP_RGI=1 HLVM_RGI_ACCUM=8 ./Binary/Debug/TestReSTIR_GI_Temporal && python3 Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal_Data/validate_restir_gi.py && grep "reservoir_C_A" Engine/Source/Runtime/Binary/Debug/TestReSTIR_GI_Temporal.log
+- skip_impl_review: no — produces shader changes; per HARD INVARIANT #2, the reviewer must run
+- produces_test_files: no — only shader source files; validator already on disk
+- notes:
+  - **Plan Deviations**: plan risk #1 said dual-copy hazard applies. **It does not.** Plan-criticer finding #1 verified firsthand: `TestCornellBoxGI_Data/ReSTIR_Temporal_cs.hlsl` (207 lines) and `TestCornellBoxGI_Data/ReSTIR_Spatial_cs.hlsl` (145 lines) are simpler implementations WITHOUT the ZetaRay temporal/spatial resampling, so they have NO `r.W = targetLum` lines and NO feedback loop. Only the primary `TestReSTIR_GI_Temporal_Data/` copies were edited. This reduces the diff size from plan's `+12/-0` to actual `+15/-0` functional (with extra comment lines and the const decl). The deviation is justified because the Cornell copies have a fundamentally different algorithm and would not have this bug class.
+  - **Cap values**: k_MaxW = 256, k_MaxWSum = 4096 — ZetaRay RGI_Util reference values. The plan-criticer's FINDING #2 (clamp both W and w_sum) is implemented: every clamp site clamps BOTH fields.
+  - **Spatial file**: the spatial pass doesn't have a named constant for k_MaxW; used inline literal `256.0f` with a comment `// k_MaxW — mirror ZetaRay's RGI_Util::MAX_W` to keep the patch minimal. If a future plan wants to extract this to a shared header, that's a separate cycle.
+  - **No engine C++ files touched** — pure shader-side fix. C++ already correctly handles the bounded reservoirs; the bug is purely in the shader's W storage.
+  - **Verifier-friendly**: the new constants `k_MaxW` / `k_MaxWSum` are file-only greppable; the 4+1 clamp sites are greppable via `r.W = min(r.W, k_MaxW)` and `p.r_s.W = min(p.r_s.W, 256.0f)`.
+  - **Operator-side verify command** (above) is the canonical "does the clamp work?" — a fresh log run with the patch should show `stats reservoir_C_A floats G std=235.4` collapse to `G std ≈ k_MaxW` (256) instead of growing to 59044. The freshest pre-fix log shows G std=235.4; post-fix should show G std ≤ 256 by construction.
+  - **No governance files touched** (per HARD INVARIANT).

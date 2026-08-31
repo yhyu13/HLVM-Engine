@@ -1,0 +1,14 @@
+# Pipeline Health — 2026-07-30 scheduled tick 20
+
+- Six-role-pipeline tick on `docs/PENDING_PICK.md` v126 (PARENT-EVIDENCE-GATED) and v127 (CURRENT TICK BLOCKED). Authoritative pick unchanged since v124 audit (`SOME_RELAX`, 6/6 UNVERIFIED).
+- Loaded skills: `devops:kanban-cron-overseer`, `software-development:gpu-rendering-bisect-debug`.
+- Single-instance-lock and read-only probe (`ls` of dumps + log dir via file tools) confirmed no change since tick 19: newest dump group still `20260727_000708` (3+ days stale); newest log still `TestReSTIR_GI_Temporal.log` from 2026-07-27 00:07 with the persistent `gi_raw R[0,0,0] G[0,0,0] B[0,0,0]` symptom.
+- `terminal` invocation was rejected pre-launch with `status=pending_approval`, `exit_code=-1`, `pattern_key=tirith:unknown` (3rd such rejection in this turn); runspace remains structurally file-only and no executable command ran.
+- File-only inspection reconfirmed: no v125+ implementation markers, no `PIPELINE_GOAL_DONE_*.md`, no fresh dump group, no fresh log, no fresh build/run/validator/structural/visual evidence.
+- Per gpu-rendering-bisect-debug §"Pipeline needs terminal access, not file-only, for GPU repair" and §"Don't accept 'PASS' when the symptom is 'image is garbage'", no `PIPELINE_GOAL_DONE_*.md` may be written from stale artifacts.
+- Per v126 PICK body and tick-19 explicit note, no `PIPELINE_NUDGE_*.md` may be written — the inner six-role pipeline is correctly holding at v126/v127 of its own gates; nudging it would only churn markers without producing fresh evidence.
+- All 7 acceptance gates remain UNVERIFIED (Debug build, fresh `HLVM_DUMP_RGI=1 HLVM_RGI_ACCUM>=8` run, fresh-log command-list/Vulkan exclusions, newest-group validator/statistics, direct visual Sponza inspection, alpha/auxiliary checks, sign-off checks).
+- No renderer, shader, test, governance, or unrelated file was edited. No Kanban card created. No `git` operation performed. No fabrication.
+- `docs/PIPELINE_OUTER_ESCALATION_2026-07-29.md` (Options A: reconfigure inner-cron `enabled_toolsets` to include `"terminal"`; B: parent executes the 4-command recipe; C: pause cron and continue interactive debugging) remains the authoritative parent-action menu and is still pending after 80+ cumulative blocked cycles.
+- Mechanically actionable work that does not require terminal: 0 items. The next action must be parent terminal evidence or toolset reconfiguration; the inner six-role pipeline is already correctly gated against file-only cycles.
+- Hard rules satisfied: #6 never-silent (this heartbeat), #10 append-only, #1 PICK-authoritative (v126/v127 honored), #2 no test files skipped in review (no test files produced this tick), #3 never auto-merge, #4 never create cards, #5 never invoke orchestrator, #7 never silent exit, #8 never modify self or other crons.

@@ -1,0 +1,9 @@
+
+# Pending Plan v89
+- task: restir-gi-fix — produce ONE fresh Part A probe at a NEW diagnostic site not cycled by v25-v88, documenting the binding-side evidence for OutputTexture.
+- source: no bundle — direct edit (parent terminal access required for build/run/validate/vision; structurally blocked in this cron runspace)
+- approach: LOCKED-SITE probe — verify the binding wiring for `OutputTexture` → u0 slot on the FGIPass dispatch. Three read-only checks via `search_files` + `read_file`: (a) `CreateTexture2D` for `OutputTexture` initial state (`UnorderedAccess`) + format (`RGBA32_FLOAT`) + `keepInitialState=true` + `isUAV=true`, (b) `UAVBindingLayout` declares `slot=0/1 Texture_UAV` and `SetBindingOffsets` is NOT called (default 0/128/256/384), (c) `UAVBuilder.SetTextureUAV(0, Desc.OutputTexture)` populates slot 0 with `Desc.OutputTexture`. These three checks confirm the binding wiring is structurally correct; the bug must be in the dispatch body or in the shader's write to u0, NOT in the binding setup. Cycle shape is verification-only: 0 source-code lines, 3 Part A spot-checks at NEW binding-wiring sites, fresh single diagnostic finding, PIPELINE_HEALTH append, no fabrication, no terminal calls (block confirmed).
+- diff_estimate: 0 source-code lines
+- skip_plan_review: no — per-cycle state machine MUST re-route through plan-criticer per HARD INVARIANT #4.
+- test_strategy: role #5 (tester) — Part A spot-checks (3/3) MUST pass exactly as stated (a/b/c below). Part B 8/8 remains UNVERIFIED, must be stated as such.
+- risks: (1) `Search_files` may have hit-rate variability across sessions — exact line numbers must match the read_file window; minor offset drift doesn't change the verification. (2) The v22 split's `SetBindingOffsets` is the known fragility surface — if NOT called at FGIPass.cpp:301 (verifying by reading the surrounding 30 lines), this is a real finding worth surfacing to the parent.

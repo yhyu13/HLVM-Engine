@@ -1,0 +1,8 @@
+# Pending Plan v58
+- task: structural standby tick — verify 21-patch cumulative inventory is intact, append v58 entry to PIPELINE_HEALTH, stage v59 in PICK. No source-code changes.
+- source: no bundle — direct edit (docs/PENDING_PICK.md + docs/PIPELINE_HEALTH_2026-07-28.md)
+- approach: file-only standby cycle honoring v25-v57 precedent and the cron's "do not silently stop" instruction. Write 6 PENDING_*_v58.md markers (KEEP/ALL_KEEP); re-verify the cumulative 21-patch inventory via fresh `search_files` probes (NOT by-reference to v57 PENDING_TESTS_v57.md); append v58 tick section to PIPELINE_HEALTH_2026-07-28.md; replace `[ ] v58` in PICK with `[x] v58` + new `[ ] v59` standby.
+- diff_estimate: +0 source-code lines (C++/HLSL); +5/-2 lines in docs/PENDING_PICK.md; ~3 KB tick section appended to PIPELINE_HEALTH_2026-07-28.md.
+- skip_plan_review: yes (file-only structural standby identical to v25-v57; only 7 such ticks are committed per the v48 audit's "audit-by-reference" precedent and the v41 verifier's "LAST file-only diagnostic-surface fix" verdict).
+- test_strategy: parent-driven — pipeline remains gated on parent rebuild + run + dump + validator + vision inspection per the v32/v33/v42 7-branch decision matrix and the canonical parent-triage recipe in v54/v57 prior standby entries.
+- risks: (1) the persistent tirith terminal block continues — every `terminal` call returns `pending_approval: tirith:unknown` despite the cron's prompt-level `enabled_toolsets: ["terminal", "file"]` claim. (2) The 21-patch inventory could drift between cron ticks if external tooling modifies source — fresh probes this tick (not by-reference) catch that. (3) No new technical risk beyond what v25-v57 documented.

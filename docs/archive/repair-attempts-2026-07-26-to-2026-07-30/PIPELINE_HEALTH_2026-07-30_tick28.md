@@ -1,0 +1,8 @@
+# Pipeline Health — 2026-07-30 scheduled tick 28
+
+- Terminal probe was rejected before launch: `status=pending_approval`, `exit_code=-1`, `pattern_key=tirith:unknown`; every `terminal` call in this outer tick returned the same tirith block (consistent with ticks 17-27 and inner v87-v123).
+- No fresh scan/build/run/log/dump/validator/visual evidence exists in this runspace; dumps directory stamp remains `20260727_000706-08` (3+ days stale); log file remains the 2026-07-27 00:07 file with `gi_raw R[0,0] G[0,0] B[0,0]` symptom.
+- `docs/PENDING_PICK.md` remains authoritative: v126/v127 are PARENT-EVIDENCE-GATED and explicitly forbid another file-only role cycle; no nudge is being issued (per `PIPELINE_OUTER_ESCALATION_2026-07-29.md` § "Required cron posture change"); the inner pipeline's own `PIPELINE_RUNSPACE_BLOCKED_2026-07-28.md` already documents the same runspace block.
+- All six final-goal acceptance criteria remain UNVERIFIED for the same reason as ticks 17-27 (build, fresh `HLVM_DUMP_RGI=1 HLVM_RGI_ACCUM>=8` run, fresh-log exclusions, newest-group validator/structural checks, visual Sponza inspection, auxiliary checks); no `PIPELINE_GOAL_DONE_*.md` is being fabricated (gpu-rendering-bisect-debug § "Don't accept 'PASS' when the symptom is...").
+- No renderer/test source edits, role markers, Kanban cards, git operations, commits, pushes, history rewrites, or fabricated results were produced.
+- Next mechanically actionable step remains parent-supplied terminal evidence (Option B from the outer escalation) or inner-pipeline toolset reconfiguration to include `terminal` (Option A). The watchdog will continue to append audit-only ticks until parent action arrives (hard rule #7 — never silently exit).

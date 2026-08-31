@@ -1,0 +1,8 @@
+# Pending Plan v46
+- task: Structural standby tick — document the persistent tirith terminal block, re-verify cumulative 21-patch inventory intact, emit canonical parent-triage recipe.
+- source: no bundle — direct read of disk state only.
+- approach: File-only re-audit. No source-code changes. Read PENDING_PICK, all v45 markers, prior PIPELINE_HEALTH tick; verify the 21 cumulative patches (v3/v5/v7/v8/v11/v12/v13/v14/v15/v17/v18/v19/v22/v23/v24/v28/v37/v38/v39/v40/v41 + bug-088) are still in source; append heartbeat to docs/PIPELINE_HEALTH_2026-07-27.md; write 6 markers (this + 5 reviews); update PENDING_PICK to mark v46 [x] and stage v47 as parent-evidence-gated standby candidate. Do not invent v17/v13a/v32 evidence branches — they remain parent-evidence-gated, correctly so.
+- diff_estimate: +0 / -0 lines (no source changes).
+- skip_plan_review: yes (pure documentation tick; identical-shape to v25-v45 standbys; no design patch to review).
+- test_strategy: 6 staged static tests via search_files + read_file; 5+ runtime tests PENDING (terminal blocked by tirith in this cron tick).
+- risks: (1) cumulative patch drift if external tooling touches files — mitigated by static re-audit before marker write. (2) terminal-block persists — acknowledged, heartbeat is the only file-only output. (3) trajectory remains closed at v16 — explicit. (4) no fabrication of KEEP/ALL_KEEP on parent-gated items — per gpu-rendering-bisect-debug anti-pattern #5 + six-role-pipeline HARD INVARIANT #6.

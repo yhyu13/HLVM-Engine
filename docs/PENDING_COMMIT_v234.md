@@ -1,0 +1,22 @@
+# Pending Commit v234 — Provenance wrap (no code change)
+
+- plan: docs/PENDING_PLAN_v234.md
+- files: (none — this is a documentation-only cycle; no HLSL, no C++, no test source)
+- source: no bundle — direct edit of `docs/` markers only
+- target: working tree (no branch — cron runspace is file-only, no git access per agent_3_impler.md step 6)
+- task: Wrap the 7 v233-tagged source edits that already exist on disk in a formal v234 cycle marker so provenance is recoverable from the marker chain. Document the functional categorization (Jacobian clamp + prev-frame normal rotation + W-clamp-at-source + spatial anti-firefly clamp). Re-audit the v233 PENDING_TESTS_v233.md row 1 inaccuracy (`_OPERATOR_RECIPE_v176.sh` is missing; canonical recipe `v176-recipe.sh` works standalone).
+- verify: First-hand file-only checks; see PENDING_TESTS_v234.md. The 7 source edits are pre-existing on disk (operator-side provenance is recoverable from `git log` if available). The runtime verification requires operator-side terminal + vision: `bash Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal_Data/v176-recipe.sh` (489 lines) covers all 7 user-stated acceptance gates.
+- skip_impl_review: no — even a documentation-only cycle benefits from explicit reviewer check (HARD INVARIANT #6: never silently exit).
+- produces_test_files: no — documentation-only cycle. The "test" mechanism is the pre-existing `v176-recipe.sh` + `validate_restir_gi.py`.
+- notes:
+  - **Plan Deviations**: None. The plan said "no code change" and the commit has no code change.
+  - **Source state (first-hand verified this turn)**:
+    - `ReSTIR_Temporal_cs.hlsl`: 3 v233-tagged comments + 1 un-tagged `RotatePrevToCurr` function (lines 254-260). All 8 functional edits verified via `read_file`.
+    - `ReSTIR_Spatial_cs.hlsl`: 2 v233-tagged comments (lines 129, 432). 2 functional edits verified.
+    - `ReSTIR_Generate_cs.hlsl`: 1 v233-tagged comment (line 110). 1 functional edit verified.
+    - Total: 11 functional edits across 3 files (counting `RotatePrevToCurr` definition as a separate functional unit).
+  - **v233 verifier row-1 inaccuracy (corrected here)**: `PENDING_TESTS_v233.md:17` row 1 claims `_OPERATOR_RECIPE_v176.sh` exists. First-hand this turn: 0 hits in repo. The canonical recipe `Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal_Data/v176-recipe.sh` DOES exist (489 lines, all 7 gates, exit codes 0-7, --mode-20/30/31 discriminators). The shim is NOT needed for the recipe to work; operator can run `bash Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal_Data/v176-recipe.sh` directly. Recorded as a stale-evidence note in v234's PENDING_TEST_AUDIT_v234.md; not corrected in v233 markers (modifying a CLOSED cycle would require its own re-vote per `six-role-pipeline §HARD INVARIANT #4`).
+  - **Cross-cycle independence**: v233 source edits touch `ReSTIR_Temporal_cs.hlsl`, `ReSTIR_Spatial_cs.hlsl`, `ReSTIR_Generate_cs.hlsl` only. `GIPathTracing.hlsl` (the file with cases 20u/21u/22u) is unchanged by v233. So the binding chain that worked post-v214 cannot have been broken by v233.
+  - **Cornell copies verified clean**: `search_files pattern=v233 path=TestCornellBoxGI_Data` returns 0 hits. Cornell algorithm is simpler (no ZetaRay temporal/spatial resampling) and doesn't need these fixes; matches v232's dual-copy deviation.
+  - **No governance files touched** (per HARD INVARIANT).
+  - **No commits/pushes** (per HARD INVARIANT and per user instruction "do not commit, push, or modify governance files").

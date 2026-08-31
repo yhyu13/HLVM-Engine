@@ -1,0 +1,102 @@
+--- a/Engine/Source/Runtime/Public/Renderer/RayTracing/FRayTracingPipeline.h
++++ b/Engine/Source/Runtime/Public/Renderer/RayTracing/FRayTracingPipeline.h
+@@ -7,5 +7,6 @@
+ #include "Core/String.h"
++#include "Core/Container/ContainerDefinition.h"
+ #include "Renderer/Common/FBindingLayoutBuilder.h"
+ #include <nvrhi/nvrhi.h>
+ 
+@@ -113,6 +114,14 @@
+     * binding layout. Must be called before FinalizePipeline().
+     */
+     void SetBindlessLayout(nvrhi::BindingLayoutHandle InBindlessLayout);
++
++    /**
++     * @brief Append an additional binding layout to globalBindingLayouts
++     *
++     * APPEND-style API for pipelines that need a second binding layout
++     * alongside the main one (e.g. v22 split: SRV-only + UAV-only).
++     * Must be called before FinalizePipeline().
++     */
++    void AddBindingLayout(nvrhi::BindingLayoutHandle InLayout);
+ 
+     /**
+      * @brief Create the ray tracing pipeline from loaded shaders + binding layout
+@@ -222,7 +231,8 @@
+     // Pipeline objects
+     nvrhi::rt::PipelineHandle    Pipeline;
+     nvrhi::rt::ShaderTableHandle ShaderTable;
+     nvrhi::BindingLayoutHandle   BindingLayout;
+     nvrhi::BindingLayoutHandle   BindlessLayout;
++    TVector<nvrhi::BindingLayoutHandle> AdditionalBindingLayouts;
+ 
+     // Builder state
+     TUniquePtr<FBindingLayoutBuilder> LayoutBuilder;
+--- a/Engine/Source/Runtime/Private/Renderer/RayTracing/FRayTracingPipeline.cpp
++++ b/Engine/Source/Runtime/Private/Renderer/RayTracing/FRayTracingPipeline.cpp
+@@ -121,4 +121,12 @@
+     BindlessLayout = InBindlessLayout;
+     bHasBindlessLayout = true;
+ }
++
++void FRayTracingPipeline::AddBindingLayout(nvrhi::BindingLayoutHandle InLayout)
++{
++    if (InLayout)
++    {
++        AdditionalBindingLayouts.push_back(InLayout);
++    }
++}
++
+ bool FRayTracingPipeline::FinalizePipeline(uint32_t MaxPayloadSize, uint32_t MaxAttributeSize)
+@@ -148,7 +156,11 @@
+     nvrhi::rt::PipelineDesc PipelineDesc;
+     PipelineDesc.globalBindingLayouts = { BindingLayout };
+     if (bHasBindlessLayout && BindlessLayout)
+     {
+         PipelineDesc.globalBindingLayouts.push_back(BindlessLayout);
+     }
++    for (const auto& Layout : AdditionalBindingLayouts)
++    {
++        PipelineDesc.globalBindingLayouts.push_back(Layout);
++    }
+     PipelineDesc.shaders = {
+         { "", RayGenShader, nullptr },
+--- a/Engine/Source/Runtime/Private/Renderer/GI/FGIPass.cpp
++++ b/Engine/Source/Runtime/Private/Renderer/GI/FGIPass.cpp
+@@ -311,7 +311,8 @@
+         UAVBindingLayout = Device->createBindingLayout(UAVLayoutDesc);
+         if (!UAVBindingLayout)
+         {
+             HLVM_LOG(LogGI, err, TXT("FGIPass: failed to create UAV binding layout (v22 split)"));
+             return false;
+         }
++        RTPipeline.AddBindingLayout(UAVBindingLayout);
+ 
+         // The actual SRV binding layout handle is created inside FRayTracingPipeline::FinalizePipeline();
+         // we only need to make sure the builder was populated here.
+--- a/Engine/Source/Runtime/Private/Renderer/Shader/GI/GIPathTracing.hlsl
++++ b/Engine/Source/Runtime/Private/Renderer/Shader/GI/GIPathTracing.hlsl
+@@ -85,9 +85,9 @@
+ // Resources
+ // =============================================================================
+ 
+-RWTexture2D<float4> Output : register(u0);
++RWTexture2D<float4> Output : register(u0, space1);
+ 
+ #if GI_DEBUG_STATS
+-RWTexture2D<float4> DebugStatsTexture : register(u1);
++RWTexture2D<float4> DebugStatsTexture : register(u1, space1);
+ #endif
+--- a/Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal_Data/GIPathTracing.hlsl
++++ b/Engine/Source/Runtime/Test/TestReSTIR_GI_Temporal_Data/GIPathTracing.hlsl
+@@ -85,9 +85,9 @@
+ // Resources
+ // =============================================================================
+ 
+-RWTexture2D<float4> Output : register(u0);
++RWTexture2D<float4> Output : register(u0, space1);
+ 
+ #if GI_DEBUG_STATS
+-RWTexture2D<float4> DebugStatsTexture : register(u1);
++RWTexture2D<float4> DebugStatsTexture : register(u1, space1);
+ #endif

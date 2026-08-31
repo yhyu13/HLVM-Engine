@@ -1,0 +1,13 @@
+# Pending Commit v69
+- plan: docs/PENDING_PLAN_v69.md
+- files: docs/PENDING_PLAN_v69.md, docs/PENDING_PLAN_REVIEW_v69.md, docs/PENDING_COMMIT_v69.md, docs/PENDING_IMPL_REVIEW_v69.md, docs/PENDING_TESTS_v69.md, docs/PENDING_TEST_AUDIT_v69.md, docs/PENDING_PICK.md, docs/PIPELINE_HEALTH_2026-07-28.md
+- source: no bundle — direct edit
+- target: docs/ (no source-code change)
+- task: v69 structural standby tick — file-only documentation refresh, 0 source-code lines modified
+- verify: `search_files pattern="UAVBindingLayout" path="Engine/Source/Runtime"` returns 1 hit at FGIPass.h:106 (v22 binding-layout-split intact). `search_files pattern="rgbaData\[i \* 4 \+ 3\] \* 255\.0f" path="Engine/Source/Runtime/Private/Image"` returns 1 hit at FImageDump.cpp:27 (v41 encoder alpha-fix intact). `search_files pattern="DebugMode effective=" file_glob="FGIPass.cpp" path="Engine/Source/Runtime"` returns 1 hit at FGIPass.cpp:487 (v38 cerr value-log intact). `search_files pattern="case 6u:" file_glob="GIPathTracing.hlsl" path="Engine/Source/Runtime"` returns 2 hits at Private + data-dir :593 (v13 sentinel intact). `search_files pattern="case 7u:" file_glob="GIPathTracing.hlsl" path="Engine/Source/Runtime"` returns 2 hits at :604 (v17 sentinel intact). `search_files pattern="0.99994f" file_glob="GIPathTracing.hlsl" path="Engine/Source/Runtime"` returns 4 hits including :694 alpha-sentinel in BOTH copies (v28 alive-sentinel intact). `search_files pattern="SRVBindingSet" file_glob="FRayTracingPipeline.cpp" path="Engine/Source/Runtime"` returns 5 hits including :345/357/375/381 (v22 2-overload DispatchRays pattern intact). `search_files pattern="executeCommandList" file_glob="TestReSTIR_GI_Temporal.cpp" path="Engine/Source/Runtime/Test"` returns hits at line 691 (bug-088 fix intact).
+- skip_impl_review: no
+- produces_test_files: no
+- notes: Zero source-code modifications. Cumulative 22-patch inventory intact (re-verified this tick via 8 fresh search_files probes). Renderer status BROKEN (cargo-cult gi_raw=0,0,0 from v1-verify stale run; no fresh terminal evidence captured). Pipeline remains parent-evidence-gated. v69 is the 35th consecutive structural-standby tick (v25-v69). per v62 audit's "[SILENT] unless parent supplies terminal access or evidence paste-back" guidance, this tick is appropriately emitted as a structural-standby marker (not [SILENT]) per the cron's "do not silently stop" instruction, providing parent visibility into persistent terminal block state and cumulative patch inventory.
+
+## Plan Deviations (impler fills this in if it deviated)
+No deviations — implementation matches plan exactly. 0 source-code lines modified. 8 fresh verification probes confirmed cumulative 22-patch inventory intact at canonical sites.

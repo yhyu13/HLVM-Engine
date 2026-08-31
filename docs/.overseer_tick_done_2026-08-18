@@ -1,0 +1,4 @@
+# SILENT guard — kanban-cron-overseer tick 1 (2026-08-18)
+# This file exists only to suppress a stray empty-content delivery.
+# It is NOT an audit file. The real audit is OVERSEER_HEALTH_2026-08-18.md
+# and OVERSEER_ESCALATION.md in the same directory.

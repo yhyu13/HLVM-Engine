@@ -1,0 +1,14 @@
+# Pending Plan v121
+- task: restir-gi-fix-runtime-verification-v121 — obtain fresh executable, log, validator, structural, and visual evidence for the v114 split-layout repair
+- source: current working-tree v114 implementation recorded by `docs/PENDING_COMMIT_v114.md`; no bundle, stale helper, patch application, or speculative renderer edit
+- approach: Preserve renderer, shader, and test source until fresh execution identifies a concrete failure. A terminal-authorized implementation/test pass must record log and dump frontiers, build `TestReSTIR_GI_Temporal`, and run `HLVM_DUMP_RGI=1 HLVM_RGI_ACCUM=8` without parallel ctest. It must evaluate only appended log bytes and one coherent post-frontier frame-8 dump group, validate that group in isolation, calculate structural statistics, and directly inspect the display for recognizable non-uniform Sponza geometry at sane exposure. If execution remains externally blocked, record the exact tool result and requeue unchanged; no renderer edit is justified.
+- diff_estimate: +0 / -0 production lines on the verification-first path; any later minimal fix must be tied to a specific fresh failure and documented as a plan deviation
+- skip_plan_review: no
+- test_strategy: Build with `./Build.sh --Config=Debug --Target=TestReSTIR_GI_Temporal`; run `HLVM_DUMP_RGI=1 HLVM_RGI_ACCUM=8 ./Build.sh --Config=Debug --Target=TestReSTIR_GI_Temporal --Test`; scan only appended log bytes for command-list-already-open, Vulkan ERROR, and `VUID-`; isolate newest coherent frame-8 PNGs before running `validate_restir_gi.py`; calculate display RGB means/std, black and saturated fractions, 4x4 cell-mean variance, and alpha-sentinel fractions; inspect the display directly. Retain static controls for additional-layout lifecycle, FGIPass UAV slots 384/385, and both `GIPathTracing.hlsl` copies using `space1`.
+- risks: Terminal authorization may again return `status=pending_approval`, `exit_code=-1`, `pattern_key=tirith:unknown` before launch; this is not runtime evidence. Historical logs and the 2026-07-27 dump group are stale and prohibited. The validator globs historical frame-8 files, so validation must use an isolated newest group. No goal-done marker is allowed unless all acceptance gates have fresh evidence.
+
+## Failure routing
+1. Build failure: preserve the first diagnostic, search the whole relevant source class for cascade siblings, and make one minimal evidence-backed fix.
+2. Process or fresh-log failure: preserve exit status and exact appended-log excerpt; diagnose command-list lifetime or descriptor/layout state before shader math.
+3. Validator, structural, or visual failure: bisect one variable per run using existing albedo/normal/direct/GI/hardware-ID/barycentric/sentinel modes and inspect each fresh image.
+4. All gates pass: downstream roles may write completion evidence; otherwise completion remains prohibited.
