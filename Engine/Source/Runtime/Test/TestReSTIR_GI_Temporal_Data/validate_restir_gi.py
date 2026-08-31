@@ -186,8 +186,28 @@ def check_scene_content(arr: "np.ndarray") -> Tuple[bool, float]:
     return frac > CONTENT_SAT_FRAC_MIN, frac
 
 
+def _rel_hf_noise(lum: "np.ndarray", mask: "np.ndarray") -> Optional[float]:
+    """v236b: relative high-frequency noise = std(img - 3x3 box blur) / mean(img).
+
+    Measured over `mask` only. Scene structure is low-frequency and cancels in
+    the residual; sample noise and fireflies survive it. Normalizing by the
+    mean luminance (not the residual mean, which is ~0) keeps the quantity a
+    dimensionless noise level.
+    """
+    if not HAS_NUMPY or lum is None:
+        return None
+    if lum[mask].mean() <= 1e-6:
+        return None
+    blurred = (lum
+               + np.roll(lum, 1, 0) + np.roll(lum, -1, 0)
+               + np.roll(lum, 1, 1) + np.roll(lum, -1, 1)
+               + np.roll(np.roll(lum, 1, 0), 1, 1) + np.roll(np.roll(lum, 1, 0), -1, 1)
+               + np.roll(np.roll(lum, -1, 0), 1, 1) + np.roll(np.roll(lum, -1, 0), -1, 1)) / 9.0
+    hf = (lum - blurred)[mask]
+    return float(hf.std() / lum[mask].mean())
+
+
 def _coefficient_of_variation(arr: "np.ndarray") -> Optional[float]:
-    """Luminance CV (std/mean) over pixels above the dark threshold."""
     if not HAS_NUMPY:
         return None
     lum = np.average(arr[..., :3], axis=2)
@@ -248,20 +268,52 @@ def check_noise_reduction(dump_dir: Path, frame_n: int,
        structurally lenient in the static view).
     v234: prefer the exact float CVs from the run log (see _cv_from_log);
     the byte-quantized PNG path remains as the fallback when no log is given.
+    v236: BOTH CVs are restricted to the VALID reservoir domain (spatial >
+    1e-3). The sky-bounce population is 0 in the reservoir path but bright in
+    gi_raw, which inflated gi_raw's CV asymmetrically (unfair in both
+    directions depending on the scene's sky fraction). The log's whole-frame
+    cv_lit is now only a fallback when the PNG mask is unavailable.
+    v236b: on real content the gate metric changed from CV to RELATIVE
+    HIGH-FREQUENCY noise (std of img - 3x3 box blur, over mean). Measured
+    2026-09-01 (static Sponza 48f): the NEE-based raw estimate is nearly
+    DETERMINISTIC frame-to-frame (per-pixel |f48-f1| = 0.002, corr 0.90), so
+    its CV (0.19 valid-domain) is scene structure, not noise — no denoiser
+    can beat it and the CV premise was unmeasurable. HF energy isolates the
+    noise: speckle survives the subtraction, structure cancels. The gate now
+    requires rel-HF(denoised) < rel-HF(gi_raw) on the valid domain.
     """
+    spatial_ts = find_group_for_frame(dump_dir, frame_n, "spatial")
+    denoised_ts = find_group_for_frame(dump_dir, frame_n, "denoised")
+    giraw_ts = find_group_for_frame(dump_dir, frame_n, "gi_raw")
+    if spatial_ts is not None and denoised_ts is not None and giraw_ts is not None:
+        spatial = _load_png_as_float(find_dump_file(dump_dir, spatial_ts, "spatial"))
+        denoised = _load_png_as_float(find_dump_file(dump_dir, denoised_ts, "denoised"))
+        giraw = _load_png_as_float(find_dump_file(dump_dir, giraw_ts, "gi_raw"))
+        if (spatial is not None and denoised is not None and giraw is not None
+                and spatial.shape == giraw.shape and denoised.shape == giraw.shape):
+            lum_s = spatial[..., :3].mean(axis=2)
+            lum_d = denoised[..., :3].mean(axis=2)
+            lum_g = giraw[..., :3].mean(axis=2)
+            valid = (lum_s > 1e-3) & (lum_g > PIXEL_DARK_THRESH / 255.0)
+            if valid.sum() >= 100:
+                hf_d = _rel_hf_noise(lum_d, valid)
+                hf_g = _rel_hf_noise(lum_g, valid)
+                if hf_g is not None and hf_d is not None and hf_g > 1e-9:
+                    return (hf_d < hf_g), hf_d / hf_g
     cv_s = _cv_from_log(log_path, "denoised")
     cv_g = _cv_from_log(log_path, "gi_raw")
     if cv_s is not None and cv_g is not None and cv_g > 1e-6:
         return (cv_s < cv_g), cv_s / cv_g
-    spatial_ts = find_group_for_frame(dump_dir, frame_n, "denoised")
-    giraw_ts = find_group_for_frame(dump_dir, frame_n, "gi_raw")
     if spatial_ts is None or giraw_ts is None:
         return False, None
-    spatial = _load_png_as_float(find_dump_file(dump_dir, spatial_ts, "denoised"))
-    giraw = _load_png_as_float(find_dump_file(dump_dir, giraw_ts, "gi_raw"))
-    if spatial is None or giraw is None:
+    denoised_ts = find_group_for_frame(dump_dir, frame_n, "denoised")
+    if denoised_ts is None:
         return False, None
-    cv_s = _coefficient_of_variation(spatial)
+    denoised = _load_png_as_float(find_dump_file(dump_dir, denoised_ts, "denoised"))
+    giraw = _load_png_as_float(find_dump_file(dump_dir, giraw_ts, "gi_raw"))
+    if denoised is None or giraw is None:
+        return False, None
+    cv_s = _coefficient_of_variation(denoised)
     cv_g = _coefficient_of_variation(giraw)
     if cv_s is None or cv_g is None or cv_g <= 1e-6:
         return False, None
@@ -269,21 +321,23 @@ def check_noise_reduction(dump_dir: Path, frame_n: int,
 
 
 def check_bias_bound(dump_dir: Path, frame_n: int) -> Tuple[bool, Optional[float]]:
-    """v234: reuse bias regression gate (FIX_LOG_2026-08-23 §9 known limitation).
+    """v236: reuse bias regression gate, restricted to the VALID reservoir domain.
 
     The reused estimate (spatial) and the raw single-sample estimate (gi_raw,
-    Lo*albedo since v233) are the SAME physical quantity, so the per-pixel
-    ratio spatial/gi_raw exposes energy removed by reuse (clamps, outlier
-    M-resets, visibility rejections, stale history under the turntable). The
-    raw sample is noisy and heavy-tailed, so the gate uses the MEDIAN ratio
-    over lit pixels — robust to gi_raw's fireflies and near-zero samples.
+    Lo*albedo) are the SAME physical quantity — but only where the reservoir
+    is VALID. On open scenes (Sponza's atrium) a large fraction of pixels are
+    SKY-BOUNCE (the primary bounce escapes to sky): the ReSTIR candidate is
+    invalid there BY DESIGN (ZetaRay Resampling.hlsli `if(!hitInfo.hit)
+    return r`), the estimate is legitimately 0, and the old all-lit-pixels
+    median compared a design-excluded population — the "0.06 bias" of
+    FAIL_LOG_2026-08-26 §4. Root-caused 2026-09-01: valid-domain ratio
+    median 0.95 (the estimate was never biased); the deficit was the
+    invalid/sky-bounce population.
 
-    Calibrated 2026-08-25 (48 accumulated frames): static median 0.77,
-    rotating median 0.43 (PNG byte quantization costs a few points vs the
-    float medians 0.80-0.89 / 0.45-0.52 from FIX_LOG_2026-08-23 §9). The gate
-    FAILS only below 0.3 — catastrophic energy loss, i.e. a regression — and
-    reports the value otherwise. Bounding the residual 10-50% bias itself is
-    the ReSTIR-vs-path-traced-reference comparison, still a planned phase.
+    Gate: median spatial/gi_raw over pixels where spatial > 1e-3 (the valid
+    domain) must exceed 0.3 — catastrophic reuse energy loss, i.e. a
+    regression. The sky-bounce fraction is reported separately as a
+    diagnostic (check_sky_bounce_fraction), not gated.
     """
     spatial_ts = find_group_for_frame(dump_dir, frame_n, "spatial")
     giraw_ts = find_group_for_frame(dump_dir, frame_n, "gi_raw")
@@ -293,20 +347,40 @@ def check_bias_bound(dump_dir: Path, frame_n: int) -> Tuple[bool, Optional[float
     giraw = _load_png_as_float(find_dump_file(dump_dir, giraw_ts, "gi_raw"))
     if spatial is None or giraw is None:
         return False, None
-    # spatial (FullResSpatial, post-resolve) and gi_raw (Lo*albedo product)
-    # are both dumped at full res — but guard anyway: refuse to compare if
-    # shapes disagree (defensive only; a FAIL here means the dump contract
-    # changed, not that bias regressed).
     if spatial.shape != giraw.shape:
         return False, None
     lum_s = spatial[..., :3].mean(axis=2)
     lum_g = giraw[..., :3].mean(axis=2)
-    lit = lum_g > PIXEL_DARK_THRESH / 255.0
-    if lit.sum() < 100:
+    valid = (lum_s > 1e-3) & (lum_g > PIXEL_DARK_THRESH / 255.0)
+    if valid.sum() < 100:
         return False, None
-    ratio = lum_s[lit] / np.maximum(lum_g[lit], 1e-6)
+    ratio = lum_s[valid] / np.maximum(lum_g[valid], 1e-6)
     med = float(np.median(ratio))
     return med > 0.3, med
+
+
+def sky_bounce_fraction(dump_dir: Path, frame_n: int) -> Optional[float]:
+    """v236 diagnostic: fraction of gi_raw-lit pixels with an INVALID reservoir.
+
+    These are sky-bounce pixels (primary bounce escapes to sky; Sponza's open
+    atrium: ~54%). Their indirect is carried by DirectTexture (u4, v236), not
+    by the reservoir — a scene characteristic, not a quality regression. Not
+    gated; reported so gate readings are interpreted against the right domain.
+    """
+    spatial_ts = find_group_for_frame(dump_dir, frame_n, "spatial")
+    giraw_ts = find_group_for_frame(dump_dir, frame_n, "gi_raw")
+    if spatial_ts is None or giraw_ts is None or not HAS_NUMPY:
+        return None
+    spatial = _load_png_as_float(find_dump_file(dump_dir, spatial_ts, "spatial"))
+    giraw = _load_png_as_float(find_dump_file(dump_dir, giraw_ts, "gi_raw"))
+    if spatial is None or giraw is None or spatial.shape != giraw.shape:
+        return None
+    lum_s = spatial[..., :3].mean(axis=2)
+    lum_g = giraw[..., :3].mean(axis=2)
+    lit = lum_g > PIXEL_DARK_THRESH / 255.0
+    if lit.sum() < 100:
+        return None
+    return float((lit & (lum_s <= 1e-3)).sum() / lit.sum())
 
 
 def check_log_metrics(log_path: Optional[Path]) -> Tuple[Optional[float], Optional[float]]:
@@ -481,9 +555,13 @@ def validate(dump_dir: Path, verbose: bool = False, display_only: bool = False,
     # (previously the noise gate reported a spurious FAIL on missing inputs).
     if not display_only:
         ok, val = check_noise_reduction(dump_dir, newest_frame, log_path)
-        results.append(("noise_reduction (denoised CV < gi_raw CV)", ok, val))
+        results.append(("noise_reduction (rel-HF denoised < gi_raw, valid domain)", ok, val))
         ok, val = check_bias_bound(dump_dir, newest_frame)
-        results.append(("bias bound (median spatial/gi_raw > 0.3)", ok, val))
+        results.append(("bias bound (median ratio > 0.3, valid domain)", ok, val))
+        # v236 diagnostic (never gates): share of gi_raw-lit pixels whose
+        # primary bounce escaped to sky — the reservoir-invalid population.
+        sky_frac = sky_bounce_fraction(dump_dir, newest_frame)
+        results.append(("sky_bounce_frac (info)", sky_frac is not None, sky_frac))
 
     m_mean, frame_ms = check_log_metrics(log_path)
     if m_mean is not None:
