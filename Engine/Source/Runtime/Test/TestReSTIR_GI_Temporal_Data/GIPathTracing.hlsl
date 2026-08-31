@@ -704,19 +704,8 @@ void RayGen() {
     float3 sampleLo = firstSampleLo;
     float3 x2Pos = worldPos + firstSampleDir * firstSampleHitT;
     bool primaryMiss = (firstSampleHitT <= 0.0f);
-    // v236: the primary BOUNCE may also escape to sky (open scenes — Sponza's
-    // atrium). The miss shader adds sky to payload.radiance, so firstSampleLo
-    // carries it, but the reservoir invalidates sky-bounce candidates
-    // (x2ID == 0xFFFFFFFF, matching ZetaRay Resampling.hlsli `if(!hitInfo.hit)
-    // return r`). Measured 2026-09-01: 54% of gi_raw-lit Sponza pixels are
-    // sky-bounce; their indirect (visible sky through the bounce) previously
-    // existed ONLY in gi_raw — the reservoir-path display lost it entirely
-    // (FAIL_LOG_2026-08-26 §4 "static spatial starfield", root cause closed).
-    // u4 already carries "sky on primary miss"; extend it with the
-    // bounce-miss sky so the display estimate matches the raw estimate.
-    bool bounceSkyMiss = (!primaryMiss) && (firstSampleX2ID == 0xFFFFFFFFu);
     float3 directAndAmbient = primaryDirect + primaryAmbient;
-    if (primaryMiss || bounceSkyMiss)
+    if (primaryMiss)
         directAndAmbient += firstSampleLo;   // miss-shader sky is visible radiance
 
     Output[pixel] = float4(primaryMiss ? float3(0.0f, 0.0f, 0.0f) : sampleLo, firstSampleHitT);
