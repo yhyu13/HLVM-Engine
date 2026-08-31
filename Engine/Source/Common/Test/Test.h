@@ -22,6 +22,15 @@
 namespace hlvm_private
 {
 	HLVM_INLINE_VAR std::vector<std::function<void()>> recorded_test_functions{};
+	// Test failure counter — incremented by HLVM_TEST_EXPECT* macros.
+	// Reset per test, aggregated for the final summary.
+	HLVM_INLINE_VAR uint32_t g_test_failure_count = 0;
+	HLVM_INLINE_VAR uint32_t g_test_failure_count_total = 0;
+	HLVM_INLINE_VAR uint32_t g_test_current_count = 0;
+	// The current test name lives as an FString (basic_string<TCHAR>) — TCHAR is the
+	// engine-wide char unit (u8 on Linux, wchar on Windows). Storing as const TCHAR*
+	// matches FString::c_str().
+	HLVM_INLINE_VAR FString g_test_current_name = FString(TXT("<unknown>"));
 }
 
 /**
@@ -33,6 +42,76 @@ struct TestContext
 	uint32_t randomSeed = 0;
 	uint32_t repeat = 1;
 };
+
+// =============================================================================
+// HLVM_TEST_EXPECT* — real assertion primitives for tests.
+// Each macro logs a structured error AND increments g_test_failure_count.
+// A test that doesn't use these is silent: it reports green even when wrong.
+// Use HLVM_ENSURE for *internal* invariants in production code.
+//
+// IMPORTANT: we pass already-stringified values to HLVM_LOG because the codebase
+// uses TXT(x) which expands to u8##x via token-pasting. Pasting "::" or any
+// non-string-literal token after "u8" produces invalid preprocessor output
+// ("pasting formed 'u8::'"). The hlvm_private::g_test_current_name helper
+// must therefore be unwrapped to its c_str() at the call site, not via TXT().
+// =============================================================================
+#define HLVM_TEST_FAIL_AT(cond_str, file, line, expr_str)                              \
+	do                                                                                \
+	{                                                                                 \
+		++::hlvm_private::g_test_failure_count;                                        \
+		++::hlvm_private::g_test_failure_count_total;                                 \
+		::hlvm_private::g_test_current_count++;                                       \
+		/* Use fmt-style {} substitution (NOT %s pointers — fmt v10+ disallows       \
+		   formatting raw const char*). Pass FString values directly so fmt can       \
+		   pick the string_view overload. */                                         \
+		HLVM_LOG(LogTemp, critical,                                                    \
+			TXT("[{}] EXPECT FAILED at {}:{}: ({}): {}"),                             \
+			::hlvm_private::g_test_current_name,                                      \
+			FString(TO_TCHAR_CSTR(file)),                                            \
+			line,                                                                     \
+			FString(TO_TCHAR_CSTR(cond_str)),                                        \
+			FString(TO_TCHAR_CSTR(expr_str)));                                       \
+	} while (0)
+
+#define HLVM_TEST_EXPECT(cond)                                                        \
+	do                                                                                \
+	{                                                                                 \
+		if (!(cond))                                                                  \
+		{                                                                             \
+			HLVM_TEST_FAIL_AT(#cond, __FILE__, __LINE__, "expected true");            \
+		}                                                                             \
+		else                                                                          \
+		{                                                                             \
+			::hlvm_private::g_test_current_count++;                                   \
+		}                                                                             \
+	} while (0)
+
+#define HLVM_TEST_EXPECT_TRUE(x)   HLVM_TEST_EXPECT(x)
+#define HLVM_TEST_EXPECT_FALSE(x)  HLVM_TEST_EXPECT(!(x))
+#define HLVM_TEST_EXPECT_EQ(a, b)   HLVM_TEST_EXPECT((a) == (b))
+#define HLVM_TEST_EXPECT_NE(a, b)   HLVM_TEST_EXPECT((a) != (b))
+#define HLVM_TEST_EXPECT_LT(a, b)   HLVM_TEST_EXPECT((a) <  (b))
+#define HLVM_TEST_EXPECT_LE(a, b)   HLVM_TEST_EXPECT((a) <= (b))
+#define HLVM_TEST_EXPECT_GT(a, b)   HLVM_TEST_EXPECT((a) >  (b))
+#define HLVM_TEST_EXPECT_GE(a, b)   HLVM_TEST_EXPECT((a) >= (b))
+
+// Floating-point near-equality. eps is the max absolute difference.
+#define HLVM_TEST_EXPECT_NEAR(a, b, eps)                                              \
+	do                                                                                \
+	{                                                                                 \
+		auto _lhs = (a);                                                              \
+		auto _rhs = (b);                                                              \
+		auto _e   = (eps);                                                            \
+		if (!(std::abs(_lhs - _rhs) <= _e))                                           \
+		{                                                                             \
+			HLVM_TEST_FAIL_AT("NEAR", __FILE__, __LINE__,                             \
+				"expected |a - b| <= eps");                                           \
+		}                                                                             \
+		else                                                                          \
+		{                                                                             \
+			::hlvm_private::g_test_current_count++;                                   \
+		}                                                                             \
+	} while (0)
 
 // Helper function to create a lambda that runs the test and prints the info
 template <typename Func>
@@ -50,23 +129,43 @@ std::function<void()> _make_test_wrapper(const FString& name, Func test_function
 			FTimer Timer{ true };
 			// Seed the random number generator
 			std::srand(ctx.randomSeed);
+			// Reset per-iteration counters and tag the current test for failure messages.
+			hlvm_private::g_test_failure_count = 0;
+			hlvm_private::g_test_current_count = 0;
+			hlvm_private::g_test_current_name = name;
 			HLVM_LOG(LogTemp, info, TXT("Running {} (#{})"), *name, _i + 1);
 			// Run the actual test function
 			// check if test_function has return type bool
 			if constexpr (std::is_same_v<decltype(test_function()), bool>)
 			{
-				HLVM_ENSURE_F(test_function(), TXT("Test failed {}, return false"), *name);
+				const bool ret = test_function();
+				// If the function returned false OR any HLVM_TEST_EXPECT failed, mark failure.
+				if (!ret || hlvm_private::g_test_failure_count > 0)
+				{
+					HLVM_LOG(LogTemp, critical, TXT("Test {} (#{}) FAILED: {} expect-failures, return={}"),
+						*name, _i + 1, hlvm_private::g_test_failure_count, ret);
+				}
 			}
 			else if constexpr (std::is_same_v<decltype(test_function()), int>)
 			{
 				int ret = test_function();
-				HLVM_ENSURE_F(ret == 0, TXT("Test failed {}, return {}"), *name, ret);
+				if (ret != 0 || hlvm_private::g_test_failure_count > 0)
+				{
+					HLVM_LOG(LogTemp, critical, TXT("Test {} (#{}) FAILED: {} expect-failures, return={}"),
+						*name, _i + 1, hlvm_private::g_test_failure_count, ret);
+				}
 			}
 			else
 			{
 				test_function();
+				if (hlvm_private::g_test_failure_count > 0)
+				{
+					HLVM_LOG(LogTemp, critical, TXT("Test {} (#{}) FAILED: {} expect-failures"),
+						*name, _i + 1, hlvm_private::g_test_failure_count);
+				}
 			}
-			HLVM_LOG(LogTemp, info, TXT("Completed {} (#{}) in {} seconds"), *name, _i + 1, Timer.MarkSec());
+			HLVM_LOG(LogTemp, info, TXT("Completed {} (#{}) in {} seconds ({} assertions checked)"),
+				*name, _i + 1, Timer.MarkSec(), hlvm_private::g_test_current_count);
 		}
 	};
 }
@@ -349,6 +448,23 @@ int main(int ac, char* av[])
 		{
 			test_function();
 		}
+	}
+
+	// Final summary — fail the process if any assertion failed.
+	if (hlvm_private::g_test_failure_count_total > 0)
+	{
+		HLVM_LOG(LogTemp, critical, TXT("=== TEST SUITE FAILED: {} total assertion failures across the run ==="),
+			hlvm_private::g_test_failure_count_total);
+		std::cout << "TEST SUITE FAILED: " << hlvm_private::g_test_failure_count_total
+			<< " assertion failures" << std::endl;
+		// Still call mallocator finalize to keep the leak checker happy,
+		// but return non-zero so CI / scripts can detect failure.
+		FinlMallocator();
+		return 1;
+	}
+	else
+	{
+		HLVM_LOG(LogTemp, info, TXT("=== TEST SUITE PASSED ==="));
 	}
 
 	// Finalize mallocator

@@ -15,10 +15,15 @@ DECLARE_LOG_CATEGORY(LogTest)
 RECORD(test_string, true)
 {
 	HLVM_LOG(LogTest, trace, TXT("Test performance impact on different order of formatting!"));
+	// SDD baseline: assert FString::Format actually substitutes correctly.
+	{
+		const FString baseline = FString::Format(TXT("{}"), TXT("hello"));
+		HLVM_TEST_EXPECT_EQ(baseline, FString(TXT("hello")));
+	}
 	{
 		const FStdString& StackTrace = FGenericPlatformStackTrace::GetStackTrace();
 		auto			  Message = FString::Format(TXT("Ensure failed: {0}, with '{1}'"), TXT("1!=1"),
-						 FString::Format(TXT("1!=1")));
+				 FString::Format(TXT("1!=1")));
 
 		constexpr int kNumThreads = 1;
 		constexpr int kNumIterations = 10;
@@ -26,9 +31,9 @@ RECORD(test_string, true)
 		double		  time_order_big_first, time_order_small_first;
 		{
 			auto TestFunc = [&](double& Duration) -> bool {
-				FTimer					 Timer;
-				std::once_flag			 Flag;
-				std::atomic<int>		 Counter{ kNumThreads };
+				FTimer					  Timer;
+				std::once_flag			  Flag;
+				std::atomic<int>		  Counter{ kNumThreads };
 				std::vector<std::thread> threads;
 				for (int j = 0; j < kNumThreads; ++j)
 				{
@@ -62,9 +67,9 @@ RECORD(test_string, true)
 
 		{
 			auto TestFunc = [&](double& Duration) -> bool {
-				FTimer					 Timer;
-				std::once_flag			 Flag;
-				std::atomic<int>		 Counter{ kNumThreads };
+				FTimer					  Timer;
+				std::once_flag			  Flag;
+				std::atomic<int>		  Counter{ kNumThreads };
 				std::vector<std::thread> threads;
 				for (int j = 0; j < kNumThreads; ++j)
 				{
@@ -125,12 +130,22 @@ RECORD(test_string, true)
 RECORD(test_name, true)
 {
 	HLVM_LOG(LogTest, trace, TXT("Test FName!"));
-	FName name("test");
+
+	// SDD assertions: name equality, copy ref-count invariant.
+	FName name(TXT("test"));
+	HLVM_TEST_EXPECT_EQ(name.ToString(), FString(TXT("test")));
+	HLVM_TEST_EXPECT_GT(name.RefCount(), size_t{0});
+
 	{
 		HLVM_LOG(LogTest, info, TXT("name: {0}, ref {1}"), *name.ToString(), name.RefCount());
+		// Copy should bump ref-count to 2.
+		FName name2 = name;
+		HLVM_TEST_EXPECT_EQ(name.RefCount(), size_t{2});
+		HLVM_TEST_EXPECT_TRUE(name.ToString() == name2.ToString());
+
 		for (int i = 0; i < 1000000; ++i)
 		{
-			FName name2 = name;
+			FName name3 = name;
 			if (i % 100000 == 0)
 			{
 				HLVM_LOG(LogTest, info, TXT("name: {0}, ref {1}"), *name.ToString(), name.RefCount());
@@ -138,4 +153,6 @@ RECORD(test_name, true)
 		}
 		HLVM_LOG(LogTest, info, TXT("name: {0}, ref {1}"), *name.ToString(), name.RefCount());
 	}
+	// After all copies go out of scope, ref-count must drop back to 1.
+	HLVM_TEST_EXPECT_EQ(name.RefCount(), size_t{1});
 }
