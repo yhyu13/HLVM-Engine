@@ -3022,6 +3022,21 @@ private:
         DumpRGBA32FTexture(DisplayTexture, TXT("display"), dir);
         DumpRGBA32FTexture(FullResSpatial, TXT("spatial"), dir);
         DumpRGBA32FTexture(DenoisedTexture, TXT("denoised"), dir);
+        // v236 diag (temporary): raw float readbacks for the small-estimate
+        // population probe (PLAN_100_FIXES #0).
+        DumpFloatRaw(FullResSpatial, TXT("f_spatial"), dir);
+        DumpFloatRaw(FullResGIRaw, TXT("f_giraw"), dir);
+        DumpFloatRaw(SpatialRadiance, TXT("f_tempest"), dir);
+        DumpFloatRaw(TemporalReservoir0, TXT("f_resA0"), dir);
+        DumpFloatRaw(TemporalReservoir1, TXT("f_resB0"), dir);
+        DumpFloatRaw(TemporalReservoir2, TXT("f_resC0"), dir);
+        DumpFloatRaw(TemporalReservoir3, TXT("f_resA1"), dir);
+        DumpFloatRaw(TemporalReservoir4, TXT("f_resB1"), dir);
+        DumpFloatRaw(TemporalReservoir5, TXT("f_resC1"), dir);
+        DumpFloatRaw(LinearDepthTexture, TXT("f_depth"), dir);
+        DumpFloatRaw(GBufferMaterial, TXT("f_material"), dir);
+        DumpFloatRaw(GBufferWorldPos, TXT("f_worldpos"), dir);
+        DumpFloatRaw(GBufferNormal, TXT("f_normal"), dir);
         // v233 (noise-gate fix): the validator's noise_reduction gate compares
         // CV(spatial) < CV(gi_raw) as "reuse must beat the raw samples". But
         // gi_raw held BARE Lo (incident radiance at x2) while the ReSTIR
@@ -3315,6 +3330,27 @@ private:
     // min/max across RGB channels and rescales to [0,1] before byte
     // encoding, so the visualization reflects relative variation instead of
     // clamping to 0 or 255.
+    // v236 diag (temporary): raw float32 dump — no PNG quantization, no
+    // alpha=1 forcing. Binary layout: [width:int32][height:int32][RGBA32F...].
+    void DumpFloatRaw(nvrhi::TextureHandle Texture, const FString& Name, const std::string& dir)
+    {
+        if (!Texture || !NvrhiDevice) return;
+        std::vector<float> Pixels;
+        if (!ReadbackTextureFloats(Texture, Pixels))
+            return;
+        const nvrhi::TextureDesc TexDesc = Texture->getDesc();
+        const std::string Filename = dir + "/" + MakeTimestampPrefix() + "_" +
+            std::string(Name.begin(), Name.end()) + "_frame" + std::to_string(AccumFrameCount) + ".bin";
+        std::ofstream F(Filename, std::ios::binary);
+        if (!F) return;
+        const std::int32_t Dims[2] = { static_cast<std::int32_t>(TexDesc.width),
+                                       static_cast<std::int32_t>(TexDesc.height) };
+        F.write(reinterpret_cast<const char*>(Dims), sizeof(Dims));
+        F.write(reinterpret_cast<const char*>(Pixels.data()),
+                static_cast<std::streamsize>(Pixels.size() * sizeof(float)));
+        HLVM_LOG(LogTest, info, TXT("Dumped raw float {} ({}x{})"), *Name, Dims[0], Dims[1]);
+    }
+
     void DumpRGBA32FTexture(nvrhi::TextureHandle Texture, const FString& Name, const std::string& dir,
                             bool bNormalizePerChannel = false)
     {
