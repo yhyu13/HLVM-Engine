@@ -1,0 +1,14 @@
+{
+  "scene": "cornell_box_analytical_v6",
+  "format": "PPM (P6) \u2014 proxy for Cycles EXR",
+  "width": 256,
+  "height": 256,
+  "channels": 3,
+  "linear": true,
+  "sha256": "038969a7fddc5c295cf51aef385ea58b003526481dce162d3eade16280198966",
+  "bytes": 196623,
+  "description": "Cornell Box v6. Camera inside near front (0.5, 0.5, 0.05), FOV 90deg, +Z forward. Walls: floor/ceiling white, back green, left red, right blue. Ceiling area light (0.5, 0.99, 0.5), 0.3x0.3, radiance (20,20,18). Direct + ambient + bleed.",
+  "generated_by": "deterministic-analytical-v6",
+  "generated_at": "2026-09-02T23:20:06.440344Z",
+  "valid_until_replace": "Replace with Cycles 4096-SPP EXR for higher fidelity."
+}
